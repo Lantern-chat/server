@@ -15,4 +15,14 @@ pub mod schema {
     pub mod role;
     pub mod room;
     pub mod user;
+
+    pub use self::{
+        emote::Emote,
+        invite::Invite,
+        msg::Message,
+        party::Party,
+        role::Role,
+        room::{Room, RoomKind},
+        user::User,
+    };
 }
