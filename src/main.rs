@@ -1,5 +1,8 @@
 #![allow(unused)]
 
+#[macro_use]
+extern crate serde;
+
 extern crate tracing as log;
 use tracing_subscriber::FmtSubscriber;
 
