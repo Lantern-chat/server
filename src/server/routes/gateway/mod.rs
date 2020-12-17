@@ -5,14 +5,16 @@ use futures::{future, Future, FutureExt, StreamExt};
 use tokio::sync::mpsc;
 use tokio_postgres::Socket;
 
-use warp::ws::{Message, WebSocket};
+use warp::ws::{Message as WsMessage, WebSocket};
 use warp::{Filter, Rejection, Reply};
 
-use crate::state::ServerState;
+use crate::server::ServerState;
+
+pub mod msg;
 
 pub struct ClientConnection {
     pub addr: Option<SocketAddr>,
-    pub tx: mpsc::UnboundedSender<Result<Message, warp::Error>>,
+    pub tx: mpsc::UnboundedSender<Result<WsMessage, warp::Error>>,
 }
 
 pub fn gateway(
