@@ -15,8 +15,6 @@ serde = "1.0.118"
 serde_json = "1.0.60"
 uuid = "0.8.1"
 env = "0.0.0"
-slog = "2.7.0"
-slog-json = "2.3.0"
 futures = "0.3.8"
 log = "0.4"
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
