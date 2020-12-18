@@ -1,12 +1,15 @@
-pub mod cache;
+pub mod client;
 pub mod conn;
+pub mod queries;
+
+pub use client::Client;
 
 pub mod sf;
 pub use sf::Snowflake;
 
 pub mod schema {
-    use super::{cache::ClientExt, Snowflake};
-    use tokio_postgres::{Client, Error, Row};
+    use super::{queries::CachedQuery, Client, Snowflake};
+    use tokio_postgres::{Error, Row};
 
     pub mod emote;
     pub mod invite;
