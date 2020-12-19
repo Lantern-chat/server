@@ -23,3 +23,8 @@ tracing-subscriber = "0.2.15"
 structopt = "0.3.21"
 bytes = "0.5.0"
 async-trait = "0.1.42"
+anyhow = "1.0.35"
+thiserror = "1.0.22"
+
+[build-dependencies]
+built = { version = "0.4.4", features = ["git2", "chrono"] }

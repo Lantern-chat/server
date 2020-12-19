@@ -6,6 +6,7 @@ extern crate serde;
 extern crate tracing as log;
 use tracing_subscriber::FmtSubscriber;
 
+pub mod built;
 pub mod cli;
 pub mod db;
 pub mod server;

@@ -4,6 +4,8 @@ use warp::{Filter, Rejection, Reply};
 
 use crate::server::ServerState;
 
+mod build;
+
 pub fn status() -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
     warp::path("status").map(|| "Testing")
 }
@@ -11,5 +13,5 @@ pub fn status() -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clo
 pub fn api(
     state: Arc<ServerState>,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
-    balanced_or_tree!(status())
+    balanced_or_tree!(status(), build::route())
 }
