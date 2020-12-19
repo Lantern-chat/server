@@ -44,4 +44,12 @@ impl Client {
     ) -> Result<Row, Error> {
         self.query_one(self.cache.get(query), params).await
     }
+
+    pub async fn query_opt_cached(
+        &self,
+        query: CachedQuery,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Option<Row>, Error> {
+        self.query_opt(self.cache.get(query), params).await
+    }
 }

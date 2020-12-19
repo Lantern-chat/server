@@ -1,4 +1,4 @@
-use crate::db::Snowflake;
+use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
@@ -11,4 +11,24 @@ pub struct Message {
     pub updated_at: (),
     pub content: String,
     pub pinned: bool,
+}
+
+impl Message {
+    pub async fn get_attachments(
+        &self,
+        client: &Client,
+    ) -> Result<impl Iterator<Item = Attachment>, Error> {
+        let rows = client
+            .query_cached(CachedQuery::GetMessageAttachments, &[&self.id])
+            .await?;
+
+        Ok(rows.into_iter().map(|row| Attachment::from_row(&row)))
+    }
+
+    pub async fn get_thread(&self, client: &Client) -> Result<Option<Thread>, Error> {
+        client
+            .query_opt_cached(CachedQuery::GetMessageThread, &[&self.thread_id])
+            .await
+            .map(|row| row.as_ref().map(Thread::from_row))
+    }
 }
