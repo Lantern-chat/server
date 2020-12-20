@@ -19,6 +19,8 @@ use warp::Filter;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
+    dotenv::dotenv().ok();
+
     let args = cli::CliOptions::from_args();
 
     // a builder for `FmtSubscriber`.
