@@ -18,7 +18,7 @@ use structopt::StructOpt;
 use warp::Filter;
 
 #[tokio::main(flavor = "multi_thread")]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv::dotenv().ok();
 
     let args = cli::CliOptions::from_args();
@@ -35,12 +35,13 @@ async fn main() {
         .finish(); // completes the builder.
 
     log::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    tracing_log::LogTracer::init()?;
 
     log::debug!("Arguments: {:?}", args);
 
     log::trace!("Parsing bind address...");
     let addr = match args.bind {
-        Some(addr) => SocketAddr::from_str(&addr).unwrap(),
+        Some(addr) => SocketAddr::from_str(&addr)?,
         None => SocketAddr::from(([127, 0, 0, 1], 3030)),
     };
 
@@ -51,4 +52,6 @@ async fn main() {
     tokio::spawn(tokio::signal::ctrl_c().then(move |_| async move { state.shutdown().await }));
 
     let _ = tokio::spawn(server).await;
+
+    Ok(())
 }
