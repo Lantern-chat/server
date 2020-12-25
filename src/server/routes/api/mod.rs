@@ -26,7 +26,7 @@ pub fn api(
             if err.is_not_found() {
                 return Err(err);
             } else if err.find::<v1::RateLimited>().is_some() {
-                code = StatusCode::METHOD_NOT_ALLOWED;
+                code = StatusCode::TOO_MANY_REQUESTS;
                 message = "RATE_LIMITED";
             } else {
                 code = StatusCode::INTERNAL_SERVER_ERROR;
