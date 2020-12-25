@@ -6,6 +6,7 @@ use futures::FutureExt;
 
 pub mod routes;
 pub mod state;
+pub mod rate;
 
 pub use state::ServerState;
 

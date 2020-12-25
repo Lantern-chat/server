@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicU16, Ordering};
 
 use std::num::NonZeroU64;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[repr(transparent)]
 pub struct Snowflake(NonZeroU64);
 
@@ -17,6 +17,10 @@ pub static mut INST: u16 = 0;
 pub static mut WORK: u16 = 0;
 
 impl Snowflake {
+    pub fn null() -> Snowflake {
+        Snowflake(unsafe { NonZeroU64::new_unchecked(1) })
+    }
+
     /// Creates a new Snowflake at this moment
     pub fn now() -> Snowflake {
         // get time since unix epoch as milliseconds, subtract Lantern epoch

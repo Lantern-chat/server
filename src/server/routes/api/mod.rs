@@ -1,13 +1,44 @@
 use std::sync::Arc;
 
-use warp::{Filter, Rejection, Reply};
+use warp::{hyper::StatusCode, Filter, Rejection, Reply};
 
 pub mod v1;
 
 use crate::server::ServerState;
 
+#[derive(Serialize)]
+pub struct ApiError {
+    code: u16,
+    message: String,
+}
+
 pub fn api(
     state: Arc<ServerState>,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
-    warp::path("api").and(warp::path("v1").and(v1::api(state)))
+    let apis = warp::path("v1").and(v1::api(state));
+
+    warp::path("api")
+        .and(apis)
+        .recover(|err: Rejection| async move {
+            let code;
+            let message;
+
+            if err.is_not_found() {
+                code = StatusCode::NOT_FOUND;
+                message = "Not Found";
+            } else if err.find::<v1::RateLimited>().is_some() {
+                code = StatusCode::METHOD_NOT_ALLOWED;
+                message = "Rate Limited";
+            } else {
+                code = StatusCode::INTERNAL_SERVER_ERROR;
+                message = "UNHANDLED_REJECTION";
+            }
+
+            let json = warp::reply::json(&ApiError {
+                code: code.as_u16(),
+                message: message.to_owned(),
+            });
+
+            Ok(warp::reply::with_status(json, code))
+        })
 }
