@@ -17,7 +17,8 @@ pub fn routes(
     balanced_or_tree!(
         api::api(state.clone()),
         gateway::gateway(state.clone()),
-        files::route(),
+        files::route(), // ensure this is last, as it has a wildcard to return index
     )
+    .with(warp::cors().build())
     .with(warp::log("server"))
 }
