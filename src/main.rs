@@ -9,6 +9,7 @@ use tracing_subscriber::FmtSubscriber;
 pub mod built;
 pub mod cli;
 pub mod db;
+pub mod util;
 pub mod server;
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
