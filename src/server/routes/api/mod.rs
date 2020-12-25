@@ -24,8 +24,7 @@ pub fn api(
             let message;
 
             if err.is_not_found() {
-                code = StatusCode::NOT_FOUND;
-                message = "Not Found";
+                return Err(err);
             } else if err.find::<v1::RateLimited>().is_some() {
                 code = StatusCode::METHOD_NOT_ALLOWED;
                 message = "Rate Limited";
