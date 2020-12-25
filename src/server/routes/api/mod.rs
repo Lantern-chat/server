@@ -27,7 +27,7 @@ pub fn api(
                 return Err(err);
             } else if err.find::<v1::RateLimited>().is_some() {
                 code = StatusCode::METHOD_NOT_ALLOWED;
-                message = "Rate Limited";
+                message = "RATE_LIMITED";
             } else {
                 code = StatusCode::INTERNAL_SERVER_ERROR;
                 message = "UNHANDLED_REJECTION";
