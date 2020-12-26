@@ -6,11 +6,14 @@ extern crate serde;
 extern crate tracing as log;
 use tracing_subscriber::FmtSubscriber;
 
-pub mod built;
+pub mod built {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
+}
+
 pub mod cli;
 pub mod db;
-pub mod util;
 pub mod server;
+pub mod util;
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
