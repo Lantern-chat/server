@@ -7,7 +7,7 @@ use std::num::NonZeroU64;
 pub struct Snowflake(NonZeroU64);
 
 /// Arbitrarily chosen starting epoch to offset the clock by
-pub const LANTERN_EPOCH: u64 = 1608198072352;
+pub const LANTERN_EPOCH: u64 = 1550102400000;
 
 /// Incremenent counter to ensure unique snowflakes
 pub static INCR: AtomicU16 = AtomicU16::new(0);
