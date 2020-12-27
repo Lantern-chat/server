@@ -16,7 +16,6 @@ serde_json = "1.0.60"
 uuid = "0.8.1"
 env = "0.0.0"
 futures = "0.3.8"
-log = "0.4"
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
 tracing-futures = { version = "0.2", default-features = false, features = ["std-future"] }
 tracing-subscriber = "0.2.15"
@@ -26,7 +25,6 @@ async-trait = "0.1.42"
 anyhow = "1.0.35"
 thiserror = "1.0.22"
 dotenv = "0.15.0"
-tracing-log = "0.1.1"
 
 [build-dependencies]
 built = { version = "0.4.4", features = ["git2", "chrono"] }

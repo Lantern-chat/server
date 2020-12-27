@@ -39,7 +39,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .finish(); // completes the builder.
 
     log::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-    tracing_log::LogTracer::init()?;
 
     log::debug!("Arguments: {:?}", args);
 
