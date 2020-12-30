@@ -2,6 +2,14 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 
+// Utility function where the
+fn is_default<T>(value: &T) -> bool
+where
+    T: Default + Eq,
+{
+    *value == T::default()
+}
+
 macro_rules! decl_msgs {
     ($($opcode:ident $(:$Default:ident)? { $($field:ident : $ty:ty),* }),*) => {paste::paste!{
         #[derive(Debug, Clone, Copy, Serialize_repr, Deserialize_repr)]
@@ -13,7 +21,7 @@ macro_rules! decl_msgs {
 
         pub mod payloads {$(
             #[derive(Debug, Clone, Serialize, Deserialize)]
-            $(#[derive($Default)])?
+            $(#[derive($Default, PartialEq, Eq)])?
             pub struct [<$opcode Payload>] {
                 $($field : $ty,)*
             }
@@ -26,6 +34,7 @@ macro_rules! decl_msgs {
                 #[serde(rename = "o")]
                 op: Opcode,
                 #[serde(rename = "p")]
+                $(#[serde(skip_serializing_if = "" [< is_ $Default:lower >] "" )])?
                 payload: payloads::[<$opcode Payload>],
             },)*
         }
@@ -101,6 +110,9 @@ mod tests {
 
         let p: Message = serde_json::from_str(hb).unwrap();
 
+        let x = serde_json::to_string(&p).unwrap();
+
         println!("{:?}", p);
+        println!("{}", x);
     }
 }
