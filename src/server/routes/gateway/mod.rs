@@ -72,7 +72,7 @@ pub async fn client_connected(
     addr: Option<SocketAddr>,
     state: Arc<ServerState>,
 ) {
-    let (ws_tx, ws_rx) = ws.split();
+    let (ws_tx, mut ws_rx) = ws.split();
     let (tx, rx) = mpsc::unbounded_channel();
 
     tokio::spawn(rx.forward(ws_tx).map(move |result: Result<_, _>| {
