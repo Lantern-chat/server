@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{error::Error, net::SocketAddr, sync::Arc};
 
 use futures::{future, Future, FutureExt, StreamExt};
 
@@ -66,9 +66,10 @@ pub async fn client_connected(
         result.map_err(|e| log::error!("websocket send error: {} to client {:?}", e, addr))
     }));
 
-    let send = |msg: msg::Message| -> Result<(), _> {
-        let msg = match query.encoding {
-            GatewayMsgEncoding::Json => serde_json::to_vec(&msg).unwrap(),
+    let send = |msg: msg::Message| -> Result<(), Box<dyn Error>> {
+        let msg: Vec<u8> = match query.encoding {
+            GatewayMsgEncoding::Json => serde_json::to_vec(&msg)?,
+            GatewayMsgEncoding::MsgPack => rmp_serde::to_vec(&msg)?,
             _ => unimplemented!(),
         };
 
@@ -76,7 +77,7 @@ pub async fn client_connected(
             // Do compression
         }
 
-        tx.send(Ok(WsMessage::binary(msg)))
+        tx.send(Ok(WsMessage::binary(msg))).map_err(Into::into)
     };
 
     let mut initiated = true;
@@ -86,23 +87,23 @@ pub async fn client_connected(
         initiated = false;
     }
 
+    // TODO: Register connected client for subscriptions
+
     // default to forceful disconnection which is overridden for safe disconnects
     let mut force_disconnect = true;
 
     while initiated {
         match ws_rx.next().await {
             Some(Ok(msg)) => {
+                let msg = msg.as_bytes();
+
                 if query.compress {
                     // do decompression
                 }
 
-                let msg = match query.encoding {
-                    GatewayMsgEncoding::Json if msg.is_text() => {
-                        serde_json::from_str(msg.to_str().unwrap())
-                    }
-                    GatewayMsgEncoding::Json if msg.is_binary() => {
-                        serde_json::from_slice(msg.as_bytes())
-                    }
+                let msg: Result<Message, Box<dyn Error>> = match query.encoding {
+                    GatewayMsgEncoding::Json => serde_json::from_slice(msg).map_err(Into::into),
+                    GatewayMsgEncoding::MsgPack => rmp_serde::from_slice(msg).map_err(Into::into),
                     _ => unimplemented!(),
                 };
 
