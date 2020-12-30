@@ -11,6 +11,7 @@ use warp::{Filter, Rejection, Reply};
 use crate::server::ServerState;
 
 pub mod msg;
+use msg::Message;
 
 /// Websocket message encoding
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -79,12 +80,57 @@ pub async fn client_connected(
         result.map_err(|e| log::error!("websocket send error: {} to client {:?}", e, addr))
     }));
 
+    let send = |msg: msg::Message| -> Result<(), _> {
+        // TODO: Monomorphize?
+        match (query.encoding, query.compress) {
+            (GatewayMsgEncoding::Json, false) => {
+                tx.send(Ok(WsMessage::text(serde_json::to_string(&msg).unwrap())))
+            }
+            _ => unimplemented!(),
+        }
+    };
+
+    let mut initiated = true;
+
+    if let Err(e) = send(Message::new_hello(45000)) {
+        log::error!("Unable to send Hello message: {:?}", e);
+        initiated = false;
+    }
+
     // default to forceful disconnection which is overridden for safe disconnects
     let mut force_disconnect = true;
 
-    loop {
+    while initiated {
         match ws_rx.next().await {
             Some(Ok(msg)) => {
+                let msg = match (query.encoding, query.compress) {
+                    (GatewayMsgEncoding::Json, false) if msg.is_text() => {
+                        serde_json::from_str(msg.to_str().unwrap())
+                    }
+                    (GatewayMsgEncoding::Json, false) if msg.is_binary() => {
+                        serde_json::from_slice(msg.as_bytes())
+                    }
+                    _ => unimplemented!(),
+                };
+
+                let msg = match msg {
+                    Ok(msg) => msg,
+                    Err(e) => {
+                        log::error!("Error parsing incoming message: {:?}", e);
+                        break;
+                    }
+                };
+
+                let res = match msg {
+                    Message::Heartbeat { .. } => send(Message::new_heartbeatack()),
+                    _ => unimplemented!(),
+                };
+
+                if let Err(e) = res {
+                    log::error!("Error sending message response: {:?}", e);
+                    break;
+                }
+
                 continue;
             }
             Some(Err(e)) => log::error!("Receiving websocket message: {}", e),
@@ -93,8 +139,8 @@ pub async fn client_connected(
             None => force_disconnect = false,
         }
 
-        // TODO: Disconnect client
-
         break;
     }
+
+    // TODO: Disconnect client
 }

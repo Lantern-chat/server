@@ -11,7 +11,7 @@ where
 }
 
 macro_rules! decl_msgs {
-    ($($opcode:ident $(:$Default:ident)? { $($field:ident : $ty:ty),* }),*) => {paste::paste!{
+    ($($opcode:ident $(:$Default:ident)? { $( $(#[$field_meta:meta])* $field:ident : $ty:ty),* }),*$(,)*) => {paste::paste!{
         #[derive(Debug, Clone, Copy, Serialize_repr, Deserialize_repr)]
         #[repr(u8)]
         pub enum Opcode {
@@ -23,7 +23,7 @@ macro_rules! decl_msgs {
             #[derive(Debug, Clone, Serialize, Deserialize)]
             $(#[derive($Default, PartialEq, Eq)])?
             pub struct [<$opcode Payload>] {
-                $($field : $ty,)*
+                $($(#[$field_meta])* pub $field : $ty,)*
             }
         )*}
 
@@ -37,6 +37,18 @@ macro_rules! decl_msgs {
                 $(#[serde(skip_serializing_if = "" [< is_ $Default:lower >] "" )])?
                 payload: payloads::[<$opcode Payload>],
             },)*
+        }
+
+        impl Message {
+            $(
+                pub const fn [<$opcode:lower>](payload: payloads::[<$opcode Payload>]) -> Message {
+                    Message::$opcode { op: Opcode::$opcode, payload }
+                }
+
+                pub const fn [<new_ $opcode:lower>]($($field: $ty),*) -> Message {
+                    Message::$opcode { op: Opcode::$opcode, payload: payloads::[<$opcode Payload>] { $($field),* }}
+                }
+            )*
         }
 
         impl<'de> Deserialize<'de> for Message {
@@ -69,7 +81,7 @@ macro_rules! decl_msgs {
                     {
                         let opcode = match map.next_entry()? {
                             Some((Field::Opcode, o)) => o,
-                            _ => return Err(de::Error::custom("Missing opcode")),
+                            _ => return Err(de::Error::custom("Missing opcode first")),
                         };
 
                         match opcode {
@@ -79,7 +91,7 @@ macro_rules! decl_msgs {
                                     payload: match map.next_entry()? {
                                         Some((Field::Payload, payload)) => payload,
                                         $(None => $Default::default(),)?
-                                        _ => return Err(de::Error::custom("Missing payload")),
+                                        _ => return Err(de::Error::missing_field("payload")),
                                     }
                                 }),
                             )*
@@ -95,9 +107,12 @@ macro_rules! decl_msgs {
 }
 
 decl_msgs! {
-    Hello { heartbeat_interval: u32 },
+    Hello {
+        /// Number of milliseconds between heartbeats
+        heartbeat_interval: u32
+    },
     Heartbeat: Default {},
-    HeartbeatACK: Default {}
+    HeartbeatACK: Default {},
 }
 
 #[cfg(test)]
