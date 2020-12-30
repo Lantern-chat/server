@@ -1,4 +1,4 @@
-use std::{error::Error, net::SocketAddr, sync::Arc};
+use std::{borrow::Cow, error::Error, net::SocketAddr, sync::Arc};
 
 use futures::{future, Future, FutureExt, StreamExt};
 
@@ -67,14 +67,19 @@ pub async fn client_connected(
     }));
 
     let send = |msg: msg::Message| -> Result<(), Box<dyn Error>> {
-        let msg: Vec<u8> = match query.encoding {
+        let mut msg: Vec<u8> = match query.encoding {
             GatewayMsgEncoding::Json => serde_json::to_vec(&msg)?,
             GatewayMsgEncoding::MsgPack => rmp_serde::to_vec(&msg)?,
             _ => unimplemented!(),
         };
 
         if query.compress {
-            // Do compression
+            use flate2::{write::ZlibEncoder, Compression};
+            use std::io::Write;
+
+            let mut encoder = ZlibEncoder::new(Vec::with_capacity(128), Compression::fast());
+            encoder.write(&msg)?;
+            msg = encoder.finish()?;
         }
 
         tx.send(Ok(WsMessage::binary(msg))).map_err(Into::into)
@@ -95,15 +100,27 @@ pub async fn client_connected(
     while initiated {
         match ws_rx.next().await {
             Some(Ok(msg)) => {
-                let msg = msg.as_bytes();
+                let mut msg = Cow::Borrowed(msg.as_bytes());
 
                 if query.compress {
-                    // do decompression
+                    use flate2::bufread::ZlibDecoder;
+                    use std::io::Read;
+
+                    let mut reader = ZlibDecoder::new(&*msg);
+                    let mut decoded = Vec::with_capacity(128);
+
+                    if let Err(e) = reader.read_to_end(&mut decoded) {
+                        log::error!("Invalid decompression: {:?}", e);
+
+                        break;
+                    }
+
+                    msg = Cow::Owned(decoded);
                 }
 
                 let msg: Result<Message, Box<dyn Error>> = match query.encoding {
-                    GatewayMsgEncoding::Json => serde_json::from_slice(msg).map_err(Into::into),
-                    GatewayMsgEncoding::MsgPack => rmp_serde::from_slice(msg).map_err(Into::into),
+                    GatewayMsgEncoding::Json => serde_json::from_slice(&msg).map_err(Into::into),
+                    GatewayMsgEncoding::MsgPack => rmp_serde::from_slice(&msg).map_err(Into::into),
                     _ => unimplemented!(),
                 };
 
@@ -115,10 +132,11 @@ pub async fn client_connected(
                     }
                 };
 
-                let res = match msg {
-                    Message::Heartbeat { .. } => send(Message::new_heartbeatack()),
+                // TODO: Place elsewhere
+                let res = send(match msg {
+                    Message::Heartbeat { .. } => Message::new_heartbeatack(),
                     _ => unimplemented!(),
-                };
+                });
 
                 if let Err(e) = res {
                     log::error!("Error sending message response: {:?}", e);

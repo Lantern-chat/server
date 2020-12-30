@@ -31,5 +31,10 @@ serde_repr = "0.1.6"
 paste = "1.0.4"
 rmp-serde = "0.15.0"
 
+[dependencies.flate2]
+version = "1.0"
+features = ["rust_backend"]
+default-features = false
+
 [build-dependencies]
 built = { version = "0.4.4", features = ["git2", "chrono"] }
