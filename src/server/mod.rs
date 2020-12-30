@@ -4,10 +4,11 @@ use std::sync::Arc;
 
 use futures::FutureExt;
 
+pub mod auth;
+pub mod gateway;
+pub mod rate;
 pub mod routes;
 pub mod state;
-pub mod rate;
-pub mod auth;
 pub mod subs;
 
 pub use state::ServerState;
