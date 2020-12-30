@@ -53,7 +53,11 @@ impl Snowflake {
 
     /// Gets the number of milliseconds since the unix epoch
     pub fn epoch_ms(&self) -> u64 {
-        (self.0.get() >> 22) + LANTERN_EPOCH
+        self.raw_timestamp() + LANTERN_EPOCH
+    }
+
+    pub fn raw_timestamp(&self) -> u64 {
+        self.0.get() >> 22
     }
 }
 
