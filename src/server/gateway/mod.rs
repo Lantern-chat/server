@@ -69,7 +69,7 @@ pub async fn client_connected(
     let send = |msg: msg::Message| -> Result<(), Box<dyn Error>> {
         let mut msg: Vec<u8> = match query.encoding {
             GatewayMsgEncoding::Json => serde_json::to_vec(&msg)?,
-            GatewayMsgEncoding::MsgPack => rmp_serde::to_vec(&msg)?,
+            GatewayMsgEncoding::MsgPack => rmp_serde::to_vec_named(&msg)?,
             _ => unimplemented!(),
         };
 
