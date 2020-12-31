@@ -40,11 +40,11 @@ const fn default_compress() -> bool {
 pub struct GatewayQueryParams {
     /// Encoding method for each individual websocket message
     #[serde(default)]
-    encoding: GatewayMsgEncoding,
+    pub encoding: GatewayMsgEncoding,
 
     /// Whether to compress individual messages
     #[serde(default = "default_compress")]
-    compress: bool,
+    pub compress: bool,
 }
 
 pub struct ClientConnection {
@@ -60,7 +60,7 @@ pub async fn client_connected(
     state: Arc<ServerState>,
 ) {
     let (ws_tx, mut ws_rx) = ws.split();
-    let (tx, rx) = mpsc::unbounded_channel();
+    let (tx, rx) = warp::test::unbounded_channel_stream();
 
     tokio::spawn(rx.forward(ws_tx).map(move |result: Result<_, _>| {
         result.map_err(|e| log::error!("websocket send error: {} to client {:?}", e, addr))
@@ -77,7 +77,7 @@ pub async fn client_connected(
             use flate2::{write::ZlibEncoder, Compression};
             use std::io::Write;
 
-            let mut encoder = ZlibEncoder::new(Vec::with_capacity(128), Compression::fast());
+            let mut encoder = ZlibEncoder::new(Vec::with_capacity(128), Compression::new(6));
             encoder.write(&msg)?;
             msg = encoder.finish()?;
         }
@@ -99,6 +99,9 @@ pub async fn client_connected(
 
     while initiated {
         match ws_rx.next().await {
+            // if None was received, we can assume the websocket safely closed
+            None => force_disconnect = false,
+
             Some(Ok(msg)) => {
                 let mut msg = Cow::Borrowed(msg.as_bytes());
 
@@ -146,9 +149,6 @@ pub async fn client_connected(
                 continue;
             }
             Some(Err(e)) => log::error!("Receiving websocket message: {}", e),
-
-            // if None was received, we can assume the websocket safely closed
-            None => force_disconnect = false,
         }
 
         break;
