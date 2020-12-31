@@ -7,32 +7,33 @@ publish = false
 
 [dependencies]
 warp = { path = "../deps/warp", features = ["compression"] }
-tokio = { version = "0.3", features = ["full"] }
+tokio = { version = "1.0.1", features = ["full"] }
 hashbrown = { version = "0.9.1", features = ["inline-more"] }
-tokio-postgres = { version = "0.6.0", features = ["with-uuid-0_8", "with-chrono-0_4", "with-serde_json-1"] }
+tokio-postgres = { version = "0.7.0", features = ["with-uuid-0_8", "with-chrono-0_4", "with-serde_json-1"] }
 chrono = "0.4.19"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1.0.60"
+serde = { version = "1.0.118", features = ["derive"] }
+serde_json = "1.0.61"
 uuid = "0.8.1"
 env = "0.0.0"
 futures = "0.3.8"
-tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
-tracing-futures = { version = "0.2", default-features = false, features = ["std-future"] }
+tracing = { version = "0.1.22", default-features = false, features = ["log", "std"] }
+tracing-futures = { version = "0.2.4", default-features = false, features = ["std-future"] }
 tracing-subscriber = "0.2.15"
 structopt = "0.3.21"
-bytes = "0.5.0"
+bytes = "1.0.0"
 async-trait = "0.1.42"
-anyhow = "1.0.35"
-thiserror = "1.0.22"
+anyhow = "1.0.37"
+thiserror = "1.0.23"
 dotenv = "0.15.0"
 lru = "0.6.3"
 ahash = "0.6.2"
 serde_repr = "0.1.6"
 paste = "1.0.4"
 rmp-serde = "0.15.0"
+tokio-stream = "0.1.0"
 
 [dependencies.flate2]
-version = "1.0"
+version = "1.0.19"
 features = ["rust_backend"]
 default-features = false
 
