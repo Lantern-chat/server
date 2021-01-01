@@ -11,12 +11,11 @@ where
 }
 
 macro_rules! decl_msgs {
-    ($($opcode:ident $(:$Default:ident)? { $( $(#[$field_meta:meta])* $field:ident : $ty:ty),* }),*$(,)*) => {paste::paste!{
+    ($($code:expr => $opcode:ident $(:$Default:ident)? { $( $(#[$field_meta:meta])* $field:ident : $ty:ty),* }),*$(,)*) => {paste::paste!{
         #[derive(Debug, Clone, Copy, Serialize_repr, Deserialize_repr)]
         #[repr(u8)]
         pub enum Opcode {
-            InvalidOpcode = 0,
-            $($opcode,)*
+            $($opcode = $code,)*
         }
 
         pub mod payloads {$(
@@ -107,12 +106,12 @@ macro_rules! decl_msgs {
 }
 
 decl_msgs! {
-    Hello {
+    0 => Hello {
         /// Number of milliseconds between heartbeats
         heartbeat_interval: u32
     },
-    Heartbeat: Default {},
-    HeartbeatACK: Default {},
+    1 => Heartbeat: Default {},
+    2 => HeartbeatACK: Default {},
 }
 
 #[cfg(test)]
