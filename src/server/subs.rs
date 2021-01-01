@@ -4,10 +4,13 @@ use ahash::{AHasher, RandomState};
 use hashbrown::HashMap;
 use tokio::sync::RwLock;
 
-use crate::db::{schema::user, Snowflake};
+use crate::{
+    db::{schema::user, Snowflake},
+    util::rmap::CHashMap,
+};
 
 pub struct ClientSubscriptions {
-    pub parties: RwLock<HashMap<Snowflake, PartySubscriptions, RandomState>>,
+    pub parties: CHashMap<Snowflake, PartySubscriptions, RandomState>,
 }
 
 pub struct PartySubscriptions {

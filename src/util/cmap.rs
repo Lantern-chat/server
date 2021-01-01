@@ -6,6 +6,7 @@ use std::sync::Arc;
 use hashbrown::hash_map::{DefaultHashBuilder, HashMap};
 use tokio::sync::{Mutex, MutexGuard, OwnedMutexGuard};
 
+/// Simple sharded hashmap using Tokio async mutexes for the shards
 #[derive(Debug)]
 pub struct CHashMap<K, T, S = DefaultHashBuilder> {
     hash_builder: S,
@@ -95,10 +96,14 @@ where
         }
     }
 
-    pub async fn get_or_default<'a>(&self, key: &K) -> BorrowedValue<'a, K, T, S>
+    pub async fn get_or_insert<'a>(
+        &self,
+        key: &K,
+        default: impl FnOnce() -> T,
+    ) -> BorrowedValue<'a, K, T, S>
     where
         K: Clone,
-        T: 'a + Default,
+        T: 'a,
     {
         let (hash, shard_idx) = self.hash_and_shard(key);
 
@@ -107,12 +112,20 @@ where
         let (_, value) = shard
             .raw_entry_mut()
             .from_key_hashed_nocheck(hash, key)
-            .or_insert_with(|| (key.clone(), T::default()));
+            .or_insert_with(|| (key.clone(), default()));
 
         BorrowedValue {
             value: unsafe { std::mem::transmute(value) }, // cast lifetime, but it's fine because we own it while the lock is valid
             lock: shard,
         }
+    }
+
+    pub async fn get_or_default<'a>(&self, key: &K) -> BorrowedValue<'a, K, T, S>
+    where
+        K: Clone,
+        T: 'a + Default,
+    {
+        self.get_or_insert(key, Default::default).await
     }
 
     pub async fn retain<F>(&self, mut f: F)

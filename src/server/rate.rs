@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::util::cmap::CHashMap;
+use crate::util::rmap::CHashMap;
 
 use crate::db::Snowflake;
 
@@ -14,23 +14,45 @@ pub struct RateLimitKey {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct RateLimit {
+pub struct RateLimiter {
     pub count: f32,
     pub last: Instant,
 }
 
-impl Default for RateLimit {
+impl Default for RateLimiter {
     fn default() -> Self {
-        RateLimit {
+        RateLimiter {
             count: 0.0,
             last: Instant::now(),
         }
     }
 }
 
+impl RateLimiter {
+    #[inline]
+    pub fn update(&mut self, req_per_sec: f32) -> bool {
+        let now = Instant::now();
+
+        // get the number of decayed requests since the last request
+        let decayed = now.duration_since(self.last).as_millis() as f32 * req_per_sec * 0.001;
+        // compute the effective number of requests performed
+        let eff_count = self.count - decayed;
+
+        if eff_count < req_per_sec {
+            // update with new request
+            self.count = eff_count.max(0.0) + 1.0;
+            self.last = now;
+
+            return true;
+        }
+
+        false
+    }
+}
+
 pub struct RateLimitTable {
     pub req_per_sec: f32,
-    pub table: CHashMap<RateLimitKey, Cell<RateLimit>>,
+    pub table: CHashMap<RateLimitKey, RateLimiter>,
 }
 
 impl RateLimitTable {
@@ -42,27 +64,10 @@ impl RateLimitTable {
     }
 
     pub async fn req(&self, key: RateLimitKey) -> bool {
-        let rll = self.table.get_or_default(&key).await;
-        let mut lim = rll.get();
-
-        let now = Instant::now();
-
-        // get the number of decayed requests since the last request
-        let decayed = now.duration_since(lim.last).as_millis() as f32 * self.req_per_sec * 0.001;
-        // compute the effective number of requests performed
-        let eff_count = lim.count - decayed;
-
-        if eff_count < self.req_per_sec {
-            // update with new request
-            lim.count = eff_count.max(0.0) + 1.0;
-            lim.last = now;
-
-            rll.set(lim);
-
-            return true;
-        }
-
-        false
+        self.table
+            .get_mut_or_default(&key)
+            .await
+            .update(self.req_per_sec)
     }
 
     pub async fn cleanup_at(&self, now: Instant) {
@@ -70,7 +75,7 @@ impl RateLimitTable {
 
         let one_second_ago = now - Duration::from_secs(1);
         self.table
-            .retain(|_, value| value.get().last < one_second_ago)
+            .retain(|_, value| value.last < one_second_ago)
             .await;
     }
 }
