@@ -9,32 +9,28 @@ use tokio::sync::{oneshot, Mutex, RwLock};
 
 use hashbrown::HashMap;
 
-use super::rate::RateLimitTable;
+use super::{conns::HostConnections, rate::RateLimitTable};
 
 pub struct ServerState {
     pub is_alive: AtomicBool,
     pub shutdown: Mutex<Option<oneshot::Sender<()>>>,
     pub rate_limit: crate::server::rate::RateLimitTable,
+    pub gateway_conns: HostConnections,
 }
 
 impl ServerState {
     pub fn new(shutdown: oneshot::Sender<()>) -> Arc<Self> {
-        let fresh_state = Arc::new(ServerState {
+        Arc::new(ServerState {
             is_alive: AtomicBool::new(true),
             shutdown: Mutex::new(Some(shutdown)),
             rate_limit: RateLimitTable::new(50.0),
-        });
+            gateway_conns: HostConnections::default(),
+        })
+    }
 
-        let state = fresh_state.clone();
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(10));
-            while state.is_alive.load(Ordering::Relaxed) {
-                let now = interval.tick().await;
-                state.rate_limit.cleanup_at(now.into_std()).await;
-            }
-        });
-
-        fresh_state
+    #[inline]
+    pub fn is_alive(&self) -> bool {
+        self.is_alive.load(Ordering::Relaxed)
     }
 
     pub async fn shutdown(&self) {

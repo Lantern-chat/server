@@ -18,7 +18,15 @@ impl<K, T> CHashMap<K, T, DefaultHashBuilder> {
     }
 }
 
+impl<K, T> Default for CHashMap<K, T, DefaultHashBuilder> {
+    fn default() -> Self {
+        Self::new(128)
+    }
+}
+
 /// Simple sharded hashmap using Tokio async rwlocks for the shards
+///
+/// Use as a simple replacement for `RwLock<HashMap<K, T, V>>`
 impl<K, T, S> CHashMap<K, T, S>
 where
     S: Clone,
