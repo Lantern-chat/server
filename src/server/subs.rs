@@ -6,7 +6,7 @@ use tokio::sync::RwLock;
 
 use crate::{
     db::{schema::user, Snowflake},
-    util::rmap::CHashMap,
+    util::cmap::CHashMap,
 };
 
 pub struct ClientSubscriptions {

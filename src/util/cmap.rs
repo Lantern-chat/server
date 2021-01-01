@@ -1,16 +1,15 @@
 use std::borrow::Borrow;
 use std::hash::{BuildHasher, Hash, Hasher};
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
-use hashbrown::hash_map::{DefaultHashBuilder, HashMap};
-use tokio::sync::{Mutex, MutexGuard, OwnedMutexGuard};
+use hashbrown::hash_map::{DefaultHashBuilder, HashMap, RawEntryMut};
+use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-/// Simple sharded hashmap using Tokio async mutexes for the shards
 #[derive(Debug)]
 pub struct CHashMap<K, T, S = DefaultHashBuilder> {
     hash_builder: S,
-    shards: Vec<Arc<Mutex<HashMap<K, T, S>>>>,
+    shards: Vec<RwLock<HashMap<K, T, S>>>,
 }
 
 impl<K, T> CHashMap<K, T, DefaultHashBuilder> {
@@ -19,6 +18,7 @@ impl<K, T> CHashMap<K, T, DefaultHashBuilder> {
     }
 }
 
+/// Simple sharded hashmap using Tokio async rwlocks for the shards
 impl<K, T, S> CHashMap<K, T, S>
 where
     S: Clone,
@@ -27,22 +27,50 @@ where
         CHashMap {
             shards: (0..num_shards)
                 .into_iter()
-                .map(|_| Arc::new(Mutex::new(HashMap::with_hasher(hash_builder.clone()))))
+                .map(|_| RwLock::new(HashMap::with_hasher(hash_builder.clone())))
                 .collect(),
             hash_builder,
         }
     }
 }
 
-pub struct BorrowedValue<'a, K, T, S> {
-    lock: OwnedMutexGuard<HashMap<K, T, S>>,
+pub struct ReadValue<'a, K, T, S> {
+    lock: RwLockReadGuard<'a, HashMap<K, T, S>>,
     value: &'a T,
 }
 
-impl<K, T, S> Deref for BorrowedValue<'_, K, T, S> {
+pub struct WriteValue<'a, K, T, S> {
+    lock: RwLockWriteGuard<'a, HashMap<K, T, S>>,
+    value: &'a mut T,
+}
+
+impl<'a, K, T, S> WriteValue<'a, K, T, S> {
+    pub fn downgrade(this: WriteValue<'a, K, T, S>) -> ReadValue<'a, K, T, S> {
+        ReadValue {
+            lock: RwLockWriteGuard::downgrade(this.lock),
+            value: this.value,
+        }
+    }
+}
+
+impl<K, T, S> Deref for ReadValue<'_, K, T, S> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
+        self.value
+    }
+}
+
+impl<K, T, S> Deref for WriteValue<'_, K, T, S> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.value
+    }
+}
+
+impl<K, T, S> DerefMut for WriteValue<'_, K, T, S> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         self.value
     }
 }
@@ -52,6 +80,16 @@ where
     K: Hash + Eq,
     S: BuildHasher,
 {
+    pub async fn retain<F>(&self, mut f: F)
+    where
+        F: Fn(&K, &mut T) -> bool,
+    {
+        for shard in &self.shards {
+            let mut shard = shard.write().await;
+            shard.retain(&f);
+        }
+    }
+
     fn hash_and_shard<Q>(&self, key: &Q) -> (u64, usize)
     where
         Q: Hash + Eq,
@@ -70,71 +108,115 @@ where
         T: Clone,
     {
         let (hash, shard_idx) = self.hash_and_shard(key);
-        let shard = self.shards[shard_idx].lock().await;
+        let shard = self.shards[shard_idx].read().await;
         shard
             .raw_entry()
             .from_key_hashed_nocheck(hash, key)
             .map(|(_, value)| value.clone())
     }
 
-    pub async fn get<'a, Q>(&self, key: &Q) -> Option<BorrowedValue<'a, K, T, S>>
+    pub async fn get<Q>(&self, key: &Q) -> Option<ReadValue<'_, K, T, S>>
     where
         K: Borrow<Q>,
         Q: Hash + Eq,
-        T: 'a,
     {
         let (hash, shard_idx) = self.hash_and_shard(key);
 
-        let shard = Mutex::lock_owned(self.shards[shard_idx].clone()).await;
+        let shard = self.shards[shard_idx].read().await;
 
         match shard.raw_entry().from_key_hashed_nocheck(hash, key) {
-            Some((_, value)) => Some(BorrowedValue {
-                value: unsafe { std::mem::transmute(value) }, // cast lifetime, but it's fine because we own it while the lock is valid
+            Some((_, value)) => Some(ReadValue {
+                // cast lifetime, but it's fine because we own it while the lock is valid
+                value: unsafe { std::mem::transmute(value) },
                 lock: shard,
             }),
             None => None,
         }
     }
 
-    pub async fn get_or_insert<'a>(
-        &self,
-        key: &K,
-        default: impl FnOnce() -> T,
-    ) -> BorrowedValue<'a, K, T, S>
+    pub async fn get_mut<Q>(&self, key: &Q) -> Option<WriteValue<'_, K, T, S>>
     where
-        K: Clone,
-        T: 'a,
+        K: Borrow<Q>,
+        Q: Hash + Eq,
     {
         let (hash, shard_idx) = self.hash_and_shard(key);
 
-        let mut shard = Mutex::lock_owned(self.shards[shard_idx].clone()).await;
+        let mut shard = self.shards[shard_idx].write().await;
+
+        match shard.raw_entry_mut().from_key_hashed_nocheck(hash, key) {
+            RawEntryMut::Occupied(mut entry) => Some(WriteValue {
+                // cast lifetime, but it's fine because we own it while the lock is valid
+                value: unsafe { std::mem::transmute(entry.get_mut()) },
+                lock: shard,
+            }),
+            _ => None,
+        }
+    }
+
+    pub async fn insert(&self, key: K, value: T) -> Option<T> {
+        let (hash, shard_idx) = self.hash_and_shard(&key);
+        self.shards[shard_idx].write().await.insert(key, value)
+    }
+
+    pub async fn get_or_insert(
+        &self,
+        key: &K,
+        on_insert: impl FnOnce() -> T,
+    ) -> ReadValue<'_, K, T, S>
+    where
+        K: Clone,
+    {
+        let (hash, shard_idx) = self.hash_and_shard(key);
+
+        let mut shard = self.shards[shard_idx].write().await;
 
         let (_, value) = shard
             .raw_entry_mut()
             .from_key_hashed_nocheck(hash, key)
-            .or_insert_with(|| (key.clone(), default()));
+            .or_insert_with(|| (key.clone(), on_insert()));
 
-        BorrowedValue {
-            value: unsafe { std::mem::transmute(value) }, // cast lifetime, but it's fine because we own it while the lock is valid
+        ReadValue {
+            value: unsafe { std::mem::transmute(value) },
+            lock: RwLockWriteGuard::downgrade(shard),
+        }
+    }
+
+    pub async fn get_mut_or_insert(
+        &self,
+        key: &K,
+        on_insert: impl FnOnce() -> T,
+    ) -> WriteValue<'_, K, T, S>
+    where
+        K: Clone,
+    {
+        let (hash, shard_idx) = self.hash_and_shard(key);
+
+        let mut shard = self.shards[shard_idx].write().await;
+
+        let (_, value) = shard
+            .raw_entry_mut()
+            .from_key_hashed_nocheck(hash, key)
+            .or_insert_with(|| (key.clone(), on_insert()));
+
+        WriteValue {
+            value: unsafe { std::mem::transmute(value) },
             lock: shard,
         }
     }
 
-    pub async fn get_or_default<'a>(&self, key: &K) -> BorrowedValue<'a, K, T, S>
+    pub async fn get_or_default(&self, key: &K) -> ReadValue<'_, K, T, S>
     where
         K: Clone,
-        T: 'a + Default,
+        T: Default,
     {
         self.get_or_insert(key, Default::default).await
     }
 
-    pub async fn retain<F>(&self, mut f: F)
+    pub async fn get_mut_or_default(&self, key: &K) -> WriteValue<'_, K, T, S>
     where
-        F: Fn(&K, &mut T) -> bool,
+        K: Clone,
+        T: Default,
     {
-        for shard in &self.shards {
-            let mut shard = shard.lock().await;
-            shard.retain(&f);
-        }
+        self.get_mut_or_insert(key, Default::default).await
     }
 }

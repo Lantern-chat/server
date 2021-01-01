@@ -3,7 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::util::rmap::CHashMap;
+use crate::util::cmap::CHashMap;
 
 use crate::db::Snowflake;
 
