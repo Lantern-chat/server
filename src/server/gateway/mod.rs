@@ -8,10 +8,12 @@ use tokio_postgres::Socket;
 use warp::ws::{Message as WsMessage, WebSocket};
 use warp::{Filter, Rejection, Reply};
 
-use crate::server::ServerState;
+use crate::server::{rate::RateLimiter, ServerState};
 
 pub mod msg;
 use msg::Message;
+
+pub mod conn;
 
 /// Websocket message encoding
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -47,11 +49,7 @@ pub struct GatewayQueryParams {
     pub compress: bool,
 }
 
-pub struct ClientConnection {
-    pub query: GatewayQueryParams,
-    pub addr: Option<SocketAddr>,
-    pub tx: mpsc::UnboundedSender<Result<WsMessage, warp::Error>>,
-}
+const MSGS_PER_SEC: f32 = 50.0;
 
 pub async fn client_connected(
     ws: WebSocket,
@@ -67,12 +65,13 @@ pub async fn client_connected(
     }));
 
     let send = |msg: msg::Message| -> Result<(), Box<dyn Error>> {
+        // encode message
         let mut msg: Vec<u8> = match query.encoding {
             GatewayMsgEncoding::Json => serde_json::to_vec(&msg)?,
             GatewayMsgEncoding::MsgPack => rmp_serde::to_vec_named(&msg)?,
-            _ => unimplemented!(),
         };
 
+        // compress
         if query.compress {
             use flate2::{write::ZlibEncoder, Compression};
             use std::io::Write;
@@ -82,6 +81,7 @@ pub async fn client_connected(
             msg = encoder.finish()?;
         }
 
+        // send as binary
         tx.send(Ok(WsMessage::binary(msg))).map_err(Into::into)
     };
 
@@ -97,14 +97,21 @@ pub async fn client_connected(
     // default to forceful disconnection which is overridden for safe disconnects
     let mut force_disconnect = true;
 
+    let mut rate_limiter = RateLimiter::default();
+
     while initiated {
         match ws_rx.next().await {
             // if None was received, we can assume the websocket safely closed
             None => force_disconnect = false,
 
             Some(Ok(msg)) => {
-                let mut msg = Cow::Borrowed(msg.as_bytes());
+                // First, check rate limiting and kick if needed
+                if !rate_limiter.update(MSGS_PER_SEC) {
+                    break; // kick
+                }
 
+                // decompress message
+                let mut msg = Cow::Borrowed(msg.as_bytes());
                 if query.compress {
                     use flate2::bufread::ZlibDecoder;
                     use std::io::Read;
@@ -114,19 +121,19 @@ pub async fn client_connected(
 
                     if let Err(e) = reader.read_to_end(&mut decoded) {
                         log::error!("Invalid decompression: {:?}", e);
-
                         break;
                     }
 
                     msg = Cow::Owned(decoded);
                 }
 
+                // parse message
                 let msg: Result<Message, Box<dyn Error>> = match query.encoding {
                     GatewayMsgEncoding::Json => serde_json::from_slice(&msg).map_err(Into::into),
                     GatewayMsgEncoding::MsgPack => rmp_serde::from_slice(&msg).map_err(Into::into),
-                    _ => unimplemented!(),
                 };
 
+                // kick on error
                 let msg = match msg {
                     Ok(msg) => msg,
                     Err(e) => {
@@ -136,17 +143,14 @@ pub async fn client_connected(
                 };
 
                 // TODO: Place elsewhere
-                let res = send(match msg {
-                    Message::Heartbeat { .. } => Message::new_heartbeatack(),
-                    _ => unimplemented!(),
-                });
+                let res = send(unimplemented!());
 
                 if let Err(e) = res {
                     log::error!("Error sending message response: {:?}", e);
                     break;
                 }
 
-                continue;
+                continue; // don't kick, continue receiving messages
             }
             Some(Err(e)) => log::error!("Receiving websocket message: {}", e),
         }
