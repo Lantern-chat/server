@@ -6,6 +6,7 @@ use futures::FutureExt;
 
 pub mod auth;
 pub mod conns;
+pub mod events;
 pub mod gateway;
 pub mod rate;
 pub mod routes;

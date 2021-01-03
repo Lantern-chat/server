@@ -8,7 +8,7 @@ use tokio_postgres::Socket;
 use warp::ws::{Message as WsMessage, WebSocket};
 use warp::{Filter, Rejection, Reply};
 
-use crate::server::{rate::RateLimiter, ServerState};
+use crate::server::{events::Event, rate::RateLimiter, ServerState};
 
 use super::msg::Message;
 
@@ -25,4 +25,6 @@ impl ClientConnection {
             _ => unimplemented!(),
         })
     }
+
+    pub async fn process_event(&self, event: Arc<Event>) {}
 }
