@@ -5,6 +5,7 @@ pub struct Emote {
     pub id: Snowflake,
     pub party_id: Snowflake,
     pub name: String,
+    pub alt: String,
     pub animated: bool,
     pub aspect_ratio: f32,
     pub sticker: bool,

@@ -1,22 +1,27 @@
-use std::ops::Deref;
+use std::{
+    any::{Any, TypeId},
+    ops::Deref,
+};
 
+use parking_lot::RwLock;
+
+use hashbrown::HashMap;
 use tokio_postgres::{
     types::{ToSql, Type},
     Client as DbClient, Error, Row, RowStream, Statement,
 };
 
-use crate::db::queries::{CachedQuery, PreparedQueryCache};
-
 pub struct Client {
     client: DbClient,
-    cache: PreparedQueryCache,
+    cache: RwLock<HashMap<TypeId, Statement>>,
 }
 
 impl Client {
     pub async fn new(db: DbClient) -> Result<Self, Error> {
-        let cache: PreparedQueryCache = PreparedQueryCache::populate(&db).await?;
-
-        Ok(Client { client: db, cache })
+        Ok(Client {
+            client: db,
+            cache: Default::default(),
+        })
     }
 }
 
@@ -29,27 +34,59 @@ impl Deref for Client {
 }
 
 impl Client {
-    pub async fn query_cached(
-        &self,
-        query: CachedQuery,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Vec<Row>, Error> {
-        self.query(self.cache.get(query), params).await
+    pub async fn prepare_cached<F>(&self, query: F) -> Result<Statement, Error>
+    where
+        F: Any + FnOnce() -> &'static str,
+    {
+        let id = TypeId::of::<F>();
+
+        let cache = self.cache.upgradable_read();
+
+        if let Some(stmt) = cache.get(&id) {
+            return Ok(stmt.clone());
+        }
+
+        let stmt = self.prepare(query()).await?;
+
+        let mut cache = parking_lot::RwLockUpgradableReadGuard::upgrade(cache);
+
+        cache.insert(id, stmt.clone());
+
+        Ok(stmt)
     }
 
-    pub async fn query_one_cached(
+    pub async fn query_cached<F>(
         &self,
-        query: CachedQuery,
+        query: F,
         params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Row, Error> {
-        self.query_one(self.cache.get(query), params).await
+    ) -> Result<Vec<Row>, Error>
+    where
+        F: Any + FnOnce() -> &'static str,
+    {
+        self.query(&self.prepare_cached(query).await?, params).await
     }
 
-    pub async fn query_opt_cached(
+    pub async fn query_one_cached<F>(
         &self,
-        query: CachedQuery,
+        query: F,
         params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Option<Row>, Error> {
-        self.query_opt(self.cache.get(query), params).await
+    ) -> Result<Row, Error>
+    where
+        F: Any + FnOnce() -> &'static str,
+    {
+        self.query_one(&self.prepare_cached(query).await?, params)
+            .await
+    }
+
+    pub async fn query_opt_cached<F>(
+        &self,
+        query: F,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Option<Row>, Error>
+    where
+        F: Any + FnOnce() -> &'static str,
+    {
+        self.query_opt(&self.prepare_cached(query).await?, params)
+            .await
     }
 }

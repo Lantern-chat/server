@@ -19,7 +19,10 @@ impl Message {
         client: &Client,
     ) -> Result<impl Iterator<Item = Attachment>, Error> {
         let rows = client
-            .query_cached(CachedQuery::GetMessageAttachments, &[&self.id])
+            .query_cached(
+                || "SELECT * FROM attachment WHERE message_id = $1",
+                &[&self.id],
+            )
             .await?;
 
         Ok(rows.into_iter().map(|row| Attachment::from_row(&row)))
@@ -27,7 +30,7 @@ impl Message {
 
     pub async fn get_thread(&self, client: &Client) -> Result<Option<Thread>, Error> {
         client
-            .query_opt_cached(CachedQuery::GetMessageThread, &[&self.thread_id])
+            .query_opt_cached(|| "SELECT * FROM thread WHERE id = $1", &[&self.thread_id])
             .await
             .map(|row| row.as_ref().map(Thread::from_row))
     }
