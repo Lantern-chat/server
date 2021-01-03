@@ -3,13 +3,15 @@ use std::ops::Deref;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+use futures::Stream;
+
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_postgres::{AsyncMessage, Connection as StdConnection, Error};
 
 /// Simple wrapper type for `tokio_postgres::Connection` that returns the actual message in the future
-pub struct Connection<S, T>(StdConnection<S, T>);
+pub struct ConnectionStream<S, T>(pub StdConnection<S, T>);
 
-impl<S, T> Deref for Connection<S, T> {
+impl<S, T> Deref for ConnectionStream<S, T> {
     type Target = StdConnection<S, T>;
 
     fn deref(&self) -> &Self::Target {
@@ -17,27 +19,14 @@ impl<S, T> Deref for Connection<S, T> {
     }
 }
 
-pub enum DbMessage {
-    Shutdown,
-    Message(AsyncMessage),
-    Err(Error),
-}
-
-impl<S, T> Future for Connection<S, T>
+impl<S, T> Stream for ConnectionStream<S, T>
 where
     S: AsyncRead + AsyncWrite + Unpin,
     T: AsyncRead + AsyncWrite + Unpin,
 {
-    type Output = DbMessage;
+    type Item = Result<AsyncMessage, Error>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        match self.0.poll_message(cx) {
-            Poll::Ready(res) => Poll::Ready(match res {
-                None => DbMessage::Shutdown,
-                Some(Ok(msg)) => DbMessage::Message(msg),
-                Some(Err(err)) => DbMessage::Err(err),
-            }),
-            _ => Poll::Pending,
-        }
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.0.poll_message(cx)
     }
 }
