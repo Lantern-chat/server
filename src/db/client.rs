@@ -40,6 +40,9 @@ impl Client {
     {
         let id = TypeId::of::<F>();
 
+        // NOTE: This uses a `parking_lot` RwLock here to take the fast path in acquiring the lock
+        // without having to yield at all, since the cache is only populated at startup any write locks
+        // will happen early-on in the program, leaving only nice fast-paths once warmed up.
         let cache = self.cache.upgradable_read();
 
         if let Some(stmt) = cache.get(&id) {
