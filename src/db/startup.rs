@@ -1,12 +1,23 @@
 use std::borrow::Cow;
+use std::sync::Arc;
 
 use futures::StreamExt;
+
+use tokio::sync::mpsc;
 
 use tokio_postgres as pg;
 
 use super::{client::Client, conn::ConnectionStream};
 
-pub async fn connect(config: pg::Config) -> Result<Client, Box<dyn std::error::Error>> {
+pub async fn connect(
+    config: pg::Config,
+) -> Result<
+    (
+        Client,
+        mpsc::UnboundedReceiver<Result<pg::AsyncMessage, pg::Error>>,
+    ),
+    Box<dyn std::error::Error>,
+> {
     log::info!(
         "Connecting to database {:?} at {:?}:{:?}...",
         config.get_dbname(),
@@ -15,18 +26,18 @@ pub async fn connect(config: pg::Config) -> Result<Client, Box<dyn std::error::E
     );
     let (client, conn) = config.connect(pg::NoTls).await?;
 
+    let (tx, rx) = mpsc::unbounded_channel();
     tokio::spawn(async move {
         let mut conn = ConnectionStream(conn);
         while let Some(msg) = conn.next().await {
-            match msg {
-                Ok(msg) => log::info!("{:?}", msg),
-                Err(e) => log::error!("Connection error: {}", e),
+            if let Err(e) = tx.send(msg) {
+                log::error!("Error forwarding database event: {:?}", e);
             }
         }
         log::info!("Disconnected from database {:?}", config.get_dbname());
     });
 
-    Ok(Client::new(client))
+    Ok((Client::new(client), rx))
 }
 
 pub async fn startup() -> Result<(), Box<dyn std::error::Error>> {
@@ -36,7 +47,17 @@ pub async fn startup() -> Result<(), Box<dyn std::error::Error>> {
     let mut config = db_str.parse::<pg::Config>()?;
 
     config.dbname("postgres");
-    let mut client = connect(config.clone()).await?;
+    let (mut client, mut conn_stream) = connect(config.clone()).await?;
+
+    // While we're determining database setup, just log any errors and ignore other things
+    tokio::spawn(async move {
+        while let Some(msg) = conn_stream.recv().await {
+            match msg {
+                Ok(msg) => {}
+                Err(e) => log::error!("Database error: {:?}", e),
+            }
+        }
+    });
 
     log::info!("Querying database setup...");
     let has_lantern = client
@@ -58,9 +79,9 @@ pub async fn startup() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     config.dbname("lantern");
-    client = connect(config).await?;
+    let (mut client, conn_stream) = connect(config).await?;
 
     // TODO: Setup migration tables and begin migrations
 
-    Ok(())
+    Ok(()) // TODO: Return client and conn_stream
 }
