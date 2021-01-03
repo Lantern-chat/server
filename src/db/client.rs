@@ -17,11 +17,11 @@ pub struct Client {
 }
 
 impl Client {
-    pub async fn new(db: DbClient) -> Result<Self, Error> {
-        Ok(Client {
+    pub fn new(db: DbClient) -> Self {
+        Client {
             client: db,
             cache: Default::default(),
-        })
+        }
     }
 }
 

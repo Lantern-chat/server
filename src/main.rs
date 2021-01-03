@@ -42,6 +42,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     log::debug!("Arguments: {:?}", args);
 
+    let db = crate::db::startup::startup().await?;
+
     log::trace!("Parsing bind address...");
     let addr = match args.bind {
         Some(addr) => SocketAddr::from_str(&addr)?,
