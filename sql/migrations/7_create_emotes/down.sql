@@ -1,0 +1,5 @@
+ALTER TABLE lantern.emotes DROP CONSTRAINT IF EXISTS party_fk CASCADE;
+
+DROP INDEX IF EXISTS lantern.emote_name_idx CASCADE;
+
+DROP TABLE IF EXISTS lantern.emotes CASCADE;
