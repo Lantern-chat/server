@@ -15,4 +15,4 @@ CREATE INDEX CONCURRENTLY room_name_idx ON lantern.rooms USING hash (name);
 
 ALTER TABLE lantern.rooms ADD CONSTRAINT party_fk FOREIGN KEY (party_id)
     REFERENCES lantern.party (id) MATCH FULL
-    ON DELETE CASCADE ON UPDATE CASCADE;
+    ON DELETE CASCADE ON UPDATE CASCADE; -- Delete rooms if party is deleted

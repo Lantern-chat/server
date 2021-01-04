@@ -19,7 +19,7 @@ CREATE UNIQUE INDEX CONCURRENTLY name_idx ON lantern.party USING btree (name);
 
 ALTER TABLE lantern.party ADD CONSTRAINT owner_fk FOREIGN KEY (owner_id)
     REFERENCES lantern.users (id) MATCH FULL
-    ON DELETE RESTRICT ON UPDATE CASCADE;
+    ON DELETE RESTRICT ON UPDATE CASCADE; -- Don't allow users to delete accounts if they own parties
 
 
 
@@ -36,8 +36,8 @@ ALTER TABLE lantern.party_member OWNER TO postgres;
 
 ALTER TABLE lantern.party_member ADD CONSTRAINT party_fk FOREIGN KEY (party_id)
     REFERENCES lantern.party (id) MATCH FULL
-    ON DELETE CASCADE ON UPDATE CASCADE;
+    ON DELETE CASCADE ON UPDATE CASCADE; -- When a party is deleted cascade to delete memberships
 
 ALTER TABLE lantern.party_member ADD CONSTRAINT member_fk FOREIGN KEY (user_id)
     REFERENCES lantern.users (id) MATCH FULL
-    ON DELETE CASCADE ON UPDATE CASCADE;
+    ON DELETE CASCADE ON UPDATE CASCADE; -- When a user is deleted cascade to delete their membership
