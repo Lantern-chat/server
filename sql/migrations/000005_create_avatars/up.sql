@@ -1,6 +1,6 @@
 CREATE TABLE lantern.avatar (
     id      bigint NOT NULL,
-    file_id bigint,
+    file_id bigint NOT NULL,
 
     CONSTRAINT avatar_pk PRIMARY KEY (id)
 );

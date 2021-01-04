@@ -1,6 +1,6 @@
 CREATE TABLE lantern.roles (
     id              bigint      NOT NULL,
-    party_id        bigint,
+    party_id        bigint      NOT NULL,
     name            varchar(32) NOT NULL,
     permissions     integer     NOT NULL    DEFAULT 0,
     color           integer,
