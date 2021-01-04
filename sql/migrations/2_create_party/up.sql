@@ -5,10 +5,8 @@
 CREATE TABLE lantern.party (
     id          bigint          NOT NULL,
     name        varchar(256)    NOT NULL,
-    user_id     bigint          NOT NULL,
-
-    -- If anonymous, it's a private group chat
-    is_anon     bool            NOT NULL,
+    -- If NULL, it's a private chat/DM
+    owner_id    bigint,
 
     -- Inactive parties are banned/deleted until purged
     is_active   bool            NOT NULL DEFAULT true,
@@ -19,8 +17,7 @@ ALTER TABLE lantern.party OWNER TO postgres;
 
 CREATE UNIQUE INDEX CONCURRENTLY name_idx ON lantern.party USING btree (name);
 
--- Party Owner
-ALTER TABLE lantern.party ADD CONSTRAINT owner_fk FOREIGN KEY (user_id)
+ALTER TABLE lantern.party ADD CONSTRAINT owner_fk FOREIGN KEY (owner_id)
     REFERENCES lantern.users (id) MATCH FULL
     ON DELETE RESTRICT ON UPDATE CASCADE;
 

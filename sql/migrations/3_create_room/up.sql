@@ -1,11 +1,11 @@
 CREATE TABLE lantern.rooms (
-    id             bigint           NOT NULL,
-    -- If NULL, then it's a direct-message
-    party_id    bigint,
+    id          bigint              NOT NULL,
+    party_id    bigint              NOT NULL,
     name        text                NOT NULL,
-    is_private  bool                NOT NULL    DEFAULT false,
     topic       varchar(2048),
-    is_nsfw     bool                NOT NULL    DEFAULT false,
+
+    -- contains info on NSFW, channel type, etc.
+    flags       smallint            NOT NULL    DEFAULT 0,
 
     CONSTRAINT room_pk PRIMARY KEY (id)
 );
