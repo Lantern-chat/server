@@ -51,6 +51,19 @@ pub struct GatewayQueryParams {
 
 const MSGS_PER_SEC: f32 = 50.0;
 
+fn compress_if(cond: bool, mut msg: Vec<u8>) -> std::io::Result<Vec<u8>> {
+    if cond {
+        use flate2::{write::ZlibEncoder, Compression};
+        use std::io::Write;
+
+        let mut encoder = ZlibEncoder::new(Vec::with_capacity(128), Compression::new(6));
+        encoder.write(&msg)?;
+        msg = encoder.finish()?;
+    }
+
+    Ok(msg)
+}
+
 pub async fn client_connected(
     ws: WebSocket,
     query: GatewayQueryParams,
@@ -64,25 +77,15 @@ pub async fn client_connected(
         result.map_err(|e| log::error!("websocket send error: {} to client {:?}", e, addr))
     }));
 
-    let send = |msg: msg::Message| -> Result<(), Box<dyn Error>> {
-        // encode message
-        let mut msg: Vec<u8> = match query.encoding {
-            GatewayMsgEncoding::Json => serde_json::to_vec(&msg)?,
-            GatewayMsgEncoding::MsgPack => rmp_serde::to_vec_named(&msg)?,
-        };
-
-        // compress
-        if query.compress {
-            use flate2::{write::ZlibEncoder, Compression};
-            use std::io::Write;
-
-            let mut encoder = ZlibEncoder::new(Vec::with_capacity(128), Compression::new(6));
-            encoder.write(&msg)?;
-            msg = encoder.finish()?;
-        }
-
-        // send as binary
-        tx.send(Ok(WsMessage::binary(msg))).map_err(Into::into)
+    // helper to encode and compress messages before sending
+    let send = |msg: msg::Message| -> anyhow::Result<()> {
+        Ok(tx.send(Ok(WsMessage::binary(compress_if(
+            query.compress,
+            match query.encoding {
+                GatewayMsgEncoding::Json => serde_json::to_vec(&msg)?,
+                GatewayMsgEncoding::MsgPack => rmp_serde::to_vec_named(&msg)?,
+            },
+        )?)))?)
     };
 
     let mut initiated = true;
@@ -97,13 +100,14 @@ pub async fn client_connected(
     // default to forceful disconnection which is overridden for safe disconnects
     let mut force_disconnect = true;
 
+    // rate-limit the websocket message stream
     let mut rate_limiter = RateLimiter::default();
 
     while initiated {
         match ws_rx.next().await {
             // if None was received, we can assume the websocket safely closed
             None => force_disconnect = false,
-
+            Some(Ok(msg)) if msg.is_close() => break,
             Some(Ok(msg)) => {
                 // First, check rate limiting and kick if needed
                 if !rate_limiter.update(MSGS_PER_SEC) {
@@ -128,7 +132,7 @@ pub async fn client_connected(
                 }
 
                 // parse message
-                let msg: Result<Message, Box<dyn Error>> = match query.encoding {
+                let msg: anyhow::Result<Message> = match query.encoding {
                     GatewayMsgEncoding::Json => serde_json::from_slice(&msg).map_err(Into::into),
                     GatewayMsgEncoding::MsgPack => rmp_serde::from_slice(&msg).map_err(Into::into),
                 };

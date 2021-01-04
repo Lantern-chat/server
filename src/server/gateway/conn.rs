@@ -19,7 +19,7 @@ pub struct ClientConnection {
 }
 
 impl ClientConnection {
-    pub async fn on_msg(&self, msg: Message) -> Result<Message, Box<dyn Error>> {
+    pub async fn on_msg(&self, msg: Message) -> anyhow::Result<Message> {
         Ok(match msg {
             Message::Heartbeat { .. } => Message::new_heartbeatack(),
             _ => unimplemented!(),
