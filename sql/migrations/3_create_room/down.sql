@@ -1,0 +1,5 @@
+ALTER TABLE lantern.rooms DROP CONSTRAINT IF EXISTS party_fk CASCADE;
+
+DROP INDEX IF EXISTS lantern.room_name_idx CASCADE;
+
+DROP TABLE IF EXISTS lantern.rooms CASCADE;

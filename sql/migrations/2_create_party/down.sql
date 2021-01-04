@@ -1,0 +1,7 @@
+ALTER TABLE lantern.party_member DROP CONSTRAINT IF EXISTS member_fk CASCADE;
+ALTER TABLE lantern.party_member DROP CONSTRAINT IF EXISTS party_fk CASCADE;
+
+DROP TABLE IF EXISTS lantern.party_member CASCADE;
+
+ALTER TABLE lantern.party DROP CONSTRAINT IF EXISTS owner_fk CASCADE;
+DROP TABLE IF EXISTS lantern.party CASCADE;
