@@ -11,13 +11,7 @@ use super::{client::Client, conn::ConnectionStream};
 
 pub async fn connect(
     config: pg::Config,
-) -> Result<
-    (
-        Client,
-        mpsc::UnboundedReceiver<Result<pg::AsyncMessage, pg::Error>>,
-    ),
-    Box<dyn std::error::Error>,
-> {
+) -> anyhow::Result<(Client, mpsc::UnboundedReceiver<pg::AsyncMessage>)> {
     log::info!(
         "Connecting to database {:?} at {:?}:{:?}...",
         config.get_dbname(),
@@ -30,8 +24,16 @@ pub async fn connect(
     tokio::spawn(async move {
         let mut conn = ConnectionStream(conn);
         while let Some(msg) = conn.next().await {
-            if let Err(e) = tx.send(msg) {
-                log::error!("Error forwarding database event: {:?}", e);
+            match msg {
+                Ok(msg) => {
+                    if let Err(e) = tx.send(msg) {
+                        log::error!("Error forwarding database event: {:?}", e);
+                    }
+                }
+                Err(e) => {
+                    log::error!("Database error: {:?}", e);
+                    break;
+                }
             }
         }
         log::info!("Disconnected from database {:?}", config.get_dbname());
@@ -40,7 +42,7 @@ pub async fn connect(
     Ok((Client::new(client), rx))
 }
 
-pub async fn startup() -> Result<(), Box<dyn std::error::Error>> {
+pub async fn startup() -> anyhow::Result<()> {
     let db_str =
         std::env::var("DB_STR").unwrap_or_else(|_| "postgresql://user:password@db:5432".to_owned());
 
@@ -52,10 +54,7 @@ pub async fn startup() -> Result<(), Box<dyn std::error::Error>> {
     // While we're determining database setup, just log any errors and ignore other things
     tokio::spawn(async move {
         while let Some(msg) = conn_stream.recv().await {
-            match msg {
-                Ok(msg) => {}
-                Err(e) => log::error!("Database error: {:?}", e),
-            }
+            // TODO
         }
     });
 
