@@ -3,6 +3,7 @@ CREATE TABLE lantern.rooms (
     party_id    bigint              NOT NULL,
     name        text                NOT NULL,
     topic       varchar(2048),
+    deleted_at  timestamp,
 
     -- contains info on NSFW, channel type, etc.
     flags       smallint            NOT NULL    DEFAULT 0,

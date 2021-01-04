@@ -1,8 +1,7 @@
 CREATE TABLE lantern.users (
     --- Snowflake id
-    id                 bigint                 NOT NULL,
-    -- Inactive users are banned/deleted until purged
-    is_active       bool                NOT NULL    DEFAULT true,
+    id              bigint              NOT NULL,
+    deleted_at      timestamp,
     username        varchar(64)         NOT NULL,
     discriminator   varchar(4)          NOT NULL,
     email           text                NOT NULL,

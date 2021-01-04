@@ -7,9 +7,7 @@ CREATE TABLE lantern.party (
     name        varchar(256)    NOT NULL,
     -- If NULL, it's a private chat/DM
     owner_id    bigint,
-
-    -- Inactive parties are banned/deleted until purged
-    is_active   bool            NOT NULL DEFAULT true,
+    deleted_at  timestamp,
 
     CONSTRAINT party_pk PRIMARY KEY (id)
 );

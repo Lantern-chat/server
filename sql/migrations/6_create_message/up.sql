@@ -6,6 +6,7 @@ CREATE TABLE lantern.messages (
     editor_id   smallint,
     updated_at  timestamp               DEFAULT now(),
     edited_at   timestamp,
+    deleted_at  timestamp,
     content     text,
 
     CONSTRAINT messages_pk PRIMARY KEY (id)
