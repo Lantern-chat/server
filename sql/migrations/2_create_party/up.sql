@@ -3,9 +3,9 @@
 --
 
 CREATE TABLE lantern.party (
-    id 			bigint 			NOT NULL,
-    name 		varchar(256) 	NOT NULL,
-    user_id 	bigint 			NOT NULL,
+    id          bigint          NOT NULL,
+    name        varchar(256)    NOT NULL,
+    user_id     bigint          NOT NULL,
 
     -- If anonymous, it's a private group chat
     is_anon     bool            NOT NULL,
@@ -29,8 +29,8 @@ ALTER TABLE lantern.party ADD CONSTRAINT owner_fk FOREIGN KEY (user_id)
 
 -- Association map between parties and users
 CREATE TABLE lantern.party_member (
-    party_id 	bigint NOT NULL,
-    user_id		bigint NOT NULL,
+    party_id    bigint NOT NULL,
+    user_id     bigint NOT NULL,
 
     -- Composite primary key
     CONSTRAINT party_member_pk PRIMARY KEY (party_id, user_id)
