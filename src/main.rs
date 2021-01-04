@@ -22,10 +22,10 @@ use structopt::StructOpt;
 use warp::Filter;
 
 #[tokio::main(flavor = "multi_thread")]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
 
-    let args = cli::CliOptions::from_args();
+    let mut args = cli::CliOptions::from_args();
 
     // a builder for `FmtSubscriber`.
     let subscriber = FmtSubscriber::builder()
@@ -39,8 +39,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .finish(); // completes the builder.
 
     log::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-
     log::debug!("Arguments: {:?}", args);
+
+    args.prepare()?;
 
     let db = crate::db::startup::startup().await?;
 

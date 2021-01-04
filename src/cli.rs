@@ -7,3 +7,13 @@ pub struct CliOptions {
     #[structopt(long, env = "LANTERN_BIND")]
     pub bind: Option<String>,
 }
+
+impl CliOptions {
+    pub fn prepare(&mut self) -> anyhow::Result<()> {
+        if let Some(ref mut bind) = self.bind {
+            *bind = bind.replace("localhost", "127.0.0.1");
+        }
+
+        Ok(())
+    }
+}
