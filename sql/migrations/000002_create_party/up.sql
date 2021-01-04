@@ -16,7 +16,7 @@ ALTER TABLE lantern.party OWNER TO postgres;
 CREATE UNIQUE INDEX CONCURRENTLY name_idx ON lantern.party USING btree (name);
 
 ALTER TABLE lantern.party ADD CONSTRAINT owner_fk FOREIGN KEY (owner_id)
-    REFERENCES lantern.users (id) MATCH SIMPLE
+    REFERENCES lantern.users (id) MATCH FULL
     ON DELETE RESTRICT ON UPDATE CASCADE; -- Don't allow users to delete accounts if they own parties
 
 
