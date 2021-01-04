@@ -19,8 +19,10 @@ CREATE TABLE lantern.files (
     -- Size of file in bytes
     size    int         NOT NULL,
 
-    -- MD5 sum for error-checking
-    md5     varbit(128) NOT NULL,
+    -- SHA3-256 hash for error-checking and deduplication
+    sha3    varbit(256) NOT NULL,
 
     CONSTRAINT file_pk PRIMARY KEY (id)
 );
+
+CREATE UNIQUE INDEX CONCURRENTLY file_hash_idx ON lantern.files USING HASH(sha3);
