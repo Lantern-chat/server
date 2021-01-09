@@ -27,6 +27,11 @@ CREATE TABLE lantern.party_member (
     party_id    bigint NOT NULL,
     user_id     bigint NOT NULL,
 
+    -- same as for user, but per-party
+    nickname    varchar(256),
+    -- same as for user, but per-party
+    away        smallint,
+
     -- Composite primary key
     CONSTRAINT party_member_pk PRIMARY KEY (party_id, user_id)
 );

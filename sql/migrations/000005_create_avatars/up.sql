@@ -39,3 +39,10 @@ ALTER TABLE lantern.rooms ADD COLUMN avatar_id bigint;
 ALTER TABLE lantern.rooms ADD CONSTRAINT avatar_fk FOREIGN KEY (avatar_id)
     REFERENCES lantern.avatar (id) MATCH FULL
     ON DELETE SET NULL ON UPDATE CASCADE; -- IMPORTANT: Only set NULL when deleting avatars, DO NOT CASCADE
+
+-- Add per-party user avatars
+ALTER TABLE lantern.party_member ADD COLUMN avatar_id bigint;
+
+ALTER TABLE lantern.party_member ADD CONSTRAINT avatar_fk FOREIGN KEY (avatar_id)
+    REFERENCES lantern.avatar (id) MATCH FULL
+    ON DELETE SET NULL ON UPDATE CASCADE; -- IMPORTANT: Only set NULL when deleting avatars, DO NOT CASCADE
