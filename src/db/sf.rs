@@ -1,4 +1,8 @@
-use std::sync::atomic::{AtomicU16, Ordering};
+use std::{
+    fmt,
+    str::FromStr,
+    sync::atomic::{AtomicU16, Ordering},
+};
 
 use std::num::NonZeroU64;
 
@@ -58,6 +62,20 @@ impl Snowflake {
 
     pub fn raw_timestamp(&self) -> u64 {
         self.0.get() >> 22
+    }
+}
+
+impl FromStr for Snowflake {
+    type Err = <NonZeroU64 as FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        NonZeroU64::from_str(s).map(Snowflake)
+    }
+}
+
+impl fmt::Display for Snowflake {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
 
