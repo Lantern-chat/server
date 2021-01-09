@@ -11,6 +11,7 @@ pub mod gateway;
 pub mod rate;
 pub mod routes;
 pub mod state;
+pub mod storage;
 
 pub use state::ServerState;
 

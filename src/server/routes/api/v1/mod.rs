@@ -8,6 +8,7 @@ use crate::{
 };
 
 mod build;
+mod file;
 
 pub fn status() -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
     warp::path("status").map(|| "Testing")
