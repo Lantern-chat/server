@@ -1,8 +1,20 @@
+use std::path::PathBuf;
+
 use super::*;
 
 use tokio::fs;
 
-pub struct FilesystemFileStore {}
+pub struct FilesystemFileStore {
+    pub base_path: PathBuf,
+}
+
+impl FilesystemFileStore {
+    pub fn to_path(&self, file_id: Snowflake) -> PathBuf {
+        let mut path = self.base_path.clone();
+        path.push(file_id.to_string());
+        path
+    }
+}
 
 #[async_trait::async_trait]
 impl FileStore for FilesystemFileStore {
@@ -10,7 +22,7 @@ impl FileStore for FilesystemFileStore {
         Ok(Box::new(
             fs::OpenOptions::new()
                 .write(true)
-                .open(format!("{}", file_id))
+                .open(self.to_path(file_id))
                 .await?,
         ))
     }
@@ -19,13 +31,12 @@ impl FileStore for FilesystemFileStore {
         Ok(Box::new(
             fs::OpenOptions::new()
                 .read(true)
-                .open(format!("{}", file_id))
+                .open(self.to_path(file_id))
                 .await?,
         ))
     }
 
     async fn delete(&self, file_id: Snowflake) -> Result<(), anyhow::Error> {
-        fs::remove_file(format!("{}", file_id)).await?;
-        Ok(())
+        Ok(fs::remove_file(self.to_path(file_id)).await?)
     }
 }
