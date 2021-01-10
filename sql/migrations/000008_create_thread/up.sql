@@ -26,12 +26,12 @@ ALTER TABLE lantern.threads ADD CONSTRAINT message_fk FOREIGN KEY (parent_id)
 
 
 -- Maps what users are subscribed to what threads
-CREATE TABLE lantern.thread_subscriptions {
+CREATE TABLE lantern.thread_subscriptions (
     user_id     bigint NOT NULL,
     thread_id   bigint NOT NULL,
 
     CONSTRAINT thread_subscriptions_pk PRIMARY KEY (user_id, thread_id)
-};
+);
 ALTER TABLE lantern.thread_subscriptions OWNER TO postgres;
 
 ALTER TABLE lantern.thread_subscriptions ADD CONSTRAINT user_fk FOREIGN KEY (user_id)

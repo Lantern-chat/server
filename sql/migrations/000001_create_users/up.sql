@@ -25,4 +25,4 @@ ALTER TABLE lantern.users OWNER TO postgres;
 
 -- Fast lookup of users via `username#0000`
 CREATE INDEX CONCURRENTLY user_username_discriminator_idx ON lantern.users
-    USING hash (username, discriminator);
+    USING btree (username, discriminator);

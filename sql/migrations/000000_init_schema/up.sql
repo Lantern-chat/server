@@ -6,7 +6,7 @@ ALTER SCHEMA lantern OWNER TO postgres;
 -- host table tracks migrations
 CREATE TABLE lantern.host (
     migration int NOT NULL,
-    migrated  timestamp NOT NULL DEFAULT,
+    migrated  timestamp NOT NULL,
 
     CONSTRAINT migration_primary_key PRIMARY KEY (migration)
 );

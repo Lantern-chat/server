@@ -20,9 +20,9 @@ CREATE TABLE lantern.files (
     size    int         NOT NULL,
 
     -- SHA3-256 hash for error-checking and deduplication
-    sha3    varbit(256) NOT NULL,
+    sha3    bytea       NOT NULL UNIQUE,
 
     CONSTRAINT file_pk PRIMARY KEY (id)
 );
 
-CREATE UNIQUE INDEX CONCURRENTLY file_hash_idx ON lantern.files USING HASH(sha3);
+CREATE INDEX CONCURRENTLY file_hash_idx ON lantern.files USING HASH(sha3);
