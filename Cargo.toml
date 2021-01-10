@@ -39,6 +39,8 @@ aes-gcm-siv = "0.9.0"
 chacha20 = "0.6.0"
 ctr = "0.6.0"
 aes = "0.6.0"
+regex = "1.4.3"
+lazy_static = "1.4.0"
 
 [dependencies.flate2]
 version = "1.0.19"
