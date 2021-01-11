@@ -2,13 +2,13 @@ pub mod client;
 pub mod conn;
 pub mod startup;
 
-pub use client::Client;
+pub use client::{Client, ClientError};
 
 pub mod sf;
 pub use sf::Snowflake;
 
 pub mod schema {
-    use super::{Client, Snowflake};
+    use super::{Client, ClientError, Snowflake};
     use tokio_postgres::{Error, Row};
 
     pub mod attachment;

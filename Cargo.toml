@@ -41,6 +41,7 @@ ctr = "0.6.0"
 aes = "0.6.0"
 regex = "1.4.3"
 lazy_static = "1.4.0"
+failsafe = "1.0.0"
 
 [dependencies.flate2]
 version = "1.0.19"

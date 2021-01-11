@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{atomic::Ordering, Arc};
 use std::{borrow::Cow, path::PathBuf};
 
 use futures::StreamExt;
@@ -8,56 +8,36 @@ use tokio::sync::mpsc;
 
 use tokio_postgres as pg;
 
-use super::{client::Client, conn::ConnectionStream};
+use super::client::Client;
 
-pub async fn connect(
-    config: pg::Config,
-) -> anyhow::Result<(Client, mpsc::UnboundedReceiver<pg::AsyncMessage>)> {
-    log::info!(
-        "Connecting to database {:?} at {:?}:{:?}...",
-        config.get_dbname(),
-        config.get_hosts(),
-        config.get_ports(),
-    );
-    let (client, conn) = config.connect(pg::NoTls).await?;
-
-    let (tx, rx) = mpsc::unbounded_channel();
+pub fn log_connection(client: Client) {
     tokio::spawn(async move {
-        let mut conn = ConnectionStream(conn);
-        while let Some(msg) = conn.next().await {
-            match msg {
-                Ok(msg) => {
-                    if let Err(e) = tx.send(msg) {
-                        log::error!("Error forwarding database event: {:?}", e);
-                    }
-                }
-                Err(e) => {
-                    log::error!("Database error: {:?}", e);
-                    break;
+        loop {
+            let mut conn = client.conn.lock().await;
+            if let Some(ref mut rx) = *conn {
+                while let Some(msg) = rx.recv().await {
+                    // TODO
                 }
             }
-        }
-        log::info!("Disconnected from database {:?}", config.get_dbname());
-    });
 
-    Ok((Client::new(client), rx))
+            if !client.autoreconnect.load(Ordering::SeqCst) {
+                break;
+            }
+        }
+    });
 }
 
-pub async fn startup() -> anyhow::Result<()> {
+pub async fn startup() -> anyhow::Result<Client> {
     let db_str =
         std::env::var("DB_STR").unwrap_or_else(|_| "postgresql://user:password@db:5432".to_owned());
 
     let mut config = db_str.parse::<pg::Config>()?;
 
     config.dbname("postgres");
-    let (mut client, mut conn_stream) = connect(config.clone()).await?;
+    let mut client = Client::connect(config.clone()).await?;
 
-    // While we're determining database setup, just log any errors and ignore other things
-    tokio::spawn(async move {
-        while let Some(msg) = conn_stream.recv().await {
-            // TODO
-        }
-    });
+    // Just log any errors and ignore other things
+    log_connection(client.clone());
 
     log::info!("Querying database setup...");
     let has_lantern = client
@@ -66,17 +46,17 @@ pub async fn startup() -> anyhow::Result<()> {
 
     if has_lantern.is_none() {
         client
-            .execute(
-                r#"
-            CREATE DATABASE lantern ENCODING = 'UTF8';
-                "#,
-                &[],
-            )
+            .execute("CREATE DATABASE lantern ENCODING = 'UTF8'", &[])
             .await?;
     }
 
+    client.close().await;
+
     config.dbname("lantern");
-    let (mut client, conn_stream) = connect(config).await?;
+    client = Client::connect(config.clone()).await?;
+
+    // Just log any errors and ignore other things
+    log_connection(client.clone());
 
     let has_migrations = client
         .query_opt(
@@ -120,15 +100,14 @@ pub async fn startup() -> anyhow::Result<()> {
     let comment_regex = regex::Regex::new(r#"--.*"#).unwrap();
 
     for (idx, migration_path) in available_migrations {
+        let name = migration_path.file_stem().unwrap().to_string_lossy();
         if idx > last_migration {
-            log::info!("Running migration {}", idx);
+            log::info!("Running migration {}: {}", idx, name);
 
             let migration = load_migration(migration_path).await?;
 
             async fn run_batch(client: &Client, sql: &str) -> Result<(), anyhow::Error> {
-                let commands = str::split(&sql, ";");
-
-                for command in commands {
+                for command in str::split(&sql, ";") {
                     client.execute(command, &[]).await?;
                 }
 
@@ -151,13 +130,15 @@ pub async fn startup() -> anyhow::Result<()> {
                 )
                 .await?;
         } else {
-            log::info!("Skipping migration {}", idx);
+            log::info!("Skipping migration {}: {}", idx, name);
         }
     }
 
-    // TODO: Setup migration tables and begin migrations
+    client.close().await;
 
-    Ok(()) // TODO: Return client and conn_stream
+    // reconnect one last time to clear old rx forwards
+    // TODO: Find a way to close this on drop
+    Client::connect(config).await
 }
 
 pub struct Migration {
