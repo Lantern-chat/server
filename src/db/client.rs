@@ -93,7 +93,10 @@ impl Client {
             this.client.store(None);
             *this.conn.lock().await = None;
 
-            log::info!("Disconnected from database {:?}", this.config.get_dbname());
+            log::info!(
+                "Disconnected from database {:?}",
+                this.config.get_dbname().unwrap_or("Unnamed")
+            );
 
             if this.autoreconnect.load(Ordering::SeqCst) {
                 log::info!("Attempting reconnect...");
@@ -106,10 +109,11 @@ impl Client {
     }
 
     async fn real_connect(&self, attempt: u64) -> Result<(), anyhow::Error> {
+        let name = self.config.get_dbname().unwrap_or("Unnamed");
         log::info!(
             "Connecting ({}) to database {:?} at {:?}:{:?}...",
             attempt,
-            self.config.get_dbname(),
+            name,
             self.config.get_hosts(),
             self.config.get_ports(),
         );
@@ -122,10 +126,7 @@ impl Client {
         self.cache.store(Default::default());
         self.client.store(Some(Arc::new(client)));
 
-        log::info!(
-            "Connection to database {:?} successful!",
-            self.config.get_dbname()
-        );
+        log::info!("Connection to database {:?} successful!", name);
 
         Ok(())
     }
