@@ -4,6 +4,7 @@ use futures::{future, Future, FutureExt, StreamExt};
 
 use tokio::sync::mpsc;
 use tokio_postgres::Socket;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use warp::ws::{Message as WsMessage, WebSocket};
 use warp::{Filter, Rejection, Reply};
@@ -71,7 +72,8 @@ pub async fn client_connected(
     state: Arc<ServerState>,
 ) {
     let (ws_tx, mut ws_rx) = ws.split();
-    let (tx, rx) = warp::test::unbounded_channel_stream();
+    let (tx, rx) = mpsc::unbounded_channel();
+    let rx = UnboundedReceiverStream::new(rx);
 
     tokio::spawn(rx.forward(ws_tx).map(move |result: Result<_, _>| {
         result.map_err(|e| log::error!("websocket send error: {} to client {:?}", e, addr))
