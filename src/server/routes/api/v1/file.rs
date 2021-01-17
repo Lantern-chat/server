@@ -9,9 +9,6 @@ use crate::{
     server::{rate::RateLimitKey, ServerState},
 };
 
-use aes_gcm_siv::aead::{generic_array::GenericArray, Aead, NewAead};
-use aes_gcm_siv::Aes256GcmSiv;
-
 const KEY: &[u8] = b"an example very very secret key.";
 const NONCE: &[u8] = b"unique nonce";
 
