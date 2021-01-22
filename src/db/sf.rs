@@ -11,7 +11,7 @@ use std::num::NonZeroU64;
 pub struct Snowflake(NonZeroU64);
 
 /// Arbitrarily chosen starting epoch to offset the clock by
-pub const LANTERN_EPOCH: u64 = 1550102400000;
+pub const LANTERN_EPOCH: u128 = 1550102400000;
 
 /// Incremenent counter to ensure unique snowflakes
 pub static INCR: AtomicU16 = AtomicU16::new(0);
@@ -25,14 +25,10 @@ impl Snowflake {
         Snowflake(unsafe { NonZeroU64::new_unchecked(1) })
     }
 
-    /// Creates a new Snowflake at this moment
-    pub fn now() -> Snowflake {
-        // get time since unix epoch as milliseconds, subtract Lantern epoch
-        let ms = std::time::UNIX_EPOCH
-            .elapsed()
-            .expect("Could not get time")
-            .as_millis() as u64
-            - LANTERN_EPOCH;
+    /// Create a snowflake at the given unix epoch (milliseconds)
+    pub fn at_ms(ms: u128) -> Snowflake {
+        // offset by Lantern epoch
+        let ms = (ms - LANTERN_EPOCH) as u64;
 
         // update incremenent counter, making sure it wraps at 12 bits
         let incr = INCR
@@ -55,9 +51,19 @@ impl Snowflake {
         })
     }
 
+    /// Creates a new Snowflake at this moment
+    pub fn now() -> Snowflake {
+        Self::at_ms(
+            std::time::UNIX_EPOCH
+                .elapsed()
+                .expect("Could not get time")
+                .as_millis(),
+        )
+    }
+
     /// Gets the number of milliseconds since the unix epoch
-    pub fn epoch_ms(&self) -> u64 {
-        self.raw_timestamp() + LANTERN_EPOCH
+    pub fn epoch_ms(&self) -> u128 {
+        self.raw_timestamp() as u128 + LANTERN_EPOCH
     }
 
     pub fn raw_timestamp(&self) -> u64 {

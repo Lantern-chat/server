@@ -9,6 +9,8 @@ use tokio::sync::{oneshot, Mutex, RwLock};
 
 use hashbrown::HashMap;
 
+use crate::db::Client;
+
 use super::{conns::HostConnections, rate::RateLimitTable};
 
 pub struct ServerState {
@@ -16,15 +18,17 @@ pub struct ServerState {
     pub shutdown: Mutex<Option<oneshot::Sender<()>>>,
     pub rate_limit: crate::server::rate::RateLimitTable,
     pub gateway_conns: HostConnections,
+    pub db: Client,
 }
 
 impl ServerState {
-    pub fn new(shutdown: oneshot::Sender<()>) -> Arc<Self> {
+    pub fn new(shutdown: oneshot::Sender<()>, db: Client) -> Arc<Self> {
         Arc::new(ServerState {
             is_alive: AtomicBool::new(true),
             shutdown: Mutex::new(Some(shutdown)),
             rate_limit: RateLimitTable::new(50.0),
             gateway_conns: HostConnections::default(),
+            db,
         })
     }
 
@@ -39,6 +43,8 @@ impl ServerState {
                 log::info!("Sending server shutdown signal.");
 
                 self.is_alive.store(false, Ordering::Relaxed);
+
+                self.db.close().await;
 
                 if let Err(err) = shutdown.send(()) {
                     log::error!("Could not shutdown server gracefully! Error: {:?}", err);

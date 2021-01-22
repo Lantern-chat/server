@@ -1,9 +1,11 @@
 use std::str::FromStr;
 
-const TOKEN_LEN: usize = 32;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct AuthToken(pub [u8; TOKEN_LEN]);
+pub struct AuthToken(pub [u8; Self::TOKEN_LEN]);
+
+impl AuthToken {
+    pub const TOKEN_LEN: usize = 32;
+}
 
 impl AuthToken {
     pub fn as_str(&self) -> &str {
@@ -18,8 +20,8 @@ impl FromStr for AuthToken {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let bytes = s.as_bytes();
-        if bytes.len() == TOKEN_LEN && s.is_ascii() {
-            let mut token = AuthToken([0; TOKEN_LEN]);
+        if bytes.len() == Self::TOKEN_LEN && s.is_ascii() {
+            let mut token = AuthToken([0; Self::TOKEN_LEN]);
             token.0.copy_from_slice(bytes);
             Ok(token)
         } else {

@@ -5,6 +5,7 @@ CREATE TABLE lantern.users (
     username        varchar(64)         NOT NULL,
     discriminator   varchar(4)          NOT NULL,
     email           text                NOT NULL,
+    dob             date                NOT NULL,
     is_verified     bool                NOT NULL    DEFAULT false,
     -- bcrypt string with hash and salt
     bcrypt          text                NOT NULL,

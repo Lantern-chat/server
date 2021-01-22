@@ -15,14 +15,19 @@ pub mod storage;
 
 pub use state::ServerState;
 
+use crate::db::Client;
+
 pub mod tasks {
     pub mod cn_cleanup;
     pub mod rl_cleanup;
 }
 
-pub fn start_server(addr: impl Into<SocketAddr>) -> (impl Future<Output = ()>, Arc<ServerState>) {
+pub fn start_server(
+    addr: impl Into<SocketAddr>,
+    db: Client,
+) -> (impl Future<Output = ()>, Arc<ServerState>) {
     let (snd, rcv) = tokio::sync::oneshot::channel();
-    let state = state::ServerState::new(snd);
+    let state = state::ServerState::new(snd, db);
     let addr = addr.into();
 
     log::info!("Binding to {:?}", addr);

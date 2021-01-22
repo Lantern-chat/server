@@ -9,6 +9,7 @@ use crate::{
 
 mod build;
 mod file;
+mod user;
 
 pub fn status() -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
     warp::path("status").map(|| "Testing")
@@ -19,6 +20,7 @@ pub fn status() -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clo
 pub enum Route {
     Status,
     Build,
+    User,
 }
 
 #[derive(Debug)]
@@ -56,5 +58,6 @@ pub fn api(
     balanced_or_tree!(
         rate_limit(Route::Status, state.clone()).and(status()),
         rate_limit(Route::Build, state.clone()).and(build::route()),
+        rate_limit(Route::User, state.clone()).and(user::user(state.clone()))
     )
 }
