@@ -20,6 +20,7 @@ use crate::db::Client;
 pub mod tasks {
     pub mod cn_cleanup;
     pub mod rl_cleanup;
+    pub mod session_cleanup;
 }
 
 pub fn start_server(
@@ -38,6 +39,7 @@ pub fn start_server(
 
     tokio::spawn(tasks::rl_cleanup::cleanup_ratelimits(state.clone()));
     tokio::spawn(tasks::cn_cleanup::cleanup_connections(state.clone()));
+    tokio::spawn(tasks::session_cleanup::cleanup_sessions(state.clone()));
 
     (server, state)
 }

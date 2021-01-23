@@ -12,6 +12,7 @@ pub mod built {
 
 pub mod cli;
 pub mod db;
+pub mod rng;
 pub mod server;
 pub mod util;
 

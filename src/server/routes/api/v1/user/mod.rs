@@ -8,10 +8,14 @@ use crate::{
     server::{rate::RateLimitKey, ServerState},
 };
 
+mod login;
 mod register;
 
 pub fn user(
     state: Arc<ServerState>,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
-    balanced_or_tree!(register::register(state.clone()))
+    warp::path("user").and(balanced_or_tree!(
+        register::register(state.clone()),
+        login::login(state.clone())
+    ))
 }

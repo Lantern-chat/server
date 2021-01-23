@@ -218,6 +218,20 @@ impl Client {
             .map_err(ClientError::from)
     }
 
+    pub async fn execute_cached<F>(
+        &self,
+        query: F,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<u64, ClientError>
+    where
+        F: Any + FnOnce() -> &'static str,
+    {
+        self.client()?
+            .execute(&self.prepare_cached(query).await?, params)
+            .await
+            .map_err(ClientError::from)
+    }
+
     pub async fn query<T>(
         &self,
         statement: &T,

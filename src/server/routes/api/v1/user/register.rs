@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::SystemTime};
 
 use warp::{
     body::json,
@@ -22,25 +22,35 @@ pub struct RegisterForm {
     day: u8,
 }
 
+#[derive(Serialize)]
+pub struct RegisterResponse {
+    auth: String,
+}
+
 pub fn register(
     state: Arc<ServerState>,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
     warp::post()
+        .and(warp::path("register"))
         .map(move || state.clone())
         .and(warp::body::form::<RegisterForm>())
         .and_then(|state: Arc<ServerState>, form: RegisterForm| async move {
             match register_user(state, form).await {
                 Ok(token) => Ok::<_, Rejection>(warp::reply::with_status(
-                    warp::reply::json(&token.as_str()),
+                    warp::reply::json(&RegisterResponse {
+                        auth: base64::encode(token.as_str()),
+                    }),
                     StatusCode::OK,
                 )),
                 Err(ref e) => match e {
-                    RegisterError::ClientError(e_inner) => {
-                        log::error!("{} while Registering: {}", e, e_inner);
+                    RegisterError::ClientError(_)
+                    | RegisterError::JoinError(_)
+                    | RegisterError::PasswordHashError(_) => {
+                        log::error!("{}", e);
                         Ok(warp::reply::with_status(
                             warp::reply::json(&ApiError {
                                 code: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                                message: e.to_string(),
+                                message: "Internal Error".to_owned(),
                             }),
                             StatusCode::INTERNAL_SERVER_ERROR,
                         ))
@@ -61,18 +71,30 @@ pub fn register(
 enum RegisterError {
     #[error("Invalid Email Address")]
     InvalidEmail,
+
     #[error("Invalid Username")]
     InvalidUsername,
+
     #[error("Invalid Password")]
     InvalidPassword,
+
     #[error("Email already registered")]
     AlreadyExists,
-    #[error("Database Error")]
+
+    #[error("Database Error {0}")]
     ClientError(#[from] ClientError),
+
     #[error("Invalid Date of Birth")]
     InvalidDob(#[from] time::error::ComponentRange),
+
     #[error("Too Young")]
     TooYoungError,
+
+    #[error("Join Error {0}")]
+    JoinError(#[from] tokio::task::JoinError),
+
+    #[error("Password Hash Error {0}")]
+    PasswordHashError(#[from] argon2::Error),
 }
 
 use regex::Regex;
@@ -82,16 +104,17 @@ lazy_static::lazy_static! {
 }
 
 // TODO: Set these in server config
-const MIN_AGE: i64 = 13;
+const MIN_AGE: i64 = 18;
 const MIN_PASSWORD_LEN: usize = 8;
+const MAX_USERNAME_LEN: usize = 64;
 const MIN_USERNAME_LEN: usize = 3;
 
 async fn register_user(
     state: Arc<ServerState>,
-    form: RegisterForm,
+    mut form: RegisterForm,
 ) -> Result<AuthToken, RegisterError> {
     // Order these tests by complexity for faster failures
-    if form.username.len() < MIN_USERNAME_LEN {
+    if form.username.len() < MIN_USERNAME_LEN || form.username.len() > MAX_USERNAME_LEN {
         return Err(RegisterError::InvalidUsername);
     }
 
@@ -105,11 +128,12 @@ async fn register_user(
         return Err(RegisterError::InvalidEmail);
     }
 
-    let dob = time::Date::try_from_ymd(form.year, form.month, form.day)?;
-    let now = time::OffsetDateTime::now_utc();
-    let today = now.date();
+    let dob = time::Date::try_from_ymd(form.year, form.month + 1, form.day + 1)?;
+    let now = SystemTime::now();
+    let today = time::OffsetDateTime::from(now).date();
     let diff = today - dob;
 
+    // TODO: Implement something better
     let mut days = diff.whole_days();
     // rough approximiation, if it's less than this, it'll be less than the exact
     if days < MIN_AGE * 365 {
@@ -117,7 +141,6 @@ async fn register_user(
     } else {
         let mut years = 0;
         let mut year = today.year();
-        days -= today.ordinal() as i64; // go to start of this year
         loop {
             year -= 1;
             days -= time::days_in_year(year) as i64;
@@ -147,5 +170,48 @@ async fn register_user(
     let id =
         Snowflake::at_ms((now - time::OffsetDateTime::unix_epoch()).whole_milliseconds() as u128);
 
-    Ok(AuthToken([0; AuthToken::TOKEN_LEN]))
+    use rand::Rng;
+
+    let password = std::mem::replace(&mut form.password, String::new());
+
+    let password_hash = tokio::task::spawn_blocking(move || {
+        let config = hash_config();
+        let salt: [u8; 16] = crate::rng::crypto_thread_rng().gen();
+        argon2::hash_encoded(password.as_bytes(), &salt, &config)
+    })
+    .await??;
+
+    state
+        .db
+        .execute_cached(
+            || "CALL lantern.register_user($1, $2, $3, $4, $5)",
+            &[&id, &form.username, &form.email, &password_hash, &dob],
+        )
+        .await?;
+
+    let token = AuthToken(crate::rng::crypto_thread_rng().gen());
+
+    let expires = now + std::time::Duration::from_secs(90 * 24 * 60 * 60); // TODO: Set from config
+    state
+        .db
+        .execute_cached(
+            || "INSERT INTO lantern.sessions (id, user_id, expires) VALUES ($1, $2, $3)",
+            &[&&token.0[..], &id, &expires],
+        )
+        .await?;
+
+    Ok(token)
+}
+
+fn hash_config() -> argon2::Config<'static> {
+    let mut config = argon2::Config::default();
+
+    config.ad = b"Lantern";
+    config.variant = argon2::Variant::Argon2i;
+    config.lanes = 1;
+    config.time_cost = 12;
+    config.thread_mode = argon2::ThreadMode::Sequential;
+    config.hash_length = 24;
+
+    config
 }
