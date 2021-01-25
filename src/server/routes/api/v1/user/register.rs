@@ -97,10 +97,14 @@ enum RegisterError {
     PasswordHashError(#[from] argon2::Error),
 }
 
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 
 lazy_static::lazy_static! {
     static ref EMAIL_REGEX: Regex = Regex::new(r#"^[^@\s]+@[^@\s]+\.[^.@\s]+$"#).unwrap();
+    static ref USERNAME_REGEX: Regex = Regex::new(r#"^[^\s].{1,62}[^\s]$"#).unwrap();
+    static ref PASSWORD_REGEX: Regex = Regex::new(r#"\P{L}|\p{N}"#).unwrap();
+
+    static ref USERNAME_SANITIZE_REGEX: Regex = Regex::new(r#"\s+"#).unwrap();
 }
 
 // TODO: Set these in server config
@@ -113,14 +117,11 @@ async fn register_user(
     state: Arc<ServerState>,
     mut form: RegisterForm,
 ) -> Result<AuthToken, RegisterError> {
-    // Order these tests by complexity for faster failures
-    if form.username.len() < MIN_USERNAME_LEN || form.username.len() > MAX_USERNAME_LEN {
+    if !USERNAME_REGEX.is_match(&form.username) {
         return Err(RegisterError::InvalidUsername);
     }
 
-    if form.password.len() < MIN_PASSWORD_LEN
-        || form.password.chars().find(|c| !c.is_alphabetic()).is_none()
-    {
+    if !PASSWORD_REGEX.is_match(&form.password) {
         return Err(RegisterError::InvalidPassword);
     }
 
@@ -174,18 +175,22 @@ async fn register_user(
 
     let password = std::mem::replace(&mut form.password, String::new());
 
-    let password_hash = tokio::task::spawn_blocking(move || {
+    // fire this off while we sanitize the username
+    let password_hash_task = tokio::task::spawn_blocking(move || {
         let config = hash_config();
         let salt: [u8; 16] = crate::rng::crypto_thread_rng().gen();
         argon2::hash_encoded(password.as_bytes(), &salt, &config)
-    })
-    .await??;
+    });
+
+    let username = USERNAME_SANITIZE_REGEX.replace_all(&form.username, " ");
+
+    let password_hash = password_hash_task.await??;
 
     state
         .db
         .execute_cached(
             || "CALL lantern.register_user($1, $2, $3, $4, $5)",
-            &[&id, &form.username, &form.email, &password_hash, &dob],
+            &[&id, &username, &form.email, &password_hash, &dob],
         )
         .await?;
 
