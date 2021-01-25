@@ -21,9 +21,9 @@ pub fn routes(
     )
     .with(warp::cors().build());
 
-    #[cfg(debug_assertions)]
+    //#[cfg(debug_assertions)]
     return routes.with(warp::trace::request());
 
-    #[cfg(not(debug_assertions))]
-    routes
+    //#[cfg(not(debug_assertions))]
+    //routes
 }
