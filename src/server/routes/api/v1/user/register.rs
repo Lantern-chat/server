@@ -1,5 +1,7 @@
 use std::{sync::Arc, time::SystemTime};
 
+use rand::Rng;
+
 use warp::{
     body::json,
     hyper::{Server, StatusCode},
@@ -100,8 +102,9 @@ enum RegisterError {
 use regex::{Regex, RegexBuilder};
 
 lazy_static::lazy_static! {
-    static ref EMAIL_REGEX: Regex = Regex::new(r#"^[^@\s]+@[^@\s]+\.[^.@\s]+$"#).unwrap();
-    static ref USERNAME_REGEX: Regex = Regex::new(r#"^[^\s].{1,62}[^\s]$"#).unwrap();
+    pub static ref EMAIL_REGEX: Regex = Regex::new(r#"^[^@\s]+@[^@\s]+\.[^.@\s]+$"#).unwrap();
+    pub static ref USERNAME_REGEX: Regex = Regex::new(r#"^[^\s].{1,62}[^\s]$"#).unwrap();
+
     static ref PASSWORD_REGEX: Regex = Regex::new(r#"\P{L}|\p{N}"#).unwrap();
 
     static ref USERNAME_SANITIZE_REGEX: Regex = Regex::new(r#"\s+"#).unwrap();
@@ -171,8 +174,6 @@ async fn register_user(
     let id =
         Snowflake::at_ms((now - time::OffsetDateTime::unix_epoch()).whole_milliseconds() as u128);
 
-    use rand::Rng;
-
     let password = std::mem::replace(&mut form.password, String::new());
 
     // fire this off while we sanitize the username
@@ -194,18 +195,7 @@ async fn register_user(
         )
         .await?;
 
-    let token = AuthToken(crate::rng::crypto_thread_rng().gen());
-
-    let expires = now + std::time::Duration::from_secs(90 * 24 * 60 * 60); // TODO: Set from config
-    state
-        .db
-        .execute_cached(
-            || "INSERT INTO lantern.sessions (id, user_id, expires) VALUES ($1, $2, $3)",
-            &[&&token.0[..], &id, &expires],
-        )
-        .await?;
-
-    Ok(token)
+    Ok(super::login::do_login(state, id, now).await?)
 }
 
 fn hash_config() -> argon2::Config<'static> {
