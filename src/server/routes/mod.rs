@@ -7,8 +7,10 @@ use warp::{Filter, Rejection, Reply};
 
 use crate::server::ServerState;
 
+pub mod wrappers;
+
 pub mod api;
-pub mod files;
+pub mod assets;
 pub mod gateway;
 
 pub fn routes(
@@ -17,7 +19,7 @@ pub fn routes(
     let routes = balanced_or_tree!(
         api::api(state.clone()),
         gateway::gateway(state.clone()),
-        files::route(), // ensure this is last, as it has a wildcard to return index
+        assets::files::route(), // ensure this is last, as it has a wildcard to return index
     )
     .with(warp::cors().build());
 
