@@ -1,5 +1,6 @@
 use std::{
     cell::Cell,
+    net::SocketAddr,
     time::{Duration, Instant},
 };
 
@@ -9,6 +10,7 @@ use crate::db::Snowflake;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RateLimitKey {
+    pub ip: SocketAddr,
     pub account: Snowflake,
     pub route: u16,
 }

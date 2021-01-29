@@ -1,10 +1,10 @@
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
 use warp::{hyper::Server, reject::Reject, Filter, Rejection, Reply};
 
 use crate::{
     db::Snowflake,
-    server::{rate::RateLimitKey, ServerState},
+    server::{rate::RateLimitKey, routes::filters::real_ip, ServerState},
 };
 
 mod build;
@@ -25,7 +25,6 @@ pub enum Route {
 
 #[derive(Debug)]
 pub struct RateLimited;
-
 impl Reject for RateLimited {}
 
 pub fn rate_limit(
@@ -34,10 +33,12 @@ pub fn rate_limit(
 ) -> impl Filter<Extract = (), Error = Rejection> + Clone {
     warp::any()
         .map(move || state.clone())
-        .and_then(move |state: Arc<ServerState>| async move {
+        .and(real_ip())
+        .and_then(move |state: Arc<ServerState>, ip: SocketAddr| async move {
             let allowed = state
                 .rate_limit
                 .req(RateLimitKey {
+                    ip,
                     account: Snowflake::null(), // TODO: Get account from cookies?
                     route: route as u16,
                 })

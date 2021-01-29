@@ -27,10 +27,13 @@ pub fn api(
                 return Err(err);
             } else if err.find::<v1::RateLimited>().is_some() {
                 code = StatusCode::TOO_MANY_REQUESTS;
-                message = "RATE_LIMITED";
+                message = "TOO_MANY_REQUESTS";
+            } else if err.find::<super::filters::NoAuth>().is_some() {
+                code = StatusCode::UNAUTHORIZED;
+                message = "UNAUTHORIZED";
             } else {
                 code = StatusCode::INTERNAL_SERVER_ERROR;
-                message = "UNHANDLED_REJECTION";
+                message = "INTERNAL_SERVER_ERROR";
             }
 
             let json = warp::reply::json(&ApiError {

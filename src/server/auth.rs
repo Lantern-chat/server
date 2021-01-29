@@ -3,8 +3,13 @@ use std::str::FromStr;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct AuthToken(pub [u8; Self::TOKEN_LEN]);
 
+const fn base64bytes(bytes: usize) -> usize {
+    ((4 * bytes / 3) + 3) & !3
+}
+
 impl AuthToken {
     pub const TOKEN_LEN: usize = 32;
+    pub const CHAR_LEN: usize = base64bytes(Self::TOKEN_LEN);
 }
 
 impl AuthToken {
