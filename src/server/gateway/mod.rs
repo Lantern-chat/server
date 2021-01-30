@@ -9,10 +9,13 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 use warp::ws::{Message as WsMessage, WebSocket};
 use warp::{Filter, Rejection, Reply};
 
-use crate::server::{rate::RateLimiter, ServerState};
+use crate::{
+    db::Snowflake,
+    server::{rate::RateLimiter, ServerState},
+};
 
 pub mod msg;
-use msg::Message;
+use msg::{ClientMsg, ServerMsg};
 
 pub mod conn;
 
@@ -65,6 +68,11 @@ fn compress_if(cond: bool, mut msg: Vec<u8>) -> std::io::Result<Vec<u8>> {
     Ok(msg)
 }
 
+pub enum ClienState {
+    Hello,
+    Identified(Snowflake),
+}
+
 pub async fn client_connected(
     ws: WebSocket,
     query: GatewayQueryParams,
@@ -73,14 +81,15 @@ pub async fn client_connected(
 ) {
     let (ws_tx, mut ws_rx) = ws.split();
     let (tx, rx) = mpsc::unbounded_channel();
-    let rx = UnboundedReceiverStream::new(rx);
 
-    tokio::spawn(rx.forward(ws_tx).map(move |result: Result<_, _>| {
-        result.map_err(|e| log::error!("websocket send error: {} to client {:?}", e, addr))
-    }));
+    tokio::spawn(UnboundedReceiverStream::new(rx).forward(ws_tx).map(
+        move |result: Result<_, _>| {
+            result.map_err(|e| log::error!("websocket send error: {} to client {:?}", e, addr))
+        },
+    ));
 
     // helper to encode and compress messages before sending
-    let send = |msg: msg::Message| -> anyhow::Result<()> {
+    let send = |msg: ServerMsg| -> anyhow::Result<()> {
         Ok(tx.send(Ok(WsMessage::binary(compress_if(
             query.compress,
             match query.encoding {
@@ -92,7 +101,7 @@ pub async fn client_connected(
 
     let mut initiated = true;
 
-    if let Err(e) = send(Message::new_hello(45000)) {
+    if let Err(e) = send(ServerMsg::new_hello(45000)) {
         log::error!("Unable to send Hello message: {:?}", e);
         initiated = false;
     }
@@ -105,6 +114,7 @@ pub async fn client_connected(
     // rate-limit the websocket message stream
     let mut rate_limiter = RateLimiter::default();
 
+    // if initiated then loop
     while initiated {
         match ws_rx.next().await {
             // if None was received, we can assume the websocket safely closed
@@ -134,7 +144,7 @@ pub async fn client_connected(
                 }
 
                 // parse message
-                let msg: anyhow::Result<Message> = match query.encoding {
+                let msg: anyhow::Result<ClientMsg> = match query.encoding {
                     GatewayMsgEncoding::Json => serde_json::from_slice(&msg).map_err(Into::into),
                     GatewayMsgEncoding::MsgPack => rmp_serde::from_slice(&msg).map_err(Into::into),
                 };
@@ -165,4 +175,11 @@ pub async fn client_connected(
     }
 
     // TODO: Disconnect client
+}
+
+pub async fn process_message(
+    state: Arc<ServerState>,
+    msg: ClientMsg,
+) -> Result<ServerMsg, anyhow::Error> {
+    unimplemented!()
 }

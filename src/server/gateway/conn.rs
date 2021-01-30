@@ -10,7 +10,7 @@ use warp::{Filter, Rejection, Reply};
 
 use crate::server::{events::Event, rate::RateLimiter, ServerState};
 
-use super::msg::Message;
+use super::msg::{ClientMsg, ServerMsg};
 
 pub struct ClientConnection {
     pub id: usize,
@@ -19,9 +19,9 @@ pub struct ClientConnection {
 }
 
 impl ClientConnection {
-    pub async fn on_msg(&self, msg: Message) -> anyhow::Result<Message> {
+    pub async fn on_msg(&self, msg: ClientMsg) -> anyhow::Result<ServerMsg> {
         Ok(match msg {
-            Message::Heartbeat { .. } => Message::new_heartbeatack(),
+            ClientMsg::Heartbeat { .. } => ServerMsg::new_heartbeatack(),
             _ => unimplemented!(),
         })
     }

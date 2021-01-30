@@ -18,7 +18,7 @@ macro_rules! decl_msgs {
             $($opcode = $code,)*
         }
 
-        pub mod payloads {$(
+        pub mod payloads { use super::*; $(
             #[derive(Debug, Clone, Serialize, Deserialize)]
             $(#[derive($Default, PartialEq, Eq)])?
             pub struct [<$opcode Payload>] {
@@ -105,28 +105,30 @@ macro_rules! decl_msgs {
     }}
 }
 
-decl_msgs! {
-    0 => Hello {
-        /// Number of milliseconds between heartbeats
-        heartbeat_interval: u32
-    },
-    1 => Heartbeat: Default {},
-    2 => HeartbeatACK: Default {},
-}
+use crate::server::auth::AuthToken;
 
-#[cfg(test)]
-mod tests {
+pub type ClientMsg = client::Message;
+pub type ServerMsg = server::Message;
+
+pub mod server {
     use super::*;
 
-    #[test]
-    fn test_hb() {
-        let hb = r#"{"o": 2}"#;
+    decl_msgs! {
+        0 => Hello {
+            /// Number of milliseconds between heartbeats
+            heartbeat_interval: u32
+        },
+        2 => HeartbeatACK: Default {},
+    }
+}
 
-        let p: Message = serde_json::from_str(hb).unwrap();
+pub mod client {
+    use super::*;
 
-        let x = serde_json::to_string(&p).unwrap();
-
-        println!("{:?}", p);
-        println!("{}", x);
+    decl_msgs! {
+        0 => Heartbeat: Default {},
+        1 => Identify {
+            auth: String
+        }
     }
 }
