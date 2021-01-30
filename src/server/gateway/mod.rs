@@ -55,19 +55,6 @@ pub struct GatewayQueryParams {
 
 const MSGS_PER_SEC: f32 = 50.0;
 
-fn compress_if(cond: bool, mut msg: Vec<u8>) -> std::io::Result<Vec<u8>> {
-    if cond {
-        use flate2::{write::ZlibEncoder, Compression};
-        use std::io::Write;
-
-        let mut encoder = ZlibEncoder::new(Vec::with_capacity(128), Compression::new(6));
-        encoder.write(&msg)?;
-        msg = encoder.finish()?;
-    }
-
-    Ok(msg)
-}
-
 pub enum ClienState {
     Hello,
     Identified(Snowflake),
@@ -114,7 +101,7 @@ pub async fn client_connected(
     // rate-limit the websocket message stream
     let mut rate_limiter = RateLimiter::default();
 
-    // if initiated then loop
+    // if initiated then loop {}
     while initiated {
         match ws_rx.next().await {
             // if None was received, we can assume the websocket safely closed
@@ -127,21 +114,13 @@ pub async fn client_connected(
                 }
 
                 // decompress message
-                let mut msg = Cow::Borrowed(msg.as_bytes());
-                if query.compress {
-                    use flate2::bufread::ZlibDecoder;
-                    use std::io::Read;
-
-                    let mut reader = ZlibDecoder::new(&*msg);
-                    let mut decoded = Vec::with_capacity(128);
-
-                    if let Err(e) = reader.read_to_end(&mut decoded) {
+                let msg = match decompress_if(query.compress, msg.as_bytes()) {
+                    Ok(msg) => msg,
+                    Err(e) => {
                         log::error!("Invalid decompression: {:?}", e);
                         break;
                     }
-
-                    msg = Cow::Owned(decoded);
-                }
+                };
 
                 // parse message
                 let msg: anyhow::Result<ClientMsg> = match query.encoding {
@@ -175,6 +154,35 @@ pub async fn client_connected(
     }
 
     // TODO: Disconnect client
+}
+
+fn compress_if(cond: bool, mut msg: Vec<u8>) -> std::io::Result<Vec<u8>> {
+    if !cond {
+        return Ok(msg);
+    }
+
+    use flate2::{write::ZlibEncoder, Compression};
+    use std::io::Write;
+
+    let mut encoder = ZlibEncoder::new(Vec::with_capacity(128), Compression::new(6));
+    encoder.write(&msg)?;
+    encoder.finish()
+}
+
+fn decompress_if(cond: bool, msg: &[u8]) -> Result<Cow<[u8]>, std::io::Error> {
+    if !cond {
+        return Ok(Cow::Borrowed(msg));
+    }
+
+    use flate2::bufread::ZlibDecoder;
+    use std::io::Read;
+
+    let mut reader = ZlibDecoder::new(&*msg);
+    let mut decoded = Vec::with_capacity(128);
+
+    reader.read_to_end(&mut decoded)?;
+
+    Ok(Cow::Owned(decoded))
 }
 
 pub async fn process_message(
