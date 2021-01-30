@@ -40,7 +40,7 @@ pub fn register(
             match register_user(state, form).await {
                 Ok(token) => Ok::<_, Rejection>(warp::reply::with_status(
                     warp::reply::json(&RegisterResponse {
-                        auth: base64::encode(token.as_str()),
+                        auth: base64::encode(token.bytes()),
                     }),
                     StatusCode::OK,
                 )),

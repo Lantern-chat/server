@@ -1,8 +1,6 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use rand::Rng;
-
 use warp::{
     body::json,
     hyper::{Server, StatusCode},
@@ -37,7 +35,7 @@ pub fn login(
             match login_user(state, form).await {
                 Ok(token) => Ok::<_, Rejection>(warp::reply::with_status(
                     warp::reply::json(&LoginResponse {
-                        auth: base64::encode(token.as_str()),
+                        auth: base64::encode(token.bytes()),
                     }),
                     StatusCode::OK,
                 )),
@@ -128,7 +126,7 @@ pub async fn do_login(
     id: Snowflake,
     now: std::time::SystemTime,
 ) -> Result<AuthToken, ClientError> {
-    let token = AuthToken(crate::rng::crypto_thread_rng().gen());
+    let token = AuthToken::new();
 
     let expires = now + std::time::Duration::from_secs(90 * 24 * 60 * 60); // TODO: Set from config
 
