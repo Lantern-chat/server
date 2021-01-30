@@ -1,10 +1,14 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
 use warp::{hyper::Server, reject::Reject, Filter, Rejection, Reply};
 
 use crate::{
     db::{ClientError, Snowflake},
-    server::{auth::AuthToken, rate::RateLimitKey, ServerState},
+    server::{
+        auth::{AuthToken, AuthTokenFromStrError},
+        rate::RateLimitKey,
+        ServerState,
+    },
 };
 
 #[derive(Debug)]
@@ -46,6 +50,9 @@ enum AuthError {
 
     #[error("Client Error: {0}")]
     ClientError(#[from] ClientError),
+
+    #[error("Auth Token Parse Error: {0}")]
+    AuthTokenParseError(#[from] AuthTokenFromStrError),
 }
 
 async fn authorize(header: String, state: Arc<ServerState>) -> Result<Snowflake, AuthError> {
@@ -55,13 +62,7 @@ async fn authorize(header: String, state: Arc<ServerState>) -> Result<Snowflake,
         return Err(AuthError::InvalidFormat);
     }
 
-    // skip the "Bearer " marker, trim any whitespace, and limit to exact number of base64 characters for fast parsing
-    let input = &header[BEARER.len()..].trim()[..AuthToken::CHAR_LEN];
-
-    let token = AuthToken(match base64::decode(input)?.try_into() {
-        Ok(token) => token,
-        Err(_) => return Err(AuthError::InvalidFormat),
-    });
+    let token = AuthToken::from_str(&header[BEARER.len()..])?;
 
     // TODO: Cache this
     let session = state
