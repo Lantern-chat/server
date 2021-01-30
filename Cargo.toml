@@ -45,6 +45,7 @@ time = "0.2.24"
 rand = "0.8.2"
 rand_chacha = "0.3.0"
 base64 = "0.13.0"
+postage = "0.3.2"
 
 [dependencies.flate2]
 version = "1.0.19"

@@ -68,7 +68,7 @@ async fn authorize(header: String, state: Arc<ServerState>) -> Result<Snowflake,
     let session = state
         .db
         .query_opt_cached(
-            || "SELECT (user_id, expires) FROM lantern.sessions WHERE token = $1",
+            || "SELECT user_id, expires FROM lantern.sessions WHERE token = $1",
             &[&&token.0[..]],
         )
         .await?;

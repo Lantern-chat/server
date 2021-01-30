@@ -81,7 +81,7 @@ enum LoginError {
     PasswordHashError(#[from] argon2::Error),
 }
 
-use super::register::EMAIL_REGEX;
+use super::register::{hash_config, EMAIL_REGEX};
 
 async fn login_user(state: Arc<ServerState>, mut form: LoginForm) -> Result<AuthToken, LoginError> {
     if !EMAIL_REGEX.is_match(&form.email) {
@@ -91,7 +91,7 @@ async fn login_user(state: Arc<ServerState>, mut form: LoginForm) -> Result<Auth
     let user = state
         .db
         .query_opt_cached(
-            || "SELECT (id, email, passhash, deleted_at) FROM lantern.users WHERE email = $1",
+            || "SELECT id, email, passhash, deleted_at FROM lantern.users WHERE email = $1",
             &[&form.email],
         )
         .await?;
@@ -110,7 +110,13 @@ async fn login_user(state: Arc<ServerState>, mut form: LoginForm) -> Result<Auth
     }
 
     let verified = tokio::task::spawn_blocking(move || {
-        argon2::verify_encoded(&passhash, form.password.as_bytes())
+        let config = hash_config();
+        argon2::verify_encoded_ext(
+            &passhash,
+            form.password.as_bytes(),
+            config.secret,
+            config.ad,
+        )
     })
     .await??;
 

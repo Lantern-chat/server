@@ -21,6 +21,10 @@ pub static mut INST: u16 = 0;
 pub static mut WORK: u16 = 0;
 
 impl Snowflake {
+    pub fn from_i64(id: i64) -> Option<Self> {
+        NonZeroU64::new(id as u64).map(Snowflake)
+    }
+
     pub fn null() -> Snowflake {
         Snowflake(unsafe { NonZeroU64::new_unchecked(1) })
     }

@@ -162,7 +162,7 @@ async fn register_user(
     let existing = state
         .db
         .query_opt_cached(
-            || "SELECT (id) FROM lantern.users WHERE email=$1",
+            || "SELECT id FROM lantern.users WHERE email=$1",
             &[&form.email],
         )
         .await?;
@@ -198,7 +198,7 @@ async fn register_user(
     Ok(super::login::do_login(state, id, now).await?)
 }
 
-fn hash_config() -> argon2::Config<'static> {
+pub fn hash_config() -> argon2::Config<'static> {
     let mut config = argon2::Config::default();
 
     config.ad = b"Lantern";
