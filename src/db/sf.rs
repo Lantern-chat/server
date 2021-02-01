@@ -6,7 +6,12 @@ use std::{
 
 use std::num::NonZeroU64;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+/**
+    Snowflakes are a UUID-like system designed to embed timestamp information in a monotonic format.
+
+    This implementation provides an EPOCH for offsetting the timestamp, and implementations for SQL/JSON interop.
+*/
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct Snowflake(NonZeroU64);
 
@@ -131,6 +136,56 @@ impl ToSql for Snowflake {
     }
 }
 
+mod serde_impl {
+    use super::*;
+
+    use std::fmt::Display;
+    use std::str::FromStr;
+
+    use serde::de::{Deserialize, Deserializer, Error, Visitor};
+    use serde::ser::{Serialize, Serializer};
+
+    impl Serialize for Snowflake {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            serializer.collect_str(self)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for Snowflake {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            struct SnowflakeVisitor;
+
+            impl<'de> Visitor<'de> for SnowflakeVisitor {
+                type Value = Snowflake;
+
+                fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    f.write_str("a 64-bit integer or numeric string")
+                }
+
+                fn visit_u64<E: Error>(self, v: u64) -> Result<Self::Value, E> {
+                    match NonZeroU64::new(v) {
+                        Some(x) => Ok(Snowflake(x)),
+                        None => Err(E::custom("expected a non-zero value")),
+                    }
+                }
+
+                fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
+                    Snowflake::from_str(v)
+                        .map_err(|e| E::custom(&format!("Invalid Snowflake: {}", e)))
+                }
+            }
+
+            deserializer.deserialize_any(SnowflakeVisitor)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -139,5 +194,22 @@ mod tests {
     fn test_sf_size() {
         use std::mem::size_of;
         assert_eq!(size_of::<u64>(), size_of::<Option<Snowflake>>());
+    }
+
+    #[test]
+    fn test_serde() {
+        #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+        struct Nested {
+            x: Snowflake,
+        }
+
+        let _: Snowflake = serde_json::from_str(r#""12234""#).unwrap();
+        let _: Snowflake = serde_json::from_str(r#"12234"#).unwrap();
+        let _: Nested = serde_json::from_str(r#"{"x": 12234}"#).unwrap();
+        let _: Nested = serde_json::from_str(r#"{"x": "12234"}"#).unwrap();
+
+        assert!(serde_json::to_string(&Snowflake::now())
+            .unwrap()
+            .contains("\""));
     }
 }
