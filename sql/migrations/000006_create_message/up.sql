@@ -1,7 +1,7 @@
 CREATE TABLE lantern.messages (
     -- Snowflake ID, contains created_at timestamp
     id          bigint      NOT NULL,
-    user_id     bigint,
+    user_id     bigint      NOT NULL,
     room_id     bigint      NOT NULL,
     editor_id   smallint,
     updated_at  timestamp               DEFAULT now(),
