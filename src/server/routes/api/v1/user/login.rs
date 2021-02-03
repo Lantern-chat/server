@@ -19,11 +19,6 @@ pub struct LoginForm {
     password: String,
 }
 
-#[derive(Serialize)]
-pub struct LoginResponse {
-    auth: String,
-}
-
 pub fn login(
     state: Arc<ServerState>,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
@@ -33,10 +28,8 @@ pub fn login(
         .and(warp::body::form::<LoginForm>())
         .and_then(|state: Arc<ServerState>, form: LoginForm| async move {
             match login_user(state, form).await {
-                Ok(token) => Ok::<_, Rejection>(warp::reply::with_status(
-                    warp::reply::json(&LoginResponse {
-                        auth: base64::encode(token.bytes()),
-                    }),
+                Ok(ref session) => Ok::<_, Rejection>(warp::reply::with_status(
+                    warp::reply::json(session),
                     StatusCode::OK,
                 )),
                 Err(ref e) => match e {
@@ -83,7 +76,7 @@ enum LoginError {
 
 use super::register::{hash_config, EMAIL_REGEX};
 
-async fn login_user(state: Arc<ServerState>, mut form: LoginForm) -> Result<AuthToken, LoginError> {
+async fn login_user(state: Arc<ServerState>, mut form: LoginForm) -> Result<Session, LoginError> {
     if !EMAIL_REGEX.is_match(&form.email) {
         return Err(LoginError::InvalidCredentials);
     }
@@ -127,11 +120,17 @@ async fn login_user(state: Arc<ServerState>, mut form: LoginForm) -> Result<Auth
     Ok(do_login(state, id, std::time::SystemTime::now()).await?)
 }
 
+#[derive(Clone, Debug, Serialize)]
+pub struct Session {
+    auth: String,
+    expires: String,
+}
+
 pub async fn do_login(
     state: Arc<ServerState>,
     id: Snowflake,
     now: std::time::SystemTime,
-) -> Result<AuthToken, ClientError> {
+) -> Result<Session, ClientError> {
     let token = AuthToken::new();
 
     let expires = now + std::time::Duration::from_secs(90 * 24 * 60 * 60); // TODO: Set from config
@@ -144,5 +143,8 @@ pub async fn do_login(
         )
         .await?;
 
-    Ok(token)
+    Ok(Session {
+        auth: token.encode(),
+        expires: time::OffsetDateTime::from(expires).format(time::Format::Rfc3339),
+    })
 }

@@ -24,11 +24,6 @@ pub struct RegisterForm {
     day: u8,
 }
 
-#[derive(Serialize)]
-pub struct RegisterResponse {
-    auth: String,
-}
-
 pub fn register(
     state: Arc<ServerState>,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
@@ -38,10 +33,8 @@ pub fn register(
         .and(warp::body::form::<RegisterForm>())
         .and_then(|state: Arc<ServerState>, form: RegisterForm| async move {
             match register_user(state, form).await {
-                Ok(token) => Ok::<_, Rejection>(warp::reply::with_status(
-                    warp::reply::json(&RegisterResponse {
-                        auth: base64::encode(token.bytes()),
-                    }),
+                Ok(ref session) => Ok::<_, Rejection>(warp::reply::with_status(
+                    warp::reply::json(session),
                     StatusCode::OK,
                 )),
                 Err(ref e) => match e {
@@ -116,10 +109,12 @@ const MIN_PASSWORD_LEN: usize = 8;
 const MAX_USERNAME_LEN: usize = 64;
 const MIN_USERNAME_LEN: usize = 3;
 
+use super::login::{do_login, Session};
+
 async fn register_user(
     state: Arc<ServerState>,
     mut form: RegisterForm,
-) -> Result<AuthToken, RegisterError> {
+) -> Result<Session, RegisterError> {
     if !USERNAME_REGEX.is_match(&form.username) {
         return Err(RegisterError::InvalidUsername);
     }
@@ -195,7 +190,7 @@ async fn register_user(
         )
         .await?;
 
-    Ok(super::login::do_login(state, id, now).await?)
+    Ok(do_login(state, id, now).await?)
 }
 
 pub fn hash_config() -> argon2::Config<'static> {
