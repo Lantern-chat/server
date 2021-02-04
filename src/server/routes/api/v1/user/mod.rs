@@ -10,6 +10,7 @@ use crate::{
 
 mod check;
 mod login;
+mod logout;
 mod register;
 
 pub fn user(
@@ -19,5 +20,6 @@ pub fn user(
         register::register(state.clone()),
         login::login(state.clone()),
         check::check(state.clone()),
+        logout::logout(state.clone()),
     ))
 }
