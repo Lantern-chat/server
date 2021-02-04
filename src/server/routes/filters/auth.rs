@@ -15,9 +15,13 @@ use crate::{
 pub struct NoAuth;
 impl Reject for NoAuth {}
 
-pub fn auth(
-    state: Arc<ServerState>,
-) -> impl Filter<Extract = (Snowflake,), Error = Rejection> + Clone {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Auth {
+    pub token: AuthToken,
+    pub user_id: Snowflake,
+}
+
+pub fn auth(state: Arc<ServerState>) -> impl Filter<Extract = (Auth,), Error = Rejection> + Clone {
     warp::header::<String>("Authorization")
         .map(move |addr| (addr, state.clone()))
         .and_then(|(auth, state)| async move {
@@ -55,7 +59,7 @@ enum AuthError {
     AuthTokenParseError(#[from] AuthTokenFromStrError),
 }
 
-async fn authorize(header: String, state: Arc<ServerState>) -> Result<Snowflake, AuthError> {
+async fn authorize(header: String, state: Arc<ServerState>) -> Result<Auth, AuthError> {
     const BEARER: &'static str = "Bearer ";
 
     if (!header.starts_with(BEARER)) {
@@ -81,7 +85,10 @@ async fn authorize(header: String, state: Arc<ServerState>) -> Result<Snowflake,
                 return Err(AuthError::NoSession);
             }
 
-            Ok(row.get(0))
+            Ok(Auth {
+                token,
+                user_id: row.get(0),
+            })
         }
         None => Err(AuthError::NoSession),
     }
