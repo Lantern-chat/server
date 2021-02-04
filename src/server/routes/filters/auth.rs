@@ -18,7 +18,7 @@ impl Reject for NoAuth {}
 pub fn auth(
     state: Arc<ServerState>,
 ) -> impl Filter<Extract = (Snowflake,), Error = Rejection> + Clone {
-    warp::header::<String>("Authentication")
+    warp::header::<String>("Authorization")
         .map(move |addr| (addr, state.clone()))
         .and_then(|(auth, state)| async move {
             match authorize(auth, state).await {
