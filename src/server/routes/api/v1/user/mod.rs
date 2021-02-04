@@ -8,6 +8,7 @@ use crate::{
     server::{rate::RateLimitKey, ServerState},
 };
 
+mod check;
 mod login;
 mod register;
 
@@ -16,6 +17,7 @@ pub fn user(
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
     warp::path("user").and(balanced_or_tree!(
         register::register(state.clone()),
-        login::login(state.clone())
+        login::login(state.clone()),
+        check::check(state.clone()),
     ))
 }
