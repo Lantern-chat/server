@@ -199,7 +199,7 @@ pub fn hash_config() -> argon2::Config<'static> {
     config.ad = b"Lantern";
     config.variant = argon2::Variant::Argon2i;
     config.lanes = 1;
-    config.time_cost = 12;
+    config.time_cost = 6;
     config.thread_mode = argon2::ThreadMode::Sequential;
     config.hash_length = 24;
 
