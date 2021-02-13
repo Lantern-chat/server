@@ -24,8 +24,8 @@ pub fn logout(
     warp::delete()
         .and(warp::path("logout"))
         .and(auth(state.clone()))
-        .map(move |auth| (state.clone(), auth))
-        .and_then(|(state, auth)| async move {
+        .map(move |auth| (auth, state.clone()))
+        .and_then(|(auth, state)| async move {
             if let Err(e) = logout_user(state, auth).await {
                 log::error!("Logout error: {}", e);
             }
@@ -40,7 +40,10 @@ enum LogoutError {
     ClientError(#[from] ClientError),
 }
 
-async fn logout_user(state: Arc<ServerState>, auth: auth::Auth) -> Result<(), LogoutError> {
+async fn logout_user(
+    state: Arc<ServerState>,
+    auth: auth::Authorization,
+) -> Result<(), LogoutError> {
     let res = state
         .db
         .execute_cached(

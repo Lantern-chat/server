@@ -16,12 +16,14 @@ pub struct NoAuth;
 impl Reject for NoAuth {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Auth {
+pub struct Authorization {
     pub token: AuthToken,
     pub user_id: Snowflake,
 }
 
-pub fn auth(state: Arc<ServerState>) -> impl Filter<Extract = (Auth,), Error = Rejection> + Clone {
+pub fn auth(
+    state: Arc<ServerState>,
+) -> impl Filter<Extract = (Authorization,), Error = Rejection> + Clone {
     warp::header::<String>("Authorization")
         .map(move |addr| (addr, state.clone()))
         .and_then(|(auth, state)| async move {
@@ -59,7 +61,7 @@ enum AuthError {
     AuthTokenParseError(#[from] AuthTokenFromStrError),
 }
 
-async fn authorize(header: String, state: Arc<ServerState>) -> Result<Auth, AuthError> {
+async fn authorize(header: String, state: Arc<ServerState>) -> Result<Authorization, AuthError> {
     const BEARER: &'static str = "Bearer ";
 
     if (!header.starts_with(BEARER)) {
@@ -85,7 +87,7 @@ async fn authorize(header: String, state: Arc<ServerState>) -> Result<Auth, Auth
                 return Err(AuthError::NoSession);
             }
 
-            Ok(Auth {
+            Ok(Authorization {
                 token,
                 user_id: row.get(0),
             })

@@ -9,6 +9,7 @@ use crate::{
 
 mod build;
 mod file;
+mod party;
 mod user;
 
 pub fn status() -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
@@ -21,6 +22,7 @@ pub enum Route {
     Status,
     Build,
     User,
+    Party,
 }
 
 #[derive(Debug)]
@@ -59,6 +61,7 @@ pub fn api(
     balanced_or_tree!(
         rate_limit(Route::Status, state.clone()).and(status()),
         rate_limit(Route::Build, state.clone()).and(build::route()),
-        rate_limit(Route::User, state.clone()).and(user::user(state.clone()))
+        rate_limit(Route::User, state.clone()).and(user::user(state.clone())),
+        rate_limit(Route::Party, state.clone()).and(party::party(state.clone()))
     )
 }

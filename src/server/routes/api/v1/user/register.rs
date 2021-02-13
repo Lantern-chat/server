@@ -28,7 +28,7 @@ pub fn register(
     state: Arc<ServerState>,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
     warp::post()
-        .and(warp::path("register"))
+        .and(warp::path::end())
         .map(move || state.clone())
         .and(warp::body::form::<RegisterForm>())
         .and_then(|state: Arc<ServerState>, form: RegisterForm| async move {
