@@ -26,7 +26,7 @@ pub mod tasks {
 pub fn start_server(
     addr: impl Into<SocketAddr>,
     db: Client,
-) -> (impl Future<Output = ()>, Arc<ServerState>) {
+) -> (impl Future<Output = ()>, ServerState) {
     let (snd, rcv) = tokio::sync::oneshot::channel();
     let state = state::ServerState::new(snd, db);
     let addr = addr.into();

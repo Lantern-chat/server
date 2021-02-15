@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use crate::server::ServerState;
 
-pub async fn cleanup_ratelimits(state: Arc<ServerState>) {
+pub async fn cleanup_ratelimits(state: ServerState) {
     let mut interval = tokio::time::interval(Duration::from_secs(10));
 
     while state.is_alive() {

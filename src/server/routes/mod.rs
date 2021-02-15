@@ -15,7 +15,7 @@ pub mod filters;
 pub mod gateway;
 
 pub fn routes(
-    state: Arc<ServerState>,
+    state: ServerState,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
     let routes = balanced_or_tree!(
         api::api(state.clone()),

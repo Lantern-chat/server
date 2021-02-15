@@ -25,13 +25,11 @@ pub struct RegisterForm {
 }
 
 pub fn register(
-    state: Arc<ServerState>,
+    state: ServerState,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
-    warp::post()
-        .and(warp::path::end())
-        .map(move || state.clone())
-        .and(warp::body::form::<RegisterForm>())
-        .and_then(|state: Arc<ServerState>, form: RegisterForm| async move {
+    warp::body::form::<RegisterForm>()
+        .and(state.inject())
+        .and_then(|form: RegisterForm, state: ServerState| async move {
             match register_user(state, form).await {
                 Ok(ref session) => Ok::<_, Rejection>(warp::reply::with_status(
                     warp::reply::json(session),
@@ -45,7 +43,7 @@ pub fn register(
                         Ok(warp::reply::with_status(
                             warp::reply::json(&ApiError {
                                 code: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                                message: "Internal Error".to_owned(),
+                                message: "Internal Error".into(),
                             }),
                             StatusCode::INTERNAL_SERVER_ERROR,
                         ))
@@ -53,13 +51,14 @@ pub fn register(
                     _ => Ok(warp::reply::with_status(
                         warp::reply::json(&ApiError {
                             code: StatusCode::BAD_REQUEST.as_u16(),
-                            message: e.to_string(),
+                            message: e.to_string().into(),
                         }),
                         StatusCode::BAD_REQUEST,
                     )),
                 },
             }
         })
+        .recover(ApiError::recover)
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -112,7 +111,7 @@ const MIN_USERNAME_LEN: usize = 3;
 use super::login::{do_login, Session};
 
 async fn register_user(
-    state: Arc<ServerState>,
+    state: ServerState,
     mut form: RegisterForm,
 ) -> Result<Session, RegisterError> {
     if !USERNAME_REGEX.is_match(&form.username) {

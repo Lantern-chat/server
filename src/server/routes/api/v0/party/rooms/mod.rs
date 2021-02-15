@@ -8,10 +8,10 @@ use crate::{
     server::{rate::RateLimitKey, ServerState},
 };
 
-mod create;
-
-pub fn party(
-    state: Arc<ServerState>,
+pub fn rooms(
+    state: ServerState,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
-    warp::path("party").and(balanced_or_tree!(create::create(state.clone())))
+    warp::path::param::<Snowflake>().and(warp::path("rooms"));
+
+    warp::path!(Snowflake / "rooms").map(|party_id| warp::reply::reply())
 }

@@ -12,13 +12,15 @@ use crate::server::ServerState;
 
 use crate::server::gateway::{client_connected, GatewayQueryParams};
 
+use super::filters::real_ip;
+
 pub fn gateway(
-    state: Arc<ServerState>,
+    state: ServerState,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
     warp::path("gateway")
         .and(warp::ws())
         .and(warp::query::<GatewayQueryParams>())
-        .and(warp::addr::remote())
+        .and(real_ip())
         .map(move |ws: warp::ws::Ws, query: GatewayQueryParams, addr| {
             let state = state.clone();
 

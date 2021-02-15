@@ -14,9 +14,10 @@ use crate::{
 };
 
 pub fn check(
-    state: Arc<ServerState>,
+    state: ServerState,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
     warp::path("check")
         .and(crate::server::routes::filters::auth(state))
         .map(|_| warp::reply::reply())
+        .recover(ApiError::recover)
 }

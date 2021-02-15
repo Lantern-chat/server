@@ -1,12 +1,17 @@
-use std::{net::SocketAddr, str::FromStr, sync::Arc};
+use std::{convert::Infallible, net::SocketAddr, str::FromStr, sync::Arc};
 
-use warp::{hyper::Server, reject::Reject, Filter, Rejection, Reply};
+use warp::{
+    hyper::{Server, StatusCode},
+    reject::Reject,
+    Filter, Rejection, Reply,
+};
 
 use crate::{
     db::{ClientError, Snowflake},
     server::{
         auth::{AuthToken, AuthTokenFromStrError},
         rate::RateLimitKey,
+        routes::api::ApiError,
         ServerState,
     },
 };
@@ -22,11 +27,11 @@ pub struct Authorization {
 }
 
 pub fn auth(
-    state: Arc<ServerState>,
+    state: ServerState,
 ) -> impl Filter<Extract = (Authorization,), Error = Rejection> + Clone {
     warp::header::<String>("Authorization")
-        .map(move |addr| (addr, state.clone()))
-        .and_then(|(auth, state)| async move {
+        .and(state.inject())
+        .and_then(|auth, state| async move {
             match authorize(auth, state).await {
                 Ok(sf) => Ok(sf),
                 Err(e) => {
@@ -39,6 +44,12 @@ pub fn auth(
                 }
             }
         })
+}
+
+pub fn no_auth(
+    _err: Rejection,
+) -> impl Filter<Extract = (impl Reply,), Error = Infallible> + Clone {
+    warp::any().map(|| ApiError::reply_json(StatusCode::UNAUTHORIZED, "UNAUTHORIZED"))
 }
 
 use std::convert::TryInto;
@@ -61,7 +72,7 @@ enum AuthError {
     AuthTokenParseError(#[from] AuthTokenFromStrError),
 }
 
-async fn authorize(header: String, state: Arc<ServerState>) -> Result<Authorization, AuthError> {
+async fn authorize(header: String, state: ServerState) -> Result<Authorization, AuthError> {
     const BEARER: &'static str = "Bearer ";
 
     if (!header.starts_with(BEARER)) {

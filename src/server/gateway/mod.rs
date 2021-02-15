@@ -63,8 +63,8 @@ pub enum ClienState {
 pub async fn client_connected(
     ws: WebSocket,
     query: GatewayQueryParams,
-    addr: Option<SocketAddr>,
-    state: Arc<ServerState>,
+    addr: SocketAddr,
+    state: ServerState,
 ) {
     let (ws_tx, mut ws_rx) = ws.split();
     let (tx, rx) = mpsc::unbounded_channel();
@@ -186,7 +186,7 @@ fn decompress_if(cond: bool, msg: &[u8]) -> Result<Cow<[u8]>, std::io::Error> {
 }
 
 pub async fn process_message(
-    state: Arc<ServerState>,
+    state: ServerState,
     msg: ClientMsg,
 ) -> Result<ServerMsg, anyhow::Error> {
     unimplemented!()

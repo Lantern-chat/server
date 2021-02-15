@@ -20,13 +20,12 @@ pub struct LoginForm {
 }
 
 pub fn login(
-    state: Arc<ServerState>,
+    state: ServerState,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
-    warp::post()
-        .and(warp::path("login"))
-        .map(move || state.clone())
+    state
+        .inject()
         .and(warp::body::form::<LoginForm>())
-        .and_then(|state: Arc<ServerState>, form: LoginForm| async move {
+        .and_then(|state: ServerState, form: LoginForm| async move {
             match login_user(state, form).await {
                 Ok(ref session) => Ok::<_, Rejection>(warp::reply::with_status(
                     warp::reply::json(session),
@@ -40,7 +39,7 @@ pub fn login(
                         Ok(warp::reply::with_status(
                             warp::reply::json(&ApiError {
                                 code: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                                message: "Internal Error".to_owned(),
+                                message: "Internal Error".into(),
                             }),
                             StatusCode::INTERNAL_SERVER_ERROR,
                         ))
@@ -48,13 +47,14 @@ pub fn login(
                     _ => Ok(warp::reply::with_status(
                         warp::reply::json(&ApiError {
                             code: StatusCode::BAD_REQUEST.as_u16(),
-                            message: e.to_string(),
+                            message: e.to_string().into(),
                         }),
                         StatusCode::BAD_REQUEST,
                     )),
                 },
             }
         })
+        .recover(ApiError::recover)
 }
 
 // TODO: Determine if I should give any feedback at all or
@@ -76,7 +76,7 @@ enum LoginError {
 
 use super::register::{hash_config, EMAIL_REGEX};
 
-async fn login_user(state: Arc<ServerState>, mut form: LoginForm) -> Result<Session, LoginError> {
+async fn login_user(state: ServerState, mut form: LoginForm) -> Result<Session, LoginError> {
     if !EMAIL_REGEX.is_match(&form.email) {
         return Err(LoginError::InvalidCredentials);
     }
@@ -127,7 +127,7 @@ pub struct Session {
 }
 
 pub async fn do_login(
-    state: Arc<ServerState>,
+    state: ServerState,
     id: Snowflake,
     now: std::time::SystemTime,
 ) -> Result<Session, ClientError> {

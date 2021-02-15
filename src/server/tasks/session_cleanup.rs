@@ -3,7 +3,7 @@ use std::{sync::Arc, time::SystemTime};
 
 use crate::server::ServerState;
 
-pub async fn cleanup_sessions(state: Arc<ServerState>) {
+pub async fn cleanup_sessions(state: ServerState) {
     let mut interval = tokio::time::interval(Duration::from_secs(60 * 5));
 
     while state.is_alive() {
