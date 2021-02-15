@@ -4,6 +4,8 @@ CREATE TABLE lantern.rooms (
     name        text                NOT NULL,
     topic       varchar(2048),
     deleted_at  timestamp,
+    sort_order  smallint            NOT NULL,
+    parent_id   bigint,
 
     -- contains info on NSFW, channel type, etc.
     flags       smallint            NOT NULL    DEFAULT 0,
@@ -17,6 +19,10 @@ CREATE INDEX CONCURRENTLY room_name_idx ON lantern.rooms USING hash (name);
 ALTER TABLE lantern.rooms ADD CONSTRAINT party_fk FOREIGN KEY (party_id)
     REFERENCES lantern.party (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE; -- Delete rooms if party is deleted
+
+ALTER TABLE lantern.rooms ADD CONSTRAINT parent_fk FOREIGN KEY (parent_id)
+    REFERENCES lantern.rooms (id) MATCH FULL
+    ON DELETE CASCADE ON UPDATE CASCADE; -- Delete rooms if whole category is deleted
 
 
 CREATE TABLE lantern.subscriptions (
