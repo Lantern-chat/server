@@ -11,7 +11,7 @@ use crate::{
     server::{
         auth::{AuthToken, AuthTokenFromStrError},
         rate::RateLimitKey,
-        routes::api::ApiError,
+        routes::error::ApiError,
         ServerState,
     },
 };
@@ -49,7 +49,7 @@ pub fn auth(
 pub fn no_auth(
     _err: Rejection,
 ) -> impl Filter<Extract = (impl Reply,), Error = Infallible> + Clone {
-    warp::any().map(|| ApiError::reply_json(StatusCode::UNAUTHORIZED, "UNAUTHORIZED"))
+    warp::any().map(|| ApiError::err(StatusCode::UNAUTHORIZED, "UNAUTHORIZED".into()))
 }
 
 use std::convert::TryInto;

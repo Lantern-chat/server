@@ -11,8 +11,9 @@ use crate::db::Snowflake;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RateLimitKey {
     pub ip: SocketAddr,
-    pub account: Snowflake,
-    pub route: u16,
+    //pub account: Snowflake,
+    pub req_per_sec: u16,
+    pub route_id: u16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -53,14 +54,12 @@ impl RateLimiter {
 }
 
 pub struct RateLimitTable {
-    pub req_per_sec: f32,
     pub table: CHashMap<RateLimitKey, RateLimiter>,
 }
 
 impl RateLimitTable {
-    pub fn new(req_per_sec: f32) -> RateLimitTable {
+    pub fn new() -> RateLimitTable {
         RateLimitTable {
-            req_per_sec: req_per_sec.max(0.01),
             table: CHashMap::new(128),
         }
     }
@@ -69,7 +68,7 @@ impl RateLimitTable {
         self.table
             .get_mut_or_default(&key)
             .await
-            .update(self.req_per_sec)
+            .update(key.req_per_sec as f32)
     }
 
     pub async fn cleanup_at(&self, now: Instant) {

@@ -41,7 +41,7 @@ impl ServerState {
         ServerState(Arc::new(InnerServerState {
             is_alive: AtomicBool::new(true),
             shutdown: Mutex::new(Some(shutdown)),
-            rate_limit: RateLimitTable::new(50.0),
+            rate_limit: RateLimitTable::new(),
             gateway_conns: HostConnections::default(),
             db,
         }))

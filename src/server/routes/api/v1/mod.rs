@@ -5,7 +5,11 @@ use warp::{hyper::Server, reject::Reject, Filter, Rejection, Reply};
 
 use crate::{
     db::Snowflake,
-    server::{rate::RateLimitKey, routes::filters::real_ip, ServerState},
+    server::{
+        rate::RateLimitKey,
+        routes::{filters::real_ip, wrappers::rate_limit},
+        ServerState,
+    },
 };
 
 mod user {
@@ -36,9 +40,5 @@ pub fn api(state: ServerState) -> impl Filter<Extract = (impl Reply,), Error = R
         warp::any() //gsdg
     ));
 
-    balanced_or_tree!(user_routes)
+    balanced_or_tree!(rate_limit(&state, None, user_routes),)
 }
-
-#[derive(Debug)]
-pub struct RateLimited;
-impl Reject for RateLimited {}

@@ -14,7 +14,7 @@ use crate::{
         auth::AuthToken,
         rate::RateLimitKey,
         routes::{
-            api::ApiError,
+            error::ApiError,
             filters::{auth, no_auth},
         },
         ServerState,

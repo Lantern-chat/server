@@ -11,6 +11,7 @@ pub mod wrappers;
 
 pub mod api;
 pub mod assets;
+pub mod error;
 pub mod filters;
 pub mod gateway;
 

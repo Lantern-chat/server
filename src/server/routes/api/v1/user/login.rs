@@ -10,7 +10,7 @@ use warp::{
 
 use crate::{
     db::{Client, ClientError, Snowflake},
-    server::{auth::AuthToken, rate::RateLimitKey, routes::api::ApiError, ServerState},
+    server::{auth::AuthToken, rate::RateLimitKey, routes::error::ApiError, ServerState},
 };
 
 #[derive(Deserialize)]
@@ -26,33 +26,19 @@ pub fn login(
         .inject()
         .and(warp::body::form::<LoginForm>())
         .and_then(|state: ServerState, form: LoginForm| async move {
-            match login_user(state, form).await {
-                Ok(ref session) => Ok::<_, Rejection>(warp::reply::with_status(
-                    warp::reply::json(session),
-                    StatusCode::OK,
-                )),
+            Ok::<_, Rejection>(match login_user(state, form).await {
+                Ok(ref session) => ApiError::ok(session),
                 Err(ref e) => match e {
                     LoginError::ClientError(_)
                     | LoginError::JoinError(_)
                     | LoginError::PasswordHashError(_) => {
                         log::error!("{}", e);
-                        Ok(warp::reply::with_status(
-                            warp::reply::json(&ApiError {
-                                code: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                                message: "Internal Error".into(),
-                            }),
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                        ))
+
+                        ApiError::err(StatusCode::INTERNAL_SERVER_ERROR, "Internal Error".into())
                     }
-                    _ => Ok(warp::reply::with_status(
-                        warp::reply::json(&ApiError {
-                            code: StatusCode::BAD_REQUEST.as_u16(),
-                            message: e.to_string().into(),
-                        }),
-                        StatusCode::BAD_REQUEST,
-                    )),
+                    _ => ApiError::err(StatusCode::BAD_REQUEST, e.to_string().into()),
                 },
-            }
+            })
         })
         .recover(ApiError::recover)
 }

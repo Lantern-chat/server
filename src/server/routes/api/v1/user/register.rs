@@ -11,7 +11,12 @@ use warp::{
 
 use crate::{
     db::{ClientError, Snowflake},
-    server::{auth::AuthToken, rate::RateLimitKey, routes::api::ApiError, ServerState},
+    server::{
+        auth::AuthToken,
+        rate::RateLimitKey,
+        routes::{api::util::time::is_of_age, error::ApiError},
+        ServerState,
+    },
 };
 
 #[derive(Clone, Deserialize)]
@@ -30,33 +35,19 @@ pub fn register(
     warp::body::form::<RegisterForm>()
         .and(state.inject())
         .and_then(|form: RegisterForm, state: ServerState| async move {
-            match register_user(state, form).await {
-                Ok(ref session) => Ok::<_, Rejection>(warp::reply::with_status(
-                    warp::reply::json(session),
-                    StatusCode::OK,
-                )),
+            Ok::<_, Rejection>(match register_user(state, form).await {
+                Ok(ref session) => ApiError::ok(session),
                 Err(ref e) => match e {
                     RegisterError::ClientError(_)
                     | RegisterError::JoinError(_)
                     | RegisterError::PasswordHashError(_) => {
                         log::error!("{}", e);
-                        Ok(warp::reply::with_status(
-                            warp::reply::json(&ApiError {
-                                code: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                                message: "Internal Error".into(),
-                            }),
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                        ))
+
+                        ApiError::err(StatusCode::INTERNAL_SERVER_ERROR, "Internal Error".into())
                     }
-                    _ => Ok(warp::reply::with_status(
-                        warp::reply::json(&ApiError {
-                            code: StatusCode::BAD_REQUEST.as_u16(),
-                            message: e.to_string().into(),
-                        }),
-                        StatusCode::BAD_REQUEST,
-                    )),
+                    _ => ApiError::err(StatusCode::BAD_REQUEST, e.to_string().into()),
                 },
-            }
+            })
         })
         .recover(ApiError::recover)
 }
@@ -128,29 +119,9 @@ async fn register_user(
 
     let dob = time::Date::try_from_ymd(form.year, form.month + 1, form.day + 1)?;
     let now = SystemTime::now();
-    let today = time::OffsetDateTime::from(now).date();
-    let diff = today - dob;
 
-    // TODO: Implement something better
-    let mut days = diff.whole_days();
-    // rough approximiation, if it's less than this, it'll be less than the exact
-    if days < MIN_AGE * 365 {
+    if !is_of_age(MIN_AGE, now, dob) {
         return Err(RegisterError::TooYoungError);
-    } else {
-        let mut years = 0;
-        let mut year = today.year();
-        loop {
-            year -= 1;
-            days -= time::days_in_year(year) as i64;
-            if days < 0 || years >= MIN_AGE {
-                break;
-            }
-            years += 1;
-        }
-
-        if years < MIN_AGE {
-            return Err(RegisterError::TooYoungError);
-        }
     }
 
     let existing = state

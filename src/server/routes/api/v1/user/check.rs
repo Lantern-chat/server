@@ -10,7 +10,7 @@ use warp::{
 
 use crate::{
     db::{Client, ClientError, Snowflake},
-    server::{auth::AuthToken, rate::RateLimitKey, routes::api::ApiError, ServerState},
+    server::{auth::AuthToken, rate::RateLimitKey, routes::error::ApiError, ServerState},
 };
 
 pub fn check(
