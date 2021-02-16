@@ -12,7 +12,6 @@ use crate::db::Snowflake;
 pub struct RateLimitKey {
     pub ip: SocketAddr,
     //pub account: Snowflake,
-    pub req_per_sec: u16,
     pub route_id: u16,
 }
 
@@ -64,11 +63,11 @@ impl RateLimitTable {
         }
     }
 
-    pub async fn req(&self, key: RateLimitKey) -> bool {
+    pub async fn req(&self, key: RateLimitKey, req_per_sec: f32) -> bool {
         self.table
             .get_mut_or_default(&key)
             .await
-            .update(key.req_per_sec as f32)
+            .update(req_per_sec)
     }
 
     pub async fn cleanup_at(&self, now: Instant) {

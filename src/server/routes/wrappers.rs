@@ -26,16 +26,17 @@ pub fn rate_limit(
     req_per_sec: Option<u16>,
     route: impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone + Send,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
-    let key = RateLimitKey {
-        ip: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 8080)),
-        req_per_sec: req_per_sec.unwrap_or(50),
-        route_id: ROUTE_COUNTER.fetch_add(1, Ordering::SeqCst),
-    };
+    let route_id = ROUTE_COUNTER.fetch_add(1, Ordering::SeqCst);
+    let req_per_sec = req_per_sec.unwrap_or(50) as f32;
 
     real_ip()
         .and(state.inject())
         .and_then(move |ip: SocketAddr, state: ServerState| async move {
-            if state.rate_limit.req(RateLimitKey { ip, ..key }).await {
+            if state
+                .rate_limit
+                .req(RateLimitKey { ip, route_id }, req_per_sec)
+                .await
+            {
                 Ok(())
             } else {
                 Err(warp::reject::custom(RateLimited))
