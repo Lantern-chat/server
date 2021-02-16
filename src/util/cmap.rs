@@ -92,10 +92,15 @@ where
     where
         F: Fn(&K, &mut T) -> bool,
     {
-        for shard in &self.shards {
-            let mut shard = shard.write().await;
-            shard.retain(&f);
-        }
+        use futures::StreamExt;
+
+        let f = &f;
+        futures::stream::iter(self.shards.iter())
+            .for_each_concurrent(None, |shard| async move {
+                let mut shard = shard.write().await;
+                shard.retain(f);
+            })
+            .await;
     }
 
     fn hash_and_shard<Q>(&self, key: &Q) -> (u64, usize)
