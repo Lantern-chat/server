@@ -11,17 +11,16 @@ use futures::FutureExt;
 use tokio::sync::{oneshot, Mutex, RwLock};
 
 use hashbrown::HashMap;
-use warp::Filter;
 
 use crate::db::Client;
 
-use super::{conns::HostConnections, rate::RateLimitTable};
+use super::rate::RateLimitTable;
 
 pub struct InnerServerState {
     pub is_alive: AtomicBool,
     pub shutdown: Mutex<Option<oneshot::Sender<()>>>,
-    pub rate_limit: crate::server::rate::RateLimitTable,
-    pub gateway_conns: HostConnections,
+    pub rate_limit: crate::server2::rate::RateLimitTable,
+    //pub gateway_conns: HostConnections,
     pub db: Client,
 }
 
@@ -42,15 +41,15 @@ impl ServerState {
             is_alive: AtomicBool::new(true),
             shutdown: Mutex::new(Some(shutdown)),
             rate_limit: RateLimitTable::new(),
-            gateway_conns: HostConnections::default(),
+            //gateway_conns: HostConnections::default(),
             db,
         }))
     }
 
-    pub fn inject(&self) -> impl Filter<Extract = (Self,), Error = Infallible> + Clone {
-        let state = self.clone();
-        warp::any().map(move || state.clone())
-    }
+    //pub fn inject(&self) -> impl Filter<Extract = (Self,), Error = Infallible> + Clone {
+    //    let state = self.clone();
+    //    warp::any().map(move || state.clone())
+    //}
 
     #[inline]
     pub fn is_alive(&self) -> bool {

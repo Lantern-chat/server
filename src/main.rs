@@ -13,14 +13,13 @@ pub mod built {
 pub mod cli;
 pub mod db;
 pub mod rng;
-pub mod server;
+pub mod server2;
 pub mod util;
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
 use futures::FutureExt;
 use structopt::StructOpt;
-use warp::Filter;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
@@ -53,12 +52,12 @@ async fn main() -> anyhow::Result<()> {
     };
 
     log::info!("Starting server...");
-    let (server, state) = server::start_server(addr, db);
+    let (server, state) = server2::start_server(addr, db);
 
     log::trace!("Setting up shutdown signal for Ctrl+C");
     tokio::spawn(tokio::signal::ctrl_c().then(move |_| async move { state.shutdown().await }));
 
-    let _ = tokio::spawn(server).await;
+    server.await?;
 
     Ok(())
 }

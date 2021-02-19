@@ -25,7 +25,7 @@ pub fn api(state: ServerState) -> impl Filter<Extract = (impl Reply,), Error = R
             // POST /api/v1/user/login
             warp::path("login").and(user::login::login(state.clone())),
             // POST /api/v1/user
-            warp::path::end().and(user::register::register(state.clone()))
+            warp::path::end().and(user::register::register(state.clone())),
         ));
 
         let user_delete_routes = warp::delete().and(balanced_or_tree!(
@@ -39,6 +39,11 @@ pub fn api(state: ServerState) -> impl Filter<Extract = (impl Reply,), Error = R
     let party_routes = warp::path("party").and(balanced_or_tree!(
         warp::any() //gsdg
     ));
+
+    let test = warp::path("warehouse")
+        .and(warp::path::param::<u32>())
+        .and(warp::path("item").and(warp::path::param::<u32>()))
+        .and_then(|warehouse_id: u32, item_id: u32| async move { Err::<(), _>(warp::reject()) });
 
     balanced_or_tree!(rate_limit(&state, None, user_routes),)
 }
