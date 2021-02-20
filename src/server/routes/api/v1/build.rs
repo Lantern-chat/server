@@ -17,8 +17,14 @@ pub const BUILD_INFO: BuildInfo = BuildInfo {
     authors: crate::built::PKG_AUTHORS,
 };
 
-use warp::{Filter, Rejection, Reply};
+use headers::ContentType;
 
-pub fn route() -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
-    warp::path("build").map(move || warp::reply::json(&BUILD_INFO))
+use super::Reply;
+
+pub fn build() -> impl Reply {
+    lazy_static::lazy_static! {
+        static ref JSON_BUILD_INFO: String = serde_json::to_string(&BUILD_INFO).unwrap();
+    }
+
+    JSON_BUILD_INFO.as_str().with_header(ContentType::json())
 }
