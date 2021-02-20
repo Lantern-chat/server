@@ -1,33 +1,30 @@
-#[macro_use]
-mod macros;
+use http::{Response, StatusCode};
+use hyper::Body;
 
-use std::sync::Arc;
-
-use warp::{Filter, Rejection, Reply};
-
-use crate::server::ServerState;
-
-pub mod wrappers;
+pub use super::reply::Reply;
+pub use super::service::Route;
+use super::{
+    fs::{dir, file},
+    util::get_real_ip,
+};
 
 pub mod api;
-pub mod assets;
-pub mod error;
-pub mod filters;
-pub mod gateway;
 
-pub fn routes(
-    state: ServerState,
-) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
-    let routes = balanced_or_tree!(
-        api::api(state.clone()),
-        gateway::gateway(state.clone()),
-        assets::files::route(), // ensure this is last, as it has a wildcard to return index
-    )
-    .with(warp::cors().build());
+const INDEX_PATH: &'static str = "frontend/dist/index.html";
+const STATIC_PATH: &'static str = "frontend/dist";
 
-    //#[cfg(debug_assertions)]
-    return routes.with(warp::trace::request());
+pub async fn routes(mut route: Route) -> Response<Body> {
+    if cfg!(debug_assertions) {
+        let ip = get_real_ip(&route);
 
-    //#[cfg(not(debug_assertions))]
-    //routes
+        log::info!("{:?}: {} {}", ip, route.req.method(), route.req.uri())
+    }
+
+    match route.next_segment() {
+        "api" => api::api(route).await,
+
+        "static" => dir(&route, STATIC_PATH).await.into_response(),
+
+        _ => file(&route, INDEX_PATH).await.into_response(),
+    }
 }

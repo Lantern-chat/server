@@ -1,40 +1,14 @@
-use std::{net::SocketAddr, sync::Arc};
+use http::{Response, StatusCode};
+use hyper::Body;
 
-use log::callsite::register;
-use warp::{hyper::Server, reject::Reject, Filter, Rejection, Reply};
+pub use super::{Reply, Route};
 
-use crate::{
-    db::Snowflake,
-    server::{
-        rate::RateLimitKey,
-        routes::{filters::real_ip, wrappers::rate_limit},
-        ServerState,
-    },
-};
+pub mod users;
 
-mod user {
-    pub mod check;
-    pub mod login;
-    pub mod logout;
-    pub mod register;
-}
+pub async fn api_v1(mut route: Route) -> Response<Body> {
+    match route.next_segment() {
+        "users" => users::users(route).await,
 
-pub fn api(state: ServerState) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
-    let user_routes = warp::path("user").and({
-        let user_post_routes = warp::post().and(balanced_or_tree!(
-            // POST /api/v1/user/login
-            warp::path("login").and(user::login::login(state.clone())),
-            // POST /api/v1/user
-            warp::path::end().and(user::register::register(state.clone())),
-        ));
-
-        let user_delete_routes = warp::delete().and(balanced_or_tree!(
-            // DELETE /api/v1/user/logout
-            warp::path("logout").and(user::logout::logout(state.clone())),
-        ));
-
-        balanced_or_tree!(user_post_routes, user_delete_routes)
-    });
-
-    balanced_or_tree!(user_routes)
+        _ => StatusCode::NOT_FOUND.into_response(),
+    }
 }

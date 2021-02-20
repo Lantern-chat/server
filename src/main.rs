@@ -13,7 +13,7 @@ pub mod built {
 pub mod cli;
 pub mod db;
 pub mod rng;
-pub mod server2;
+pub mod server;
 pub mod util;
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
@@ -52,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     log::info!("Starting server...");
-    let (server, state) = server2::start_server(addr, db);
+    let (server, state) = server::start_server(addr, db);
 
     log::trace!("Setting up shutdown signal for Ctrl+C");
     tokio::spawn(tokio::signal::ctrl_c().then(move |_| async move { state.shutdown().await }));

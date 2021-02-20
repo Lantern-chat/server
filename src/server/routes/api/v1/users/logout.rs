@@ -7,7 +7,7 @@ use auth::authorize;
 
 use crate::{
     db::{Client, ClientError, Snowflake},
-    server2::{
+    server::{
         auth::{self, AuthError, AuthToken},
         rate::RateLimitKey,
         ServerState,

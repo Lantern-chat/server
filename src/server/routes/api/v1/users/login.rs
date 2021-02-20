@@ -5,7 +5,7 @@ use http::StatusCode;
 
 use crate::{
     db::{Client, ClientError, Snowflake},
-    server2::{
+    server::{
         auth::AuthToken,
         body::{content_length_limit, form, BodyDeserializeError},
         rate::RateLimitKey,

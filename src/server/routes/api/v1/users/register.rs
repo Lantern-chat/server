@@ -1,23 +1,21 @@
+use rand::Rng;
 use std::{sync::Arc, time::SystemTime};
 
-use rand::Rng;
-
-use warp::{
-    body::json,
-    hyper::{Server, StatusCode},
-    reject::Reject,
-    Filter, Rejection, Reply,
-};
+use http::StatusCode;
 
 use crate::{
     db::{ClientError, Snowflake},
     server::{
         auth::AuthToken,
+        body::{content_length_limit, form, BodyDeserializeError},
         rate::RateLimitKey,
-        routes::{api::util::time::is_of_age, error::ApiError},
+        reply::json,
+        routes::api::util::time::is_of_age,
         ServerState,
     },
 };
+
+use super::{Reply, Route};
 
 #[derive(Clone, Deserialize)]
 pub struct RegisterForm {
@@ -29,27 +27,33 @@ pub struct RegisterForm {
     day: u8,
 }
 
-pub fn register(
-    state: ServerState,
-) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
-    warp::body::form::<RegisterForm>()
-        .and(state.inject())
-        .and_then(|form: RegisterForm, state: ServerState| async move {
-            Ok::<_, Rejection>(match register_user(state, form).await {
-                Ok(ref session) => ApiError::ok(session),
-                Err(ref e) => match e {
-                    RegisterError::ClientError(_)
-                    | RegisterError::JoinError(_)
-                    | RegisterError::PasswordHashError(_) => {
-                        log::error!("{}", e);
+pub async fn register(mut route: Route) -> impl Reply {
+    // 10KB max form size
+    if let Some(err) = content_length_limit(&route, 1024 * 10) {
+        return err.into_response();
+    }
 
-                        ApiError::err(StatusCode::INTERNAL_SERVER_ERROR, "Internal Error".into())
-                    }
-                    _ => ApiError::err(StatusCode::BAD_REQUEST, e.to_string().into()),
-                },
-            })
-        })
-        .recover(ApiError::recover)
+    let form = match form::<RegisterForm>(&mut route).await {
+        Ok(form) => form,
+        Err(e) => return e.into_response(),
+    };
+
+    match register_user(route.state, form).await {
+        Ok(ref session) => json(session).into_response(),
+        Err(e) => match e {
+            RegisterError::ClientError(_)
+            | RegisterError::JoinError(_)
+            | RegisterError::PasswordHashError(_) => {
+                log::error!("Register Error: {}", e);
+
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            }
+            _ => e
+                .to_string()
+                .with_status(StatusCode::BAD_REQUEST)
+                .into_response(),
+        },
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

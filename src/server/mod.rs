@@ -1,45 +1,49 @@
-use std::future::Future;
-use std::net::SocketAddr;
-use std::sync::Arc;
+use std::{convert::Infallible, future::Future, net::SocketAddr};
 
 use futures::FutureExt;
 
-pub mod auth;
-pub mod conns;
-pub mod events;
-pub mod gateway;
+use hyper::{
+    server::conn::AddrStream,
+    service::{make_service_fn, service_fn},
+    Server,
+};
+
 pub mod rate;
-pub mod routes;
+pub mod reply;
+pub mod service;
 pub mod state;
-pub mod storage;
+//pub mod conns;
+pub mod auth;
+pub mod body;
+pub mod fs;
+pub mod routes;
+pub mod util;
 
 pub use state::ServerState;
 
 use crate::db::Client;
 
-pub mod tasks {
-    pub mod cn_cleanup;
-    pub mod rl_cleanup;
-    pub mod session_cleanup;
-}
-
 pub fn start_server(
-    addr: impl Into<SocketAddr>,
+    addr: SocketAddr,
     db: Client,
-) -> (impl Future<Output = ()>, ServerState) {
+) -> (impl Future<Output = Result<(), hyper::Error>>, ServerState) {
     let (snd, rcv) = tokio::sync::oneshot::channel();
-    let state = state::ServerState::new(snd, db);
-    let addr = addr.into();
+    let state = ServerState::new(snd, db);
 
-    log::info!("Binding to {:?}", addr);
-    let (_, server) = warp::serve(routes::routes(state.clone()))
-        .bind_with_graceful_shutdown(addr, rcv.map(|_| { /* ignore errors */ }));
+    let inner_state = state.clone();
+    let server = Server::bind(&addr)
+        .http2_adaptive_window(true)
+        .serve(make_service_fn(move |socket: &AddrStream| {
+            let remote_addr = socket.remote_addr();
+            let state = inner_state.clone();
 
-    log::info!("Starting interval tasks...");
-
-    tokio::spawn(tasks::rl_cleanup::cleanup_ratelimits(state.clone()));
-    tokio::spawn(tasks::cn_cleanup::cleanup_connections(state.clone()));
-    tokio::spawn(tasks::session_cleanup::cleanup_sessions(state.clone()));
+            async move {
+                Ok::<_, Infallible>(service_fn(move |req| {
+                    service::service(remote_addr, req, state.clone())
+                }))
+            }
+        }))
+        .with_graceful_shutdown(rcv.map(|_| { /* ignore errors */ }));
 
     (server, state)
 }

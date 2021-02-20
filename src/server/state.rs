@@ -19,7 +19,7 @@ use super::rate::RateLimitTable;
 pub struct InnerServerState {
     pub is_alive: AtomicBool,
     pub shutdown: Mutex<Option<oneshot::Sender<()>>>,
-    pub rate_limit: crate::server2::rate::RateLimitTable,
+    pub rate_limit: crate::server::rate::RateLimitTable,
     //pub gateway_conns: HostConnections,
     pub db: Client,
 }
