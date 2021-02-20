@@ -1,39 +1,32 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use warp::{
-    body::json,
-    hyper::{Server, StatusCode},
-    reject::Reject,
-    Filter, Rejection, Reply,
-};
+use http::StatusCode;
+
+use auth::authorize;
 
 use crate::{
     db::{Client, ClientError, Snowflake},
-    server::{
-        auth::AuthToken,
+    server2::{
+        auth::{self, AuthError, AuthToken},
         rate::RateLimitKey,
-        routes::{
-            error::ApiError,
-            filters::{auth, no_auth},
-        },
         ServerState,
     },
 };
 
-pub fn logout(
-    state: ServerState,
-) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
-    auth(state.clone())
-        .and(state.inject())
-        .and_then(|auth, state| async move {
-            if let Err(e) = logout_user(state, auth).await {
-                log::error!("Logout error: {}", e);
-            }
+use super::{Reply, Route};
 
-            Ok::<_, Rejection>(warp::reply::reply())
-        })
-        .recover(ApiError::recover)
+pub async fn logout(mut route: Route) -> impl Reply {
+    let auth = match auth::authorize(&route).await {
+        Ok(auth) => auth,
+        Err(e) => return e.into_response(),
+    };
+
+    if let Err(e) = logout_user(route.state, auth).await {
+        log::error!("Logout error: {}", e);
+    }
+
+    StatusCode::OK.into_response()
 }
 
 #[derive(Debug, thiserror::Error)]

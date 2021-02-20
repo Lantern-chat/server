@@ -13,7 +13,11 @@ pub mod reply;
 pub mod service;
 pub mod state;
 //pub mod conns;
+pub mod auth;
+pub mod body;
+pub mod fs;
 pub mod routes;
+pub mod util;
 
 pub use state::ServerState;
 

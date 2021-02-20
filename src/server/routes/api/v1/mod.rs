@@ -36,14 +36,5 @@ pub fn api(state: ServerState) -> impl Filter<Extract = (impl Reply,), Error = R
         balanced_or_tree!(user_post_routes, user_delete_routes)
     });
 
-    let party_routes = warp::path("party").and(balanced_or_tree!(
-        warp::any() //gsdg
-    ));
-
-    let test = warp::path("warehouse")
-        .and(warp::path::param::<u32>())
-        .and(warp::path("item").and(warp::path::param::<u32>()))
-        .and_then(|warehouse_id: u32, item_id: u32| async move { Err::<(), _>(warp::reject()) });
-
-    balanced_or_tree!(rate_limit(&state, None, user_routes),)
+    balanced_or_tree!(user_routes)
 }

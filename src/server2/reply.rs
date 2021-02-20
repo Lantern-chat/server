@@ -1,5 +1,5 @@
 use flate2::Status;
-use headers::HeaderMapExt;
+use headers::{Header, HeaderMapExt};
 use http::{Response, StatusCode};
 
 use hyper::Body;
@@ -7,11 +7,24 @@ use hyper::Body;
 pub trait Reply {
     fn into_response(self) -> Response<Body>;
 
+    #[inline]
     fn with_status(self, status: StatusCode) -> WithStatus<Self>
     where
         Self: Sized,
     {
         with_status(self, status)
+    }
+
+    #[inline]
+    fn with_header<H>(self, header: H) -> WithHeader<Self, H>
+    where
+        Self: Sized,
+        H: Header,
+    {
+        WithHeader {
+            reply: self,
+            header,
+        }
     }
 }
 
@@ -62,6 +75,20 @@ impl<R: Reply> Reply for WithStatus<R> {
     }
 }
 
+pub struct WithHeader<R: Reply, H: Header> {
+    reply: R,
+    header: H,
+}
+
+impl<R: Reply, H: Header> Reply for WithHeader<R, H> {
+    #[inline]
+    fn into_response(self) -> Response<Body> {
+        let mut res = self.reply.into_response();
+        res.headers_mut().typed_insert(self.header);
+        res
+    }
+}
+
 impl Reply for &'static str {
     #[inline]
     fn into_response(self) -> Response<Body> {
@@ -93,7 +120,7 @@ impl Reply for Response<Body> {
 impl Reply for StatusCode {
     #[inline]
     fn into_response(self) -> Response<Body> {
-        let mut res = Response::default();
+        let mut res = Response::new(Body::from(self.to_string()));
         *res.status_mut() = self;
         res
     }

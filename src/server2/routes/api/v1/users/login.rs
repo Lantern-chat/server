@@ -1,16 +1,17 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use warp::{
-    body::json,
-    hyper::{Server, StatusCode},
-    reject::Reject,
-    Filter, Rejection, Reply,
-};
+use http::StatusCode;
 
 use crate::{
     db::{Client, ClientError, Snowflake},
-    server::{auth::AuthToken, rate::RateLimitKey, routes::error::ApiError, ServerState},
+    server2::{
+        auth::AuthToken,
+        body::{content_length_limit, form, BodyDeserializeError},
+        rate::RateLimitKey,
+        reply::json,
+        ServerState,
+    },
 };
 
 #[derive(Deserialize)]
@@ -19,6 +20,38 @@ pub struct LoginForm {
     password: String,
 }
 
+use super::{Reply, Route};
+
+pub async fn login(mut route: Route) -> impl Reply {
+    // 10KB max form size
+    if let Some(err) = content_length_limit(&route, 1024 * 10) {
+        return err.into_response();
+    }
+
+    let form = match form::<LoginForm>(&mut route).await {
+        Ok(form) => form,
+        Err(e) => return e.into_response(),
+    };
+
+    match login_user(route.state, form).await {
+        Ok(ref session) => json(session).into_response(),
+        Err(e) => match e {
+            LoginError::ClientError(_)
+            | LoginError::JoinError(_)
+            | LoginError::PasswordHashError(_) => {
+                log::error!("Login Error {}", e);
+
+                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+            }
+            _ => e
+                .to_string()
+                .with_status(StatusCode::BAD_REQUEST)
+                .into_response(),
+        },
+    }
+}
+
+/*
 pub fn login(
     state: ServerState,
 ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
@@ -42,11 +75,15 @@ pub fn login(
         })
         .recover(ApiError::recover)
 }
+*/
 
 // TODO: Determine if I should give any feedback at all or
 // just say catchall "invalid username/email/password"
 #[derive(thiserror::Error, Debug)]
 enum LoginError {
+    #[error(transparent)]
+    BodyDeserializeError(#[from] BodyDeserializeError),
+
     #[error("Invalid Email or Password")]
     InvalidCredentials,
 
