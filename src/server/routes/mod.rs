@@ -6,15 +6,6 @@ use crate::server::ftl::*;
 pub mod api;
 
 pub async fn routes(mut route: Route) -> Response<Body> {
-    if cfg!(debug_assertions) {
-        log::info!(
-            "{:?}: {} {}",
-            real_ip::get_real_ip(&route),
-            route.req.method(),
-            route.req.uri()
-        )
-    }
-
     match route.next_segment_method() {
         (_, Exact("api")) => api::api(route).await,
 
