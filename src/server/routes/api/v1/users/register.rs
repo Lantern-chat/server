@@ -16,7 +16,8 @@ use crate::{
     },
 };
 
-use super::{auth::AuthToken, Reply, Route};
+use crate::server::ftl::*;
+use crate::server::routes::api::auth::AuthToken;
 
 #[derive(Clone, Deserialize)]
 pub struct RegisterForm {

@@ -22,7 +22,8 @@ pub struct LoginForm {
     password: String,
 }
 
-use super::{auth::AuthToken, Reply, Route};
+use crate::server::ftl::*;
+use crate::server::routes::api::auth::AuthToken;
 
 pub async fn login(mut route: Route) -> impl Reply {
     // 10KB max form size

@@ -10,6 +10,7 @@ use hyper::{
 
 use crate::server::ServerState;
 
+// TODO: Make state generic
 pub struct Route {
     pub addr: SocketAddr,
     pub req: Request<Body>,
@@ -18,13 +19,19 @@ pub struct Route {
     pub has_body: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Segment<'a> {
+    Exact(&'a str),
+    End,
+}
+
 impl Route {
     pub fn tail(&self) -> &str {
         &self.req.uri().path()[self.segment_index..]
     }
 
     #[inline]
-    pub fn next_segment(&mut self) -> &str {
+    pub fn next_segment(&mut self) -> Segment {
         self.next_segment_method().1
     }
 
@@ -33,8 +40,12 @@ impl Route {
         self.req.headers().typed_get()
     }
 
-    pub fn next_segment_method(&mut self) -> (&Method, &str) {
+    pub fn next_segment_method(&mut self) -> (&Method, Segment) {
         let path = self.req.uri().path();
+
+        if self.segment_index == path.len() {
+            return (self.req.method(), Segment::End);
+        }
 
         let segment = path[self.segment_index..]
             .split('/') // split the next segment
@@ -54,7 +65,7 @@ impl Route {
             };
         }
 
-        (self.req.method(), segment)
+        (self.req.method(), Segment::Exact(segment))
     }
 
     pub fn body(&self) -> &Body {

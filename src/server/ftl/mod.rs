@@ -10,4 +10,7 @@ pub mod route;
 pub mod ws;
 
 pub use self::reply::Reply;
-pub use self::route::{BodyError, Route};
+pub use self::route::{
+    BodyError, Route,
+    Segment::{self, End, Exact},
+};

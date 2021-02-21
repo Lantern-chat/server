@@ -7,10 +7,8 @@ use crate::{
 };
 use http::StatusCode;
 
-use super::{
-    auth::{self, authorize, AuthError, AuthToken},
-    Reply, Route,
-};
+use crate::server::ftl::*;
+use crate::server::routes::api::auth;
 
 pub async fn logout(mut route: Route) -> impl Reply {
     let auth = match auth::authorize(&route).await {

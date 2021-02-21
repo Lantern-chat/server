@@ -2,7 +2,7 @@ use http::StatusCode;
 
 use crate::server::routes::api::auth::{self, AuthError, AuthToken};
 
-use super::{Reply, Route};
+use crate::server::ftl::*;
 
 pub async fn check(mut route: Route) -> impl Reply {
     match auth::authorize(&route).await {

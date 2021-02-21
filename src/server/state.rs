@@ -10,8 +10,6 @@ use std::{
 use futures::FutureExt;
 use tokio::sync::{oneshot, Mutex, RwLock};
 
-use hashbrown::HashMap;
-
 use crate::db::Client;
 
 use super::ftl::rate_limit::RateLimitTable;
@@ -45,11 +43,6 @@ impl ServerState {
             db,
         }))
     }
-
-    //pub fn inject(&self) -> impl Filter<Extract = (Self,), Error = Infallible> + Clone {
-    //    let state = self.clone();
-    //    warp::any().map(move || state.clone())
-    //}
 
     #[inline]
     pub fn is_alive(&self) -> bool {

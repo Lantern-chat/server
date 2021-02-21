@@ -1,7 +1,7 @@
 use http::{Method, Response, StatusCode};
 use hyper::Body;
 
-pub use super::ftl::{fs, real_ip, Reply, Route};
+use crate::server::ftl::*;
 
 pub mod api;
 
@@ -16,9 +16,14 @@ pub async fn routes(mut route: Route) -> Response<Body> {
     }
 
     match route.next_segment_method() {
-        (_, "api") => api::api(route).await,
+        (_, Exact("api")) => api::api(route).await,
 
-        (&Method::GET, "static") => fs::dir(&route, "frontend/dist").await.into_response(),
+        (_, Exact("test")) => match route.next_segment() {
+            End => "End".into_response(),
+            _ => "Other".into_response(),
+        },
+
+        (&Method::GET, Exact("static")) => fs::dir(&route, "frontend/dist").await.into_response(),
 
         (&Method::GET, _) => fs::file(&route, "frontend/dist/index.html")
             .await
