@@ -280,6 +280,8 @@ async fn file_reply(route: &Route, path: impl AsRef<Path>) -> impl Reply {
 use futures::Stream;
 use std::io::SeekFrom;
 
+// TODO: Rewrite this with manual stream state machine for highest possible efficiency
+// Take note of https://github.com/tokio-rs/tokio/blob/43bd11bf2fa4eaee84383ddbe4c750868f1bb684/tokio/src/io/seek.rs
 fn file_stream(
     mut file: TkFile,
     buf_size: usize,

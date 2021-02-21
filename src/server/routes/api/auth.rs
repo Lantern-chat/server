@@ -111,7 +111,7 @@ pub enum AuthError {
     AuthTokenParseError(#[from] AuthTokenFromStrError),
 }
 
-use super::service::Route;
+use super::{Route, Reply};
 
 pub async fn authorize(route: &Route) -> Result<Authorization, AuthError> {
     const BEARER: &'static [u8] = b"Bearer ";
@@ -156,8 +156,6 @@ pub async fn authorize(route: &Route) -> Result<Authorization, AuthError> {
 
 use http::Response;
 use hyper::Body;
-
-use super::reply::Reply;
 
 impl Reply for AuthError {
     fn into_response(self) -> Response<Body> {

@@ -6,9 +6,8 @@ use http::StatusCode;
 use crate::{
     db::{Client, ClientError, Snowflake},
     server::{
-        auth::AuthToken,
         body::{content_length_limit, form, BodyDeserializeError},
-        rate::RateLimitKey,
+        rate_limit::RateLimitKey,
         reply::json,
         ServerState,
     },
@@ -20,7 +19,7 @@ pub struct LoginForm {
     password: String,
 }
 
-use super::{Reply, Route};
+use super::{auth::AuthToken, Reply, Route};
 
 pub async fn login(mut route: Route) -> impl Reply {
     // 10KB max form size

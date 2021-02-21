@@ -1,20 +1,16 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use http::StatusCode;
-
-use auth::authorize;
-
 use crate::{
     db::{Client, ClientError, Snowflake},
-    server::{
-        auth::{self, AuthError, AuthToken},
-        rate::RateLimitKey,
-        ServerState,
-    },
+    server::{rate_limit::RateLimitKey, ServerState},
 };
+use http::StatusCode;
 
-use super::{Reply, Route};
+use super::{
+    auth::{self, authorize, AuthError, AuthToken},
+    Reply, Route,
+};
 
 pub async fn logout(mut route: Route) -> impl Reply {
     let auth = match auth::authorize(&route).await {

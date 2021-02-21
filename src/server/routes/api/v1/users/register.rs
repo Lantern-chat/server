@@ -6,16 +6,15 @@ use http::StatusCode;
 use crate::{
     db::{ClientError, Snowflake},
     server::{
-        auth::AuthToken,
         body::{content_length_limit, form, BodyDeserializeError},
-        rate::RateLimitKey,
+        rate_limit::RateLimitKey,
         reply::json,
         routes::api::util::time::is_of_age,
         ServerState,
     },
 };
 
-use super::{Reply, Route};
+use super::{auth::AuthToken, Reply, Route};
 
 #[derive(Clone, Deserialize)]
 pub struct RegisterForm {

@@ -1,14 +1,13 @@
-use http::{Method, Response, StatusCode};
-use hyper::Body;
+use http::{Method, StatusCode};
 
-pub use super::{Reply, Route};
+pub use super::{Reply, Route, ApiError, auth};
 
 pub mod check;
 pub mod login;
 pub mod logout;
 pub mod register;
 
-pub async fn users(mut route: Route) -> Response<Body> {
+pub async fn users(mut route: Route) -> impl Reply {
     match (route.req.method().clone(), route.next_segment()) {
         // POST /api/v1/users
         (Method::POST, "") => register::register(route).await.into_response(),

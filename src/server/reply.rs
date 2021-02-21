@@ -1,5 +1,5 @@
 use flate2::Status;
-use headers::{Header, HeaderMapExt};
+use headers::{ContentType, Header, HeaderMapExt};
 use http::{Response, StatusCode};
 
 use hyper::Body;
@@ -47,11 +47,10 @@ pub fn json<T: serde::Serialize>(value: &T) -> Json {
 impl Reply for Json {
     fn into_response(self) -> Response<Body> {
         match self.inner {
-            Ok(body) => {
-                let mut res = Response::new(body.into());
-                res.headers_mut().typed_insert(headers::ContentType::json());
-                res
-            }
+            Ok(body) => Body::from(body)
+                .with_header(ContentType::json())
+                .into_response(),
+
             Err(()) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         }
     }
@@ -120,7 +119,7 @@ impl Reply for Response<Body> {
 impl Reply for StatusCode {
     #[inline]
     fn into_response(self) -> Response<Body> {
-        let mut res = Response::new(Body::from(self.to_string()));
+        let mut res = Response::new(Body::empty());
         *res.status_mut() = self;
         res
     }

@@ -8,15 +8,13 @@ use hyper::{
     Server,
 };
 
-pub mod rate;
-pub mod reply;
-pub mod service;
-pub mod state;
-//pub mod conns;
-pub mod auth;
 pub mod body;
 pub mod fs;
+pub mod rate_limit;
+pub mod reply;
 pub mod routes;
+pub mod service;
+pub mod state;
 pub mod util;
 
 pub mod tasks {
@@ -51,11 +49,11 @@ pub fn start_server(
         }))
         .with_graceful_shutdown(rcv.map(|_| { /* ignore errors */ }));
 
-        log::info!("Starting interval tasks...");
+    log::info!("Starting interval tasks...");
 
-        tokio::spawn(tasks::rl_cleanup::cleanup_ratelimits(state.clone()));
-        tokio::spawn(tasks::cn_cleanup::cleanup_connections(state.clone()));
-        tokio::spawn(tasks::session_cleanup::cleanup_sessions(state.clone()));
+    tokio::spawn(tasks::rl_cleanup::cleanup_ratelimits(state.clone()));
+    tokio::spawn(tasks::cn_cleanup::cleanup_connections(state.clone()));
+    tokio::spawn(tasks::session_cleanup::cleanup_sessions(state.clone()));
 
     (server, state)
 }

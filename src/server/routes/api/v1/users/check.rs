@@ -1,6 +1,6 @@
 use http::StatusCode;
 
-use crate::server::auth::{self, AuthError, AuthToken};
+use crate::server::routes::api::auth::{self, AuthError, AuthToken};
 
 use super::{Reply, Route};
 
