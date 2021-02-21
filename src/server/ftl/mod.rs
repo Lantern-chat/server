@@ -7,6 +7,7 @@ pub mod rate_limit;
 pub mod real_ip;
 pub mod reply;
 pub mod route;
+pub mod ws;
 
 pub use self::reply::Reply;
 pub use self::route::{BodyError, Route};

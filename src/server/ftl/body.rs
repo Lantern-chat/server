@@ -23,7 +23,7 @@ pub async fn json<T>(route: &mut Route) -> Result<T, BodyDeserializeError>
 where
     T: serde::de::DeserializeOwned,
 {
-    if route.req.headers().typed_get::<ContentType>() != Some(ContentType::json()) {
+    if route.header::<ContentType>() != Some(ContentType::json()) {
         return Err(BodyDeserializeError::IncorrectContentType);
     }
 
@@ -36,7 +36,7 @@ pub async fn form<T>(route: &mut Route) -> Result<T, BodyDeserializeError>
 where
     T: serde::de::DeserializeOwned,
 {
-    match route.req.headers().typed_get::<ContentType>() {
+    match route.header::<ContentType>() {
         Some(ct) if ct == ContentType::form_url_encoded() => {}
         _ => return Err(BodyDeserializeError::IncorrectContentType),
     }
@@ -61,11 +61,7 @@ impl Reply for BodyDeserializeError {
 }
 
 pub fn content_length(route: &Route) -> Option<u64> {
-    route
-        .req
-        .headers()
-        .typed_get::<ContentLength>()
-        .map(|cl| cl.0)
+    route.header::<ContentLength>().map(|cl| cl.0)
 }
 
 use super::reply::Reply;

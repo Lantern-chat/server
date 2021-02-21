@@ -1,6 +1,7 @@
 use std::{convert::Infallible, net::SocketAddr, str::Split};
 
 use bytes::Buf;
+use headers::{Header, HeaderMapExt};
 use http::Method;
 use hyper::{
     body::{aggregate, HttpBody},
@@ -22,8 +23,14 @@ impl Route {
         &self.req.uri().path()[self.segment_index..]
     }
 
+    #[inline]
     pub fn next_segment(&mut self) -> &str {
         self.next_segment_method().1
+    }
+
+    #[inline]
+    pub fn header<H: Header>(&self) -> Option<H> {
+        self.req.headers().typed_get()
     }
 
     pub fn next_segment_method(&mut self) -> (&Method, &str) {
