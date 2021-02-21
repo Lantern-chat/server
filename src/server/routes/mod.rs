@@ -18,11 +18,6 @@ pub async fn routes(mut route: Route) -> Response<Body> {
     match route.next_segment_method() {
         (_, Exact("api")) => api::api(route).await,
 
-        (_, Exact("test")) => match route.next_segment() {
-            End => "End".into_response(),
-            _ => "Other".into_response(),
-        },
-
         (&Method::GET, Exact("static")) => fs::dir(&route, "frontend/dist").await.into_response(),
 
         (&Method::GET, _) => fs::file(&route, "frontend/dist/index.html")
