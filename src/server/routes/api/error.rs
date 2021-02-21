@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use http::StatusCode;
 
-use crate::server::reply::{json, Reply};
+use crate::server::ftl::reply::{self, Reply};
 
 #[derive(Serialize)]
 pub struct ApiError {
@@ -12,7 +12,7 @@ pub struct ApiError {
 
 impl ApiError {
     pub fn err(status: StatusCode, message: impl Into<Cow<'static, str>>) -> impl Reply {
-        json(&ApiError {
+        reply::json(&ApiError {
             message: message.into(),
             code: status.as_u16(),
         })

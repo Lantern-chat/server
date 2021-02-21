@@ -6,9 +6,11 @@ use http::StatusCode;
 use crate::{
     db::{ClientError, Snowflake},
     server::{
-        body::{content_length_limit, form, BodyDeserializeError},
-        rate_limit::RateLimitKey,
-        reply::json,
+        ftl::{
+            body::{content_length_limit, form, BodyDeserializeError},
+            rate_limit::RateLimitKey,
+            reply,
+        },
         routes::api::util::time::is_of_age,
         ServerState,
     },
@@ -38,7 +40,7 @@ pub async fn register(mut route: Route) -> impl Reply {
     };
 
     match register_user(route.state, form).await {
-        Ok(ref session) => json(session).into_response(),
+        Ok(ref session) => reply::json(session).into_response(),
         Err(e) => match e {
             RegisterError::ClientError(_)
             | RegisterError::JoinError(_)

@@ -47,7 +47,7 @@ rand_chacha = "0.3.0"
 base64 = "0.13.0"
 postage = "0.4.1"
 # validator = { version = "0.12", features = ["derive"] }
-hyper = { version = "0.14.4", features = ["full"] }
+hyper = { version = "0.14.4", features = ["http1", "http2", "server", "stream", "runtime"] }
 tokio-tungstenite = "0.13.0"
 http = "0.2.3"
 async-compression = { version = "0.3.7", features = ["brotli", "deflate", "gzip", "tokio"] }

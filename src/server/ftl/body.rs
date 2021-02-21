@@ -2,7 +2,7 @@ use bytes::Buf;
 use headers::{ContentLength, ContentType, HeaderMapExt};
 use http::StatusCode;
 
-use super::service::{BodyError, Route};
+use super::{BodyError, Route};
 
 #[derive(Debug, thiserror::Error)]
 pub enum BodyDeserializeError {

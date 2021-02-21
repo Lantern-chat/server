@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use crate::{
     db::{Client, ClientError, Snowflake},
-    server::{rate_limit::RateLimitKey, ServerState},
+    server::{ftl::rate_limit::RateLimitKey, ServerState},
 };
 use http::StatusCode;
 

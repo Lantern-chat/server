@@ -14,12 +14,12 @@ use hashbrown::HashMap;
 
 use crate::db::Client;
 
-use super::rate_limit::RateLimitTable;
+use super::ftl::rate_limit::RateLimitTable;
 
 pub struct InnerServerState {
     pub is_alive: AtomicBool,
     pub shutdown: Mutex<Option<oneshot::Sender<()>>>,
-    pub rate_limit: crate::server::rate_limit::RateLimitTable,
+    pub rate_limit: RateLimitTable,
     //pub gateway_conns: HostConnections,
     pub db: Client,
 }

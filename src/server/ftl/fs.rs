@@ -13,8 +13,7 @@ use http::{Response, StatusCode};
 use hyper::Body;
 use percent_encoding::percent_decode_str;
 
-use super::reply::Reply;
-use super::service::Route;
+use super::{Reply, Route};
 
 #[derive(Debug)]
 pub struct Conditionals {
@@ -123,35 +122,6 @@ pub fn sanitize_path(base: impl AsRef<Path>, tail: &str) -> Result<PathBuf, Sani
     //}
 
     Ok(buf)
-}
-
-struct BadRange;
-fn bytes_range(range: Option<Range>, max_len: u64) -> Result<(u64, u64), BadRange> {
-    use std::ops::Bound;
-
-    match range.and_then(|r| r.iter().next()) {
-        Some((start, end)) => {
-            let start = match start {
-                Bound::Unbounded => 0,
-                Bound::Included(s) => s,
-                Bound::Excluded(s) => s + 1,
-            };
-
-            let end = match end {
-                Bound::Unbounded => max_len,
-                Bound::Included(s) => s + 1,
-                Bound::Excluded(s) => s,
-            };
-
-            if start < end && end <= max_len {
-                Ok((start, end))
-            } else {
-                log::trace!("unsatisfiable byte range: {}-{}/{}", start, end, max_len);
-                Err(BadRange)
-            }
-        }
-        None => Ok((0, max_len)),
-    }
 }
 
 const DEFAULT_READ_BUF_SIZE: usize = 8_192;
@@ -274,6 +244,35 @@ async fn file_reply(route: &Route, path: impl AsRef<Path>) -> impl Reply {
                     .into_response()
             }
         },
+    }
+}
+
+struct BadRange;
+fn bytes_range(range: Option<Range>, max_len: u64) -> Result<(u64, u64), BadRange> {
+    use std::ops::Bound;
+
+    match range.and_then(|r| r.iter().next()) {
+        Some((start, end)) => {
+            let start = match start {
+                Bound::Unbounded => 0,
+                Bound::Included(s) => s,
+                Bound::Excluded(s) => s + 1,
+            };
+
+            let end = match end {
+                Bound::Unbounded => max_len,
+                Bound::Included(s) => s + 1,
+                Bound::Excluded(s) => s,
+            };
+
+            if start < end && end <= max_len {
+                Ok((start, end))
+            } else {
+                log::trace!("unsatisfiable byte range: {}-{}/{}", start, end, max_len);
+                Err(BadRange)
+            }
+        }
+        None => Ok((0, max_len)),
     }
 }
 

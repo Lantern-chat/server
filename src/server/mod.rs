@@ -2,20 +2,18 @@ use std::{convert::Infallible, future::Future, net::SocketAddr};
 
 use futures::FutureExt;
 
+use http::StatusCode;
 use hyper::{
     server::conn::AddrStream,
     service::{make_service_fn, service_fn},
     Server,
 };
 
-pub mod body;
-pub mod fs;
-pub mod rate_limit;
-pub mod reply;
+pub mod ftl;
+
 pub mod routes;
 pub mod service;
 pub mod state;
-pub mod util;
 
 pub mod tasks {
     pub mod cn_cleanup;
@@ -26,6 +24,8 @@ pub mod tasks {
 pub use state::ServerState;
 
 use crate::db::Client;
+
+use ftl::Reply;
 
 pub fn start_server(
     addr: SocketAddr,
@@ -43,7 +43,19 @@ pub fn start_server(
 
             async move {
                 Ok::<_, Infallible>(service_fn(move |req| {
-                    service::service(remote_addr, req, state.clone())
+                    let state = state.clone();
+
+                    // gracefully fail and return HTTP 500
+                    async move {
+                        match tokio::spawn(service::service(remote_addr, req, state)).await {
+                            Ok(resp) => resp,
+                            Err(err) => {
+                                log::error!("Internal Server Error: {}", err);
+
+                                Ok(StatusCode::INTERNAL_SERVER_ERROR.into_response())
+                            }
+                        }
+                    }
                 }))
             }
         }))
