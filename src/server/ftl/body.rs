@@ -2,7 +2,7 @@ use bytes::Buf;
 use headers::{ContentLength, ContentType, HeaderMapExt};
 use http::StatusCode;
 
-use super::{BodyError, Route};
+use super::{BodyError, Reply, ReplyError, Response, Route};
 
 #[derive(Debug, thiserror::Error)]
 pub enum BodyDeserializeError {
@@ -46,11 +46,8 @@ where
     Ok(serde_urlencoded::from_reader(body.reader())?)
 }
 
-use http::Response;
-use hyper::Body;
-
 impl Reply for BodyDeserializeError {
-    fn into_response(self) -> Response<Body> {
+    fn into_response(self) -> Response {
         match self {
             BodyDeserializeError::IncorrectContentType => "Incorrect Content-Type"
                 .with_status(StatusCode::BAD_REQUEST)
@@ -60,11 +57,18 @@ impl Reply for BodyDeserializeError {
     }
 }
 
+impl ReplyError for BodyDeserializeError {
+    fn status(&self) -> StatusCode {
+        match self {
+            BodyDeserializeError::IncorrectContentType => StatusCode::BAD_REQUEST,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
 pub fn content_length(route: &Route) -> Option<u64> {
     route.header::<ContentLength>().map(|cl| cl.0)
 }
-
-use super::reply::Reply;
 
 pub fn content_length_limit(route: &Route, limit: u64) -> Option<impl Reply> {
     match content_length(route) {

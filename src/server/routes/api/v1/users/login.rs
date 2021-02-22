@@ -5,15 +5,7 @@ use http::StatusCode;
 
 use crate::{
     db::{ClientError, Snowflake},
-    server::{
-        ftl::{
-            body::{content_length_limit, form, BodyDeserializeError},
-            rate_limit::RateLimitKey,
-            reply,
-        },
-        routes::api::util::time::is_of_age,
-        ServerState,
-    },
+    server::{routes::api::util::time::is_of_age, ServerState},
 };
 
 #[derive(Deserialize)]
@@ -26,7 +18,7 @@ use crate::server::ftl::*;
 use crate::server::routes::api::auth::AuthToken;
 
 pub async fn login(mut route: Route) -> impl Reply {
-    let form = match form::<LoginForm>(&mut route).await {
+    let form = match body::form::<LoginForm>(&mut route).await {
         Ok(form) => form,
         Err(e) => return e.into_response(),
     };
@@ -53,9 +45,6 @@ pub async fn login(mut route: Route) -> impl Reply {
 // just say catchall "invalid username/email/password"
 #[derive(thiserror::Error, Debug)]
 enum LoginError {
-    #[error(transparent)]
-    BodyDeserializeError(#[from] BodyDeserializeError),
-
     #[error("Invalid Email or Password")]
     InvalidCredentials,
 
