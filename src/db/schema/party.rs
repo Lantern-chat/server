@@ -19,6 +19,21 @@ impl Party {
         Ok(())
     }
 
+    pub async fn find(client: &Client, id: Snowflake) -> Result<Option<Self>, ClientError> {
+        let row = client
+            .query_opt_cached(
+                || "SELECT owner_id, name FROM lantern.party WHERE id = $1",
+                &[&id],
+            )
+            .await?;
+
+        Ok(row.map(|row| Party {
+            id,
+            owner_id: row.get(0),
+            name: row.get(1),
+        }))
+    }
+
     /*
     pub async fn get_roles(
         &self,

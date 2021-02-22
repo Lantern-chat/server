@@ -12,29 +12,24 @@ pub mod create;
 pub mod get;
 
 pub async fn party(mut route: Route) -> impl Reply {
-    //let auth = match authorize(&route).await {
-    //    Ok(auth) => auth,
-    //    Err(err) => return StatusCode::UNAUTHORIZED.into_response(),
-    //};
-
-    let auth = Authorization::testing();
+    let auth = match authorize(&route).await {
+        Ok(auth) => auth,
+        Err(err) => return StatusCode::UNAUTHORIZED.into_response(),
+    };
 
     match route.next().method_segment() {
         // POST /api/v1/party
         (&Method::POST, End) => create::create(route, auth).await.into_response(),
 
-        _ => {
-            let party_id = match route.param::<Snowflake>() {
-                Some(Ok(sf)) => sf,
-                _ => return StatusCode::BAD_REQUEST.into_response(),
-            };
-
-            match route.next().method_segment() {
+        // ANY /api/v1/party/1234
+        _ => match route.param::<Snowflake>() {
+            Some(Ok(party_id)) => match route.next().method_segment() {
                 // GET /api/v1/party/1234
                 (&Method::GET, End) => get::get(route, auth, party_id).await.into_response(),
 
                 _ => StatusCode::NOT_FOUND.into_response(),
-            }
-        }
+            },
+            _ => return StatusCode::BAD_REQUEST.into_response(),
+        },
     }
 }
