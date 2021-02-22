@@ -14,6 +14,7 @@ pub struct Message {
 }
 
 impl Message {
+    /*
     pub async fn get_attachments(
         &self,
         client: &Client,
@@ -34,4 +35,5 @@ impl Message {
             .await
             .map(|row| row.as_ref().map(Thread::from_row))
     }
+     */
 }

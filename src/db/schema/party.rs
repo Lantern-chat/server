@@ -8,6 +8,7 @@ pub struct Party {
 }
 
 impl Party {
+    /*
     pub async fn get_roles(
         &self,
         client: &Client,
@@ -26,4 +27,5 @@ impl Party {
 
         Ok(User::from_row(&row))
     }
+     */
 }

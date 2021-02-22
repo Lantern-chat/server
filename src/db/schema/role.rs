@@ -11,16 +11,4 @@ pub struct Role {
     pub mentionable: bool,
 }
 
-impl Role {
-    pub fn from_row(row: &Row) -> Self {
-        Role {
-            id: row.get(0),
-            party_id: row.get(1),
-            name: row.get(2),
-            admin: row.get(3),
-            permissions: row.get(4),
-            color: row.get(5),
-            mentionable: row.get(6),
-        }
-    }
-}
+impl Role {}

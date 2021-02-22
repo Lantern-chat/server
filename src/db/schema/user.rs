@@ -10,15 +10,4 @@ pub struct User {
     pub preferences: String, // JSON
 }
 
-impl User {
-    pub fn from_row(row: &Row) -> Self {
-        User {
-            id: row.get(0),
-            username: row.get(1),
-            nickname: row.get(2),
-            blurb: row.get(3),
-            avatar_id: row.get(4),
-            preferences: row.get(5),
-        }
-    }
-}
+impl User {}
