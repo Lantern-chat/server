@@ -4,21 +4,17 @@ use hyper::Body;
 
 pub type Response = HttpResponse<Body>;
 
-pub trait Reply {
+pub trait Reply: Sized {
     fn into_response(self) -> Response;
 
     #[inline]
-    fn with_status(self, status: StatusCode) -> WithStatus<Self>
-    where
-        Self: Sized,
-    {
+    fn with_status(self, status: StatusCode) -> WithStatus<Self> {
         with_status(self, status)
     }
 
     #[inline]
     fn with_header<H>(self, header: H) -> WithHeader<Self, H>
     where
-        Self: Sized,
         H: Header,
     {
         WithHeader {
@@ -32,6 +28,11 @@ pub trait ReplyError: Reply {
     fn status(&self) -> StatusCode {
         StatusCode::INTERNAL_SERVER_ERROR
     }
+
+    fn into_error_response(self) -> Response {
+        let status = self.status();
+        self.with_status(status).into_response()
+    }
 }
 
 impl<R, E> Reply for Result<R, E>
@@ -42,10 +43,7 @@ where
     fn into_response(self) -> Response {
         match self {
             Ok(reply) => reply.into_response(),
-            Err(err) => {
-                let status = err.status();
-                err.with_status(status).into_response()
-            }
+            Err(err) => err.into_error_response(),
         }
     }
 }
@@ -158,11 +156,21 @@ impl ReplyError for StatusCode {
     fn status(&self) -> StatusCode {
         *self
     }
+
+    #[inline]
+    fn into_error_response(self) -> Response {
+        self.into_response()
+    }
 }
 
 impl ReplyError for Response {
     #[inline]
     fn status(&self) -> StatusCode {
         self.status()
+    }
+
+    #[inline]
+    fn into_error_response(self) -> Response {
+        self
     }
 }
