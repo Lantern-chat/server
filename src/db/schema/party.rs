@@ -8,6 +8,17 @@ pub struct Party {
 }
 
 impl Party {
+    pub async fn insert(&self, client: &Client) -> Result<(), ClientError> {
+        client
+            .execute_cached(
+                || "INSERT INTO lantern.party (id, owner_id, name) VALUES ($1, $2, $3)",
+                &[&self.id, &self.owner_id, &self.name],
+            )
+            .await?;
+
+        Ok(())
+    }
+
     /*
     pub async fn get_roles(
         &self,
