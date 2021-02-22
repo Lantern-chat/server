@@ -5,7 +5,6 @@ use crate::{
     db::{Client, ClientError, Snowflake},
     server::{ftl::rate_limit::RateLimitKey, ServerState},
 };
-use http::StatusCode;
 
 use crate::server::ftl::*;
 use crate::server::routes::api::auth;

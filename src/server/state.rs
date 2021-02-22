@@ -10,7 +10,7 @@ use std::{
 use futures::FutureExt;
 use tokio::sync::{oneshot, Mutex, RwLock};
 
-use crate::db::Client;
+use crate::{config::LanternConfig, db::Client};
 
 use super::ftl::rate_limit::RateLimitTable;
 
@@ -20,6 +20,7 @@ pub struct InnerServerState {
     pub rate_limit: RateLimitTable,
     //pub gateway_conns: HostConnections,
     pub db: Client,
+    pub config: LanternConfig,
 }
 
 #[derive(Clone)]
@@ -41,6 +42,7 @@ impl ServerState {
             rate_limit: RateLimitTable::new(),
             //gateway_conns: HostConnections::default(),
             db,
+            config: Default::default(), // TODO: Load from file
         }))
     }
 

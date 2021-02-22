@@ -15,6 +15,7 @@ pub mod db;
 pub mod rng;
 pub mod server;
 pub mod util;
+pub mod config;
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 

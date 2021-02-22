@@ -26,11 +26,6 @@ use crate::server::ftl::*;
 use crate::server::routes::api::auth::AuthToken;
 
 pub async fn login(mut route: Route) -> impl Reply {
-    // 10KB max form size
-    if let Some(err) = content_length_limit(&route, 1024 * 10) {
-        return err.into_response();
-    }
-
     let form = match form::<LoginForm>(&mut route).await {
         Ok(form) => form,
         Err(e) => return e.into_response(),
@@ -53,32 +48,6 @@ pub async fn login(mut route: Route) -> impl Reply {
         },
     }
 }
-
-/*
-pub fn login(
-    state: ServerState,
-) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
-    state
-        .inject()
-        .and(warp::body::form::<LoginForm>())
-        .and_then(|state: ServerState, form: LoginForm| async move {
-            Ok::<_, Rejection>(match login_user(state, form).await {
-                Ok(ref session) => ApiError::ok(session),
-                Err(ref e) => match e {
-                    LoginError::ClientError(_)
-                    | LoginError::JoinError(_)
-                    | LoginError::PasswordHashError(_) => {
-                        log::error!("{}", e);
-
-                        ApiError::err(StatusCode::INTERNAL_SERVER_ERROR, "Internal Error".into())
-                    }
-                    _ => ApiError::err(StatusCode::BAD_REQUEST, e.to_string().into()),
-                },
-            })
-        })
-        .recover(ApiError::recover)
-}
-*/
 
 // TODO: Determine if I should give any feedback at all or
 // just say catchall "invalid username/email/password"
@@ -159,7 +128,7 @@ pub async fn do_login(
 ) -> Result<Session, ClientError> {
     let token = AuthToken::new();
 
-    let expires = now + std::time::Duration::from_secs(90 * 24 * 60 * 60); // TODO: Set from config
+    let expires = now + state.config.login_session_duration;
 
     state
         .db

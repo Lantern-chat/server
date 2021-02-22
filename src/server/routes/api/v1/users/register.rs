@@ -5,15 +5,7 @@ use http::StatusCode;
 
 use crate::{
     db::{ClientError, Snowflake},
-    server::{
-        ftl::{
-            body::{content_length_limit, form, BodyDeserializeError},
-            rate_limit::RateLimitKey,
-            reply,
-        },
-        routes::api::util::time::is_of_age,
-        ServerState,
-    },
+    server::{routes::api::util::time::is_of_age, ServerState},
 };
 
 use crate::server::ftl::*;
@@ -30,12 +22,7 @@ pub struct RegisterForm {
 }
 
 pub async fn register(mut route: Route) -> impl Reply {
-    // 10KB max form size
-    if let Some(err) = content_length_limit(&route, 1024 * 10) {
-        return err.into_response();
-    }
-
-    let form = match form::<RegisterForm>(&mut route).await {
+    let form = match body::form::<RegisterForm>(&mut route).await {
         Ok(form) => form,
         Err(e) => return e.into_response(),
     };
@@ -91,19 +78,13 @@ enum RegisterError {
 use regex::{Regex, RegexBuilder};
 
 lazy_static::lazy_static! {
-    pub static ref EMAIL_REGEX: Regex = Regex::new(r#"^[^@\s]+@[^@\s]+\.[^.@\s]+$"#).unwrap();
-    pub static ref USERNAME_REGEX: Regex = Regex::new(r#"^[^\s].{1,62}[^\s]$"#).unwrap();
+    pub static ref EMAIL_REGEX: Regex = Regex::new(r#"^[^@\s]{1,64}@[^@\s]+\.[^.@\s]+$"#).unwrap();
+    pub static ref USERNAME_REGEX: Regex = Regex::new(r#"^[^\s].*[^\s]$"#).unwrap();
 
     static ref PASSWORD_REGEX: Regex = Regex::new(r#"\P{L}|\p{N}"#).unwrap();
 
     static ref USERNAME_SANITIZE_REGEX: Regex = Regex::new(r#"\s+"#).unwrap();
 }
-
-// TODO: Set these in server config
-const MIN_AGE: i64 = 18;
-const MIN_PASSWORD_LEN: usize = 8;
-const MAX_USERNAME_LEN: usize = 64;
-const MIN_USERNAME_LEN: usize = 3;
 
 use super::login::{do_login, Session};
 
@@ -111,22 +92,26 @@ async fn register_user(
     state: ServerState,
     mut form: RegisterForm,
 ) -> Result<Session, RegisterError> {
-    if !USERNAME_REGEX.is_match(&form.username) {
+    if !state.config.username_len.contains(&form.username.len())
+        || !USERNAME_REGEX.is_match(&form.username)
+    {
         return Err(RegisterError::InvalidUsername);
     }
 
-    if !PASSWORD_REGEX.is_match(&form.password) {
+    if !state.config.password_len.contains(&form.password.len())
+        || !PASSWORD_REGEX.is_match(&form.password)
+    {
         return Err(RegisterError::InvalidPassword);
     }
 
-    if !EMAIL_REGEX.is_match(&form.email) {
+    if form.email.len() > 320 || !EMAIL_REGEX.is_match(&form.email) {
         return Err(RegisterError::InvalidEmail);
     }
 
     let dob = time::Date::try_from_ymd(form.year, form.month + 1, form.day + 1)?;
     let now = SystemTime::now();
 
-    if !is_of_age(MIN_AGE, now, dob) {
+    if !is_of_age(state.config.min_user_age_in_years as i64, now, dob) {
         return Err(RegisterError::TooYoungError);
     }
 
