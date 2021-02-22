@@ -9,16 +9,7 @@ pub async fn service(
     req: Request<Body>,
     state: ServerState,
 ) -> Result<Response<Body>, Infallible> {
-    // skip leading slashes
-    let segment_index = req.uri().path().starts_with('/') as usize;
-
-    let mut route = Route {
-        addr,
-        req,
-        state,
-        segment_index,
-        has_body: true,
-    };
+    let mut route = Route::new(addr, req, state);
 
     let info = format!(
         "{:?}: {} {}",

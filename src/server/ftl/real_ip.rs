@@ -4,7 +4,7 @@ use std::str::FromStr;
 use http::header::ToStrError;
 use tokio_postgres::Socket;
 
-use super::Route;
+use super::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum GetRealIpError {

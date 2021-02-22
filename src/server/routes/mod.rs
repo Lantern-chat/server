@@ -1,12 +1,11 @@
-use http::{Method, Response, StatusCode};
-use hyper::Body;
+use http::{Method, StatusCode};
 
 use crate::server::ftl::*;
 
 pub mod api;
 
-pub async fn routes(mut route: Route) -> Response<Body> {
-    match route.next_segment_method() {
+pub async fn routes(mut route: Route) -> Response {
+    match route.next().method_segment() {
         (_, Exact("api")) => api::api(route).await,
 
         (&Method::GET, Exact("static")) => fs::dir(&route, "frontend/dist").await.into_response(),

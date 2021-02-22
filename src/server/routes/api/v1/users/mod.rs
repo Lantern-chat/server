@@ -8,7 +8,7 @@ pub mod logout;
 pub mod register;
 
 pub async fn users(mut route: Route) -> impl Reply {
-    match route.next_segment_method() {
+    match route.next().method_segment() {
         // POST /api/v1/users
         (&Method::POST, End) => register::register(route).await.into_response(),
 

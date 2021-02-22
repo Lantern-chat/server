@@ -1,6 +1,7 @@
-use std::{convert::Infallible, net::SocketAddr, str::Split};
+use std::{convert::Infallible, net::SocketAddr, str::FromStr};
 
-use bytes::Buf;
+use bytes::{Buf, Bytes};
+use futures::Stream;
 use headers::{Header, HeaderMapExt};
 use http::Method;
 use hyper::{
@@ -16,6 +17,7 @@ pub struct Route {
     pub req: Request<Body>,
     pub state: ServerState,
     pub segment_index: usize,
+    pub next_segment_index: usize,
     pub has_body: bool,
 }
 
@@ -26,13 +28,35 @@ pub enum Segment<'a> {
 }
 
 impl Route {
+    pub fn new(addr: SocketAddr, req: Request<Body>, state: ServerState) -> Route {
+        Route {
+            addr,
+            req,
+            state,
+            segment_index: 0,
+            next_segment_index: 0,
+            has_body: true,
+        }
+    }
+
+    pub fn path(&self) -> &str {
+        self.req.uri().path()
+    }
+
     pub fn tail(&self) -> &str {
-        &self.req.uri().path()[self.segment_index..]
+        &self.path()[self.next_segment_index..]
+    }
+
+    pub fn param<P: FromStr>(&self) -> Option<Result<P, P::Err>> {
+        match self.segment() {
+            Segment::Exact(segment) => Some(segment.parse()),
+            Segment::End => None,
+        }
     }
 
     #[inline]
-    pub fn next_segment(&mut self) -> Segment {
-        self.next_segment_method().1
+    pub fn segment(&self) -> Segment {
+        self.method_segment().1
     }
 
     #[inline]
@@ -40,11 +64,19 @@ impl Route {
         self.req.headers().typed_get()
     }
 
-    pub fn next_segment_method(&mut self) -> (&Method, Segment) {
+    pub fn next(&mut self) -> &mut Self {
+        self.segment_index = self.next_segment_index;
+
         let path = self.req.uri().path();
 
+        // already at end, nothing to do
         if self.segment_index == path.len() {
-            return (self.req.method(), Segment::End);
+            return self;
+        }
+
+        // skip leading slash
+        if path.as_bytes()[self.segment_index] == b'/' {
+            self.segment_index += 1;
         }
 
         let segment = path[self.segment_index..]
@@ -52,20 +84,21 @@ impl Route {
             .next() // only take the first
             .expect("split always has at least 1");
 
-        if !segment.is_empty() {
-            let index = self.segment_index + segment.len();
+        self.next_segment_index = self.segment_index + segment.len();
 
-            // if already at the end, don't increment
-            self.segment_index = if path.len() == index {
-                index
-            } else {
-                // otherwise skip the slash
-                debug_assert_eq!(path.as_bytes()[index], b'/');
-                index + 1
-            };
-        }
+        self
+    }
 
-        (self.req.method(), Segment::Exact(segment))
+    pub fn method_segment(&self) -> (&Method, Segment) {
+        let path = self.req.uri().path();
+        let method = self.req.method();
+        let segment = if self.segment_index == path.len() {
+            Segment::End
+        } else {
+            Segment::Exact(&path[self.segment_index..self.next_segment_index])
+        };
+
+        (method, segment)
     }
 
     pub fn body(&self) -> &Body {
@@ -82,9 +115,29 @@ impl Route {
         }
     }
 
+    /// Combines the body together in a buffered but chunked set of buffers
+    ///
+    /// Prefer this to `bytes()` when you don't care about random-access (i.e. using `buf.as_reader()`)
     pub async fn aggregate(&mut self) -> Result<impl Buf, BodyError> {
         Ok(match self.take_body() {
             Some(body) => hyper::body::aggregate(body).await?,
+            None => return Err(BodyError::DoubleUseError),
+        })
+    }
+
+    /// Concatenates the body together into a single contiguous buffer
+    ///
+    /// Prefer `aggregate()` when you don't care about random-access (i.e. using `buf.as_reader()`)
+    pub async fn bytes(&mut self) -> Result<Bytes, BodyError> {
+        Ok(match self.take_body() {
+            Some(body) => hyper::body::to_bytes(body).await?,
+            None => return Err(BodyError::DoubleUseError),
+        })
+    }
+
+    pub fn stream(&mut self) -> Result<impl Stream<Item = Result<Bytes, hyper::Error>>, BodyError> {
+        Ok(match self.take_body() {
+            Some(body) => body,
             None => return Err(BodyError::DoubleUseError),
         })
     }

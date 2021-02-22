@@ -90,6 +90,15 @@ pub struct Authorization {
     pub user_id: Snowflake,
 }
 
+impl Authorization {
+    pub fn testing() -> Authorization {
+        Authorization {
+            token: AuthToken([0; AuthToken::TOKEN_LEN]),
+            user_id: Snowflake::null(),
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum AuthError {
     #[error("Missing Authorization header")]
@@ -111,7 +120,7 @@ pub enum AuthError {
     AuthTokenParseError(#[from] AuthTokenFromStrError),
 }
 
-use super::{Route, Reply};
+use crate::server::ftl::*;
 
 pub async fn authorize(route: &Route) -> Result<Authorization, AuthError> {
     const BEARER: &'static [u8] = b"Bearer ";
@@ -154,11 +163,8 @@ pub async fn authorize(route: &Route) -> Result<Authorization, AuthError> {
     }
 }
 
-use http::Response;
-use hyper::Body;
-
 impl Reply for AuthError {
-    fn into_response(self) -> Response<Body> {
+    fn into_response(self) -> Response {
         match self {
             // TODO: Maybe don't include decode error?
             AuthError::ClientError(_) | AuthError::DecodeError(_) => {
