@@ -26,11 +26,13 @@ pub static mut INST: u16 = 0;
 pub static mut WORK: u16 = 0;
 
 impl Snowflake {
+    #[inline]
     pub fn from_i64(id: i64) -> Option<Self> {
         NonZeroU64::new(id as u64).map(Snowflake)
     }
 
-    pub fn null() -> Snowflake {
+    #[inline]
+    pub const fn null() -> Snowflake {
         Snowflake(unsafe { NonZeroU64::new_unchecked(1) })
     }
 
@@ -71,12 +73,19 @@ impl Snowflake {
     }
 
     /// Gets the number of milliseconds since the unix epoch
+    #[inline]
     pub fn epoch_ms(&self) -> u128 {
         self.raw_timestamp() as u128 + LANTERN_EPOCH
     }
 
+    #[inline]
     pub fn raw_timestamp(&self) -> u64 {
         self.0.get() >> 22
+    }
+
+    #[inline]
+    pub const fn to_u64(self) -> u64 {
+        self.0.get()
     }
 }
 

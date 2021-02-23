@@ -11,11 +11,12 @@ pub mod built {
 }
 
 pub mod cli;
+pub mod config;
 pub mod db;
+pub mod fs;
 pub mod rng;
 pub mod server;
 pub mod util;
-pub mod config;
 
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
