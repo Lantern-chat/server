@@ -13,6 +13,7 @@ pub mod schema {
 
     pub mod attachment;
     pub mod emote;
+    pub mod file;
     pub mod invite;
     pub mod msg;
     pub mod party;

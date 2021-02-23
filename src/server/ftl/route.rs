@@ -68,6 +68,11 @@ impl Route {
     }
 
     #[inline]
+    pub fn method(&self) -> &Method {
+        self.req.method()
+    }
+
+    #[inline]
     pub fn header<H: Header>(&self) -> Option<H> {
         self.req.headers().typed_get()
     }

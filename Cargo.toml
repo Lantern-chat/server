@@ -59,6 +59,9 @@ mime_guess = "2.0.3"
 headers = "0.3"
 url = "2.2.0"
 tokio-util = { version = "0.6", features = ["io"] }
+crc32fast = "1.2.1"
+serde_shims = { version = "0.2", features = ["std", "mime", "bitflags"] }
+bitflags = "1.2"
 
 [dependencies.flate2]
 version = "1.0.19"
