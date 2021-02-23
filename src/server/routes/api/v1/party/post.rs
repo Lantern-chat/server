@@ -18,7 +18,7 @@ struct PartyCreateForm {
     name: String,
 }
 
-pub async fn create(mut route: Route, auth: Authorization) -> impl Reply {
+pub async fn post(mut route: Route, auth: Authorization) -> impl Reply {
     let form = match body::form::<PartyCreateForm>(&mut route).await {
         Ok(form) => form,
         Err(e) => return e.into_response(),
