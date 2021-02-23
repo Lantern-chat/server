@@ -26,7 +26,7 @@ pub async fn party(mut route: Route) -> impl Reply {
         (&Method::POST, End) => post::post(route, auth).await.into_response(),
 
         // ANY /api/v1/party/1234
-        _ => match route.param::<Snowflake>() {
+        (_, Exact(_)) => match route.param::<Snowflake>() {
             Some(Ok(party_id)) => match route.next().method_segment() {
                 // GET /api/v1/party/1234
                 (&Method::GET, End) => get::get(route, auth, party_id).await.into_response(),
@@ -48,5 +48,7 @@ pub async fn party(mut route: Route) -> impl Reply {
             },
             _ => return StatusCode::BAD_REQUEST.into_response(),
         },
+
+        _ => StatusCode::NOT_FOUND.into_response(),
     }
 }
