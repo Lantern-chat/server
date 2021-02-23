@@ -95,7 +95,12 @@ impl<R: Reply> Reply for WithStatus<R> {
     #[inline]
     fn into_response(self) -> Response {
         let mut res = self.reply.into_response();
-        *res.status_mut() = self.status;
+
+        // Don't override server errors with non-server errors
+        if !(res.status().is_server_error() && !self.status.is_server_error()) {
+            *res.status_mut() = self.status;
+        }
+
         res
     }
 }
