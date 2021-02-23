@@ -3,7 +3,7 @@ use std::{convert::Infallible, net::SocketAddr, str::FromStr};
 use bytes::{Buf, Bytes};
 use futures::Stream;
 use headers::{Header, HeaderMapExt};
-use http::Method;
+use http::{method::InvalidMethod, Method};
 use hyper::{
     body::{aggregate, HttpBody},
     Body, Request, Response,
@@ -37,6 +37,19 @@ impl Route {
             next_segment_index: 0,
             has_body: true,
         }
+    }
+
+    pub fn apply_method_override(&mut self) -> Result<(), InvalidMethod> {
+        if let Some(method_override) = self.req.headers().get("x-http-method-override") {
+            let new_method = match Method::from_bytes(method_override.as_bytes()) {
+                Ok(m) => m,
+                Err(e) => return Err(e),
+            };
+
+            *self.req.method_mut() = new_method;
+        }
+
+        Ok(())
     }
 
     pub fn path(&self) -> &str {

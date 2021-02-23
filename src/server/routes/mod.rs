@@ -5,6 +5,10 @@ use crate::server::ftl::*;
 pub mod api;
 
 pub async fn routes(mut route: Route) -> Response {
+    if let Err(_) = route.apply_method_override() {
+        return StatusCode::METHOD_NOT_ALLOWED.into_response();
+    }
+
     match route.next().method_segment() {
         (_, Exact("api")) => api::api(route).await,
 
