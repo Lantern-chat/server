@@ -1,1 +1,42 @@
+use std::io;
+use std::path::{Path, PathBuf};
+
+use crate::db::Snowflake;
+
+use io::SeekFrom;
+use tokio::fs::{self, File};
+use tokio::io::AsyncSeekExt;
+
 pub mod path;
+
+pub struct FileStore {
+    pub root: PathBuf,
+}
+
+impl FileStore {
+    pub fn new<P: AsRef<Path>>(root: P) -> FileStore {
+        FileStore {
+            root: root.as_ref().to_owned(),
+        }
+    }
+
+    pub async fn open(&self, id: Snowflake, offset: u64, read: bool) -> Result<File, io::Error> {
+        let mut path = self.root.clone();
+        path.push(path::id_to_path(id));
+
+        let mut options = fs::OpenOptions::new();
+
+        let mut file = options
+            .read(read)
+            .write(!read)
+            .create(true)
+            .open(path)
+            .await?;
+
+        if offset != 0 {
+            file.seek(SeekFrom::Start(offset)).await?;
+        }
+
+        Ok(file)
+    }
+}

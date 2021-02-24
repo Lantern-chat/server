@@ -2,8 +2,8 @@ use std::{convert::Infallible, net::SocketAddr, str::FromStr};
 
 use bytes::{Buf, Bytes};
 use futures::Stream;
-use headers::{Header, HeaderMapExt};
-use http::{method::InvalidMethod, Method};
+use headers::{Header, HeaderMapExt, HeaderValue};
+use http::{header::ToStrError, method::InvalidMethod, Method};
 use hyper::{
     body::{aggregate, HttpBody},
     Body, Request, Response,
@@ -75,6 +75,20 @@ impl Route {
     #[inline]
     pub fn header<H: Header>(&self) -> Option<H> {
         self.req.headers().typed_get()
+    }
+
+    #[inline]
+    pub fn raw_header(&self, name: &str) -> Option<&HeaderValue> {
+        self.req.headers().get(name)
+    }
+
+    #[inline]
+    pub fn parse_raw_header<T: FromStr>(
+        &self,
+        name: &str,
+    ) -> Option<Result<Result<T, T::Err>, ToStrError>> {
+        self.raw_header(name)
+            .map(|header| header.to_str().map(FromStr::from_str))
     }
 
     pub fn next(&mut self) -> &mut Self {

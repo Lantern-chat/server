@@ -29,7 +29,11 @@ lazy_static::lazy_static! {
         headers
     };
 
+    // 460 Checksum Mismatch
     pub static ref CHECKSUM_MISMATCH: StatusCode = StatusCode::from_u16(460).unwrap();
+
+    // 413 Request Entity Too Large
+    pub static ref REQUEST_ENTITY_TOO_LARGE: StatusCode = StatusCode::from_u16(413).unwrap();
 }
 
 pub async fn file(mut route: Route) -> impl Reply {

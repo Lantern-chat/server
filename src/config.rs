@@ -9,6 +9,7 @@ pub struct LanternConfig {
     pub password_len: Range<usize>,
     pub username_len: Range<usize>,
     pub partyname_len: Range<usize>,
+    pub max_upload_size: u32,
 }
 
 impl Default for LanternConfig {
@@ -19,6 +20,7 @@ impl Default for LanternConfig {
             password_len: 8..9999,
             username_len: 3..64,
             partyname_len: 3..64,
+            max_upload_size: 1024 * 1024 * 8,
         }
     }
 }

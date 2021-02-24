@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use super::{Client, ClientError, Snowflake};
 
-use serde_shims::mime::Wrapper as Mime;
+pub use serde_shims::mime::Wrapper as Mime;
 
 bitflags::bitflags! {
     pub struct FileFlags: i16 {

@@ -1,4 +1,4 @@
-use std::{convert::Infallible, time::Duration};
+use std::{convert::Infallible, path::PathBuf, time::Duration};
 use std::{
     ops::Deref,
     sync::{
@@ -10,7 +10,7 @@ use std::{
 use futures::FutureExt;
 use tokio::sync::{oneshot, Mutex, RwLock};
 
-use crate::{config::LanternConfig, db::Client};
+use crate::{config::LanternConfig, db::Client, fs::disk::FileStore};
 
 use super::ftl::rate_limit::RateLimitTable;
 
@@ -21,6 +21,7 @@ pub struct InnerServerState {
     //pub gateway_conns: HostConnections,
     pub db: Client,
     pub config: LanternConfig,
+    pub fs: FileStore,
 }
 
 #[derive(Clone)]
@@ -42,7 +43,8 @@ impl ServerState {
             rate_limit: RateLimitTable::new(),
             //gateway_conns: HostConnections::default(),
             db,
-            config: Default::default(), // TODO: Load from file
+            config: Default::default(),   // TODO: Load from file
+            fs: FileStore::new("./data"), // TODO: Set from config
         }))
     }
 
