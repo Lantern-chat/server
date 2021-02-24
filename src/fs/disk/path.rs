@@ -23,7 +23,7 @@ pub fn outer_perfect_shuffle(mut x: u64) -> u64 {
 }
 
 // TODO: Optimize this to return a fixed-size string since all the file paths are the same size.
-pub fn id_to_path(id: Snowflake) -> PathBuf {
+pub fn id_to_path(buf: &mut PathBuf, id: Snowflake) {
     let id = id.to_u64();
 
     let mut hasher = ahash::AHasher::new_with_keys(
@@ -36,8 +36,6 @@ pub fn id_to_path(id: Snowflake) -> PathBuf {
     // take upper bits and use them for directories
     let mut encoded = [0; 4 * 2];
     hex::encode_to_slice(&hash[..4], &mut encoded);
-
-    let mut buf = PathBuf::new();
 
     for chunk in encoded.chunks_exact(2) {
         buf.push(unsafe { std::str::from_utf8_unchecked(chunk) });
@@ -62,8 +60,6 @@ pub fn id_to_path(id: Snowflake) -> PathBuf {
     );
 
     buf.push(unsafe { std::str::from_utf8_unchecked(&name_encoded[..len]) });
-
-    buf
 }
 
 #[cfg(test)]

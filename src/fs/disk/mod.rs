@@ -22,7 +22,9 @@ impl FileStore {
 
     pub async fn open(&self, id: Snowflake, offset: u64, read: bool) -> Result<File, io::Error> {
         let mut path = self.root.clone();
-        path.push(path::id_to_path(id));
+        path::id_to_path(&mut path, id);
+
+        fs::create_dir_all(&path).await?;
 
         let mut options = fs::OpenOptions::new();
 
