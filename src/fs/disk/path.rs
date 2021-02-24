@@ -60,6 +60,8 @@ pub fn id_to_path(buf: &mut PathBuf, id: Snowflake) {
     );
 
     buf.push(unsafe { std::str::from_utf8_unchecked(&name_encoded[..len]) });
+
+    buf.set_extension("bin");
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 use futures::StreamExt;
 use http::StatusCode;
 use std::io::ErrorKind;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
 use crate::{
     db::{schema::file::File, Snowflake},
@@ -36,7 +36,7 @@ pub async fn patch(mut route: Route, mut file: File) -> impl Reply {
     let mut fd = match route
         .state
         .fs
-        .open(file.id, upload_offset as u64, false)
+        .open(file.id, file.offset as u64, false)
         .await
     {
         Ok(f) => f,
@@ -54,13 +54,12 @@ pub async fn patch(mut route: Route, mut file: File) -> impl Reply {
         Ok(s) => s,
         Err(e) => {
             log::error!("Patch file error: {}", e);
-
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     };
 
     // TODO: Parse Upload-Checksum
-    let mut crc = crc32fast::Hasher::new();
+    //let mut crc = crc32fast::Hasher::new();
     let mut written = 0;
 
     while let Some(chunk) = stream.next().await {
@@ -72,7 +71,9 @@ pub async fn patch(mut route: Route, mut file: File) -> impl Reply {
             }
         };
 
-        crc.update(&chunk);
+        //crc.update(&chunk);
+
+        // TODO: Encrypt content
 
         match fd.write_buf(&mut chunk).await {
             Ok(n) => written += n,
@@ -83,11 +84,26 @@ pub async fn patch(mut route: Route, mut file: File) -> impl Reply {
         }
     }
 
-    file.offset += written as u32;
+    // TODO: Compare checksums
 
     if written != content_length as usize {
-        // TODO: Server received partial request
+        log::warn!(
+            "File Upload terminated earlier than expected, {} out of {} bytes written",
+            written,
+            content_length
+        );
     }
 
-    ().into_response()
+    file.offset += written as u32;
+
+    if let Err(e) = file.update_offset(&route.state.db).await {
+        log::error!("Error updating file offset: {}", e);
+        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+    }
+
+    // just copy formatting from the HEAD response
+    let mut res = super::head::head(route, file).await.into_response();
+    *res.status_mut() = StatusCode::NO_CONTENT;
+
+    res
 }

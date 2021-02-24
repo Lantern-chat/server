@@ -17,14 +17,11 @@ lazy_static::lazy_static! {
     pub static ref TUS_HEADERS: HeaderMap<HeaderValue> = {
         let mut headers = HeaderMap::new();
 
-        //let max_size = 1024 * 1024 * 100; // 100MB
-        //let max_size_str = max_size.to_string();
-
         headers.insert("Tus-Resumable", HeaderValue::from_static("1.0.0"));
         headers.insert("Tus-Version", HeaderValue::from_static("1.0.0"));
-        headers.insert("Tus-Extension", HeaderValue::from_static("creation,expiration,checksum,termination"));
-        headers.insert("Tus-Checksum-Algorithm", HeaderValue::from_static("crc32"));
-        //headers.insert("Tus-Max-Size", HeaderValue::from_str(&max_size_str).unwrap());
+        headers.insert("Tus-Extension", HeaderValue::from_static("creation,expiration,termination"));
+        //headers.insert("Tus-Extension", HeaderValue::from_static("creation,expiration,checksum,termination"));
+        //headers.insert("Tus-Checksum-Algorithm", HeaderValue::from_static("crc32"));
 
         headers
     };

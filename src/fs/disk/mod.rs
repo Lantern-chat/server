@@ -31,7 +31,7 @@ impl FileStore {
         let mut file = options
             .read(read)
             .write(!read)
-            .create(true)
+            .create(!read)
             .open(path)
             .await?;
 

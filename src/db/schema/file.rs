@@ -75,4 +75,17 @@ impl File {
             }
         }))
     }
+
+    pub async fn update_offset(&self, client: &Client) -> Result<(), ClientError> {
+        let offset = self.offset as i32;
+
+        client
+            .execute_cached(
+                || "UPDATE lantern.files SET \"offset\" = $2 WHERE id = $1",
+                &[&self.id, &offset],
+            )
+            .await?;
+
+        Ok(())
+    }
 }
