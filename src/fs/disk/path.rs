@@ -65,37 +65,3 @@ pub fn id_to_name(id: Snowflake, buf: &mut PathBuf) {
 
     buf.push(unsafe { std::str::from_utf8_unchecked(&name_encoded[..len]) });
 }
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_snowflake_path() {
-        let sfs = &[
-            257572505441533953,
-            257575024569876482,
-            257647575669145600,
-            257697879563436033,
-            258443242050158592,
-            258458986167140353,
-            259579731467304960,
-            259899541854093312,
-            259899862957424641,
-            260694140294004738,
-            262140182344499200,
-            267332947680428032,
-            267467596813565952,
-            267762777089638400,
-            267769887873564672,
-        ];
-
-        for sf in sfs {
-            let sf = Snowflake::from_i64(*sf).unwrap();
-
-            let path = id_to_path(sf);
-
-            println!("{}", path.display());
-        }
-    }
-}
