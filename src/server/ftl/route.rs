@@ -64,6 +64,12 @@ impl Route {
         }
     }
 
+    pub fn query<T: serde::de::DeserializeOwned>(
+        &self,
+    ) -> Option<Result<T, serde_urlencoded::de::Error>> {
+        self.req.uri().query().map(serde_urlencoded::de::from_str)
+    }
+
     pub fn path(&self) -> &str {
         self.req.uri().path()
     }
@@ -77,6 +83,18 @@ impl Route {
             Segment::Exact(segment) => Some(segment.parse()),
             Segment::End => None,
         }
+    }
+
+    pub fn method_segment(&self) -> (&Method, Segment) {
+        let path = self.req.uri().path();
+        let method = self.req.method();
+        let segment = if self.segment_index == path.len() {
+            Segment::End
+        } else {
+            Segment::Exact(&path[self.segment_index..self.next_segment_index])
+        };
+
+        (method, segment)
     }
 
     #[inline]
@@ -131,18 +149,6 @@ impl Route {
         self.next_segment_index = self.segment_index + segment.len();
 
         self
-    }
-
-    pub fn method_segment(&self) -> (&Method, Segment) {
-        let path = self.req.uri().path();
-        let method = self.req.method();
-        let segment = if self.segment_index == path.len() {
-            Segment::End
-        } else {
-            Segment::Exact(&path[self.segment_index..self.next_segment_index])
-        };
-
-        (method, segment)
     }
 
     pub fn body(&self) -> &Body {
