@@ -3,7 +3,7 @@ use std::{convert::Infallible, net::SocketAddr, str::FromStr};
 use bytes::{Buf, Bytes};
 use futures::Stream;
 use headers::{Header, HeaderMapExt, HeaderValue};
-use http::{header::ToStrError, method::InvalidMethod, Method};
+use http::{header::ToStrError, method::InvalidMethod, uri::Authority, Method};
 use hyper::{
     body::{aggregate, HttpBody},
     Body, Request, Response,
@@ -45,6 +45,23 @@ impl Route {
         }
 
         Ok(())
+    }
+
+    pub fn host(&self) -> Option<Authority> {
+        let from_uri = self.req.uri().authority();
+
+        let from_header = match self.parse_raw_header::<Authority>("host") {
+            Some(Ok(Ok(host))) => Some(host),
+            _ => None,
+        };
+
+        match (from_uri, from_header) {
+            (None, None) => None,
+            (Some(a), None) => Some(a.clone()),
+            (None, Some(b)) => Some(b),
+            (Some(a), Some(b)) if *a == b => Some(b),
+            _ => None,
+        }
     }
 
     pub fn path(&self) -> &str {
