@@ -40,14 +40,18 @@ pub fn id_to_path(buf: &mut PathBuf, id: Snowflake) {
     for chunk in encoded.chunks_exact(2) {
         buf.push(unsafe { std::str::from_utf8_unchecked(chunk) });
     }
+}
 
+pub fn id_to_name(id: Snowflake, buf: &mut PathBuf) {
     // shuffle bytes for file name
 
-    let ordered_bytes = outer_perfect_shuffle(id).swap_bytes().to_le_bytes();
-    let mut shuffled = [0; 8];
+    let ordered_bytes = outer_perfect_shuffle(id.to_u64())
+        .swap_bytes()
+        .to_le_bytes();
 
     const SHUFFLE: [usize; 8] = [7, 4, 2, 0, 1, 6, 3, 5]; // randomly generated
 
+    let mut shuffled = [0; 8];
     for i in 0..8 {
         shuffled[i] = ordered_bytes[SHUFFLE[i]];
     }
@@ -60,8 +64,6 @@ pub fn id_to_path(buf: &mut PathBuf, id: Snowflake) {
     );
 
     buf.push(unsafe { std::str::from_utf8_unchecked(&name_encoded[..len]) });
-
-    buf.set_extension("bin");
 }
 
 #[cfg(test)]
