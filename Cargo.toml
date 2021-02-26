@@ -9,6 +9,7 @@ publish = false
 tokio = { version = "1.2", features = ["full"] }
 hashbrown = { version = "0.9.1", features = ["inline-more"] }
 tokio-postgres = { version = "0.7.0", features = ["with-uuid-0_8", "with-chrono-0_4", "with-serde_json-1", "with-time-0_2"] }
+flate2 = { version = "1.0.19", default-features = false, features = ["rust_backend"] }
 chrono = "0.4.19"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -64,17 +65,6 @@ crc32fast = "1.2.1"
 serde_shims = { version = "0.2", features = ["std", "mime", "bitflags"] }
 bitflags = "1.2"
 
-[dependencies.flate2]
-version = "1.0.19"
-features = ["rust_backend"]
-default-features = false
 
 [build-dependencies]
 built = { version = "0.4.4", features = ["git2", "chrono"] }
-
-[dev-dependencies]
-criterion = "0.3.3"
-
-[[bench]]
-name = "encrypt"
-harness = false
