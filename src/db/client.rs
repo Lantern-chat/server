@@ -7,7 +7,7 @@ use std::{
     },
 };
 
-use futures::StreamExt;
+use futures::{Stream, StreamExt, TryStreamExt};
 use hashbrown::HashMap;
 use parking_lot::RwLock;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -240,7 +240,7 @@ impl Client {
         &self,
         statement: &T,
         params: &[&(dyn ToSql + Sync)],
-    ) -> Result<RowStream, ClientError>
+    ) -> Result<impl Stream<Item = Result<Row, ClientError>>, ClientError>
     where
         T: ?Sized + ToStatement,
     {
@@ -250,14 +250,17 @@ impl Client {
             s.iter().map(|s| *s as _)
         }
 
-        self.query_raw(statement, slice_iter(params)).await
+        Ok(self
+            .query_raw(statement, slice_iter(params))
+            .await?
+            .map_err(ClientError::from))
     }
 
     pub async fn query_stream_cached<F>(
         &self,
         query: F,
         params: &[&(dyn ToSql + Sync)],
-    ) -> Result<RowStream, ClientError>
+    ) -> Result<impl Stream<Item = Result<Row, ClientError>>, ClientError>
     where
         F: Any + FnOnce() -> &'static str,
     {
