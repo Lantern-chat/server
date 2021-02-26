@@ -1,8 +1,45 @@
 use bytes::Buf;
 use headers::{ContentLength, ContentType, HeaderMapExt};
 use http::StatusCode;
+use serde::de::DeserializeOwned;
 
 use super::{BodyError, Reply, ReplyError, Response, Route};
+
+pub async fn any<T>(route: &mut Route) -> Result<T, BodyDeserializeError>
+where
+    T: DeserializeOwned,
+{
+    let content_type = route.header::<ContentType>();
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum BodyType {
+        Json,
+        FormUrlEncoded,
+        MsgPack,
+    }
+
+    let kind = if let Some(ct) = route.header::<ContentType>() {
+        if ct == ContentType::json() {
+            BodyType::Json
+        } else if ct == ContentType::form_url_encoded() {
+            BodyType::FormUrlEncoded
+        } else if ct == ContentType::from(mime::APPLICATION_MSGPACK) {
+            BodyType::MsgPack
+        } else {
+            return Err(BodyDeserializeError::IncorrectContentType);
+        }
+    } else {
+        return Err(BodyDeserializeError::IncorrectContentType);
+    };
+
+    let reader = route.aggregate().await?.reader();
+
+    Ok(match kind {
+        BodyType::Json => serde_json::from_reader(reader)?,
+        BodyType::FormUrlEncoded => serde_urlencoded::from_reader(reader)?,
+        BodyType::MsgPack => rmp_serde::from_read(reader)?,
+    })
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum BodyDeserializeError {
@@ -15,13 +52,16 @@ pub enum BodyDeserializeError {
     #[error("Parse Error: {0}")]
     Form(#[from] serde_urlencoded::de::Error),
 
+    #[error("Parse Error: {0}")]
+    MsgPack(#[from] rmp_serde::decode::Error),
+
     #[error("Content Type Error")]
     IncorrectContentType,
 }
 
 pub async fn json<T>(route: &mut Route) -> Result<T, BodyDeserializeError>
 where
-    T: serde::de::DeserializeOwned,
+    T: DeserializeOwned,
 {
     if route.header::<ContentType>() != Some(ContentType::json()) {
         return Err(BodyDeserializeError::IncorrectContentType);
@@ -34,7 +74,7 @@ where
 
 pub async fn form<T>(route: &mut Route) -> Result<T, BodyDeserializeError>
 where
-    T: serde::de::DeserializeOwned,
+    T: DeserializeOwned,
 {
     match route.header::<ContentType>() {
         Some(ct) if ct == ContentType::form_url_encoded() => {}
@@ -44,6 +84,20 @@ where
     let body = route.aggregate().await?;
 
     Ok(serde_urlencoded::from_reader(body.reader())?)
+}
+
+pub async fn msgpack<T>(route: &mut Route) -> Result<T, BodyDeserializeError>
+where
+    T: DeserializeOwned,
+{
+    match route.header::<ContentType>() {
+        Some(ct) if ct == ContentType::from(mime::APPLICATION_MSGPACK) => {}
+        _ => return Err(BodyDeserializeError::IncorrectContentType),
+    }
+
+    let body = route.aggregate().await?;
+
+    Ok(rmp_serde::from_read(body.reader())?)
 }
 
 impl Reply for BodyDeserializeError {

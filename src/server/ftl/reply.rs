@@ -58,6 +58,34 @@ impl Reply for () {
     }
 }
 
+pub struct MsgPack {
+    inner: Result<Vec<u8>, ()>,
+}
+
+pub fn msgpack<T: serde::Serialize>(value: &T, named: bool) -> MsgPack {
+    let res = match named {
+        true => rmp_serde::to_vec_named(value),
+        false => rmp_serde::to_vec(value),
+    };
+
+    MsgPack {
+        inner: res.map_err(|err| {
+            log::error!("MsgPack Reply error: {}", err);
+        }),
+    }
+}
+
+impl Reply for MsgPack {
+    fn into_response(self) -> Response {
+        match self.inner {
+            Ok(body) => Body::from(body)
+                .with_header(ContentType::from(mime::APPLICATION_MSGPACK))
+                .into_response(),
+            Err(()) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+        }
+    }
+}
+
 pub struct Json {
     inner: Result<Vec<u8>, ()>,
 }
