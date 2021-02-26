@@ -22,7 +22,7 @@ struct PatchPartyForm {
 }
 
 pub async fn patch(mut route: Route, auth: Authorization, party_id: Snowflake) -> impl Reply {
-    let form = match body::form::<PatchPartyForm>(&mut route).await {
+    let form = match body::any::<PatchPartyForm>(&mut route).await {
         Ok(form) => form,
         Err(e) => return e.into_response(),
     };

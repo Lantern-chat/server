@@ -22,7 +22,7 @@ pub struct RegisterForm {
 }
 
 pub async fn register(mut route: Route) -> impl Reply {
-    let form = match body::form::<RegisterForm>(&mut route).await {
+    let form = match body::any::<RegisterForm>(&mut route).await {
         Ok(form) => form,
         Err(e) => return e.into_response(),
     };

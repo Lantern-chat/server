@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::SystemTime};
 
 use warp::{
-    body::json,
+    body::json_or_form,
     hyper::{Server, StatusCode},
     reject::Reject,
     Filter, Rejection, Reply,
@@ -31,7 +31,7 @@ pub fn create(
     warp::post()
         .and(warp::path::end())
         .and(auth(state.clone()))
-        .and(warp::body::form::<PartyCreateForm>())
+        .and(warp::body::json_or_form::<PartyCreateForm>())
         .and(state.inject())
         .and_then(|auth, form, state| async move {
             match create_party(state, auth, form).await {

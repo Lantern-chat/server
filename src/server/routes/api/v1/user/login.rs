@@ -18,7 +18,7 @@ use crate::server::ftl::*;
 use crate::server::routes::api::auth::AuthToken;
 
 pub async fn login(mut route: Route) -> impl Reply {
-    let form = match body::form::<LoginForm>(&mut route).await {
+    let form = match body::any::<LoginForm>(&mut route).await {
         Ok(form) => form,
         Err(e) => return e.into_response(),
     };

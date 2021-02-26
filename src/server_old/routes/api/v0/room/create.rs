@@ -1,7 +1,7 @@
 use std::{sync::Arc, time::SystemTime};
 
 use warp::{
-    body::json,
+    body::json_or_form,
     hyper::{Server, StatusCode},
     reject::Reject,
     Filter, Rejection, Reply,
@@ -34,7 +34,7 @@ pub fn create(
     warp::post()
         .and(warp::path::end())
         .and(auth(state.clone()))
-        .and(warp::body::form::<RoomCreateForm>())
+        .and(warp::body::json_or_form::<RoomCreateForm>())
         .map(move |auth, form| (auth, form, state.clone()))
         .and_then(|(auth, form, state)| async move {
             match create_room(state, auth, form).await {

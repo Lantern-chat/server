@@ -18,7 +18,7 @@ pub struct RoomCreateForm {
 }
 
 pub async fn post_room(mut route: Route, auth: Authorization, party_id: Snowflake) -> impl Reply {
-    let form = match body::json::<RoomCreateForm>(&mut route).await {
+    let form = match body::any::<RoomCreateForm>(&mut route).await {
         Ok(form) => form,
         Err(e) => return StatusCode::BAD_REQUEST.into_response(),
     };
