@@ -8,6 +8,8 @@ use crate::{
     },
 };
 
+pub mod get;
+
 pub mod messages;
 
 pub async fn room(mut route: Route) -> impl Reply {
@@ -19,6 +21,8 @@ pub async fn room(mut route: Route) -> impl Reply {
     // ANY /api/v1/room/1234
     match route.next().param::<Snowflake>() {
         Some(Ok(room_id)) => match route.next().method_segment() {
+            (&Method::GET, End) => get::get_room(route, auth, room_id).await.into_response(),
+
             (_, Exact("messages")) => messages::messages(route, auth, room_id)
                 .await
                 .into_response(),
