@@ -17,8 +17,8 @@ use tokio::sync::{
 };
 use tokio_postgres as pg;
 use tokio_postgres::{
-    types::{ToSql, Type},
-    Row, RowStream, Statement,
+    types::{BorrowToSql, ToSql, Type},
+    Row, RowStream, Statement, ToStatement,
 };
 
 use failsafe::futures::CircuitBreaker;
@@ -204,13 +204,74 @@ impl Client {
         Ok(stmt)
     }
 
+    pub async fn query_raw<T, P, I>(
+        &self,
+        statement: &T,
+        params: I,
+    ) -> Result<RowStream, ClientError>
+    where
+        T: ?Sized + ToStatement,
+        P: BorrowToSql,
+        I: IntoIterator<Item = P>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        self.client()?
+            .query_raw(statement, params)
+            .await
+            .map_err(ClientError::from)
+    }
+
+    pub async fn query_raw_cached<F, P, I>(
+        &self,
+        query: F,
+        params: I,
+    ) -> Result<RowStream, ClientError>
+    where
+        F: Any + FnOnce() -> &'static str,
+        P: BorrowToSql,
+        I: IntoIterator<Item = P>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        self.query_raw(&self.prepare_cached(query).await?, params)
+            .await
+    }
+
+    pub async fn query_stream<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<RowStream, ClientError>
+    where
+        T: ?Sized + ToStatement,
+    {
+        fn slice_iter<'a>(
+            s: &'a [&'a (dyn ToSql + Sync)],
+        ) -> impl ExactSizeIterator<Item = &'a dyn ToSql> + 'a {
+            s.iter().map(|s| *s as _)
+        }
+
+        self.query_raw(statement, slice_iter(params)).await
+    }
+
+    pub async fn query_stream_cached<F>(
+        &self,
+        query: F,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<RowStream, ClientError>
+    where
+        F: Any + FnOnce() -> &'static str,
+    {
+        self.query_stream(&self.prepare_cached(query).await?, params)
+            .await
+    }
+
     pub async fn execute<T>(
         &self,
         statement: &T,
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<u64, ClientError>
     where
-        T: ?Sized + pg::ToStatement,
+        T: ?Sized + ToStatement,
     {
         self.client()?
             .execute(statement, params)
@@ -238,7 +299,7 @@ impl Client {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Vec<Row>, ClientError>
     where
-        T: ?Sized + pg::ToStatement,
+        T: ?Sized + ToStatement,
     {
         self.client()?
             .query(statement, params)
@@ -263,7 +324,7 @@ impl Client {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Row, ClientError>
     where
-        T: ?Sized + pg::ToStatement,
+        T: ?Sized + ToStatement,
     {
         self.client()?
             .query_one(statement, params)
@@ -289,7 +350,7 @@ impl Client {
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Option<Row>, ClientError>
     where
-        T: ?Sized + pg::ToStatement,
+        T: ?Sized + ToStatement,
     {
         self.client()?
             .query_opt(statement, params)
