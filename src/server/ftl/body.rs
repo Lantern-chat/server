@@ -120,12 +120,8 @@ impl ReplyError for BodyDeserializeError {
     }
 }
 
-pub fn content_length(route: &Route) -> Option<u64> {
-    route.header::<ContentLength>().map(|cl| cl.0)
-}
-
 pub fn content_length_limit(route: &Route, limit: u64) -> Option<impl Reply> {
-    match content_length(route) {
+    match route.content_length() {
         Some(len) if len > limit => Some("Content length is too long"),
         None => Some("Content-length is missing!"),
         _ => None,

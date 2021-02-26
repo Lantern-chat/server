@@ -126,6 +126,11 @@ impl Route {
             .map(|header| header.to_str().map(FromStr::from_str))
     }
 
+    #[inline]
+    pub fn content_length(&self) -> Option<u64> {
+        self.header::<headers::ContentLength>().map(|cl| cl.0)
+    }
+
     pub fn next(&mut self) -> &mut Self {
         self.segment_index = self.next_segment_index;
 
