@@ -22,25 +22,40 @@ pub struct Room {
     pub parent_id: Option<Snowflake>,
 }
 
+use futures::{StreamExt, TryStreamExt};
+
 impl Room {
-    pub async fn of_party(
-        client: &Client,
-        party_id: Snowflake,
-    ) -> Result<impl Iterator<Item = Room>, ClientError> {
-        let rows = client.query_cached(
+    pub async fn insert(&self, client: &Client) -> Result<(), ClientError> {
+        client
+            .execute_cached(
+                || "INSERT INTO lantern.rooms (id, party_id, name, topic, avatar_id, sort_order, flags, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                &[&self.id, &self.party_id, &self.name, &self.topic, &self.avatar_id, &self.sort_order, &self.flags.bits(), &self.parent_id],
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn of_party(client: &Client, party_id: Snowflake) -> Result<Vec<Room>, ClientError> {
+        client.query_stream_cached(
             || "SELECT id, name, topic, avatar_id, sort_order, flags, parent_id FROM lantern.rooms WHERE party_id = $1",
             &[&party_id]
-        ).await?;
-
-        Ok(rows.into_iter().map(move |row| Room {
-            id: row.get(0),
-            party_id,
-            name: row.get(1),
-            topic: row.get(2),
-            avatar_id: row.get(3),
-            sort_order: row.get(4),
-            flags: RoomFlags::from_bits_truncate(row.get(5)),
-            parent_id: row.get(6),
-        }))
+        )
+        .await?
+        .map(|res| match res {
+            Err(e) => Err(e),
+            Ok(row) => Ok(Room {
+                id: row.try_get(0)?,
+                party_id,
+                name: row.try_get(1)?,
+                topic: row.try_get(2)?,
+                avatar_id: row.try_get(3)?,
+                sort_order: row.try_get(4)?,
+                flags: RoomFlags::from_bits_truncate(row.try_get(5)?),
+                parent_id: row.try_get(6)?,
+            })
+        })
+        .try_collect()
+        .await
     }
 }
