@@ -59,21 +59,24 @@ impl File {
             )
             .await?;
 
-        Ok(row.map(|row| {
-            let mime: Option<String> = row.get(2);
-            let sha3: Option<Vec<u8>> = row.get(5);
+        match row {
+            None => Ok(None),
+            Some(row) => Ok(Some({
+                let mime: Option<String> = row.try_get(2)?;
+                let sha3: Option<Vec<u8>> = row.try_get(5)?;
 
-            File {
-                id,
-                name: row.get(0),
-                preview: row.get(1),
-                mime: mime.and_then(|mime| Mime::from_str(&mime).ok()),
-                size: row.get::<_, i32>(3) as u32,
-                offset: row.get::<_, i32>(4) as u32,
-                flags: FileFlags::from_bits_truncate(row.get(6)),
-                sha3: sha3.map(|sha3| sha3.into_boxed_slice()),
-            }
-        }))
+                File {
+                    id,
+                    name: row.try_get(0)?,
+                    preview: row.try_get(1)?,
+                    mime: mime.and_then(|mime| Mime::from_str(&mime).ok()),
+                    size: row.try_get::<_, i32>(3)? as u32,
+                    offset: row.try_get::<_, i32>(4)? as u32,
+                    flags: FileFlags::from_bits_truncate(row.try_get(6)?),
+                    sha3: sha3.map(|sha3| sha3.into_boxed_slice()),
+                }
+            })),
+        }
     }
 
     pub async fn update_offset(&self, client: &Client) -> Result<(), ClientError> {

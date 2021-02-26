@@ -27,11 +27,14 @@ impl Party {
             )
             .await?;
 
-        Ok(row.map(|row| Party {
-            id,
-            owner_id: row.get(0),
-            name: row.get(1),
-        }))
+        match row {
+            None => Ok(None),
+            Some(row) => Ok(Some(Party {
+                id,
+                owner_id: row.try_get(0)?,
+                name: row.try_get(1)?,
+            })),
+        }
     }
 
     /*
