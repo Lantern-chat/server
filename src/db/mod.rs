@@ -23,14 +23,7 @@ pub mod schema {
     pub mod user;
 
     pub use self::{
-        attachment::Attachment,
-        emote::Emote,
-        invite::Invite,
-        msg::Message,
-        party::Party,
-        role::Role,
-        room::{Room, RoomKind},
-        thread::Thread,
-        user::User,
+        attachment::Attachment, emote::Emote, invite::Invite, msg::Message, party::Party,
+        role::Role, room::Room, thread::Thread, user::User,
     };
 }

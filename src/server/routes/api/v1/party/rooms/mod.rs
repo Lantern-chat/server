@@ -2,10 +2,7 @@ use http::{Method, StatusCode};
 
 use crate::{
     db::Snowflake,
-    server::{
-        ftl::*,
-        routes::api::auth::{authorize, Authorization},
-    },
+    server::{ftl::*, routes::api::auth::Authorization},
 };
 
 pub mod get;
@@ -18,7 +15,7 @@ pub async fn party_rooms(mut route: Route, auth: Authorization, party_id: Snowfl
         (&Method::POST, End) => "".into_response(),
 
         // GET /api/v1/party/1234/rooms
-        (&Method::GET, End) => "".into_response(),
+        (&Method::GET, End) => get::get_rooms(route, auth, party_id).await.into_response(),
 
         // ANY /api/v1/party/1234/rooms/5678
         _ => match route.param::<Snowflake>() {
