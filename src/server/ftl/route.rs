@@ -1,4 +1,8 @@
-use std::{convert::Infallible, net::SocketAddr, str::FromStr};
+use std::{
+    convert::Infallible,
+    net::{AddrParseError, IpAddr, SocketAddr},
+    str::FromStr,
+};
 
 use bytes::{Buf, Bytes};
 use futures::Stream;
@@ -39,6 +43,10 @@ impl Route {
         }
     }
 
+    /// Use this at the start of a Route to override the provided HTTP Method with the value present in
+    /// the `x-http-method-override` HTTP header.
+    ///
+    /// This is sometimes used in old browsers without support for PATCH or OPTIONS methods.
     pub fn apply_method_override(&mut self) -> Result<(), InvalidMethod> {
         if let Some(method_override) = self.req.headers().get("x-http-method-override") {
             *self.req.method_mut() = Method::from_bytes(method_override.as_bytes())?;
@@ -47,6 +55,10 @@ impl Route {
         Ok(())
     }
 
+    /// Attempt to discern the current host authority either by
+    /// looking at the input URI or the `HOST` HTTP Header.
+    ///
+    /// If no consistent host authority can be found, `None` is returned.
     pub fn host(&self) -> Option<Authority> {
         let from_uri = self.req.uri().authority();
 
@@ -64,6 +76,7 @@ impl Route {
         }
     }
 
+    /// Parse the URI query
     pub fn query<T: serde::de::DeserializeOwned>(
         &self,
     ) -> Option<Result<T, serde_urlencoded::de::Error>> {
@@ -74,10 +87,12 @@ impl Route {
         self.req.uri().path()
     }
 
+    /// Returns the remaining parts of the URI path **After** the current segment.
     pub fn tail(&self) -> &str {
         &self.path()[self.next_segment_index..]
     }
 
+    /// Parses a URI as an arbitrary parameter using `FromStr`
     pub fn param<P: FromStr>(&self) -> Option<Result<P, P::Err>> {
         match self.segment() {
             Segment::Exact(segment) => Some(segment.parse()),
@@ -85,6 +100,7 @@ impl Route {
         }
     }
 
+    /// Returns both the `Method` and URI `Segment` a the same time for convenient `match` statements.
     pub fn method_segment(&self) -> (&Method, Segment) {
         let path = self.req.uri().path();
         let method = self.req.method();
@@ -117,6 +133,7 @@ impl Route {
         self.req.headers().get(name)
     }
 
+    /// Parse a header value using `FromStr`
     #[inline]
     pub fn parse_raw_header<T: FromStr>(
         &self,
@@ -126,11 +143,26 @@ impl Route {
             .map(|header| header.to_str().map(FromStr::from_str))
     }
 
+    /// Parses the `Content-Length` header and returns the value as a `u64`,
+    /// or `None` if there was not a set content length
     #[inline]
     pub fn content_length(&self) -> Option<u64> {
         self.header::<headers::ContentLength>().map(|cl| cl.0)
     }
 
+    /// Parses the proxy chain in the `x-forwarded-for` HTTP header.
+    pub fn forwarded_for<'a>(
+        &'a self,
+    ) -> Option<Result<impl Iterator<Item = Result<IpAddr, AddrParseError>> + 'a, ToStrError>> {
+        self.req
+            .headers()
+            .get("x-forwarded-for")
+            .map(|ff| ff.to_str().map(|ff| ff.split(',').map(IpAddr::from_str)))
+    }
+
+    /// Finds the next segment in the URI path, storing the result internally for further usage.
+    ///
+    /// Use [`.segment()`], [`.method_segment()`] or [`param`] to parse the segment found (if any)
     pub fn next(&mut self) -> &mut Self {
         self.segment_index = self.next_segment_index;
 
@@ -160,6 +192,7 @@ impl Route {
         self.req.body()
     }
 
+    /// Takes ownership of the request body, returning `None` if it was already consumed.
     pub fn take_body(&mut self) -> Option<Body> {
         if self.has_body {
             let body = std::mem::replace(self.req.body_mut(), Body::empty());

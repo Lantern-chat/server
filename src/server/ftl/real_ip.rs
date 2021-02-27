@@ -21,18 +21,15 @@ pub enum GetRealIpError {
 pub fn get_real_ip(route: &Route) -> Result<IpAddr, GetRealIpError> {
     let headers = route.req.headers();
 
-    Ok(if let Some(x_real_ip) = headers.get("x-real-ip") {
-        IpAddr::from_str(x_real_ip.to_str()?.trim())?
-    } else if let Some(x_forwarded_for) = headers.get("x-forwarded-for") {
-        IpAddr::from_str(
-            x_forwarded_for
-                .to_str()?
-                .split(',')
-                .next()
-                .expect("at least one client or proxy")
-                .trim(),
-        )?
-    } else {
-        route.addr.ip()
-    })
+    if let Some(x_real_ip) = headers.get("x-real-ip") {
+        return Ok(IpAddr::from_str(x_real_ip.to_str()?.trim())?);
+    }
+
+    if let Some(Ok(mut proxies)) = route.forwarded_for() {
+        if let Some(first) = proxies.next() {
+            return Ok(first?);
+        }
+    }
+
+    Ok(route.addr.ip())
 }
