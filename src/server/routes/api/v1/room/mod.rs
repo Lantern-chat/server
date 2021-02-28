@@ -29,6 +29,6 @@ pub async fn room(mut route: Route) -> impl Reply {
 
             _ => StatusCode::NOT_FOUND.into_response(),
         },
-        _ => return StatusCode::BAD_REQUEST.into_response(),
+        _ => StatusCode::BAD_REQUEST.into_response(),
     }
 }
