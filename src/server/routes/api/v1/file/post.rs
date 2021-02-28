@@ -11,6 +11,7 @@ use crate::{
     server::ftl::*,
 };
 
+// TODO: Limit the number of files that can be pending at once, probably to 3
 pub async fn post(route: Route) -> impl Reply {
     let upload_length = match route.parse_raw_header::<u32>("upload-length") {
         Some(Ok(Ok(upload_length))) => upload_length,
