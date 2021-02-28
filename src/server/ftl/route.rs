@@ -154,10 +154,12 @@ impl Route {
     pub fn forwarded_for<'a>(
         &'a self,
     ) -> Option<Result<impl Iterator<Item = Result<IpAddr, AddrParseError>> + 'a, ToStrError>> {
-        self.req
-            .headers()
-            .get("x-forwarded-for")
-            .map(|ff| ff.to_str().map(|ff| ff.split(',').map(IpAddr::from_str)))
+        self.req.headers().get("x-forwarded-for").map(|ff| {
+            ff.to_str().map(|ff| {
+                ff.split(',')
+                    .map(|segment| IpAddr::from_str(segment.trim()))
+            })
+        })
     }
 
     /// Finds the next segment in the URI path, storing the result internally for further usage.
