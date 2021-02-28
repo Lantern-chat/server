@@ -8,6 +8,7 @@ CREATE TABLE lantern.messages (
     edited_at   timestamp,
     deleted_at  timestamp,
     content     text,
+    pinned      bool        NOT NULL    DEFAULT false,
 
     CONSTRAINT messages_pk PRIMARY KEY (id)
 );
