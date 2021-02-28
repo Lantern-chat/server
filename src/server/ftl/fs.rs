@@ -9,7 +9,7 @@ use headers::{
     AcceptRanges, ContentLength, ContentRange, ContentType, HeaderMapExt, IfModifiedSince, IfRange,
     IfUnmodifiedSince, LastModified, Range,
 };
-use http::{Response, StatusCode};
+use http::{Method, Response, StatusCode};
 use hyper::Body;
 use percent_encoding::percent_decode_str;
 
@@ -220,8 +220,11 @@ async fn file_reply(route: &Route, path: impl AsRef<Path>) -> impl Reply {
                 let sub_len = end - start;
                 let buf_size = optimal_buf_size(&metadata);
 
-                let mut resp =
-                    Response::new(Body::wrap_stream(file_stream(file, buf_size, (start, end))));
+                let mut resp = if route.method() == &Method::GET {
+                    Response::new(Body::wrap_stream(file_stream(file, buf_size, (start, end))))
+                } else {
+                    Response::default()
+                };
 
                 if sub_len != len {
                     *resp.status_mut() = StatusCode::PARTIAL_CONTENT;

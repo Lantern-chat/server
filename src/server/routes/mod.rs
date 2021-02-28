@@ -12,9 +12,11 @@ pub async fn entry(mut route: Route) -> Response {
     match route.next().method_segment() {
         (_, Exact("api")) => api::api(route).await,
 
-        (&Method::GET, Exact("static")) => fs::dir(&route, "frontend/dist").await.into_response(),
+        (&Method::GET, Exact("static")) | (&Method::HEAD, Exact("static")) => {
+            fs::dir(&route, "frontend/dist").await.into_response()
+        }
 
-        (&Method::GET, _) => fs::file(&route, "frontend/dist/index.html")
+        (&Method::GET, _) | (&Method::HEAD, _) => fs::file(&route, "frontend/dist/index.html")
             .await
             .into_response(),
 
