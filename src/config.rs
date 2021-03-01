@@ -10,6 +10,8 @@ pub struct LanternConfig {
     pub username_len: Range<usize>,
     pub partyname_len: Range<usize>,
     pub roomname_len: Range<usize>,
+    pub message_len: Range<usize>,
+    pub max_message_newlines: usize,
     pub max_upload_size: u32,
 }
 
@@ -22,6 +24,8 @@ impl Default for LanternConfig {
             username_len: 3..64,
             partyname_len: 3..64,
             roomname_len: 3..64,
+            message_len: 1..5000,
+            max_message_newlines: 120,
             max_upload_size: 1024 * 1024 * 8,
         }
     }

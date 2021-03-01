@@ -1,6 +1,7 @@
 pub mod client;
 pub mod conn;
 pub mod startup;
+pub mod util;
 
 pub use client::{Client, ClientError};
 

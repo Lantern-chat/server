@@ -3,7 +3,7 @@ CREATE TABLE lantern.messages (
     id          bigint      NOT NULL,
     user_id     bigint      NOT NULL,
     room_id     bigint      NOT NULL,
-    editor_id   smallint,
+    editor_id   bigint,
     updated_at  timestamp               DEFAULT now(),
     edited_at   timestamp,
     deleted_at  timestamp,

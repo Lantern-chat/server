@@ -2,6 +2,7 @@ use std::{
     fmt,
     str::FromStr,
     sync::atomic::{AtomicU16, Ordering},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use std::num::NonZeroU64;
@@ -36,6 +37,15 @@ impl Snowflake {
         Snowflake(unsafe { NonZeroU64::new_unchecked(1) })
     }
 
+    // Constructs a Snowflake from the given timestamp with any of the deduplication
+    // values. This is ideal for database searches using simple operators.
+    pub fn timestamp_only(ts: SystemTime) -> Snowflake {
+        let elapsed: Duration = ts.duration_since(UNIX_EPOCH).unwrap();
+        let ms = (elapsed.as_millis() - LANTERN_EPOCH) as u64;
+
+        Snowflake(unsafe { NonZeroU64::new_unchecked(ms << 22) })
+    }
+
     /// Create a snowflake at the given unix epoch (milliseconds)
     pub fn at_ms(ms: u128) -> Snowflake {
         // offset by Lantern epoch
@@ -65,7 +75,7 @@ impl Snowflake {
     /// Creates a new Snowflake at this moment
     pub fn now() -> Snowflake {
         Self::at_ms(
-            std::time::UNIX_EPOCH
+            UNIX_EPOCH
                 .elapsed()
                 .expect("Could not get time")
                 .as_millis(),
