@@ -84,7 +84,7 @@ impl Message {
         limit: u8,
         mode: MessageSearch,
     ) -> Result<impl Stream<Item = Result<Message, ClientError>>, ClientError> {
-        let limit = limit as i16;
+        let limit = limit as i64;
 
         let stream = match mode {
             MessageSearch::After(ts) => {
