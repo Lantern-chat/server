@@ -110,6 +110,71 @@ impl Reply for Json {
     }
 }
 
+use bytes::Bytes;
+use futures::{Stream, StreamExt};
+
+pub struct JsonStream {
+    body: Body,
+}
+
+pub fn json_stream<T, E>(stream: impl Stream<Item = Result<T, E>> + Send + 'static) -> impl Reply
+where
+    T: serde::Serialize + Send + Sync + 'static,
+    E: Into<Box<dyn std::error::Error + Send + Sync>> + Send + Sync + 'static,
+{
+    JsonStream {
+        body: Body::wrap_stream(async_stream::stream! {
+            futures::pin_mut!(stream);
+
+            let mut first = true;
+            let mut buffer = Vec::with_capacity(128);
+            buffer.push(b'[');
+
+            let error: Result<(), Box<dyn std::error::Error + Send + Sync>> = loop {
+                match stream.next().await {
+                    Some(Ok(ref value)) => {
+                        if !first {
+                            buffer.push(b',');
+                        }
+
+                        if let Err(e) = serde_json::to_writer(&mut buffer, value) {
+                            if !first {
+                                buffer.pop(); // remove comma on error, maybe preserve what we have so far
+                            }
+
+                            break Err(e.into());
+                        }
+
+                        first = false;
+                    }
+                    Some(Err(e)) => break Err(e.into()),
+                    None => break Ok(()),
+                }
+
+                // Flush buffer at 2KB
+                if buffer.len() >= 2048 {
+                    yield Ok(Bytes::from(std::mem::replace(&mut buffer, Vec::new())));
+                }
+            };
+
+            buffer.push(b']');
+
+            if let Err(e) = error {
+                log::error!("Error serializing json array: {}", e);
+                yield Err(e);
+            }
+
+            yield Ok(buffer.into());
+        }),
+    }
+}
+
+impl Reply for JsonStream {
+    fn into_response(self) -> Response {
+        self.body.with_header(ContentType::json()).into_response()
+    }
+}
+
 pub struct WithStatus<R: Reply> {
     reply: R,
     status: StatusCode,
