@@ -106,7 +106,7 @@ impl Reply for BodyDeserializeError {
             BodyDeserializeError::IncorrectContentType => "Incorrect Content-Type"
                 .with_status(StatusCode::BAD_REQUEST)
                 .into_response(),
-            _ => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            _ => self.status().into_response(),
         }
     }
 }
@@ -114,8 +114,8 @@ impl Reply for BodyDeserializeError {
 impl ReplyError for BodyDeserializeError {
     fn status(&self) -> StatusCode {
         match self {
-            BodyDeserializeError::IncorrectContentType => StatusCode::BAD_REQUEST,
-            _ => StatusCode::INTERNAL_SERVER_ERROR,
+            BodyDeserializeError::BodyError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            _ => StatusCode::BAD_REQUEST,
         }
     }
 }
