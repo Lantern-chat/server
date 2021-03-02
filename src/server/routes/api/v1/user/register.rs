@@ -127,9 +127,6 @@ async fn register_user(
         return Err(RegisterError::AlreadyExists);
     }
 
-    let id =
-        Snowflake::at_ms((now - time::OffsetDateTime::unix_epoch()).whole_milliseconds() as u128);
-
     let password = std::mem::replace(&mut form.password, String::new());
 
     // fire this off while we sanitize the username
@@ -139,6 +136,7 @@ async fn register_user(
         argon2::hash_encoded(password.as_bytes(), &salt, &config)
     });
 
+    let id = Snowflake::at(now);
     let username = USERNAME_SANITIZE_REGEX.replace_all(&form.username, " ");
 
     let password_hash = password_hash_task.await??;

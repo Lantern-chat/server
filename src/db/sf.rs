@@ -82,6 +82,10 @@ impl Snowflake {
         )
     }
 
+    pub fn at(ts: SystemTime) -> Snowflake {
+        Self::at_ms(ts.duration_since(UNIX_EPOCH).unwrap().as_millis())
+    }
+
     /// Gets the number of milliseconds since the unix epoch
     #[inline]
     pub fn epoch_ms(&self) -> u128 {
