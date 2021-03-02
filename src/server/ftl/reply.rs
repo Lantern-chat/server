@@ -133,15 +133,14 @@ where
             let error: Result<(), Box<dyn std::error::Error + Send + Sync>> = loop {
                 match stream.next().await {
                     Some(Ok(ref value)) => {
+                        let pos = buffer.len();
+
                         if !first {
                             buffer.push(b',');
                         }
 
                         if let Err(e) = serde_json::to_writer(&mut buffer, value) {
-                            if !first {
-                                buffer.pop(); // remove comma on error, maybe preserve what we have so far
-                            }
-
+                            buffer.truncate(pos); // revert back to previous element
                             break Err(e.into());
                         }
 
@@ -151,20 +150,19 @@ where
                     None => break Ok(()),
                 }
 
-                // Flush buffer at 2KB
-                if buffer.len() >= 2048 {
+                // Flush buffer at 4KB
+                if buffer.len() >= 4096 {
                     yield Ok(Bytes::from(std::mem::replace(&mut buffer, Vec::new())));
                 }
             };
 
             buffer.push(b']');
+            yield Ok(buffer.into());
 
             if let Err(e) = error {
                 log::error!("Error serializing json array: {}", e);
                 yield Err(e);
             }
-
-            yield Ok(buffer.into());
         }),
     }
 }

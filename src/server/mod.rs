@@ -37,6 +37,7 @@ pub fn start_server(
     let inner_state = state.clone();
     let server = Server::bind(&addr)
         .http2_adaptive_window(true)
+        .tcp_nodelay(true)
         .serve(make_service_fn(move |socket: &AddrStream| {
             let remote_addr = socket.remote_addr();
             let state = inner_state.clone();
