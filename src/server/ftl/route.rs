@@ -2,6 +2,7 @@ use std::{
     convert::Infallible,
     net::{AddrParseError, IpAddr, SocketAddr},
     str::FromStr,
+    time::{Duration, Instant},
 };
 
 use bytes::{Buf, Bytes};
@@ -23,6 +24,7 @@ pub struct Route {
     pub segment_index: usize,
     pub next_segment_index: usize,
     pub has_body: bool,
+    pub start: Instant,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -32,8 +34,10 @@ pub enum Segment<'a> {
 }
 
 impl Route {
+    #[inline]
     pub fn new(addr: SocketAddr, req: Request<Body>, state: ServerState) -> Route {
         Route {
+            start: Instant::now(),
             addr,
             req,
             state,
@@ -41,6 +45,11 @@ impl Route {
             next_segment_index: 0,
             has_body: true,
         }
+    }
+
+    #[inline]
+    pub fn elapsed(&self) -> Duration {
+        self.start.elapsed()
     }
 
     /// Use this at the start of a Route to override the provided HTTP Method with the value present in

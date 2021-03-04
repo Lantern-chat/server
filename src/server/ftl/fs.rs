@@ -1,15 +1,15 @@
-use std::fs::Metadata;
 use std::path::{Path, PathBuf};
+use std::{fs::Metadata, time::Instant};
 
 use bytes::{Bytes, BytesMut};
 use tokio::fs::File as TkFile;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
 use headers::{
-    AcceptRanges, ContentLength, ContentRange, ContentType, HeaderMapExt, IfModifiedSince, IfRange,
-    IfUnmodifiedSince, LastModified, Range,
+    AcceptRanges, ContentLength, ContentRange, ContentType, HeaderMap, HeaderMapExt, HeaderValue,
+    IfModifiedSince, IfRange, IfUnmodifiedSince, LastModified, Range, TransferEncoding,
 };
-use http::{Method, Response, StatusCode};
+use http::{header::TRAILER, Method, Response, StatusCode};
 use hyper::Body;
 use percent_encoding::percent_decode_str;
 
@@ -221,7 +221,7 @@ async fn file_reply(route: &Route, path: impl AsRef<Path>) -> impl Reply {
                 let buf_size = optimal_buf_size(&metadata);
 
                 let mut resp = if route.method() == &Method::GET {
-                    Response::new(Body::wrap_stream(file_stream(file, buf_size, (start, end))))
+                    Response::new(file_body(route.start, file, buf_size, (start, end)))
                 } else {
                     Response::default()
                 };
@@ -240,6 +240,9 @@ async fn file_reply(route: &Route, path: impl AsRef<Path>) -> impl Reply {
                 if let Some(last_modified) = modified {
                     resp.headers_mut().typed_insert(last_modified);
                 }
+
+                resp.headers_mut()
+                    .insert(TRAILER, HeaderValue::from_static("Server-Timing"));
 
                 resp.with_header(ContentLength(len))
                     .with_header(ContentType::from(mime))
@@ -282,6 +285,84 @@ fn bytes_range(range: Option<Range>, max_len: u64) -> Result<(u64, u64), BadRang
 use futures::Stream;
 use std::io::SeekFrom;
 
+fn file_body(
+    route_start: Instant,
+    mut file: TkFile,
+    buf_size: usize,
+    (start, end): (u64, u64),
+) -> Body {
+    //return Body::wrap_stream(file_stream(file, buf_size, (start, end)));
+
+    let (mut sender, body) = Body::channel();
+
+    tokio::spawn(async move {
+        if start != 0 {
+            if let Err(e) = file.seek(SeekFrom::Start(start)).await {
+                log::error!("Error seeking file: {}", e);
+                return sender.abort();
+            }
+        }
+
+        let mut buf = BytesMut::new();
+        let mut len = end - start;
+
+        while len != 0 {
+            // reserve at least buf_size
+            if buf.capacity() - buf.len() < buf_size {
+                buf.reserve(buf_size);
+            }
+
+            let n = match file.read_buf(&mut buf).await {
+                Ok(n) => n as u64,
+                Err(err) => {
+                    log::debug!("file read error: {}", err);
+                    return sender.abort();
+                }
+            };
+
+            if n == 0 {
+                log::warn!("file read found EOF before expected length");
+                break;
+            }
+
+            let mut chunk = buf.split().freeze();
+            if n > len {
+                chunk = chunk.split_to(len as usize);
+                len = 0;
+            } else {
+                len -= n;
+            }
+
+            if let Err(e) = sender.send_data(chunk).await {
+                log::error!("Error sending file chunk: {}", e);
+                return sender.abort();
+            }
+        }
+
+        let elapsed = route_start.elapsed().as_secs_f64() * 1000.0;
+
+        log::info!("File transfer finished in {:.4}ms", elapsed);
+
+        let mut trailers = HeaderMap::new();
+        if let Ok(value) = HeaderValue::from_str(&format!("end;dur={:.4}", elapsed)) {
+            trailers.insert("Server-Timing", value);
+
+            if let Err(e) = sender.send_trailers(trailers).await {
+                log::error!("Error sending trailers");
+
+                return sender.abort();
+            }
+        } else {
+            log::warn!("Unable to create trailer value");
+        }
+
+        drop(sender);
+    });
+
+    body
+}
+
+/*
 // TODO: Rewrite this with manual stream state machine for highest possible efficiency
 // Take note of https://github.com/tokio-rs/tokio/blob/43bd11bf2fa4eaee84383ddbe4c750868f1bb684/tokio/src/io/seek.rs
 fn file_stream(
@@ -332,6 +413,7 @@ fn file_stream(
         }
     }
 }
+*/
 
 #[cfg(test)]
 mod tests {

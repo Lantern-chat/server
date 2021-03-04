@@ -122,49 +122,57 @@ where
     T: serde::Serialize + Send + Sync + 'static,
     E: Into<Box<dyn std::error::Error + Send + Sync>> + Send + Sync + 'static,
 {
-    JsonStream {
-        body: Body::wrap_stream(async_stream::stream! {
-            futures::pin_mut!(stream);
+    let (mut sender, body) = Body::channel();
 
-            let mut first = true;
-            let mut buffer = Vec::with_capacity(128);
-            buffer.push(b'[');
+    tokio::spawn(async move {
+        futures::pin_mut!(stream);
 
-            let error: Result<(), Box<dyn std::error::Error + Send + Sync>> = loop {
-                match stream.next().await {
-                    Some(Ok(ref value)) => {
-                        let pos = buffer.len();
+        let mut first = true;
+        let mut buffer = Vec::with_capacity(128);
+        buffer.push(b'[');
 
-                        if !first {
-                            buffer.push(b',');
-                        }
+        let error: Result<(), Box<dyn std::error::Error + Send + Sync>> = loop {
+            match stream.next().await {
+                Some(Ok(ref value)) => {
+                    let pos = buffer.len();
 
-                        if let Err(e) = serde_json::to_writer(&mut buffer, value) {
-                            buffer.truncate(pos); // revert back to previous element
-                            break Err(e.into());
-                        }
-
-                        first = false;
+                    if !first {
+                        buffer.push(b',');
                     }
-                    Some(Err(e)) => break Err(e.into()),
-                    None => break Ok(()),
+
+                    if let Err(e) = serde_json::to_writer(&mut buffer, value) {
+                        buffer.truncate(pos); // revert back to previous element
+                        break Err(e.into());
+                    }
+
+                    first = false;
                 }
-
-                // Flush buffer at 4KB
-                if buffer.len() >= 4096 {
-                    yield Ok(Bytes::from(std::mem::replace(&mut buffer, Vec::new())));
-                }
-            };
-
-            buffer.push(b']');
-            yield Ok(buffer.into());
-
-            if let Err(e) = error {
-                log::error!("Error serializing json array: {}", e);
-                yield Err(e);
+                Some(Err(e)) => break Err(e.into()),
+                None => break Ok(()),
             }
-        }),
-    }
+
+            // Flush buffer at 4KB
+            if buffer.len() >= 4096 {
+                let chunk = Bytes::from(std::mem::replace(&mut buffer, Vec::new()));
+                if let Err(e) = sender.send_data(chunk).await {
+                    log::error!("Error sending JSON array chunk: {}", e);
+                    return sender.abort();
+                }
+            }
+        };
+
+        buffer.push(b']');
+        if let Err(e) = sender.send_data(buffer.into()).await {
+            log::error!("Error sending JSON array chunk: {}", e);
+            return sender.abort();
+        }
+
+        if let Err(e) = error {
+            log::error!("Error serializing json array: {}", e);
+        }
+    });
+
+    JsonStream { body }
 }
 
 impl Reply for JsonStream {

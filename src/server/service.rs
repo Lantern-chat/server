@@ -1,6 +1,9 @@
 use std::{convert::Infallible, net::SocketAddr, time::Instant};
 
-use hyper::{Body, Request, Response};
+use futures::FutureExt;
+
+use headers::HeaderValue;
+use hyper::{body::HttpBody, Body, Request, Response};
 
 use super::{ftl::*, routes, ServerState};
 
@@ -9,7 +12,7 @@ pub async fn service(
     req: Request<Body>,
     state: ServerState,
 ) -> Result<Response<Body>, Infallible> {
-    let mut route = Route::new(addr, req, state);
+    let route = Route::new(addr, req, state);
 
     let info = format!(
         "{:?}: {} {}",
@@ -18,13 +21,16 @@ pub async fn service(
         route.req.uri()
     );
 
-    let now = Instant::now();
+    let start = route.start;
 
-    let resp = routes::entry(route).await;
+    let mut resp = routes::entry(route).await;
 
-    let elapsed = now.elapsed().as_secs_f64() * 1000.0;
+    let elapsed = start.elapsed().as_secs_f64() * 1000.0;
 
     log::info!("{} -> {} {:.4}ms", info, resp.status(), elapsed);
+    if let Ok(value) = HeaderValue::from_str(&format!("resp;dur={:.4}", elapsed)) {
+        resp.headers_mut().insert("Server-Timing", value);
+    }
 
     Ok(resp)
 }
