@@ -1,25 +1,34 @@
 use http::{Method, StatusCode};
 
-use crate::server::ftl::*;
+use crate::{
+    db::Snowflake,
+    server::{ftl::*, routes::api::auth::authorize},
+};
 
 pub mod check;
-pub mod login;
-pub mod logout;
 pub mod register;
 
-pub async fn users(mut route: Route) -> impl Reply {
+pub mod me;
+
+pub async fn user(mut route: Route) -> impl Reply {
     match route.next().method_segment() {
-        // POST /api/v1/users
+        // POST /api/v1/user
         (&Method::POST, End) => register::register(route).await.into_response(),
 
-        // POST /api/v1/users/login
-        (&Method::POST, Exact("login")) => login::login(route).await.into_response(),
-
-        // DELETE /api/v1/users/logout
-        (&Method::DELETE, Exact("logout")) => logout::logout(route).await.into_response(),
-
-        // HEAD /api/v1/users/check
+        // HEAD /api/v1/user/check
         (&Method::HEAD, Exact("check")) => check::check(route).await.into_response(),
+
+        // ANY /api/v1/user/@me
+        (_, Exact("@me")) => me::me(route).await.into_response(),
+
+        // ANY /api/v1/user/1234
+        (_, Exact(segment)) => match segment.parse::<Snowflake>() {
+            Err(_) => StatusCode::BAD_REQUEST.into_response(),
+            Ok(user_id) => match authorize(&route).await {
+                Ok(auth) => "user stuff".into_response(),
+                Err(e) => e.into_response(),
+            },
+        },
 
         _ => StatusCode::NOT_FOUND.into_response(),
     }

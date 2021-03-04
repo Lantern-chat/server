@@ -11,7 +11,7 @@ pub mod user;
 
 pub async fn api_v1(mut route: Route) -> impl Reply {
     match route.next().method_segment() {
-        (_, Exact("user")) => user::users(route).await.into_response(),
+        (_, Exact("user")) => user::user(route).await.into_response(),
         (_, Exact("party")) => party::party(route).await.into_response(),
         (_, Exact("file")) => file::file(route).await.into_response(),
         (_, Exact("room")) => room::room(route).await.into_response(),

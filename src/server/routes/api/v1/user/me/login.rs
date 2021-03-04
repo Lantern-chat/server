@@ -58,7 +58,7 @@ enum LoginError {
     PasswordHashError(#[from] argon2::Error),
 }
 
-use super::register::{hash_config, EMAIL_REGEX};
+use super::super::register::{hash_config, EMAIL_REGEX};
 
 async fn login_user(state: ServerState, mut form: LoginForm) -> Result<Session, LoginError> {
     if !EMAIL_REGEX.is_match(&form.email) {

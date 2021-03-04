@@ -9,12 +9,7 @@ use crate::{
 use crate::server::ftl::*;
 use crate::server::routes::api::auth;
 
-pub async fn logout(mut route: Route) -> impl Reply {
-    let auth = match auth::authorize(&route).await {
-        Ok(auth) => auth,
-        Err(e) => return e.into_response(),
-    };
-
+pub async fn logout(mut route: Route, auth: auth::Authorization) -> impl Reply {
     if let Err(e) = logout_user(route.state, auth).await {
         log::error!("Logout error: {}", e);
     }

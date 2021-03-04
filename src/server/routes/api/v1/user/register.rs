@@ -86,7 +86,7 @@ lazy_static::lazy_static! {
     static ref USERNAME_SANITIZE_REGEX: Regex = Regex::new(r#"\s+"#).unwrap();
 }
 
-use super::login::{do_login, Session};
+use super::me::login::{do_login, Session};
 
 async fn register_user(
     state: ServerState,
