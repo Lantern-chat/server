@@ -17,6 +17,7 @@ pub fn gateway(route: Route) -> Result<impl Reply, WsError> {
         _ => return Ok(StatusCode::BAD_REQUEST.into_response()),
     };
 
+    // TODO: Move this into websocket?
     let state = route.state.clone();
 
     Ok(Ws::new(route)?
