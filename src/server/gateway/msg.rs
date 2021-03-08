@@ -105,8 +105,6 @@ macro_rules! decl_msgs {
     }}
 }
 
-use crate::server::auth::AuthToken;
-
 pub type ClientMsg = client::Message;
 pub type ServerMsg = server::Message;
 

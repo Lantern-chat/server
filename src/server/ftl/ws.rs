@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 use headers::{
     Connection, HeaderMapExt, SecWebsocketAccept, SecWebsocketKey, SecWebsocketVersion, Upgrade,
 };
-use http::{Method, Response, StatusCode};
+use http::{Method, StatusCode};
 use hyper::{upgrade::OnUpgrade, Body};
 use tokio_tungstenite::{
     tungstenite::{
@@ -17,7 +17,7 @@ use tokio_tungstenite::{
     WebSocketStream,
 };
 
-use super::{Reply, Route};
+use super::{Reply, ReplyError, Response, Route};
 
 pub struct Ws {
     config: WebSocketConfig,
@@ -41,6 +41,25 @@ pub enum WsError {
 
     #[error("Missing WebSocket Key")]
     MissingWebSocketKey,
+}
+
+impl Reply for WsError {
+    fn into_response(self) -> Response {
+        self.status().into_response()
+    }
+}
+
+impl ReplyError for WsError {
+    fn status(&self) -> StatusCode {
+        match self {
+            WsError::MethodNotAllowed => StatusCode::METHOD_NOT_ALLOWED,
+            _ => StatusCode::BAD_REQUEST,
+        }
+    }
+
+    fn into_error_response(self) -> Response {
+        self.into_response()
+    }
 }
 
 impl Ws {
@@ -141,7 +160,7 @@ where
     F: FnOnce(WebSocket) -> U + Send + 'static,
     U: Future<Output = ()> + Send + 'static,
 {
-    fn into_response(self) -> Response<Body> {
+    fn into_response(self) -> Response {
         if let Some(on_upgrade) = self.ws.on_upgrade {
             let on_upgrade_cb = self.on_upgrade;
             let config = self.ws.config;

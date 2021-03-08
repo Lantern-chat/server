@@ -11,6 +11,7 @@ use hyper::{
 
 pub mod ftl;
 
+pub mod gateway;
 pub mod routes;
 pub mod service;
 pub mod state;
