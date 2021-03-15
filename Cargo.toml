@@ -50,7 +50,7 @@ hex = "0.4.2"
 postage = "0.4.1"
 # validator = { version = "0.12", features = ["derive"] }
 hyper = { version = "0.14.4", features = ["http1", "http2", "server", "stream", "runtime"] }
-tokio-tungstenite = "0.13.0"
+tokio-tungstenite = "0.14.0"
 http = "0.2.3"
 async-compression = { version = "0.3.7", features = ["brotli", "deflate", "gzip", "tokio"] }
 multipart = { version = "0.17", default-features = false, features = ["server"] }
@@ -64,6 +64,7 @@ tokio-util = { version = "0.6", features = ["io"] }
 crc32fast = "1.2.1"
 serde_shims = { version = "0.2", features = ["std", "mime", "bitflags"] }
 bitflags = "1.2"
+num_cpus = "1.13.0"
 
 
 [build-dependencies]
