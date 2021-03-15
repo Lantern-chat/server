@@ -59,6 +59,7 @@ impl Party {
         }
     }
 
+    #[rustfmt::skip]
     pub async fn get_members(
         &self,
         client: &Client,
@@ -71,14 +72,14 @@ impl Party {
         Ok(stream.map(|res| match res {
             Err(e) => Err(e),
             Ok(row) => Ok(PartyMember {
-                id: row.try_get(0)?,
-                username: row.try_get(1)?,
-                discriminator: row.try_get(2)?,
-                is_verified: row.try_get(3)?,
-                nickname: row.try_get(4)?,
-                status: row.try_get(5)?,
-                bio: row.try_get(6)?,
-                avatar_id: row.try_get(7)?,
+                id:             row.try_get(0)?,
+                username:       row.try_get(1)?,
+                discriminator:  row.try_get(2)?,
+                is_verified:    row.try_get(3)?,
+                nickname:       row.try_get(4)?,
+                status:         row.try_get(5)?,
+                bio:            row.try_get(6)?,
+                avatar_id:      row.try_get(7)?,
             }),
         }))
     }
