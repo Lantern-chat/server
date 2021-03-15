@@ -10,6 +10,7 @@ use crate::server::ftl::*;
 
 pub async fn api(mut route: Route) -> Response {
     match route.next().segment() {
+        // ANY /api/v1
         Exact("v1") => v1::api_v1(route).await.into_response(),
 
         _ => StatusCode::NOT_FOUND.into_response(),

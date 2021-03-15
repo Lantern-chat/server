@@ -10,6 +10,7 @@ pub async fn entry(mut route: Route) -> Response {
     }
 
     match route.next().method_segment() {
+        // ANY /api
         (_, Exact("api")) => api::api(route).await,
 
         (&Method::GET, Exact("static")) | (&Method::HEAD, Exact("static")) => {
