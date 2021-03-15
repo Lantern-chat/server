@@ -138,10 +138,9 @@ impl Ws {
         self
     }
 
-    pub fn on_upgrade<F, U>(self, func: F) -> impl Reply
+    pub fn on_upgrade<F>(self, func: F) -> impl Reply
     where
-        F: FnOnce(WebSocket) -> U + Send + 'static,
-        U: Future<Output = ()> + Send + 'static,
+        F: FnOnce(WebSocket) + Send + 'static,
     {
         WsReply {
             ws: self,
@@ -155,10 +154,9 @@ struct WsReply<F> {
     on_upgrade: F,
 }
 
-impl<F, U> Reply for WsReply<F>
+impl<F> Reply for WsReply<F>
 where
-    F: FnOnce(WebSocket) -> U + Send + 'static,
-    U: Future<Output = ()> + Send + 'static,
+    F: FnOnce(WebSocket) + Send + 'static,
 {
     fn into_response(self) -> Response {
         if let Some(on_upgrade) = self.ws.on_upgrade {
@@ -174,7 +172,7 @@ where
                             WebSocket::from_raw_socket(upgraded, protocol::Role::Server, config)
                                 .await;
 
-                        on_upgrade_cb(socket).await;
+                        on_upgrade_cb(socket);
                     }
                 }
             });
