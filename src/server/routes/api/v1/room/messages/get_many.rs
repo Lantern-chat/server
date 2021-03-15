@@ -2,10 +2,7 @@ use http::StatusCode;
 
 use crate::{
     db::{
-        schema::{
-            msg::{Message, MessageSearch},
-            Room,
-        },
+        schema::{Message, MessageSearch, Room},
         Snowflake,
     },
     server::{ftl::*, routes::api::auth::Authorization},

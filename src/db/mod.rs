@@ -27,7 +27,7 @@ pub mod schema {
         attachment::Attachment,
         emote::Emote,
         invite::Invite,
-        msg::Message,
+        msg::{Message, MessageSearch},
         party::Party,
         role::Role,
         room::{Room, RoomFlags},
