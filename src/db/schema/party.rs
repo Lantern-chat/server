@@ -99,6 +99,14 @@ impl Party {
         Ok(count > 0)
     }
 
+    pub async fn add_member(
+        &self,
+        member: &PartyMember,
+        client: &Client,
+    ) -> Result<(), ClientError> {
+        Ok(())
+    }
+
     /*
     pub async fn get_roles(
         &self,

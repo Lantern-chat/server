@@ -1,17 +1,20 @@
-use std::{borrow::Cow, error::Error, net::IpAddr, sync::Arc};
+use std::{borrow::Cow, error::Error, net::IpAddr, pin::Pin, sync::Arc, time::Instant};
 
-use futures::{future, Future, FutureExt, StreamExt};
+use futures::{future, Future, FutureExt, SinkExt, StreamExt, TryStreamExt};
 
 use tokio::sync::mpsc;
 use tokio_postgres::Socket;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-use crate::server::ftl::ws::{Message as WsMessage, WebSocket};
+use crate::{
+    db::Snowflake,
+    server::ftl::ws::{Message as WsMessage, WebSocket},
+};
 
 pub mod msg;
 use msg::{ClientMsg, ServerMsg};
 
-use super::ServerState;
+use super::{routes::api::auth::Authorization, ServerState};
 
 /// Websocket message encoding
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -56,11 +59,56 @@ impl Default for GatewayQueryParams {
     }
 }
 
-pub async fn client_connected(
+pub mod conn;
+
+
+//pub enum ClientState {
+//    Hello,
+//    Identified(Box<ClientConnection>),
+//}
+
+pub fn client_connected(
     ws: WebSocket,
     query: GatewayQueryParams,
     addr: IpAddr,
     state: ServerState,
 ) {
-    log::info!("Client Connected!");
+    /*
+    tokio::spawn(async move {
+        log::info!("Client Connected!");
+
+        let (ws_tx, ws_rx) = ws.split();
+
+        let mut ws_rx = ws_rx.map(|msg| {
+            // TODO
+            ()
+        });
+
+        futures::pin_mut!(ws_rx);
+
+        let mut state = ClientState::Hello;
+
+        loop {
+            match state {
+                ClientState::Hello => {}
+                ClientState::Identified(ref mut conn) => {
+                    let ev_rx = unsafe { Pin::new_unchecked(&mut conn.ev_rx) };
+
+                    let msg: _ = futures::stream::select(ws_rx, ev_rx).await;
+                }
+            }
+
+            break;
+        }
+    });
+
+    ws_rx
+        .then(|msg| async move {
+            // TODO
+            unimplemented!()
+        })
+        .forward(ws_tx);
+        */
+
+    //ws_rx.flat_map(|msg| {});
 }
