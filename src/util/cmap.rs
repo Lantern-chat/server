@@ -298,4 +298,42 @@ where
             }
         }
     }
+
+    pub async fn batch_write<'a, Q: 'a, I, F>(
+        &self,
+        keys: I,
+        cache: Option<&mut Vec<(&'a Q, u64, usize)>>,
+        f: F,
+    ) where
+        K: Borrow<Q>,
+        Q: Hash + Eq,
+        I: IntoIterator<Item = &'a Q>,
+        F: Fn(hashbrown::hash_map::RawEntryMut<K, T, S>),
+    {
+        let mut own_cache = Vec::new();
+        let cache = cache.unwrap_or(&mut own_cache);
+
+        self.batch_hash_and_sort(keys, cache);
+
+        if cache.is_empty() {
+            return;
+        }
+
+        let mut i = 0;
+        loop {
+            let current_shard = cache[i].2;
+            let mut shard = unsafe { self.shards.get_unchecked(current_shard).write().await };
+
+            while cache[i].2 == current_shard {
+                f(shard
+                    .raw_entry_mut()
+                    .from_key_hashed_nocheck(cache[i].1, cache[i].0));
+                i += 1;
+
+                if i >= cache.len() {
+                    return;
+                }
+            }
+        }
+    }
 }
