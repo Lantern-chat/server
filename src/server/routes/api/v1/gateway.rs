@@ -3,7 +3,7 @@ use crate::server::ftl::{
     *,
 };
 
-use crate::server::gateway::client_connected;
+use crate::server::gateway::socket::client_connected;
 
 pub fn gateway(route: Route) -> Result<impl Reply, WsError> {
     let addr = match real_ip::get_real_ip(&route) {
@@ -17,7 +17,7 @@ pub fn gateway(route: Route) -> Result<impl Reply, WsError> {
         _ => return Ok(StatusCode::BAD_REQUEST.into_response()),
     };
 
-    // TODO: Move this into websocket?
+    // TODO: Move this into FTL websocket part?
     let state = route.state.clone();
 
     Ok(Ws::new(route)?

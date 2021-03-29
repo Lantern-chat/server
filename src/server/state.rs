@@ -12,7 +12,7 @@ use tokio::sync::{oneshot, Mutex, RwLock};
 
 use crate::{config::LanternConfig, db::Client, fs::disk::FileStore};
 
-use super::ftl::rate_limit::RateLimitTable;
+use super::{ftl::rate_limit::RateLimitTable, gateway::PartyGateway};
 
 pub struct InnerServerState {
     pub is_alive: AtomicBool,
@@ -22,6 +22,7 @@ pub struct InnerServerState {
     pub db: Client,
     pub config: LanternConfig,
     pub fs: FileStore,
+    pub gateway: PartyGateway,
 }
 
 #[derive(Clone)]
@@ -45,6 +46,7 @@ impl ServerState {
             db,
             config: Default::default(),   // TODO: Load from file
             fs: FileStore::new("./data"), // TODO: Set from config
+            gateway: PartyGateway::default(),
         }))
     }
 

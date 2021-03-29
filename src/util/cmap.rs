@@ -261,16 +261,18 @@ where
         }
     }
 
+    // TODO: Rewrite this to take unique shards into a small Vec,
+    // then iterate over them concurrently to avoid blocking on any single one
     pub async fn batch_read<'a, Q: 'a, I, F>(
         &self,
         keys: I,
         cache: Option<&mut Vec<(&'a Q, u64, usize)>>,
-        f: F,
+        mut f: F,
     ) where
         K: Borrow<Q>,
         Q: Hash + Eq,
         I: IntoIterator<Item = &'a Q>,
-        F: Fn(Option<(&K, &T)>),
+        F: FnMut(&'a Q, Option<(&K, &T)>),
     {
         let mut own_cache = Vec::new();
         let cache = cache.unwrap_or(&mut own_cache);
@@ -287,9 +289,12 @@ where
             let shard = unsafe { self.shards.get_unchecked(current_shard).read().await };
 
             while cache[i].2 == current_shard {
-                f(shard
-                    .raw_entry()
-                    .from_key_hashed_nocheck(cache[i].1, cache[i].0));
+                f(
+                    cache[i].0,
+                    shard
+                        .raw_entry()
+                        .from_key_hashed_nocheck(cache[i].1, cache[i].0),
+                );
                 i += 1;
 
                 if i >= cache.len() {
@@ -299,16 +304,17 @@ where
         }
     }
 
+    // TODO: Same as with `batch_read`
     pub async fn batch_write<'a, Q: 'a, I, F>(
         &self,
         keys: I,
         cache: Option<&mut Vec<(&'a Q, u64, usize)>>,
-        f: F,
+        mut f: F,
     ) where
         K: Borrow<Q>,
         Q: Hash + Eq,
         I: IntoIterator<Item = &'a Q>,
-        F: Fn(hashbrown::hash_map::RawEntryMut<K, T, S>),
+        F: FnMut(&'a Q, hashbrown::hash_map::RawEntryMut<K, T, S>),
     {
         let mut own_cache = Vec::new();
         let cache = cache.unwrap_or(&mut own_cache);
@@ -325,9 +331,12 @@ where
             let mut shard = unsafe { self.shards.get_unchecked(current_shard).write().await };
 
             while cache[i].2 == current_shard {
-                f(shard
-                    .raw_entry_mut()
-                    .from_key_hashed_nocheck(cache[i].1, cache[i].0));
+                f(
+                    cache[i].0,
+                    shard
+                        .raw_entry_mut()
+                        .from_key_hashed_nocheck(cache[i].1, cache[i].0),
+                );
                 i += 1;
 
                 if i >= cache.len() {

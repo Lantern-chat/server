@@ -1,114 +1,162 @@
-use std::{borrow::Cow, error::Error, net::IpAddr, pin::Pin, sync::Arc, time::Instant};
+pub mod msg;
+pub mod socket;
+
+use std::{
+    borrow::Cow,
+    error::Error,
+    pin::Pin,
+    sync::{atomic::AtomicUsize, Arc},
+    time::Duration,
+};
 
 use futures::{future, Future, FutureExt, SinkExt, StreamExt, TryStreamExt};
 
-use tokio::sync::mpsc;
+use hashbrown::HashMap;
+use tokio::sync::{broadcast, mpsc, RwLock};
 use tokio_postgres::Socket;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-use crate::{
-    db::Snowflake,
-    server::ftl::ws::{Message as WsMessage, WebSocket},
-};
+use crate::{db::Snowflake, util::cmap::CHashMap};
 
-pub mod msg;
-use msg::{ClientMsg, ServerMsg};
+pub type PartyId = Snowflake;
+pub type UserId = Snowflake;
+pub type EventId = Snowflake;
+pub type ConnectionId = Snowflake;
 
-use super::{routes::api::auth::Authorization, ServerState};
+// TODO
+pub enum RawEvent {}
 
-/// Websocket message encoding
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum GatewayMsgEncoding {
-    /// Textual JSON, simple.
-    Json,
-
-    /// Binary MessagePack (smaller, slower to encode/decode in browser)
-    ///
-    /// This is recommended when you have access to natively compiled MsgPack libraries
-    MsgPack,
+pub struct EventInner {
+    pub raw: RawEvent,
+    pub encoded: Option<Vec<u8>>,
 }
 
-impl Default for GatewayMsgEncoding {
-    fn default() -> Self {
-        GatewayMsgEncoding::Json
-    }
+#[derive(Clone)]
+pub struct Event(Arc<EventInner>);
+
+/// Stored in the gateway, provides a channel directly
+/// to a user connection
+pub struct ConnectionEmitter {
+    pub tx: mpsc::UnboundedSender<Event>,
 }
 
-const fn default_compress() -> bool {
-    true
+/// Receives per-user events
+pub struct ConnectionSubscription {
+    pub rx: mpsc::UnboundedReceiver<Event>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct GatewayQueryParams {
-    /// Encoding method for each individual websocket message
-    #[serde(default)]
-    pub encoding: GatewayMsgEncoding,
-
-    /// Whether to compress individual messages
-    #[serde(default = "default_compress")]
-    pub compress: bool,
+/// Receives party events
+pub struct PartySubscription {
+    pub rx: broadcast::Receiver<Event>,
 }
 
-impl Default for GatewayQueryParams {
-    fn default() -> Self {
-        GatewayQueryParams {
-            encoding: GatewayMsgEncoding::default(),
-            compress: default_compress(),
-        }
-    }
+/// Stored in the gateway, provides a channel to party subscribers
+pub struct PartyEmitter {
+    pub tx: mpsc::UnboundedSender<Event>,
+    pub bc: broadcast::Sender<Event>,
 }
 
-pub mod conn;
+impl PartyEmitter {
+    pub fn new() -> Self {
+        let bc = broadcast::channel(16).0;
+        let (tx, mut rx) = mpsc::unbounded_channel();
 
+        let bc2 = bc.clone();
 
-//pub enum ClientState {
-//    Hello,
-//    Identified(Box<ClientConnection>),
-//}
+        // TODO: Replace this mpsc buffering with database pulling
+        tokio::spawn(async move {
+            while let Some(mut event) = rx.recv().await {
+                'try_loop: loop {
+                    event = match bc2.send(event) {
+                        Ok(_) => break 'try_loop,
+                        // If the error was because there are no receivers,
+                        // just ignore the event entirely.
+                        Err(_) if bc2.receiver_count() == 0 => break 'try_loop,
+                        // Move value back and retry
+                        Err(broadcast::error::SendError(event)) => event,
+                    };
 
-pub fn client_connected(
-    ws: WebSocket,
-    query: GatewayQueryParams,
-    addr: IpAddr,
-    state: ServerState,
-) {
-    /*
-    tokio::spawn(async move {
-        log::info!("Client Connected!");
-
-        let (ws_tx, ws_rx) = ws.split();
-
-        let mut ws_rx = ws_rx.map(|msg| {
-            // TODO
-            ()
-        });
-
-        futures::pin_mut!(ws_rx);
-
-        let mut state = ClientState::Hello;
-
-        loop {
-            match state {
-                ClientState::Hello => {}
-                ClientState::Identified(ref mut conn) => {
-                    let ev_rx = unsafe { Pin::new_unchecked(&mut conn.ev_rx) };
-
-                    let msg: _ = futures::stream::select(ws_rx, ev_rx).await;
+                    tokio::time::sleep(Duration::from_millis(5)).await;
                 }
             }
+        });
 
-            break;
+        PartyEmitter { bc, tx }
+    }
+
+    pub fn subscribe(&self) -> PartySubscription {
+        PartySubscription {
+            rx: self.bc.subscribe(),
         }
-    });
+    }
+}
 
-    ws_rx
-        .then(|msg| async move {
-            // TODO
-            unimplemented!()
-        })
-        .forward(ws_tx);
-        */
+#[derive(Default)]
+pub struct PartyGateway {
+    pub parties: CHashMap<PartyId, PartyEmitter>,
+    pub users: CHashMap<UserId, HashMap<ConnectionId, ConnectionEmitter>>,
+}
 
-    //ws_rx.flat_map(|msg| {});
+impl PartyGateway {
+    pub async fn sub_and_add_connection(
+        &self,
+        user_id: UserId,
+        conn_id: ConnectionId,
+        party_ids: impl IntoIterator<Item = &PartyId>,
+    ) -> (ConnectionSubscription, Vec<PartySubscription>) {
+        let conn = self.add_connection(user_id, conn_id);
+        let subs = self.subscribe(party_ids);
+
+        futures::future::join(conn, subs).await
+    }
+
+    pub async fn add_connection(
+        &self,
+        user_id: UserId,
+        conn_id: ConnectionId,
+    ) -> ConnectionSubscription {
+        let (tx, rx) = mpsc::unbounded_channel();
+
+        self.users
+            .get_mut_or_default(&user_id)
+            .await
+            .insert(conn_id, ConnectionEmitter { tx });
+
+        ConnectionSubscription { rx }
+    }
+
+    pub async fn subscribe(
+        &self,
+        party_ids: impl IntoIterator<Item = &PartyId>,
+    ) -> Vec<PartySubscription> {
+        let mut subs = Vec::new();
+        let mut missing = Vec::new();
+        let mut cache = Vec::new();
+
+        self.parties
+            .batch_read(
+                party_ids.into_iter(),
+                Some(&mut cache),
+                |key, value| match value {
+                    Some((_, p)) => subs.push(p.subscribe()),
+                    None => missing.push(key),
+                },
+            )
+            .await;
+
+        if !missing.is_empty() {
+            self.parties
+                .batch_write(missing, Some(&mut cache), |key, value| {
+                    subs.push(
+                        value
+                            .or_insert_with(|| (*key, PartyEmitter::new()))
+                            .1
+                            .subscribe(),
+                    )
+                })
+                .await;
+        }
+
+        subs
+    }
 }
