@@ -1,13 +1,8 @@
+pub mod event;
 pub mod msg;
 pub mod socket;
 
-use std::{
-    borrow::Cow,
-    error::Error,
-    pin::Pin,
-    sync::{atomic::AtomicUsize, Arc},
-    time::Duration,
-};
+use std::{borrow::Cow, error::Error, pin::Pin, time::Duration};
 
 use futures::{future, Future, FutureExt, SinkExt, StreamExt, TryStreamExt};
 
@@ -23,16 +18,7 @@ pub type UserId = Snowflake;
 pub type EventId = Snowflake;
 pub type ConnectionId = Snowflake;
 
-// TODO
-pub enum RawEvent {}
-
-pub struct EventInner {
-    pub raw: RawEvent,
-    pub encoded: Option<Vec<u8>>,
-}
-
-#[derive(Clone)]
-pub struct Event(Arc<EventInner>);
+pub use event::Event;
 
 /// Stored in the gateway, provides a channel directly
 /// to a user connection
