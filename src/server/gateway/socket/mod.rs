@@ -24,33 +24,31 @@ pub fn client_connected(
     addr: IpAddr,
     state: ServerState,
 ) {
-    tokio::spawn(async move {
-        let (ws_tx, ws_rx) = ws.split();
+    let (ws_tx, ws_rx) = ws.split();
 
-        let mut ws_rx = ws_rx.then(|msg| async move {
-            match msg {
-                Err(e) => Err(MessageIncomingError::from(e)),
-                Ok(msg) if msg.is_close() => Err(MessageIncomingError::SocketClosed),
-                Ok(msg) => {
-                    // Block to decompress and parse
-                    tokio::task::spawn_blocking(move || -> Result<_, MessageIncomingError> {
-                        let msg = decompress_if(query.compress, msg.as_bytes())?;
+    let mut ws_rx = ws_rx.then(|msg| async move {
+        match msg {
+            Err(e) => Err(MessageIncomingError::from(e)),
+            Ok(msg) if msg.is_close() => Err(MessageIncomingError::SocketClosed),
+            Ok(msg) => {
+                // Block to decompress and parse
+                tokio::task::spawn_blocking(move || -> Result<_, MessageIncomingError> {
+                    let msg = decompress_if(query.compress, msg.as_bytes())?;
 
-                        Ok(match query.encoding {
-                            GatewayMsgEncoding::Json => serde_json::from_slice(&msg)?,
-                            GatewayMsgEncoding::MsgPack => rmp_serde::from_slice(&msg)?,
-                        })
+                    Ok(match query.encoding {
+                        GatewayMsgEncoding::Json => serde_json::from_slice(&msg)?,
+                        GatewayMsgEncoding::MsgPack => rmp_serde::from_slice(&msg)?,
                     })
-                    .await?
-                }
+                })
+                .await?
             }
-        });
+        }
+    });
 
-        tokio::spawn(async move {
-            lazy_static::lazy_static! {
-                static ref HELLO_MSG: Vec<u8> = unimplemented!();
-            }
-        });
+    tokio::spawn(async move {
+        lazy_static::lazy_static! {
+            static ref HELLO_MSG: Vec<u8> = unimplemented!();
+        }
     });
 }
 
