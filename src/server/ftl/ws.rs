@@ -232,8 +232,9 @@ impl Stream for WebSocket {
     }
 }
 
+pub type SinkError = tungstenite::Error;
 impl Sink<Message> for WebSocket {
-    type Error = tungstenite::Error;
+    type Error = SinkError;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         match ready!(Pin::new(&mut self.inner).poll_ready(cx)) {

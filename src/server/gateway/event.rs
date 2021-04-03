@@ -1,13 +1,16 @@
+use std::ops::Deref;
 use std::sync::Arc;
 
+use super::socket::{GatewayMsgEncoding, GatewayQueryParams};
+
 pub struct CompressedEvent {
-    decompressed: Vec<u8>,
-    compressed: Vec<u8>,
+    pub uncompressed: Vec<u8>,
+    pub compressed: Vec<u8>,
 }
 
 pub struct EncodedEvent {
-    json: CompressedEvent,
-    msgpack: CompressedEvent,
+    pub json: CompressedEvent,
+    pub msgpack: CompressedEvent,
 }
 
 pub enum RawEvent {
@@ -25,6 +28,15 @@ pub struct EventInner {
 #[derive(Clone)]
 pub struct Event(Arc<EventInner>);
 
+impl Deref for Event {
+    type Target = EventInner;
+
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        &*self.0
+    }
+}
+
 impl EncodedEvent {
     pub fn new<S: serde::Serialize>(value: &S) -> Result<Self, EncodingError> {
         let as_msgpack = rmp_serde::to_vec(value)?;
@@ -34,6 +46,13 @@ impl EncodedEvent {
             json: CompressedEvent::new(as_json)?,
             msgpack: CompressedEvent::new(as_msgpack)?,
         })
+    }
+
+    pub fn get(&self, params: GatewayQueryParams) -> &Vec<u8> {
+        match params.encoding {
+            GatewayMsgEncoding::Json => self.json.get(params.compress),
+            GatewayMsgEncoding::MsgPack => self.msgpack.get(params.compress),
+        }
     }
 }
 
@@ -50,9 +69,16 @@ impl CompressedEvent {
         let compressed = encoder.finish()?;
 
         Ok(CompressedEvent {
-            decompressed: value,
+            uncompressed: value,
             compressed,
         })
+    }
+
+    pub fn get(&self, compressed: bool) -> &Vec<u8> {
+        match compressed {
+            true => &self.compressed,
+            false => &self.uncompressed,
+        }
     }
 }
 

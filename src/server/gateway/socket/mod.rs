@@ -8,12 +8,16 @@ use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use crate::{
     db::Snowflake,
-    server::ftl::ws::{Message as WsMessage, WebSocket},
+    server::ftl::ws::{Message as WsMessage, SinkError, WebSocket},
+    util::laggy,
 };
 
 use crate::server::{routes::api::auth::Authorization, ServerState};
 
-use super::msg::{ClientMsg, ServerMsg};
+use super::{
+    event::{EncodedEvent, Event},
+    msg::{ClientMsg, ServerMsg},
+};
 
 pub mod params;
 pub use params::{GatewayMsgEncoding, GatewayQueryParams};
@@ -24,6 +28,11 @@ pub fn client_connected(
     addr: IpAddr,
     state: ServerState,
 ) {
+    lazy_static::lazy_static! {
+        static ref HELLO_EVENT: EncodedEvent = EncodedEvent::new(&ServerMsg::new_hello(45000)).unwrap();
+        static ref HEARTBEAT_ACK: EncodedEvent = EncodedEvent::new(&ServerMsg::new_heartbeatack()).unwrap();
+    }
+
     let (ws_tx, ws_rx) = ws.split();
 
     let mut ws_rx = ws_rx.then(|msg| async move {
@@ -45,11 +54,30 @@ pub fn client_connected(
         }
     });
 
-    tokio::spawn(async move {
-        lazy_static::lazy_static! {
-            static ref HELLO_MSG: Vec<u8> = unimplemented!();
-        }
+    // by placing the WsMessage constructor here, it avoids allocation ahead of when it can send the message
+    let mut ws_tx = ws_tx.with(|event: Result<Event, MessageOutgoingError>| {
+        futures::future::ok::<_, SinkError>(match event {
+            Err(_) => WsMessage::close(),
+            Ok(event) => WsMessage::binary(event.encoded.get(query).clone()),
+        })
     });
+
+    pub enum SocketState {
+        Hello,
+        Realtime,
+        Catchup,
+    }
+
+    tokio::spawn(async move {
+
+        // TODO
+    });
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum MessageOutgoingError {
+    #[error("Socket Closed")]
+    SocketClosed,
 }
 
 #[derive(Debug, thiserror::Error)]

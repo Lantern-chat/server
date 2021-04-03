@@ -48,7 +48,7 @@ impl ServerState {
             config: Default::default(),   // TODO: Load from file
             fs: FileStore::new("./data"), // TODO: Set from config
             gateway: PartyGateway::default(),
-            hashing_semaphore: Semaphore::new(16),
+            hashing_semaphore: Semaphore::new(16), // TODO: Set from available memory?
         }))
     }
 
