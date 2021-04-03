@@ -10,12 +10,11 @@ use headers::{
 use http::{Method, StatusCode};
 use hyper::{upgrade::OnUpgrade, Body};
 use tokio_tungstenite::{
-    tungstenite::{
-        self,
-        protocol::{self, WebSocketConfig},
-    },
+    tungstenite::{self, protocol},
     WebSocketStream,
 };
+
+pub use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
 use super::{Reply, ReplyError, Response, Route};
 
@@ -84,7 +83,7 @@ impl Ws {
     /// - Header `connection: upgrade`
     /// - Header `upgrade: websocket`
     /// - Header `sec-websocket-accept` with the hash value of the received key.
-    pub fn new(mut route: Route) -> Result<Ws, WsError> {
+    pub fn new(mut route: Route, config: Option<WebSocketConfig>) -> Result<Ws, WsError> {
         if route.req.method() != &Method::GET {
             return Err(WsError::MethodNotAllowed);
         }
@@ -114,7 +113,7 @@ impl Ws {
         let on_upgrade = route.req.extensions_mut().remove::<OnUpgrade>();
 
         Ok(Ws {
-            config: WebSocketConfig::default(),
+            config: config.unwrap_or_else(|| WebSocketConfig::default()),
             key,
             on_upgrade,
         })

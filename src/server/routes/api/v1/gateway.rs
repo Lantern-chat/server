@@ -1,5 +1,5 @@
 use crate::server::ftl::{
-    ws::{Ws, WsError},
+    ws::{WebSocketConfig, Ws, WsError},
     *,
 };
 
@@ -20,7 +20,11 @@ pub fn gateway(route: Route) -> Result<impl Reply, WsError> {
     // TODO: Move this into FTL websocket part?
     let state = route.state.clone();
 
-    Ok(Ws::new(route)?
+    let mut config = WebSocketConfig::default();
+    config.max_message_size = Some(1024 * 512); // 512KIB
+    config.max_send_queue = Some(1);
+
+    Ok(Ws::new(route, Some(config))?
         .on_upgrade(move |ws| client_connected(ws, query, addr, state))
         .into_response())
 }
