@@ -28,6 +28,7 @@ pub async fn login(mut route: Route) -> impl Reply {
         Err(e) => match e {
             LoginError::ClientError(_)
             | LoginError::JoinError(_)
+            | LoginError::SemaphoreError(_)
             | LoginError::PasswordHashError(_) => {
                 log::error!("Login Error {}", e);
 
@@ -56,6 +57,9 @@ enum LoginError {
 
     #[error("Password Hash Error {0}")]
     PasswordHashError(#[from] argon2::Error),
+
+    #[error("Semaphore Error: {0}")]
+    SemaphoreError(#[from] tokio::sync::AcquireError),
 }
 
 use super::super::register::{hash_config, EMAIL_REGEX};
@@ -86,6 +90,10 @@ async fn login_user(state: ServerState, mut form: LoginForm) -> Result<Session, 
         return Err(LoginError::InvalidCredentials);
     }
 
+    // NOTE: Given how expensive it can be to compute an argon2 hash,
+    // this only allows a given number to process at once.
+    let permit = state.hashing_semaphore.acquire().await?;
+
     let verified = tokio::task::spawn_blocking(move || {
         let config = hash_config();
         argon2::verify_encoded_ext(
@@ -96,6 +104,8 @@ async fn login_user(state: ServerState, mut form: LoginForm) -> Result<Session, 
         )
     })
     .await??;
+
+    drop(permit);
 
     if !verified {
         return Err(LoginError::InvalidCredentials);

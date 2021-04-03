@@ -32,6 +32,7 @@ pub async fn register(mut route: Route) -> impl Reply {
         Err(e) => match e {
             RegisterError::ClientError(_)
             | RegisterError::JoinError(_)
+            | RegisterError::SemaphoreError(_)
             | RegisterError::PasswordHashError(_) => {
                 log::error!("Register Error: {}", e);
 
@@ -73,6 +74,9 @@ enum RegisterError {
 
     #[error("Password Hash Error {0}")]
     PasswordHashError(#[from] argon2::Error),
+
+    #[error("Semaphore Error: {0}")]
+    SemaphoreError(#[from] tokio::sync::AcquireError),
 }
 
 use regex::{Regex, RegexBuilder};
@@ -129,6 +133,10 @@ async fn register_user(
 
     let password = std::mem::replace(&mut form.password, String::new());
 
+    // NOTE: Given how expensive it can be to compute an argon2 hash,
+    // this only allows a given number to process at once.
+    let permit = state.hashing_semaphore.acquire().await?;
+
     // fire this off while we sanitize the username
     let password_hash_task = tokio::task::spawn_blocking(move || {
         let config = hash_config();
@@ -140,6 +148,8 @@ async fn register_user(
     let username = USERNAME_SANITIZE_REGEX.replace_all(&form.username, " ");
 
     let password_hash = password_hash_task.await??;
+
+    drop(permit);
 
     state
         .db
@@ -156,9 +166,10 @@ pub fn hash_config() -> argon2::Config<'static> {
     let mut config = argon2::Config::default();
 
     config.ad = b"Lantern";
-    config.variant = argon2::Variant::Argon2i;
+    config.mem_cost = 15 * 1024 * 1024; // 15 MiB
+    config.variant = argon2::Variant::Argon2id;
     config.lanes = 1;
-    config.time_cost = 6;
+    config.time_cost = 2;
     config.thread_mode = argon2::ThreadMode::Sequential;
     config.hash_length = 24;
 

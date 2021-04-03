@@ -8,7 +8,7 @@ use std::{
 };
 
 use futures::FutureExt;
-use tokio::sync::{oneshot, Mutex, RwLock};
+use tokio::sync::{oneshot, Mutex, RwLock, Semaphore};
 
 use crate::{config::LanternConfig, db::Client, fs::disk::FileStore};
 
@@ -23,6 +23,7 @@ pub struct InnerServerState {
     pub config: LanternConfig,
     pub fs: FileStore,
     pub gateway: PartyGateway,
+    pub hashing_semaphore: Semaphore,
 }
 
 #[derive(Clone)]
@@ -47,6 +48,7 @@ impl ServerState {
             config: Default::default(),   // TODO: Load from file
             fs: FileStore::new("./data"), // TODO: Set from config
             gateway: PartyGateway::default(),
+            hashing_semaphore: Semaphore::new(16),
         }))
     }
 
