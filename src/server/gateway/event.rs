@@ -37,6 +37,14 @@ impl Deref for Event {
     }
 }
 
+impl Event {
+    pub fn new_opaque<S: serde::Serialize>(value: S) -> Result<Event, EncodingError> {
+        let encoded = EncodedEvent::new(&value)?;
+        let raw = RawEvent::Opaque;
+        Ok(Event(Arc::new(EventInner { raw, encoded })))
+    }
+}
+
 impl EncodedEvent {
     pub fn new<S: serde::Serialize>(value: &S) -> Result<Self, EncodingError> {
         let as_msgpack = rmp_serde::to_vec(value)?;

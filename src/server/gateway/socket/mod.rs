@@ -29,13 +29,13 @@ pub fn client_connected(
     state: ServerState,
 ) {
     lazy_static::lazy_static! {
-        static ref HELLO_EVENT: EncodedEvent = EncodedEvent::new(&ServerMsg::new_hello(45000)).unwrap();
-        static ref HEARTBEAT_ACK: EncodedEvent = EncodedEvent::new(&ServerMsg::new_heartbeatack()).unwrap();
+        static ref HELLO_EVENT: Event = Event::new_opaque(ServerMsg::new_hello(45000)).unwrap();
+        static ref HEARTBEAT_ACK: Event = Event::new_opaque(ServerMsg::new_heartbeatack()).unwrap();
     }
 
     let (ws_tx, ws_rx) = ws.split();
 
-    let mut ws_rx = ws_rx.then(|msg| async move {
+    let ws_rx = ws_rx.then(move |msg| async move {
         match msg {
             Err(e) => Err(MessageIncomingError::from(e)),
             Ok(msg) if msg.is_close() => Err(MessageIncomingError::SocketClosed),
@@ -55,22 +55,73 @@ pub fn client_connected(
     });
 
     // by placing the WsMessage constructor here, it avoids allocation ahead of when it can send the message
-    let mut ws_tx = ws_tx.with(|event: Result<Event, MessageOutgoingError>| {
+    let mut ws_tx = ws_tx.with(move |event: Result<Event, MessageOutgoingError>| {
         futures::future::ok::<_, SinkError>(match event {
             Err(_) => WsMessage::close(),
             Ok(event) => WsMessage::binary(event.encoded.get(query).clone()),
         })
     });
 
-    pub enum SocketState {
-        Hello,
-        Realtime,
-        Catchup,
-    }
-
     tokio::spawn(async move {
+        futures::pin_mut!(ws_rx);
 
-        // TODO
+        match ws_tx.send(Ok(HELLO_EVENT.clone())).await {
+            Ok(_) => {}
+            Err(SinkError::ConnectionClosed) | Err(SinkError::AlreadyClosed) => {
+                log::warn!("Connection disconnected before Hello could be sent");
+
+                return;
+            }
+            Err(e) => {
+                log::error!("Error sending Hello message: {}", e);
+
+                if let Err(e) = ws_tx.send(Err(MessageOutgoingError::SocketClosed)).await {
+                    log::error!("Error sending close message: {}", e);
+                }
+            }
+        }
+
+        match ws_rx.next().await {
+            Some(Ok(msg)) => {}
+            Some(Err(e)) => {
+                log::error!("Error recv msg: {}", e);
+
+                match e {
+                    MessageIncomingError::SocketClosed
+                    | MessageIncomingError::TungsteniteError(SinkError::ConnectionClosed)
+                    | MessageIncomingError::TungsteniteError(SinkError::AlreadyClosed) => {
+                        log::warn!(
+                            "Connection disconnected before Identify/Resume could be recieved"
+                        );
+
+                        return;
+                    }
+                    MessageIncomingError::JsonParseError(_)
+                    | MessageIncomingError::MsgParseError(_)
+                    | MessageIncomingError::IoError(_) => {
+                        // TODO: Disconnect with error code
+
+                        if let Err(e) = ws_tx.send(Err(MessageOutgoingError::SocketClosed)).await {
+                            log::error!("Error sending close message: {}", e);
+                        }
+                    }
+                    _ => {
+                        if let Err(e) = ws_tx.send(Err(MessageOutgoingError::SocketClosed)).await {
+                            log::error!("Error sending close message: {}", e);
+                        }
+                    }
+                }
+            }
+            None => {
+                if let Err(e) = ws_tx.send(Err(MessageOutgoingError::SocketClosed)).await {
+                    log::error!("Error sending close message: {}", e);
+                }
+            }
+        }
+
+        while let Some(msg) = ws_rx.next().await {
+            // TODO
+        }
     });
 }
 
