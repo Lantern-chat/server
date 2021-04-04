@@ -1,11 +1,18 @@
-use std::{borrow::Cow, error::Error, net::IpAddr, pin::Pin, sync::Arc, time::Instant};
+use std::{
+    borrow::Cow,
+    error::Error,
+    net::IpAddr,
+    pin::Pin,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use futures::{
     future::{self, Either},
     stream, Future, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
 };
 
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast::error::RecvError, mpsc};
 use tokio_postgres::Socket;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
@@ -66,31 +73,68 @@ pub fn client_connected(
     });
 
     tokio::spawn(async move {
-        //type BoxedStream<I> = Pin<Box<dyn stream::Stream<Item = I> + Send>>;
+        type LeftItem = Result<Event, RecvError>;
+        type RightItem = Result<ClientMsg, MessageIncomingError>;
+        type Item = Either<LeftItem, RightItem>;
 
-        type BoxedStream<I> = Pin<Box<dyn Stream<Item = I> + Send>>;
-        type StreamLeftItem = Result<Event, MessageOutgoingError>;
-        type StreamRightItem = Result<ClientMsg, MessageIncomingError>;
-        type StreamItem = Either<StreamLeftItem, StreamRightItem>;
-
-        let mut events = stream::SelectAll::<BoxedStream<StreamItem>>::new();
+        let mut events = stream::SelectAll::<stream::BoxStream<Item>>::new();
 
         // Push Hello event to begin stream and forward ws_rx into events
         events.push(stream::once(future::ready(Either::Left(Ok(HELLO_EVENT.clone())))).boxed());
         events.push(ws_rx.map(|msg| Either::Right(msg)).boxed());
 
         while let Some(event) = events.next().await {
-            match event {
-                Either::Left(event) => {
-                    // TODO: Handle event
+            let resp = match event {
+                Either::Left(event) => match event {
+                    Ok(event) => {
+                        // TODO: Check event for updates
+                        Ok(event)
+                    }
+                    Err(e) => {
+                        log::warn!("Event error: {}", e);
+                        Err(MessageOutgoingError::SocketClosed) // kick
+                    }
+                },
+                Either::Right(msg) => match msg {
+                    Ok(msg) => {
+                        todo!("Handle message");
+                        continue; // no immediate response necessary, continue listening for events
+                    }
+                    Err(e) => match e {
+                        MessageIncomingError::SocketClosed
+                        | MessageIncomingError::TungsteniteError(SinkError::ConnectionClosed)
+                        | MessageIncomingError::TungsteniteError(SinkError::AlreadyClosed) => {
+                            log::warn!("Connection disconnected");
+                            break;
+                        }
+                        MessageIncomingError::JsonParseError(_)
+                        | MessageIncomingError::MsgParseError(_)
+                        | MessageIncomingError::IoError(_) => {
+                            // TODO: Send code with it
+                            Err(MessageOutgoingError::SocketClosed)
+                        }
+                        _ => Err(MessageOutgoingError::SocketClosed),
+                    },
+                },
+            };
+
+            let flush_and_send = async {
+                ws_tx.flush().await?;
+                ws_tx.send(resp).await
+            };
+
+            match tokio::time::timeout(Duration::from_millis(45000), flush_and_send).await {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => {
+                    todo!("Handle errors from websocket")
                 }
-                Either::Right(msg) => {
-                    // TODO: Handle message
+                Err(timeout_error) => {
+                    todo!("Force kick socket?")
                 }
             }
-
-            // do stuff with ws_tx
         }
+
+        // TODO: Cleanup connection
 
         /*
         match ws_tx.send(Ok(HELLO_EVENT.clone())).await {
@@ -107,48 +151,6 @@ pub fn client_connected(
                     log::error!("Error sending close message: {}", e);
                 }
             }
-        }
-
-        match ws_rx.next().await {
-            Some(Ok(msg)) => {}
-            Some(Err(e)) => {
-                log::error!("Error recv msg: {}", e);
-
-                match e {
-                    MessageIncomingError::SocketClosed
-                    | MessageIncomingError::TungsteniteError(SinkError::ConnectionClosed)
-                    | MessageIncomingError::TungsteniteError(SinkError::AlreadyClosed) => {
-                        log::warn!(
-                            "Connection disconnected before Identify/Resume could be recieved"
-                        );
-
-                        return;
-                    }
-                    MessageIncomingError::JsonParseError(_)
-                    | MessageIncomingError::MsgParseError(_)
-                    | MessageIncomingError::IoError(_) => {
-                        // TODO: Disconnect with error code
-
-                        if let Err(e) = ws_tx.send(Err(MessageOutgoingError::SocketClosed)).await {
-                            log::error!("Error sending close message: {}", e);
-                        }
-                    }
-                    _ => {
-                        if let Err(e) = ws_tx.send(Err(MessageOutgoingError::SocketClosed)).await {
-                            log::error!("Error sending close message: {}", e);
-                        }
-                    }
-                }
-            }
-            None => {
-                if let Err(e) = ws_tx.send(Err(MessageOutgoingError::SocketClosed)).await {
-                    log::error!("Error sending close message: {}", e);
-                }
-            }
-        }
-
-        while let Some(msg) = ws_rx.next().await {
-            // TODO
         }
         */
     });
