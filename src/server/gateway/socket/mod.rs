@@ -1,6 +1,9 @@
 use std::{borrow::Cow, error::Error, net::IpAddr, pin::Pin, sync::Arc, time::Instant};
 
-use futures::{future, Future, FutureExt, SinkExt, StreamExt, TryStreamExt};
+use futures::{
+    future::{self, Either},
+    stream, Future, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
+};
 
 use tokio::sync::mpsc;
 use tokio_postgres::Socket;
@@ -63,8 +66,33 @@ pub fn client_connected(
     });
 
     tokio::spawn(async move {
-        futures::pin_mut!(ws_rx);
+        //type BoxedStream<I> = Pin<Box<dyn stream::Stream<Item = I> + Send>>;
 
+        type BoxedStream<I> = Pin<Box<dyn Stream<Item = I> + Send>>;
+        type StreamLeftItem = Result<Event, MessageOutgoingError>;
+        type StreamRightItem = Result<ClientMsg, MessageIncomingError>;
+        type StreamItem = Either<StreamLeftItem, StreamRightItem>;
+
+        let mut events = stream::SelectAll::<BoxedStream<StreamItem>>::new();
+
+        // Push Hello event to begin stream and forward ws_rx into events
+        events.push(stream::once(future::ready(Either::Left(Ok(HELLO_EVENT.clone())))).boxed());
+        events.push(ws_rx.map(|msg| Either::Right(msg)).boxed());
+
+        while let Some(event) = events.next().await {
+            match event {
+                Either::Left(event) => {
+                    // TODO: Handle event
+                }
+                Either::Right(msg) => {
+                    // TODO: Handle message
+                }
+            }
+
+            // do stuff with ws_tx
+        }
+
+        /*
         match ws_tx.send(Ok(HELLO_EVENT.clone())).await {
             Ok(_) => {}
             Err(SinkError::ConnectionClosed) | Err(SinkError::AlreadyClosed) => {
@@ -122,6 +150,7 @@ pub fn client_connected(
         while let Some(msg) = ws_rx.next().await {
             // TODO
         }
+        */
     });
 }
 
