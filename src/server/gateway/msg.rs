@@ -11,7 +11,9 @@ where
 }
 
 macro_rules! decl_msgs {
-    ($($code:expr => $opcode:ident $(:$Default:ident)? { $( $(#[$field_meta:meta])* $field:ident : $ty:ty),* }),*$(,)*) => {paste::paste!{
+    ($($code:expr => $opcode:ident $(:$Default:ident)? {
+        $( $(#[$field_meta:meta])* $field:ident : $ty:ty),*$(,)?
+    }),*$(,)?) => {paste::paste!{
         #[derive(Debug, Clone, Copy, Serialize_repr, Deserialize_repr)]
         #[repr(u8)]
         pub enum Opcode {
@@ -105,18 +107,54 @@ macro_rules! decl_msgs {
     }}
 }
 
+use crate::db::Snowflake;
+
 pub type ClientMsg = client::Message;
 pub type ServerMsg = server::Message;
 
 pub mod server {
     use super::*;
 
+    type Channel = (); // TODO
+    type ChannelMessage = (); // TODO
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct ReadyPayloadInner {}
+
+    // TODO: Check that this enum doesn't grow too large, allocate large payloads like Ready
     decl_msgs! {
         0 => Hello {
             /// Number of milliseconds between heartbeats
-            heartbeat_interval: u32
+            heartbeat_interval: u32,
         },
+
         2 => HeartbeatACK: Default {},
+        3 => Ready {
+            #[serde(flatten)]
+            inner: Box<ReadyPayloadInner>
+        },
+        4 => InvalidSession: Default {},
+
+        5 => ChannelCreate { channel: Channel },
+        6 => ChannelUpdate { channel: Channel },
+        7 => ChannelDelete { channel: Snowflake },
+
+        8 => MessageCreate { message: ChannelMessage },
+        9 => MessageUpdate { message: ChannelMessage },
+        10 => MessageDelete { message: Snowflake },
+
+        11 => PresenceUpdate {
+            user: Snowflake,
+            party: Snowflake,
+            status: u8,
+        },
+        12 => TypingStart {
+            channel: Snowflake,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            party: Option<Snowflake>,
+            user: Snowflake,
+            ts: u32,
+        },
     }
 }
 
@@ -126,7 +164,11 @@ pub mod client {
     decl_msgs! {
         0 => Heartbeat: Default {},
         1 => Identify {
-            auth: String
-        }
+            auth: String,
+            intent: u32,
+        },
+        2 => Resume {
+            session: Snowflake,
+        },
     }
 }

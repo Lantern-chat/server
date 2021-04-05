@@ -88,17 +88,24 @@ pub fn client_connected(
                 Either::Left(event) => match event {
                     Ok(event) => {
                         // TODO: Check event for updates
-                        Ok(event)
+                        Ok(event) // forward event directly to tx
                     }
                     Err(e) => {
                         log::warn!("Event error: {}", e);
-                        Err(MessageOutgoingError::SocketClosed) // kick
+                        Err(MessageOutgoingError::SocketClosed) // kick for lag
                     }
                 },
                 Either::Right(msg) => match msg {
                     Ok(msg) => {
-                        todo!("Handle message");
-                        continue; // no immediate response necessary, continue listening for events
+                        match msg {
+                            // Respond to heartbeats immediately.
+                            // TODO: Update a timer somewhere
+                            ClientMsg::Heartbeat { .. } => Ok(HEARTBEAT_ACK.clone()),
+                            _ => {
+                                todo!("Handle message, like Identify/Resume");
+                                continue; // no immediate response necessary, continue listening for events
+                            }
+                        }
                     }
                     Err(e) => match e {
                         MessageIncomingError::SocketClosed
@@ -107,17 +114,13 @@ pub fn client_connected(
                             log::warn!("Connection disconnected");
                             break;
                         }
-                        MessageIncomingError::JsonParseError(_)
-                        | MessageIncomingError::MsgParseError(_)
-                        | MessageIncomingError::IoError(_) => {
-                            // TODO: Send code with it
-                            Err(MessageOutgoingError::SocketClosed)
-                        }
+                        // TODO: Send code with it
                         _ => Err(MessageOutgoingError::SocketClosed),
                     },
                 },
             };
 
+            // group together
             let flush_and_send = async {
                 ws_tx.flush().await?;
                 ws_tx.send(resp).await
@@ -135,24 +138,6 @@ pub fn client_connected(
         }
 
         // TODO: Cleanup connection
-
-        /*
-        match ws_tx.send(Ok(HELLO_EVENT.clone())).await {
-            Ok(_) => {}
-            Err(SinkError::ConnectionClosed) | Err(SinkError::AlreadyClosed) => {
-                log::warn!("Connection disconnected before Hello could be sent");
-
-                return;
-            }
-            Err(e) => {
-                log::error!("Error sending Hello message: {}", e);
-
-                if let Err(e) = ws_tx.send(Err(MessageOutgoingError::SocketClosed)).await {
-                    log::error!("Error sending close message: {}", e);
-                }
-            }
-        }
-        */
     });
 }
 
