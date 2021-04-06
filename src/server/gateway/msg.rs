@@ -34,6 +34,7 @@ macro_rules! decl_msgs {
             $opcode {
                 #[serde(rename = "o")]
                 op: Opcode,
+
                 #[serde(rename = "p")]
                 $(#[serde(skip_serializing_if = "" [< is_ $Default:lower >] "" )])?
                 payload: payloads::[<$opcode Payload>],
@@ -63,6 +64,7 @@ macro_rules! decl_msgs {
                 enum Field {
                     #[serde(rename = "o")]
                     Opcode,
+
                     #[serde(rename = "p")]
                     Payload,
                 }
@@ -135,13 +137,13 @@ pub mod server {
         },
         4 => InvalidSession: Default {},
 
-        5 => ChannelCreate { channel: Channel },
-        6 => ChannelUpdate { channel: Channel },
-        7 => ChannelDelete { channel: Snowflake },
+        5 => ChannelCreate { chan: Channel },
+        6 => ChannelUpdate { chan: Channel },
+        7 => ChannelDelete { chan: Snowflake },
 
-        8 => MessageCreate { message: ChannelMessage },
-        9 => MessageUpdate { message: ChannelMessage },
-        10 => MessageDelete { message: Snowflake },
+        8 => MessageCreate { msg: ChannelMessage },
+        9 => MessageUpdate { msg: ChannelMessage },
+        10 => MessageDelete { msg: Snowflake },
 
         11 => PresenceUpdate {
             user: Snowflake,
@@ -149,7 +151,7 @@ pub mod server {
             status: u8,
         },
         12 => TypingStart {
-            channel: Snowflake,
+            chan: Snowflake,
             #[serde(skip_serializing_if = "Option::is_none")]
             party: Option<Snowflake>,
             user: Snowflake,

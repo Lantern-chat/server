@@ -108,17 +108,20 @@ pub fn client_connected(
                         }
                     }
                     Err(e) => match e {
-                        MessageIncomingError::SocketClosed
-                        | MessageIncomingError::TungsteniteError(SinkError::ConnectionClosed)
-                        | MessageIncomingError::TungsteniteError(SinkError::AlreadyClosed) => {
+                        _ if e.is_close() => {
                             log::warn!("Connection disconnected");
                             break;
                         }
                         // TODO: Send code with it
-                        _ => Err(MessageOutgoingError::SocketClosed),
+                        _ => {
+                            log::error!("Misc err: {}", e);
+                            Err(MessageOutgoingError::SocketClosed)
+                        }
                     },
                 },
             };
+
+            log::info!("Msg: {:?}", resp);
 
             // group together
             let flush_and_send = async {
@@ -127,9 +130,11 @@ pub fn client_connected(
             };
 
             match tokio::time::timeout(Duration::from_millis(45000), flush_and_send).await {
-                Ok(Ok(())) => {}
+                Ok(Ok(())) => {
+                    println!("Message sent!");
+                }
                 Ok(Err(e)) => {
-                    todo!("Handle errors from websocket")
+                    todo!("Handle errors from websocket: {}", e);
                 }
                 Err(timeout_error) => {
                     todo!("Force kick socket?")
@@ -166,6 +171,23 @@ pub enum MessageIncomingError {
 
     #[error(transparent)]
     JoinError(#[from] tokio::task::JoinError),
+}
+
+impl MessageIncomingError {
+    pub fn is_close(&self) -> bool {
+        use tokio_tungstenite::tungstenite::error::{Error, ProtocolError};
+
+        match self {
+            Self::SocketClosed => true,
+            Self::TungsteniteError(e) => match e {
+                Error::AlreadyClosed
+                | Error::ConnectionClosed
+                | Error::Protocol(ProtocolError::ResetWithoutClosingHandshake) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
 }
 
 #[inline]

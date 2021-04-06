@@ -1,18 +1,23 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
+use miniz_oxide::deflate::core::TDEFLStatus;
+
 use super::socket::{GatewayMsgEncoding, GatewayQueryParams};
 
+#[derive(Debug)]
 pub struct CompressedEvent {
     pub uncompressed: Vec<u8>,
     pub compressed: Vec<u8>,
 }
 
+#[derive(Debug)]
 pub struct EncodedEvent {
     pub json: CompressedEvent,
     pub msgpack: CompressedEvent,
 }
 
+#[derive(Debug)]
 pub enum RawEvent {
     /// The socket doens't care about opaque events and should just send them
     ///
@@ -20,12 +25,13 @@ pub enum RawEvent {
     Opaque,
 }
 
+#[derive(Debug)]
 pub struct EventInner {
     pub raw: RawEvent,
     pub encoded: EncodedEvent,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Event(Arc<EventInner>);
 
 impl Deref for Event {
