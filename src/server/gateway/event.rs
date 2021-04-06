@@ -65,16 +65,19 @@ impl EncodedEvent {
 }
 
 impl CompressedEvent {
+    // TODO: Make async with `async-compression`?
     pub fn new(value: Vec<u8>) -> Result<Self, EncodingError> {
-        use flate2::{write::ZlibEncoder, Compression};
-        use std::io::Write;
+        let compressed = miniz_oxide::deflate::compress_to_vec_zlib(&value, 7);
 
-        let mut encoder = ZlibEncoder::new(
-            Vec::with_capacity((value.len() * 2) / 3),
-            Compression::new(6),
-        );
-        encoder.write(&value)?;
-        let compressed = encoder.finish()?;
+        //use flate2::{write::ZlibEncoder, Compression};
+        //use std::io::Write;
+        //
+        //let mut encoder = ZlibEncoder::new(
+        //    Vec::with_capacity((value.len() * 2) / 3),
+        //    Compression::new(6),
+        //);
+        //encoder.write(&value)?;
+        //let compressed = encoder.finish()?;
 
         Ok(CompressedEvent {
             uncompressed: value,
