@@ -36,7 +36,7 @@ pub enum MessageSearch {
 
 impl Message {
     pub async fn find(id: Snowflake, client: &Client) -> Result<Option<Message>, ClientError> {
-        let row = client.query_opt_cached(
+        let row = client.read.query_opt_cached(
             || "SELECT user_id, room_id, editor_id, thread_id, updated_at, deleted_at, content, pinned FROM lantern.messages WHERE id = $1",
             &[&id]
         ).await?;
@@ -59,6 +59,7 @@ impl Message {
 
     pub async fn upsert(&self, client: &Client) -> Result<(), ClientError> {
         let _ = client
+            .write
             .execute_cached(
                 || "CALL lantern.upsert_msg($1, $2, $3, $4, $5, $6, $7, $8, $9)",
                 &[
@@ -88,7 +89,7 @@ impl Message {
 
         let stream = match mode {
             MessageSearch::After(ts) => {
-                client
+                client.read
                     .query_stream_cached(
                         || "SELECT id, user_id, thread_id, editor_id, updated_at, deleted_at, content, pinned FROM lantern.messages WHERE room_id = $1 AND id > $2 LIMIT $3",
                         &[&room_id, &ts, &limit],
@@ -97,7 +98,7 @@ impl Message {
                     .boxed()
             }
             MessageSearch::Before(ts) => {
-                client
+                client.read
                     .query_stream_cached(
                         || "SELECT id, user_id, thread_id, editor_id, updated_at, deleted_at, content, pinned FROM lantern.messages WHERE room_id = $1 AND id < $2 LIMIT $3",
                         &[&room_id, &ts, &limit],

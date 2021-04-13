@@ -71,6 +71,7 @@ async fn login_user(state: ServerState, mut form: LoginForm) -> Result<Session, 
 
     let user = state
         .db
+        .read
         .query_opt_cached(
             || "SELECT id, email, passhash, deleted_at FROM lantern.users WHERE email = $1",
             &[&form.email],
@@ -131,6 +132,7 @@ pub async fn do_login(
 
     state
         .db
+        .write
         .execute_cached(
             || "INSERT INTO lantern.sessions (token, user_id, expires) VALUES ($1, $2, $3)",
             &[&&token.0[..], &id, &expires],

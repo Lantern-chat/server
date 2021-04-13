@@ -121,6 +121,7 @@ async fn register_user(
 
     let existing = state
         .db
+        .read
         .query_opt_cached(
             || "SELECT id FROM lantern.users WHERE email=$1",
             &[&form.email],
@@ -153,6 +154,7 @@ async fn register_user(
 
     state
         .db
+        .write
         .execute_cached(
             || "CALL lantern.register_user($1, $2, $3, $4, $5)",
             &[&id, &username, &form.email, &password_hash, &dob],

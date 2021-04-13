@@ -11,8 +11,10 @@ pub async fn cleanup_sessions(state: ServerState) {
 
         let _ = interval.tick().await;
 
+        // TODO: Only execute this on the actual write-server
         let res = state
             .db
+            .write
             .execute_cached(
                 || "DELETE FROM lantern.sessions WHERE expires < $1",
                 &[&SystemTime::now()],

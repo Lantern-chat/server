@@ -45,13 +45,13 @@ async fn main() -> anyhow::Result<()> {
 
     args.prepare()?;
 
-    let db = crate::db::startup::startup().await?;
-
     log::trace!("Parsing bind address...");
     let addr = match args.bind {
         Some(addr) => SocketAddr::from_str(&addr)?,
         None => SocketAddr::from(([127, 0, 0, 1], 3030)),
     };
+
+    let db = crate::db::Client::startup().await?;
 
     log::info!("Starting server...");
     let (server, state) = server::start_server(addr, db);

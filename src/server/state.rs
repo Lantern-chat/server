@@ -64,7 +64,8 @@ impl ServerState {
 
                 self.is_alive.store(false, Ordering::Relaxed);
 
-                self.db.close().await;
+                self.db.read.close().await;
+                self.db.write.close().await;
 
                 if let Err(err) = shutdown.send(()) {
                     log::error!("Could not shutdown server gracefully! Error: {:?}", err);

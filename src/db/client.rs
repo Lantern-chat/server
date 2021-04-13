@@ -26,9 +26,28 @@ use failsafe::Config;
 
 use arc_swap::{ArcSwap, ArcSwapOption};
 
-use super::conn::ConnectionStream;
+use super::{
+    conn::ConnectionStream,
+    startup::{self, StartupError},
+};
+
+#[derive(Clone)]
+pub struct ReadWriteClient {
+    pub read: Client,
+    pub write: Client,
+}
+
+impl ReadWriteClient {
+    pub async fn startup() -> Result<ReadWriteClient, StartupError> {
+        let write = startup::startup(false).await?;
+        let read = startup::startup(true).await?;
+
+        Ok(ReadWriteClient { read, write })
+    }
+}
 
 pub struct ClientInner {
+    pub readonly: bool,
     pub autoreconnect: AtomicBool,
     pub config: pg::Config,
     pub client: ArcSwapOption<pg::Client>,
@@ -108,7 +127,7 @@ impl Client {
         });
     }
 
-    async fn real_connect(&self, attempt: u64) -> Result<(), anyhow::Error> {
+    async fn real_connect(&self, attempt: u64) -> Result<(), ClientError> {
         let name = self.config.get_dbname().unwrap_or("Unnamed");
         log::info!(
             "Connecting ({}) to database {:?} at {:?}:{:?}...",
@@ -131,7 +150,7 @@ impl Client {
         Ok(())
     }
 
-    pub async fn reconnect(&self) -> Result<(), anyhow::Error> {
+    pub async fn reconnect(&self) -> Result<(), ClientError> {
         self.client.store(None);
 
         let circuit_breaker = Config::new().build();
@@ -152,8 +171,9 @@ impl Client {
         unreachable!()
     }
 
-    pub async fn connect(config: pg::Config) -> Result<Self, anyhow::Error> {
+    pub async fn connect(config: pg::Config, readonly: bool) -> Result<Self, ClientError> {
         let this = Client(Arc::new(ClientInner {
+            readonly,
             config,
             client: ArcSwapOption::from(None),
             cache: ArcSwap::default(),
@@ -167,7 +187,25 @@ impl Client {
     }
 }
 
+// TODO: I'm sure there is something better than a regex for this
+lazy_static::lazy_static! {
+    static ref WRITE_REGEX: regex::Regex =
+        regex::RegexBuilder::new("(update|insert|alter|create|drop|grant|revoke|delete|truncate)")
+        .case_insensitive(true).build().unwrap();
+}
+
 impl Client {
+    #[inline(always)]
+    fn debug_check_readonly<'a>(&self, query: &'a str) -> &'a str {
+        if cfg!(debug_assertions) {
+            if self.readonly {
+                assert!(!WRITE_REGEX.is_match(query));
+            }
+        }
+
+        return query;
+    }
+
     pub fn client(&self) -> Result<Arc<pg::Client>, ClientError> {
         match self.client.load_full() {
             Some(client) => Ok(client),
@@ -193,7 +231,10 @@ impl Client {
             return Ok(stmt.clone());
         }
 
-        let stmt = self.client()?.prepare(query()).await?;
+        let stmt = self
+            .client()?
+            .prepare(self.debug_check_readonly(query()))
+            .await?;
 
         self.cache.rcu(|cache| {
             let mut cache = HashMap::clone(&cache);

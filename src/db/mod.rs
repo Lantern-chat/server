@@ -3,7 +3,7 @@ pub mod conn;
 pub mod startup;
 pub mod util;
 
-pub use client::{Client, ClientError};
+pub use client::{ClientError, ReadWriteClient as Client};
 
 pub mod sf;
 pub use sf::Snowflake;

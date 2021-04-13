@@ -26,6 +26,7 @@ enum LogoutError {
 async fn logout_user(state: ServerState, auth: auth::Authorization) -> Result<(), LogoutError> {
     let res = state
         .db
+        .write
         .execute_cached(
             || "DELETE FROM lantern.sessions WHERE token = $1",
             &[&auth.token.bytes()],

@@ -8,7 +8,7 @@ use tokio::sync::mpsc;
 
 use tokio_postgres as pg;
 
-use super::client::Client;
+use super::{client::Client, ClientError};
 
 pub fn log_connection(client: Client) {
     tokio::spawn(async move {
@@ -27,14 +27,29 @@ pub fn log_connection(client: Client) {
     });
 }
 
-pub async fn startup() -> anyhow::Result<Client> {
+#[derive(Debug, thiserror::Error)]
+pub enum StartupError {
+    #[error("Database error: {0}")]
+    DatabaseError(#[from] pg::Error),
+
+    #[error("Client error: {0}")]
+    ClientError(#[from] ClientError),
+
+    #[error("IO Error: {0}")]
+    IoError(#[from] std::io::Error),
+
+    #[error("Not up to date")]
+    NotUpToDate,
+}
+
+pub async fn startup(readonly: bool) -> Result<Client, StartupError> {
     let db_str =
         std::env::var("DB_STR").unwrap_or_else(|_| "postgresql://user:password@db:5432".to_owned());
 
     let mut config = db_str.parse::<pg::Config>()?;
 
     config.dbname("postgres");
-    let mut client = Client::connect(config.clone()).await?;
+    let mut client = Client::connect(config.clone(), readonly).await?;
 
     // Just log any errors and ignore other things
     log_connection(client.clone());
@@ -53,7 +68,7 @@ pub async fn startup() -> anyhow::Result<Client> {
     client.close().await;
 
     config.dbname("lantern");
-    client = Client::connect(config.clone()).await?;
+    client = Client::connect(config.clone(), readonly).await?;
 
     // Just log any errors and ignore other things
     log_connection(client.clone());
@@ -82,18 +97,18 @@ pub async fn startup() -> anyhow::Result<Client> {
 
     let mut available_migrations = std::fs::read_dir("./backend/sql/migrations")?
         .map(|res| {
-            res.map_err(anyhow::Error::from).and_then(|e| {
+            res.map_err(StartupError::from).and_then(|e| {
                 let path = e.path();
                 let s = path.file_stem().unwrap().to_string_lossy();
 
                 let (idx, _) = s.char_indices().find(|(i, c)| !c.is_ascii_digit()).unwrap();
 
-                let migration_number = i32::from_str(&s[..idx])?;
+                let migration_number = i32::from_str(&s[..idx]).unwrap();
 
                 Ok((migration_number, path))
             })
         })
-        .collect::<Result<Vec<_>, anyhow::Error>>()?;
+        .collect::<Result<Vec<_>, StartupError>>()?;
 
     available_migrations.sort_by_key(|(key, _)| *key);
 
@@ -102,11 +117,16 @@ pub async fn startup() -> anyhow::Result<Client> {
     for (idx, migration_path) in available_migrations {
         let name = migration_path.file_stem().unwrap().to_string_lossy();
         if idx > last_migration {
+            if readonly {
+                // If in read-only mode we can't apply migrations
+                return Err(StartupError::NotUpToDate);
+            }
+
             log::info!("Running migration {}: {}", idx, name);
 
             let migration = load_migration(migration_path).await?;
 
-            async fn run_batch(client: &Client, sql: &str) -> Result<(), anyhow::Error> {
+            async fn run_batch(client: &Client, sql: &str) -> Result<(), StartupError> {
                 for command in SqlIterator::new(&sql) {
                     client.execute(command, &[]).await?;
                 }
@@ -138,7 +158,9 @@ pub async fn startup() -> anyhow::Result<Client> {
 
     // reconnect one last time to clear old rx forwards
     // TODO: Find a way to close this on drop
-    Client::connect(config).await
+    let client = Client::connect(config, readonly).await?;
+
+    Ok(client)
 }
 
 pub struct Migration {
@@ -150,7 +172,7 @@ lazy_static::lazy_static! {
     static ref SQL_COMMENT: regex::Regex = regex::Regex::new(r#"--.*"#).unwrap();
 }
 
-async fn load_sql(path: PathBuf) -> Result<String, anyhow::Error> {
+async fn load_sql(path: PathBuf) -> Result<String, StartupError> {
     let mut sql = tokio::fs::read_to_string(path).await?;
 
     sql = SQL_COMMENT.replace_all(&sql, "").into_owned();
@@ -158,7 +180,7 @@ async fn load_sql(path: PathBuf) -> Result<String, anyhow::Error> {
     Ok(sql)
 }
 
-async fn load_migration(path: PathBuf) -> Result<Migration, anyhow::Error> {
+async fn load_migration(path: PathBuf) -> Result<Migration, StartupError> {
     let mut up = path.clone();
     let mut down = path;
 

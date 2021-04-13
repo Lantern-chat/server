@@ -33,6 +33,7 @@ impl File {
         let flags = self.flags.bits();
 
         client
+            .write
             .execute_cached(
                 || "CALL lantern.upsert_file($1, $2, $3, $4, $5, $6, $7, $8)",
                 &[
@@ -52,7 +53,7 @@ impl File {
     }
 
     pub async fn find(id: Snowflake, client: &Client) -> Result<Option<File>, ClientError> {
-        let row = client
+        let row = client.read
             .query_opt_cached(
                 || "SELECT name, preview, mime, size, \"offset\", sha3, flags FROM lantern.files WHERE id = $1",
                 &[&id],
@@ -83,6 +84,7 @@ impl File {
         let offset = self.offset as i32;
 
         client
+            .write
             .execute_cached(
                 || "UPDATE lantern.files SET \"offset\" = $2 WHERE id = $1",
                 &[&self.id, &offset],

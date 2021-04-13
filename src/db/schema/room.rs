@@ -26,7 +26,7 @@ use futures::{StreamExt, TryStreamExt};
 
 impl Room {
     pub async fn insert(&self, client: &Client) -> Result<(), ClientError> {
-        client
+        client.write
             .execute_cached(
                 || "INSERT INTO lantern.rooms (id, party_id, name, topic, avatar_id, sort_order, flags, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
                 &[&self.id, &self.party_id, &self.name, &self.topic, &self.avatar_id, &self.sort_order, &self.flags.bits(), &self.parent_id],
@@ -37,7 +37,7 @@ impl Room {
     }
 
     pub async fn find(client: &Client, room_id: Snowflake) -> Result<Option<Room>, ClientError> {
-        let row = client.query_opt_cached(
+        let row = client.read.query_opt_cached(
             || "SELECT party_id, name, topic, avatar_id, sort_order, flags, parent_id FROM lantern.rooms WHERE id = $1",
             &[&room_id]
         ).await?;
@@ -58,7 +58,7 @@ impl Room {
     }
 
     pub async fn of_party(client: &Client, party_id: Snowflake) -> Result<Vec<Room>, ClientError> {
-        client.query_stream_cached(
+        client.read.query_stream_cached(
             || "SELECT id, name, topic, avatar_id, sort_order, flags, parent_id FROM lantern.rooms WHERE party_id = $1",
             &[&party_id]
         )

@@ -32,6 +32,7 @@ pub struct PartyMember {
 impl Party {
     pub async fn insert(&self, client: &Client) -> Result<(), ClientError> {
         client
+            .write
             .execute_cached(
                 || "INSERT INTO lantern.party (id, owner_id, name) VALUES ($1, $2, $3)",
                 &[&self.id, &self.owner_id, &self.name],
@@ -43,6 +44,7 @@ impl Party {
 
     pub async fn find(client: &Client, id: Snowflake) -> Result<Option<Self>, ClientError> {
         let row = client
+            .read
             .query_opt_cached(
                 || "SELECT owner_id, name FROM lantern.party WHERE id = $1",
                 &[&id],
@@ -64,7 +66,7 @@ impl Party {
         &self,
         client: &Client,
     ) -> Result<impl Stream<Item = Result<PartyMember, ClientError>>, ClientError> {
-        let stream = client.query_stream_cached(
+        let stream = client.read.query_stream_cached(
             || "SELECT id, username, discriminator, is_verified, COALESCE(party_member.nickname, users.nickname), custom_status, biography, COALESCE(party_member.avatar_id, users.avatar_id) FROM users LEFT JOIN party_member ON id = user_id WHERE party_id = $1",
             &[&self.id],
         ).await?;
@@ -90,6 +92,7 @@ impl Party {
         client: &Client,
     ) -> Result<bool, ClientError> {
         let count = client
+            .read
             .execute_cached(
                 || "SELECT FROM lantern.party_member WHERE party_id = $1 AND user_id = $2",
                 &[&self.id, &user_id],

@@ -140,6 +140,7 @@ pub async fn authorize(route: &Route) -> Result<Authorization, AuthError> {
     let session = route
         .state
         .db
+        .read
         .query_opt_cached(
             || "SELECT user_id, expires FROM lantern.sessions WHERE token = $1",
             &[&&token.0[..]],
