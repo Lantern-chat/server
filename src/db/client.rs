@@ -113,7 +113,12 @@ impl Client {
             *this.conn.lock().await = None;
 
             log::info!(
-                "Disconnected from database {:?}",
+                "Disconnected from {} database {:?}",
+                if this.readonly {
+                    "read-only"
+                } else {
+                    "writable"
+                },
                 this.config.get_dbname().unwrap_or("Unnamed")
             );
 
@@ -130,8 +135,13 @@ impl Client {
     async fn real_connect(&self, attempt: u64) -> Result<(), ClientError> {
         let name = self.config.get_dbname().unwrap_or("Unnamed");
         log::info!(
-            "Connecting ({}) to database {:?} at {:?}:{:?}...",
+            "Connecting ({}) to {} database {:?} at {:?}:{:?}...",
             attempt,
+            if self.readonly {
+                "read-only"
+            } else {
+                "writable"
+            },
             name,
             self.config.get_hosts(),
             self.config.get_ports(),
