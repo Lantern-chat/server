@@ -32,6 +32,16 @@ use super::{
 pub mod params;
 pub use params::{GatewayMsgEncoding, GatewayQueryParams};
 
+pub mod identify;
+
+#[derive(Debug, thiserror::Error)]
+pub enum EventError {
+    #[error(transparent)]
+    Broadcast(#[from] RecvError),
+    #[error(transparent)]
+    Oneshot(#[from] tokio::sync::oneshot::error::RecvError),
+}
+
 pub fn client_connected(
     ws: WebSocket,
     query: GatewayQueryParams,
@@ -73,7 +83,7 @@ pub fn client_connected(
     });
 
     tokio::spawn(async move {
-        type LeftItem = Result<Event, RecvError>;
+        type LeftItem = Result<Event, EventError>;
         type RightItem = Result<ClientMsg, MessageIncomingError>;
         type Item = Either<LeftItem, RightItem>;
 
@@ -101,10 +111,17 @@ pub fn client_connected(
                             // Respond to heartbeats immediately.
                             // TODO: Update a timer somewhere
                             ClientMsg::Heartbeat { .. } => Ok(HEARTBEAT_ACK.clone()),
-                            _ => {
-                                todo!("Handle message, like Identify/Resume");
-                                continue; // no immediate response necessary, continue listening for events
+                            ClientMsg::Identify { payload, .. } => {
+                                events.push(
+                                    identify::identify(payload.auth, payload.intent)
+                                        .map(|msg| Either::Left(msg))
+                                        .into_stream()
+                                        .boxed(),
+                                );
+                                continue;
                             }
+                            // no immediate response necessary, continue listening for events
+                            _ => continue,
                         }
                     }
                     Err(e) => match e {
