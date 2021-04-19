@@ -16,10 +16,12 @@ use tokio::sync::{broadcast::error::RecvError, mpsc};
 use tokio_postgres::Socket;
 use tokio_stream::wrappers::{errors::BroadcastStreamRecvError, BroadcastStream, ReceiverStream};
 
+use hashbrown::HashMap;
+
 use crate::{
     db::Snowflake,
     server::ftl::ws::{Message as WsMessage, SinkError, WebSocket},
-    util::laggy,
+    util::cancel::{Cancel, CancelableStream},
 };
 
 use crate::server::{routes::api::auth::Authorization, ServerState};
@@ -67,6 +69,7 @@ pub fn client_connected(
     lazy_static::lazy_static! {
         static ref HELLO_EVENT: Event = Event::new_opaque(ServerMsg::new_hello(45000)).unwrap();
         static ref HEARTBEAT_ACK: Event = Event::new_opaque(ServerMsg::new_heartbeatack()).unwrap();
+        static ref INVALID_SESSION: Event = Event::new_opaque(ServerMsg::new_invalidsession()).unwrap();
     }
 
     tokio::spawn(async move {
@@ -75,6 +78,8 @@ pub fn client_connected(
 
         let (ws_tx, ws_rx) = ws.split();
 
+        // map each incoming websocket message such that it will decompress/decode the message
+        // AND update the last_msg value concurrently.
         let conn2 = conn.clone();
         let ws_rx = ws_rx
             .map(|msg| (msg, &conn2))
@@ -96,6 +101,7 @@ pub fn client_connected(
                         );
 
                         // do the parsing/decompressing at the same time as updating the heartbeat
+                        // TODO: Only count heartbeats on the actual event?
                         let (res, _) = future::join(block, conn.heartbeat()).await;
 
                         res?
@@ -110,6 +116,8 @@ pub fn client_connected(
                 Ok(event) => WsMessage::binary(event.encoded.get(query).clone()),
             })
         });
+
+        let mut listener_table = HashMap::new();
 
         let mut events = stream::SelectAll::<stream::BoxStream<Item>>::new();
 
@@ -127,22 +135,38 @@ pub fn client_connected(
                 Item::Event(event) => match event {
                     Ok(event) => {
                         match event.raw {
-                            RawEvent::Ready { user_id } => {
+                            // TODO: Make this non-blocking for the event-loop?
+                            RawEvent::Ready {
+                                user_id,
+                                ref party_ids,
+                            } => {
+                                // subscribe to all relevant party broadcasts
+                                // and activate the connection for per-user events
                                 let subs = state
                                     .gateway
-                                    .sub_and_activate_connection(user_id, conn.clone(), &[])
+                                    .sub_and_activate_connection(
+                                        user_id,
+                                        conn.clone(),
+                                        party_ids.iter(),
+                                    )
                                     .await;
 
                                 events.extend(subs.into_iter().map(|sub| {
-                                    BroadcastStream::new(sub.rx)
+                                    let (stream, cancel) =
+                                        CancelableStream::new(BroadcastStream::new(sub.rx));
+
+                                    listener_table.insert(sub.party_id, cancel);
+
+                                    stream
                                         .map(|event| Item::Event(event.map_err(Into::into)))
                                         .boxed()
                                 }));
                             }
+                            // TODO: Party ADD
+                            // TODO: Party REMOVE
                             _ => {}
                         }
 
-                        // TODO: Check event for socket state updates
                         Ok(event) // forward event directly to tx
                     }
                     Err(e) => {

@@ -28,6 +28,7 @@ pub enum RawEvent {
 
     Ready {
         user_id: Snowflake,
+        party_ids: Vec<Snowflake>,
     },
 }
 

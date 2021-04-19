@@ -4,7 +4,7 @@ use std::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
     },
-    time::SystemTime,
+    time::Instant,
 };
 
 use crate::db::Snowflake;
@@ -14,10 +14,9 @@ use super::Event;
 use tokio::sync::{broadcast, mpsc, RwLock};
 
 pub struct GatewayConnectionInner {
-    //pub user_id: Snowflake,
     pub id: Snowflake,
     pub is_active: AtomicBool,
-    pub last_msg: RwLock<SystemTime>,
+    pub last_msg: RwLock<Instant>,
     pub tx: mpsc::Sender<Event>,
 }
 
@@ -34,11 +33,10 @@ impl Deref for GatewayConnection {
 impl GatewayConnection {
     pub fn new() -> (Self, mpsc::Receiver<Event>) {
         let (tx, rx) = mpsc::channel(1);
-        let now = SystemTime::now();
         let conn = GatewayConnection(Arc::new(GatewayConnectionInner {
-            id: Snowflake::at(now),
+            id: Snowflake::now(),
             is_active: AtomicBool::new(false),
-            last_msg: RwLock::new(now),
+            last_msg: RwLock::new(Instant::now()),
             tx,
         }));
 
@@ -46,6 +44,6 @@ impl GatewayConnection {
     }
 
     pub async fn heartbeat(&self) {
-        *self.last_msg.write().await = SystemTime::now();
+        *self.last_msg.write().await = Instant::now();
     }
 }

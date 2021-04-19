@@ -34,17 +34,19 @@ pub struct ConnectionSubscription {
 
 /// Receives party events
 pub struct PartySubscription {
+    pub party_id: PartyId,
     pub rx: broadcast::Receiver<Event>,
 }
 
 /// Stored in the gateway, provides a channel to party subscribers
 pub struct PartyEmitter {
+    pub id: PartyId,
     pub tx: mpsc::UnboundedSender<Event>,
     pub bc: broadcast::Sender<Event>,
 }
 
 impl PartyEmitter {
-    pub fn new() -> Self {
+    pub fn new(id: PartyId) -> Self {
         let bc = broadcast::channel(16).0;
         let (tx, mut rx) = mpsc::unbounded_channel();
 
@@ -68,11 +70,12 @@ impl PartyEmitter {
             }
         });
 
-        PartyEmitter { bc, tx }
+        PartyEmitter { id, bc, tx }
     }
 
     pub fn subscribe(&self) -> PartySubscription {
         PartySubscription {
+            party_id: self.id,
             rx: self.bc.subscribe(),
         }
     }
@@ -143,7 +146,7 @@ impl Gateway {
                 .batch_write(missing, Some(&mut cache), |key, value| {
                     subs.push(
                         value
-                            .or_insert_with(|| (*key, PartyEmitter::new()))
+                            .or_insert_with(|| (*key, PartyEmitter::new(*key)))
                             .1
                             .subscribe(),
                     )
