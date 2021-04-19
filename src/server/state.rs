@@ -12,17 +12,16 @@ use tokio::sync::{oneshot, Mutex, RwLock, Semaphore};
 
 use crate::{config::LanternConfig, db::Client, fs::disk::FileStore};
 
-use super::{ftl::rate_limit::RateLimitTable, gateway::PartyGateway};
+use super::{ftl::rate_limit::RateLimitTable, gateway::Gateway};
 
 pub struct InnerServerState {
     pub is_alive: AtomicBool,
     pub shutdown: Mutex<Option<oneshot::Sender<()>>>,
     pub rate_limit: RateLimitTable,
-    //pub gateway_conns: HostConnections,
     pub db: Client,
     pub config: LanternConfig,
     pub fs: FileStore,
-    pub gateway: PartyGateway,
+    pub gateway: Gateway,
     pub hashing_semaphore: Semaphore,
 }
 
@@ -47,7 +46,7 @@ impl ServerState {
             db,
             config: Default::default(),   // TODO: Load from file
             fs: FileStore::new("./data"), // TODO: Set from config
-            gateway: PartyGateway::default(),
+            gateway: Gateway::default(),
             hashing_semaphore: Semaphore::new(16), // TODO: Set from available memory?
         }))
     }

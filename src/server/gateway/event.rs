@@ -3,6 +3,8 @@ use std::sync::Arc;
 
 use miniz_oxide::deflate::core::TDEFLStatus;
 
+use crate::db::Snowflake;
+
 use super::socket::{GatewayMsgEncoding, GatewayQueryParams};
 
 #[derive(Debug)]
@@ -23,6 +25,10 @@ pub enum RawEvent {
     ///
     /// This is a majority of events
     Opaque,
+
+    Ready {
+        user_id: Snowflake,
+    },
 }
 
 #[derive(Debug)]

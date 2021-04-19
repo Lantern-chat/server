@@ -1,3 +1,4 @@
+pub mod conn;
 pub mod event;
 pub mod msg;
 pub mod socket;
@@ -77,41 +78,48 @@ impl PartyEmitter {
     }
 }
 
+use conn::GatewayConnection;
+
 #[derive(Default)]
-pub struct PartyGateway {
+pub struct Gateway {
+    /// per-party emitters that can be subscribed to
     pub parties: CHashMap<PartyId, PartyEmitter>,
-    pub users: CHashMap<UserId, HashMap<ConnectionId, ConnectionEmitter>>,
+
+    /// All gateway connections, even unidentified
+    pub conns: CHashMap<ConnectionId, GatewayConnection>,
+
+    /// Identified gateway connections that can targetted by UserId
+    pub users: CHashMap<UserId, HashMap<ConnectionId, GatewayConnection>>,
 }
 
-impl PartyGateway {
-    pub async fn sub_and_add_connection(
+impl Gateway {
+    /// After identifying, a connection can be added to active subscriptions
+    #[rustfmt::skip]
+    pub async fn sub_and_activate_connection(
         &self,
         user_id: UserId,
-        conn_id: ConnectionId,
+        conn: GatewayConnection,
         party_ids: impl IntoIterator<Item = &PartyId>,
-    ) -> (ConnectionSubscription, Vec<PartySubscription>) {
-        let conn = self.add_connection(user_id, conn_id);
-        let subs = self.subscribe(party_ids);
+    ) -> Vec<PartySubscription> {
+        let (_, subs) = futures::future::join(
+            self.activate_connection(user_id, conn),
+            self.subscribe(party_ids)).await;
 
-        futures::future::join(conn, subs).await
+        subs
     }
 
-    pub async fn add_connection(
-        &self,
-        user_id: UserId,
-        conn_id: ConnectionId,
-    ) -> ConnectionSubscription {
-        let (tx, rx) = mpsc::unbounded_channel();
+    pub async fn add_connection(&self, conn: GatewayConnection) {
+        self.conns.insert(conn.id, conn).await;
+    }
 
+    async fn activate_connection(&self, user_id: UserId, conn: GatewayConnection) {
         self.users
             .get_mut_or_default(&user_id)
             .await
-            .insert(conn_id, ConnectionEmitter { tx });
-
-        ConnectionSubscription { rx }
+            .insert(conn.id, conn);
     }
 
-    pub async fn subscribe(
+    async fn subscribe(
         &self,
         party_ids: impl IntoIterator<Item = &PartyId>,
     ) -> Vec<PartySubscription> {

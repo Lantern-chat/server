@@ -14,7 +14,7 @@ use futures::{
 
 use tokio::sync::{broadcast::error::RecvError, mpsc};
 use tokio_postgres::Socket;
-use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio_stream::wrappers::{errors::BroadcastStreamRecvError, BroadcastStream, ReceiverStream};
 
 use crate::{
     db::Snowflake,
@@ -25,7 +25,8 @@ use crate::{
 use crate::server::{routes::api::auth::Authorization, ServerState};
 
 use super::{
-    event::{EncodedEvent, Event},
+    conn::GatewayConnection,
+    event::{EncodedEvent, Event, RawEvent},
     msg::{ClientMsg, ServerMsg},
 };
 
@@ -38,8 +39,23 @@ pub mod identify;
 pub enum EventError {
     #[error(transparent)]
     Broadcast(#[from] RecvError),
+
     #[error(transparent)]
     Oneshot(#[from] tokio::sync::oneshot::error::RecvError),
+}
+
+impl From<BroadcastStreamRecvError> for EventError {
+    fn from(e: BroadcastStreamRecvError) -> Self {
+        EventError::Broadcast(match e {
+            BroadcastStreamRecvError::Lagged(l) => RecvError::Lagged(l),
+        })
+    }
+}
+
+pub enum Item {
+    Event(Result<Event, EventError>),
+    Msg(Result<ClientMsg, MessageIncomingError>),
+    MissedHeartbeat,
 }
 
 pub fn client_connected(
@@ -53,51 +69,80 @@ pub fn client_connected(
         static ref HEARTBEAT_ACK: Event = Event::new_opaque(ServerMsg::new_heartbeatack()).unwrap();
     }
 
-    let (ws_tx, ws_rx) = ws.split();
-
-    let ws_rx = ws_rx.then(move |msg| async move {
-        match msg {
-            Err(e) => Err(MessageIncomingError::from(e)),
-            Ok(msg) if msg.is_close() => Err(MessageIncomingError::SocketClosed),
-            Ok(msg) => {
-                // Block to decompress and parse
-                tokio::task::spawn_blocking(move || -> Result<_, MessageIncomingError> {
-                    let msg = decompress_if(query.compress, msg.as_bytes())?;
-
-                    Ok(match query.encoding {
-                        GatewayMsgEncoding::Json => serde_json::from_slice(&msg)?,
-                        GatewayMsgEncoding::MsgPack => rmp_serde::from_slice(&msg)?,
-                    })
-                })
-                .await?
-            }
-        }
-    });
-
-    // by placing the WsMessage constructor here, it avoids allocation ahead of when it can send the message
-    let mut ws_tx = ws_tx.with(move |event: Result<Event, MessageOutgoingError>| {
-        futures::future::ok::<_, SinkError>(match event {
-            Err(_) => WsMessage::close(),
-            Ok(event) => WsMessage::binary(event.encoded.get(query).clone()),
-        })
-    });
-
     tokio::spawn(async move {
-        type LeftItem = Result<Event, EventError>;
-        type RightItem = Result<ClientMsg, MessageIncomingError>;
-        type Item = Either<LeftItem, RightItem>;
+        let (conn, conn_rx) = GatewayConnection::new();
+        let conn_rx = ReceiverStream::new(conn_rx);
+
+        let (ws_tx, ws_rx) = ws.split();
+
+        let conn2 = conn.clone();
+        let ws_rx = ws_rx
+            .map(|msg| (msg, &conn2))
+            .then(move |(msg, conn)| async move {
+                match msg {
+                    Err(e) => Err(MessageIncomingError::from(e)),
+                    Ok(msg) if msg.is_close() => Err(MessageIncomingError::SocketClosed),
+                    Ok(msg) => {
+                        // Block to decompress and parse
+                        let block = tokio::task::spawn_blocking(
+                            move || -> Result<_, MessageIncomingError> {
+                                let msg = decompress_if(query.compress, msg.as_bytes())?;
+
+                                Ok(match query.encoding {
+                                    GatewayMsgEncoding::Json => serde_json::from_slice(&msg)?,
+                                    GatewayMsgEncoding::MsgPack => rmp_serde::from_slice(&msg)?,
+                                })
+                            },
+                        );
+
+                        // do the parsing/decompressing at the same time as updating the heartbeat
+                        let (res, _) = future::join(block, conn.heartbeat()).await;
+
+                        res?
+                    }
+                }
+            });
+
+        // by placing the WsMessage constructor here, it avoids allocation ahead of when it can send the message
+        let mut ws_tx = ws_tx.with(move |event: Result<Event, MessageOutgoingError>| {
+            futures::future::ok::<_, SinkError>(match event {
+                Err(_) => WsMessage::close(),
+                Ok(event) => WsMessage::binary(event.encoded.get(query).clone()),
+            })
+        });
 
         let mut events = stream::SelectAll::<stream::BoxStream<Item>>::new();
 
-        // Push Hello event to begin stream and forward ws_rx into events
-        events.push(stream::once(future::ready(Either::Left(Ok(HELLO_EVENT.clone())))).boxed());
-        events.push(ws_rx.map(|msg| Either::Right(msg)).boxed());
+        // Push Hello event to begin stream and forward ws_rx/conn_rx into events
+        events.push(stream::once(future::ready(Item::Event(Ok(HELLO_EVENT.clone())))).boxed());
+        events.push(ws_rx.map(|msg| Item::Msg(msg)).boxed());
+        events.push(conn_rx.map(|msg| Item::Event(Ok(msg))).boxed());
+
+        // Make the new connection known to the gateway
+        state.gateway.add_connection(conn.clone()).await;
 
         while let Some(event) = events.next().await {
             let resp = match event {
-                Either::Left(event) => match event {
+                Item::MissedHeartbeat => Err(MessageOutgoingError::SocketClosed),
+                Item::Event(event) => match event {
                     Ok(event) => {
-                        // TODO: Check event for updates
+                        match event.raw {
+                            RawEvent::Ready { user_id } => {
+                                let subs = state
+                                    .gateway
+                                    .sub_and_activate_connection(user_id, conn.clone(), &[])
+                                    .await;
+
+                                events.extend(subs.into_iter().map(|sub| {
+                                    BroadcastStream::new(sub.rx)
+                                        .map(|event| Item::Event(event.map_err(Into::into)))
+                                        .boxed()
+                                }));
+                            }
+                            _ => {}
+                        }
+
+                        // TODO: Check event for socket state updates
                         Ok(event) // forward event directly to tx
                     }
                     Err(e) => {
@@ -105,25 +150,23 @@ pub fn client_connected(
                         Err(MessageOutgoingError::SocketClosed) // kick for lag
                     }
                 },
-                Either::Right(msg) => match msg {
-                    Ok(msg) => {
-                        match msg {
-                            // Respond to heartbeats immediately.
-                            // TODO: Update a timer somewhere
-                            ClientMsg::Heartbeat { .. } => Ok(HEARTBEAT_ACK.clone()),
-                            ClientMsg::Identify { payload, .. } => {
-                                events.push(
-                                    identify::identify(payload.auth, payload.intent)
-                                        .map(|msg| Either::Left(msg))
-                                        .into_stream()
-                                        .boxed(),
-                                );
-                                continue;
-                            }
-                            // no immediate response necessary, continue listening for events
-                            _ => continue,
+                Item::Msg(msg) => match msg {
+                    Ok(msg) => match msg {
+                        // Respond to heartbeats immediately.
+                        // TODO: Update a timer somewhere
+                        ClientMsg::Heartbeat { .. } => Ok(HEARTBEAT_ACK.clone()),
+                        ClientMsg::Identify { payload, .. } => {
+                            events.push(
+                                identify::identify(payload.auth, payload.intent)
+                                    .map(|msg| Item::Event(msg))
+                                    .into_stream()
+                                    .boxed(),
+                            );
+                            continue;
                         }
-                    }
+                        // no immediate response necessary, continue listening for events
+                        _ => continue,
+                    },
                     Err(e) => match e {
                         _ if e.is_close() => {
                             log::warn!("Connection disconnected");
@@ -137,8 +180,6 @@ pub fn client_connected(
                     },
                 },
             };
-
-            log::info!("Msg: {:?}", resp);
 
             // group together
             let flush_and_send = async {
