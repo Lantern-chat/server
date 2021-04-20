@@ -60,18 +60,18 @@ pub enum Item {
     MissedHeartbeat,
 }
 
+lazy_static::lazy_static! {
+    pub static ref HELLO_EVENT: Event = Event::new_opaque(ServerMsg::new_hello(45000)).unwrap();
+    pub static ref HEARTBEAT_ACK: Event = Event::new_opaque(ServerMsg::new_heartbeatack()).unwrap();
+    pub static ref INVALID_SESSION: Event = Event::new_opaque(ServerMsg::new_invalidsession()).unwrap();
+}
+
 pub fn client_connected(
     ws: WebSocket,
     query: GatewayQueryParams,
     addr: IpAddr,
     state: ServerState,
 ) {
-    lazy_static::lazy_static! {
-        static ref HELLO_EVENT: Event = Event::new_opaque(ServerMsg::new_hello(45000)).unwrap();
-        static ref HEARTBEAT_ACK: Event = Event::new_opaque(ServerMsg::new_heartbeatack()).unwrap();
-        static ref INVALID_SESSION: Event = Event::new_opaque(ServerMsg::new_invalidsession()).unwrap();
-    }
-
     tokio::spawn(async move {
         let (conn, conn_rx) = GatewayConnection::new();
         let conn_rx = ReceiverStream::new(conn_rx);
@@ -177,15 +177,15 @@ pub fn client_connected(
                 Item::Msg(msg) => match msg {
                     Ok(msg) => match msg {
                         // Respond to heartbeats immediately.
-                        // TODO: Update a timer somewhere
                         ClientMsg::Heartbeat { .. } => Ok(HEARTBEAT_ACK.clone()),
                         ClientMsg::Identify { payload, .. } => {
-                            events.push(
-                                identify::identify(payload.auth, payload.intent)
-                                    .map(|msg| Item::Event(msg))
-                                    .into_stream()
-                                    .boxed(),
-                            );
+                            // this will send a ready event on success
+                            tokio::spawn(identify::identify(
+                                state.clone(),
+                                conn.clone(),
+                                payload.auth,
+                                payload.intent,
+                            ));
                             continue;
                         }
                         // no immediate response necessary, continue listening for events

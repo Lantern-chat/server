@@ -121,7 +121,11 @@ pub mod server {
     type ChannelMessage = (); // TODO
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct ReadyPayloadInner {}
+    pub struct ReadyPayloadInner {
+        user_id: Snowflake,
+        username: String,
+        email: String,
+    }
 
     // TODO: Check that this enum doesn't grow too large, allocate large payloads like Ready
     decl_msgs! {

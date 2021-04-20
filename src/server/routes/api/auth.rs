@@ -82,7 +82,10 @@ impl AuthToken {
 use headers::HeaderMapExt;
 use http::StatusCode;
 
-use crate::db::{ClientError, Snowflake};
+use crate::{
+    db::{ClientError, Snowflake},
+    server::ServerState,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Authorization {
@@ -122,23 +125,11 @@ pub enum AuthError {
 
 use crate::server::ftl::*;
 
-pub async fn authorize(route: &Route) -> Result<Authorization, AuthError> {
-    const BEARER: &'static [u8] = b"Bearer ";
-
-    let header = match route.req.headers().get("Authorization") {
-        Some(header) => header.as_bytes(),
-        None => return Err(AuthError::MissingHeader),
-    };
-
-    if !header.starts_with(BEARER) {
-        return Err(AuthError::InvalidFormat);
-    }
-
-    let token = AuthToken::from_bytes(&header[BEARER.len()..])?;
+pub async fn do_auth(state: &ServerState, raw_token: &[u8]) -> Result<Authorization, AuthError> {
+    let token = AuthToken::from_bytes(raw_token)?;
 
     // TODO: Cache this
-    let session = route
-        .state
+    let session = state
         .db
         .read
         .query_opt_cached(
@@ -162,6 +153,21 @@ pub async fn authorize(route: &Route) -> Result<Authorization, AuthError> {
         }
         None => Err(AuthError::NoSession),
     }
+}
+
+pub async fn authorize(route: &Route) -> Result<Authorization, AuthError> {
+    const BEARER: &'static [u8] = b"Bearer ";
+
+    let header = match route.req.headers().get("Authorization") {
+        Some(header) => header.as_bytes(),
+        None => return Err(AuthError::MissingHeader),
+    };
+
+    if !header.starts_with(BEARER) {
+        return Err(AuthError::InvalidFormat);
+    }
+
+    do_auth(&route.state, &header[BEARER.len()..]).await
 }
 
 impl Reply for AuthError {

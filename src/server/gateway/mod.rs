@@ -2,6 +2,7 @@ pub mod conn;
 pub mod event;
 pub mod msg;
 pub mod socket;
+pub mod models;
 
 use std::{borrow::Cow, error::Error, pin::Pin, time::Duration};
 
