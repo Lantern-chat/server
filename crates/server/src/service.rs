@@ -22,7 +22,7 @@ pub async fn service(
 
     let start = route.start;
 
-    let mut resp = routes::entry(route).await;
+    let mut resp = compression::wrap_route(false, route, |r| routes::entry(r)).await;
 
     let elapsed = start.elapsed().as_secs_f64() * 1000.0;
 

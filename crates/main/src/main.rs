@@ -3,7 +3,7 @@ use tracing_subscriber::FmtSubscriber;
 
 pub mod cli;
 
-use std::{net::SocketAddr, str::FromStr, sync::Arc};
+use std::{net::SocketAddr, str::FromStr};
 
 use futures::FutureExt;
 use structopt::StructOpt;
