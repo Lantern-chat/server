@@ -1,0 +1,46 @@
+[package]
+name = "server"
+version = "0.1.0"
+authors = ["novacrazy <novacrazy@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ftl = { path = "../ftl" }
+db = { path = "../db" }
+util = { path = "../util" }
+
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1.4", features = ["full"] }
+tokio-util = { version = "0.6", features = ["io"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+hashbrown = { version = "0.11", features = ["inline-more"] }
+futures = "0.3"
+hyper = { version = "0.14.4", features = ["http1", "http2", "server", "stream", "runtime"] }
+http = "0.2.3"
+tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
+headers = "0.3"
+base64 = "0.13.0"
+hex = "0.4.2"
+lazy_static = "1.4.0"
+rust-argon2 = "0.8.3"
+ctr = "0.6.0"
+aes = "0.6.0"
+sha3 = "0.9.1"
+flate2 = { version = "1.0.19", default-features = false, features = ["rust_backend"] }
+miniz_oxide = "0.4.4"
+thiserror = "1.0.24"
+serde_repr = "0.1.6"
+paste = "1.0.5"
+serde_json = "1.0.64"
+rmp-serde = "0.15.4"
+rand = "0.8.3"
+time = "0.2.26"
+regex = "1.4.6"
+tokio-tungstenite = "0.14.0"
+ahash = "0.7.2"
+
+[build-dependencies]
+built = { version = "0.4.4", features = ["git2", "chrono"] }
+
