@@ -2,7 +2,7 @@ use ftl::*;
 
 use db::{
     schema::{Message, Room},
-    ClientError, Snowflake,
+    ClientError, Snowflake, SnowflakeExt,
 };
 
 use crate::{routes::api::auth::Authorization, ServerState};

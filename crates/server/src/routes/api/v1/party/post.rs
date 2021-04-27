@@ -1,6 +1,6 @@
 use ftl::*;
 
-use db::{schema::Party, ClientError, Snowflake};
+use db::{schema::Party, ClientError, Snowflake, SnowflakeExt};
 
 use crate::{
     routes::api::{auth::Authorization, util::time::is_of_age},

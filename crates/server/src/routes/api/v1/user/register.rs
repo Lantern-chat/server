@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::SystemTime};
 
-use db::{ClientError, Snowflake};
+use db::{ClientError, Snowflake, SnowflakeExt};
 
 use crate::{routes::api::util::time::is_of_age, ServerState};
 

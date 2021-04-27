@@ -6,7 +6,7 @@ use ftl::*;
 
 use db::{
     schema::file::{File, FileFlags, Mime},
-    Snowflake,
+    Snowflake, SnowflakeExt
 };
 
 // TODO: Limit the number of files that can be pending at once, probably to 3

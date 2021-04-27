@@ -11,10 +11,10 @@ pub mod util;
 pub use client::{ClientError, ReadWriteClient as Client};
 
 pub mod sf;
-pub use sf::Snowflake;
+pub use sf::{Snowflake, SnowflakeExt};
 
 pub mod schema {
-    pub(self) use super::{Client, ClientError, Snowflake};
+    pub(self) use super::{Client, ClientError, Snowflake, SnowflakeExt};
 
     pub mod attachment;
     pub mod emote;
