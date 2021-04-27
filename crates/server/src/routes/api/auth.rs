@@ -69,7 +69,7 @@ impl FromStr for AuthToken {
 
 impl AuthToken {
     /// Attempt to parse an auth token from raw bytes
-    pub fn from_bytes(mut b: &[u8]) -> Result<Self, AuthTokenFromStrError> {
+    pub fn from_bytes(b: &[u8]) -> Result<Self, AuthTokenFromStrError> {
         let decoded = base64::decode(&b[..Self::CHAR_LEN])?;
 
         match decoded.try_into() {

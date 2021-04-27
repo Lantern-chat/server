@@ -1,6 +1,8 @@
 //! FTL is the internal web framework derived from parts of warp,
 //! but designed for a more imperative workflow.
 
+#![allow(unused_imports)]
+
 extern crate tracing as log;
 
 pub mod body;

@@ -98,7 +98,7 @@ macro_rules! decl_msgs {
                                     }
                                 }),
                             )*
-                            _ => Err(de::Error::custom("Invalid opcode")),
+                            // _ => Err(de::Error::custom("Invalid opcode")),
                         }
                     }
                 }

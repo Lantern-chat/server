@@ -215,7 +215,7 @@ pub fn client_connected(
                 Ok(Err(e)) => {
                     todo!("Handle errors from websocket: {}", e);
                 }
-                Err(timeout_error) => {
+                Err(_timeout_error) => {
                     todo!("Force kick socket?")
                 }
             }
