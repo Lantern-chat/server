@@ -1,6 +1,6 @@
 CREATE TABLE lantern.rooms (
     id          bigint              NOT NULL,
-    party_id    bigint              NOT NULL,
+    party_id    bigint,
     name        text                NOT NULL,
     topic       varchar(2048),
     deleted_at  timestamp,

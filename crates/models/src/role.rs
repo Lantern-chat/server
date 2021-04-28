@@ -1,7 +1,5 @@
 use super::*;
 
-use models::permission::Permission;
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Role {
     pub id: Snowflake,
@@ -12,5 +10,3 @@ pub struct Role {
     pub color: u32,
     pub mentionable: bool,
 }
-
-impl Role {}

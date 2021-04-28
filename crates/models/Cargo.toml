@@ -9,11 +9,12 @@ edition = "2018"
 [dependencies]
 postgres-types = { version = "0.2.1", optional = true }
 bytes = { version = "1", optional = true }
-serde = "1"
+serde = { version = "1", features = ["derive"] }
+serde_shims = { version = "0.2", features = ["std", "mime", "bitflags"] }
+bitflags = "1.2"
 
 [features]
 tokio-pg = ["postgres-types", "bytes"]
 
 [dev-dependencies]
 serde_json = "1"
-serde_derive = "1"

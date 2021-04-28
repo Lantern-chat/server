@@ -124,7 +124,11 @@ mod serde_impl {
         where
             S: Serializer,
         {
-            serializer.collect_str(self)
+            if serializer.is_human_readable() {
+                serializer.collect_str(self)
+            } else {
+                self.0.serialize(serializer)
+            }
         }
     }
 
@@ -172,8 +176,6 @@ mod tests {
 
     #[test]
     fn test_serde() {
-        use serde_derive::*;
-
         #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
         struct Nested {
             x: Snowflake,

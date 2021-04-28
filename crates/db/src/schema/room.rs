@@ -1,14 +1,6 @@
 use super::{Client, ClientError, Snowflake};
 
-bitflags::bitflags! {
-    pub struct RoomFlags: i16 {
-        const NSFW    = 1 << 0;
-        const PRIVATE = 1 << 1;
-        const DIRECT  = 1 << 2;
-    }
-}
-
-serde_shims::impl_serde_for_bitflags!(RoomFlags);
+pub use models::room::RoomFlags;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Room {

@@ -24,7 +24,6 @@ pub mod schema {
     pub mod invite;
     pub mod msg;
     pub mod party;
-    pub mod permission;
     pub mod role;
     pub mod room;
     pub mod thread;
@@ -36,7 +35,6 @@ pub mod schema {
         invite::Invite,
         msg::{Message, MessageSearch},
         party::Party,
-        permission::Permission,
         role::Role,
         room::{Room, RoomFlags},
         thread::Thread,
