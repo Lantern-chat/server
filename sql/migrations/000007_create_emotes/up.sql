@@ -11,6 +11,7 @@ CREATE TABLE lantern.emotes (
 );
 ALTER TABLE lantern.emotes OWNER TO postgres;
 
+-- TODO: Maybe deduplicate this? Depends on how many duplicate names there are
 CREATE UNIQUE INDEX CONCURRENTLY emote_name_idx ON lantern.emotes USING btree (name);
 
 ALTER TABLE lantern.emotes ADD CONSTRAINT party_fk FOREIGN KEY (party_id)
