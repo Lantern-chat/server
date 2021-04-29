@@ -73,3 +73,24 @@ pub struct Overwrite {
     pub allow: Permission,
     pub deny: Permission,
 }
+
+impl Permission {
+    #[inline]
+    pub const fn pack(self) -> u64 {
+        let low = self.party.bits() as u64;
+        let mid = self.room.bits() as u64;
+        let high = self.stream.bits() as u64;
+
+        // NOTE: These must be updated if the field size is changed
+        low | (mid << 16) | (high << 32)
+    }
+
+    #[inline]
+    pub const fn unpack(bits: u64) -> Self {
+        Permission {
+            party: PartyPermissions::from_bits_truncate(bits as i16),
+            room: RoomPermissions::from_bits_truncate((bits >> 16) as i16),
+            stream: StreamPermissions::from_bits_truncate((bits >> 32) as i16),
+        }
+    }
+}
