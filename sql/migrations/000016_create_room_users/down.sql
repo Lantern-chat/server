@@ -1,0 +1,4 @@
+ALTER TABLE IF EXISTS lantern.room_users DROP CONSTRAINT IF EXISTS user_id_fk CASCADE;
+ALTER TABLE IF EXISTS lantern.room_users DROP CONSTRAINT IF EXISTS room_id_fk CASCADE;
+
+DROP TABLE IF EXISTS lantern.room_users CASCADE;

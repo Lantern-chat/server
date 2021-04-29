@@ -24,13 +24,15 @@ ALTER TABLE lantern.party ADD CONSTRAINT owner_fk FOREIGN KEY (owner_id)
 
 -- Association map between parties and users
 CREATE TABLE lantern.party_member (
-    party_id    bigint NOT NULL,
-    user_id     bigint NOT NULL,
+    party_id    bigint      NOT NULL,
+    user_id     bigint      NOT NULL,
 
     -- same as for user, but per-party
     nickname    varchar(256),
     -- same as for user, but per-party
     away        smallint,
+
+    joined_at   timestamp   NOT NULL      DEFAULT now(),
 
     -- Composite primary key
     CONSTRAINT party_member_pk PRIMARY KEY (party_id, user_id)

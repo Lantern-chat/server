@@ -2,7 +2,7 @@ use super::{Client, ClientError, Snowflake};
 
 pub use models::room::RoomFlags;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Room {
     pub id: Snowflake,
     pub party_id: Snowflake,

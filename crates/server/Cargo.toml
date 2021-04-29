@@ -9,6 +9,7 @@ private = true
 
 [dependencies]
 ftl = { path = "../ftl" }
+models = { path = "../models" }
 db = { path = "../db" }
 util = { path = "../util" }
 

@@ -2,7 +2,7 @@ use super::*;
 
 use models::permission::Permission;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Role {
     pub id: Snowflake,
     pub party_id: Snowflake,

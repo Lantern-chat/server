@@ -2,30 +2,22 @@ use futures::{Stream, StreamExt};
 
 use super::*;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Party {
     pub id: Snowflake,
     pub owner_id: Snowflake,
     pub name: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct PartyMember {
     pub id: Snowflake,
     pub username: String,
     pub discriminator: i16,
     pub is_verified: bool,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub nickname: Option<String>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub bio: Option<String>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub avatar_id: Option<Snowflake>,
 }
 

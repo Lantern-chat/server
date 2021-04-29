@@ -124,9 +124,9 @@ pub mod server {
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct ReadyPayloadInner {
-        user: schema::User,
+        user: models::User,
         private_rooms: Vec<()>,
-        parties: Vec<schema::Party>,
+        parties: Vec<models::Party>,
     }
 
     // TODO: Check that this enum doesn't grow too large, allocate large payloads like Ready

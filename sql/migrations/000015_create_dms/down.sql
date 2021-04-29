@@ -1,5 +1,5 @@
 ALTER TABLE IF EXISTS lantern.group_members DROP CONSTRAINT IF EXISTS user_id_fk CASCADE;
-ALTER TABLE IF EXISTS lantern.group_members DROP CONSTRAINT IF EXISTS group_id_fk CASCADE:
+ALTER TABLE IF EXISTS lantern.group_members DROP CONSTRAINT IF EXISTS group_id_fk CASCADE;
 
 DROP INDEX IF EXISTS lantern.group_member_user_idx CASCADE;
 DROP INDEX IF EXISTS lantern.group_member_id_idx CASCADE;

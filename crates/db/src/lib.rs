@@ -19,6 +19,7 @@ pub mod schema {
     pub(self) use super::{Client, ClientError, Snowflake, SnowflakeExt};
 
     pub mod attachment;
+    pub mod dm;
     pub mod emote;
     pub mod file;
     pub mod invite;
@@ -30,14 +31,7 @@ pub mod schema {
     pub mod user;
 
     pub use self::{
-        attachment::Attachment,
-        emote::Emote,
-        invite::Invite,
-        msg::{Message, MessageSearch},
-        party::Party,
-        role::Role,
-        room::{Room, RoomFlags},
-        thread::Thread,
-        user::User,
+        attachment::*, dm::*, emote::*, invite::*, msg::*, party::*, role::*, room::*, thread::*,
+        user::*,
     };
 }

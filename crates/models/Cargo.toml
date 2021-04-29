@@ -12,6 +12,7 @@ bytes = { version = "1", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_shims = { version = "0.2", features = ["std", "mime", "bitflags"] }
 bitflags = "1.2"
+typescript-definitions = { git = "https://github.com/storyscript/typescript-definitions" }
 
 [features]
 tokio-pg = ["postgres-types", "bytes"]
