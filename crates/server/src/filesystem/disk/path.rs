@@ -35,7 +35,7 @@ pub fn id_to_path(buf: &mut PathBuf, id: Snowflake) {
 
     // take upper bits and use them for directories
     let mut encoded = [0; 4 * 2];
-    hex::encode_to_slice(&hash[..4], &mut encoded);
+    hex::encode_to_slice(&hash[..4], &mut encoded).unwrap();
 
     for chunk in encoded.chunks_exact(2) {
         buf.push(unsafe { std::str::from_utf8_unchecked(chunk) });

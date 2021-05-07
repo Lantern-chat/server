@@ -15,23 +15,25 @@ pub use client::{ClientError, ReadWriteClient as Client};
 pub mod sf;
 pub use sf::{Snowflake, SnowflakeExt};
 
-pub mod schema {
-    pub(self) use super::{Client, ClientError, Snowflake, SnowflakeExt};
+//pub mod schema;
 
-    pub mod attachment;
-    pub mod dm;
-    pub mod emote;
-    pub mod file;
-    pub mod invite;
-    pub mod msg;
-    pub mod party;
-    pub mod role;
-    pub mod room;
-    pub mod thread;
-    pub mod user;
-
-    pub use self::{
-        attachment::*, dm::*, emote::*, invite::*, msg::*, party::*, role::*, room::*, thread::*,
-        user::*,
-    };
-}
+//pub mod schema {
+//    pub(self) use super::{Client, ClientError, Snowflake, SnowflakeExt};
+//
+//    pub mod attachment;
+//    pub mod dm;
+//    pub mod emote;
+//    pub mod file;
+//    pub mod invite;
+//    pub mod msg;
+//    pub mod party;
+//    pub mod role;
+//    pub mod room;
+//    pub mod thread;
+//    pub mod user;
+//
+//    pub use self::{
+//        attachment::*, dm::*, emote::*, invite::*, msg::*, party::*, role::*, room::*, thread::*,
+//        user::*,
+//    };
+//}

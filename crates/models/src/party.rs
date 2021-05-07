@@ -1,5 +1,29 @@
 use super::*;
 
+bitflags::bitflags! {
+    pub struct SecurityFlags: i8 {
+        /// Must have a verified email address
+        const EMAIL         = 1 << 0;
+        /// Must have a verified phone number
+        const PHONE         = 1 << 1;
+        /// Must be a Lantern user for longer than 5 minutes
+        const NEW_USER      = 1 << 2;
+        /// Must be a member of the server for longer than 10 minutes
+        const NEW_MEMBER    = 1 << 3;
+        /// Must have MFA enabled
+        const MFA_ENABLED   = 1 << 4;
+    }
+}
+
+serde_shims::impl_serde_for_bitflags!(SecurityFlags);
+
+//#[derive(Debug, Clone, Serialize, Deserialize)]
+//#[serde(untagged)]
+//pub enum UnvailableParty {
+//    Available(Party),
+//    Unavailable { id: Snowflake, unavailable: bool },
+//}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Party {
     #[serde(flatten)]
@@ -8,8 +32,15 @@ pub struct Party {
     /// Id of owner user
     pub owner: Snowflake,
 
+    pub security: SecurityFlags,
+
     pub roles: Vec<Role>,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub emotes: Vec<Emote>,
+
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub members: Vec<PartyMember>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

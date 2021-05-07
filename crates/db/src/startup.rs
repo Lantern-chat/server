@@ -15,7 +15,7 @@ pub fn log_connection(client: Client) {
         loop {
             let mut conn = client.conn.lock().await;
             if let Some(ref mut rx) = *conn {
-                while let Some(msg) = rx.recv().await {
+                while let Some(_msg) = rx.recv().await {
                     // TODO
                 }
             }
@@ -48,24 +48,28 @@ pub async fn startup(readonly: bool) -> Result<Client, StartupError> {
 
     let mut config = db_str.parse::<pg::Config>()?;
 
-    config.dbname("postgres");
-    let mut client = Client::connect(config.clone(), readonly).await?;
+    let mut client;
 
-    // Just log any errors and ignore other things
-    log_connection(client.clone());
+    if !readonly {
+        config.dbname("postgres");
+        client = Client::connect(config.clone(), readonly).await?;
 
-    log::info!("Querying database setup...");
-    let has_lantern = client
-        .query_opt("SELECT 1 FROM pg_database WHERE datname=$1", &[&"lantern"])
-        .await?;
+        // Just log any errors and ignore other things
+        log_connection(client.clone());
 
-    if has_lantern.is_none() {
-        client
-            .execute("CREATE DATABASE lantern ENCODING = 'UTF8'", &[])
+        log::info!("Querying database setup...");
+        let has_lantern = client
+            .query_opt("SELECT 1 FROM pg_database WHERE datname=$1", &[&"lantern"])
             .await?;
-    }
 
-    client.close().await;
+        if has_lantern.is_none() {
+            client
+                .execute("CREATE DATABASE lantern ENCODING = 'UTF8'", &[])
+                .await?;
+        }
+
+        client.close().await;
+    }
 
     config.dbname("lantern");
     client = Client::connect(config.clone(), readonly).await?;
@@ -222,101 +226,6 @@ impl<'a> Iterator for SqlIterator<'a> {
             } else {
                 return None;
             }
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    static QUERY_A: &str = r#"
-
-CREATE TABLE lantern.users (
-    --- Snowflake id
-    id              bigint              NOT NULL,
-    deleted_at      timestamp,
-    username        varchar(64)         NOT NULL,
-    -- 2-byte integer that can be displayed as 4 hex digits
-    discriminator   smallint            NOT NULL,
-    email           text                NOT NULL,
-    dob             date                NOT NULL,
-    is_verified     bool                NOT NULL    DEFAULT false,
-    passhash        text                NOT NULL,
-    nickname        varchar(256),
-    -- custom_status tracks the little blurb that appears on users
-    custom_status   varchar(128),
-    -- biography is an extended user description on their profile
-    biography       varchar(1024),
-    -- this is for client-side user preferences, which can be stored as JSON easily enough
-    preferences     jsonb,
-
-    -- 0/NULL for online, 1 for away, 2 for busy, 3 for invisible
-    away            smallint,
-
-    CONSTRAINT users_pk PRIMARY KEY (id)
-);
-ALTER TABLE lantern.users OWNER TO postgres;
-
--- Fast lookup of users with identical usernames
-CREATE INDEX CONCURRENTLY user_username_idx ON lantern.users
-    USING hash (username);
-
--- Fast lookup of users via `username#0000`
-CREATE INDEX CONCURRENTLY user_username_discriminator_idx ON lantern.users
-    USING btree (username, discriminator);
-
-CREATE TABLE lantern.users_freelist (
-    username        varchar(64) NOT NULL,
-    descriminator   smallint    NOT NULL
-);
-ALTER TABLE lantern.users_freelist OWNER TO postgres;
-
-CREATE INDEX CONCURRENTLY user_freelist_username_idx ON lantern.users_freelist
-    USING hash (username);
-
-    "#;
-
-    static QUERY_B: &str = r#"
-    CREATE OR REPLACE PROCEDURE lantern.register_user(
-        _id bigint,
-        _username varchar(64),
-        _email text,
-        _passhash text,
-        _dob date
-     )
-     LANGUAGE plpgsql AS
-     $$
-     DECLARE
-        _discriminator smallint;
-     BEGIN
-         SELECT descriminator INTO _discriminator FROM lantern.users_freelist WHERE username = _username;
-
-         IF FOUND THEN
-             DELETE FROM lantern.users_freelist WHERE username = _username AND discriminator = _discriminator;
-         ELSE
-             SELECT discriminator INTO _discriminator FROM lantern.users WHERE username = _username ORDER BY id DESC;
-
-             IF NOT FOUND THEN
-                 _discriminator := 0;
-             ELSIF _discriminator = -1 THEN
-                 RAISE EXCEPTION 'Username % exhausted', _username;
-             ELSE
-                 _discriminator := _discriminator + 1;
-             END IF;
-         END IF;
-
-         INSERT INTO lantern.users (id, username, discriminator, email, passhash, dob) VALUES (_id, _username, _discriminator, _email, _passhash, _dob);
-     END
-     $$;
-
-    "#;
-
-    #[test]
-    fn test_split_a() {
-        for part in SqlIterator::new(QUERY_A).take(20) {
-            println!("{};", part);
-            println!("------------------------------");
         }
     }
 }

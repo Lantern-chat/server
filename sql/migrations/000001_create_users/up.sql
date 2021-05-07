@@ -7,7 +7,7 @@ CREATE TABLE lantern.users (
     discriminator   smallint            NOT NULL,
     email           text                NOT NULL,
     dob             date                NOT NULL,
-    is_verified     bool                NOT NULL    DEFAULT false,
+    flags           smallint            NOT NULL    DEFAULT false,
     passhash        text                NOT NULL,
     nickname        varchar(256),
     -- custom_status tracks the little blurb that appears on users

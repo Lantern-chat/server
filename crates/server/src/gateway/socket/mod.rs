@@ -66,7 +66,7 @@ lazy_static::lazy_static! {
 pub fn client_connected(
     ws: WebSocket,
     query: GatewayQueryParams,
-    addr: IpAddr,
+    _addr: IpAddr,
     state: ServerState,
 ) {
     tokio::spawn(async move {

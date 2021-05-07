@@ -8,10 +8,22 @@ bitflags::bitflags! {
         const BOT         = 1 << 3;
         const STAFF       = 1 << 4;
         const PREMIUM     = 1 << 5;
+
+        /// Always strip these from public responses
+        const PRIVATE_FLAGS = Self::VERIFIED.bits | Self::MFA_ENABLED.bits;
     }
 }
 
 serde_shims::impl_serde_for_bitflags!(UserFlags);
+
+impl UserFlags {
+    /// Cleanup any private flags for public responses
+    #[inline]
+    pub fn publicize(mut self) -> Self {
+        self.remove(Self::PRIVATE_FLAGS);
+        self
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
@@ -19,13 +31,14 @@ pub struct User {
     pub username: String,
     pub descriminator: i16,
     pub flags: UserFlags,
+    pub avatar_id: Option<Snowflake>,
 
+    /// Not present when user isn't self
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub email: Option<String>,
 
-    pub nickname: Option<String>,
-    pub blurb: Option<String>,
-    pub avatar_id: Option<Snowflake>,
+    /// Not present when user isn't self
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preferences: Option<UserPreferences>,
 }
 

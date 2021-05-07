@@ -117,8 +117,6 @@ pub type ServerMsg = server::Message;
 pub mod server {
     use super::*;
 
-    use db::schema;
-
     type Room = (); // TODO
     type RoomMessage = (); // TODO
 

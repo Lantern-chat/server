@@ -1,3 +1,5 @@
+use std::num::NonZeroU32;
+
 use super::*;
 
 pub enum RoomType {}
@@ -19,13 +21,36 @@ pub struct Room {
     pub id: Snowflake,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub party_id: Option<Snowflake>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_id: Option<Snowflake>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub party_id: Option<Snowflake>,
+    pub topic: Option<String>,
 
+    /// Sort order
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pos: Option<u16>,
 
     pub flags: RoomFlags,
+
+    /// Slow-mode rate limit, in seconds
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate_limit_per_user: Option<NonZeroU32>,
+
+    /// Parent room ID for categories
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<Snowflake>,
+
+    /// Permission overwrites for this room
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub overwrites: Vec<Overwrite>,
+
+    /// Direct/Group Message Users
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recipients: Vec<User>,
 }

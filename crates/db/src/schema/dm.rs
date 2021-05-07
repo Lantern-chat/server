@@ -1,20 +1,16 @@
-use super::*;
+#[cfg(test)]
+mod test {
+    use super::*;
 
-#[derive(Debug, Clone)]
-pub struct DirectMessage {
-    pub user_a: Snowflake,
-    pub user_b: Snowflake,
-    pub channel_id: Snowflake,
-}
+    #[test]
+    fn test_query() {
+        let query = Query::select()
+            .columns([DirectMessage::UserA, DirectMessage::UserB].iter().copied())
+            .from(DirectMessage::Table)
+            .to_owned();
 
-#[derive(Debug, Clone)]
-pub struct GroupMessage {
-    pub id: Snowflake,
-    pub channel_id: Snowflake,
-}
+        let s = query.build(PostgresQueryBuilder).0;
 
-#[derive(Debug, Clone)]
-pub struct GroupMember {
-    pub group_id: Snowflake,
-    pub user_id: Snowflake,
+        println!("{}", s);
+    }
 }

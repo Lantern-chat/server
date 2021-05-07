@@ -59,7 +59,11 @@ impl Party {
         client: &Client,
     ) -> Result<impl Stream<Item = Result<PartyMember, ClientError>>, ClientError> {
         let stream = client.read.query_stream_cached(
-            || "SELECT id, username, discriminator, is_verified, COALESCE(party_member.nickname, users.nickname), custom_status, biography, COALESCE(party_member.avatar_id, users.avatar_id) FROM users LEFT JOIN party_member ON id = user_id WHERE party_id = $1",
+            || r#"
+                SELECT id, username, discriminator, is_verified, COALESCE(party_member.nickname, users.nickname), custom_status, biography, COALESCE(party_member.avatar_id, users.avatar_id)
+                FROM users
+                LEFT JOIN party_member ON id = user_id WHERE party_id = $1
+            "#
             &[&self.id],
         ).await?;
 
