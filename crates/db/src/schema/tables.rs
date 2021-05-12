@@ -1,115 +1,104 @@
+use thorn::pg::Type;
+
 use super::*;
 
-#[derive(Debug, Clone, Copy, Iden)]
-pub enum Host {
-    Table,
-    Migration,
-    Migrated,
-}
+thorn::tables! {
+    pub struct Host in Lantern {
+        Migration: Type::INT8,
+        Migrated: Type::TIMESTAMP,
+    }
 
-#[derive(Debug, Clone, Copy, Iden)]
-pub enum Users {
-    Table,
-    Id,
-    DeletedAt,
-    Username,
-    Discriminator,
-    Email,
-    Dob,
-    Flags,
-    AvatarId,
-    Passhash,
-    Nickname,
-    CustomStatus,
-    Biography,
-    Preferences,
-    Away,
-}
+    pub struct Users in Lantern {
+        Id: Type::INT8,
+        DeletedAt: Type::TIMESTAMP,
+        Username: Type::VARCHAR,
+        Discriminator: Type::INT2,
+        Email: Type::TEXT,
+        Dob: Type::DATE,
+        Passhash: Type::TEXT,
+        Nickname: Type::VARCHAR,
+        CustomStatus: Type::VARCHAR,
+        Biography: Type::VARCHAR,
+        Preferences: Type::JSONB,
+        Away: Type::INT2,
+        AvatarId: Type::INT8,
+        Flags: Type::INT2,
+    }
 
-#[derive(Debug, Clone, Copy, Iden)]
-pub enum Party {
-    Table,
-    Id,
-    OwnerId,
-    DeletedAt,
-    IconId,
-}
+    pub struct Party in Lantern {
+        Id: Type::INT8,
+        OwnerId: Type::INT8,
+        DeletedAt: Type::TIMESTAMP,
+        IconId: Type::INT8,
+    }
 
-#[derive(Debug, Clone, Copy, Iden)]
-pub enum PartyMember {
-    Table,
-    UserId,
-    Nickname,
-    Away,
-    AvatarId,
-    InviteId,
-    JoinedAt,
-}
+    pub struct PartyMember in Lantern {
+        PartyId: Type::INT8,
+        UserId: Type::INT8,
+        Nickname: Type::VARCHAR,
+        Away: Type::INT2,
+        AvatarId: Type::INT8,
+        InviteId: Type::INT8,
+        JoinedAt: Type::TIMESTAMP,
+    }
 
-#[derive(Debug, Clone, Copy, Iden)]
-pub enum Rooms {
-    Table,
-    Id,
-    PartyId,
-    Name,
-    Topic,
-    DeletedAt,
-    Flags,
-    AvatarId,
-    SortOrder,
-    ParentId,
-}
+    pub struct Rooms in Lantern {
+        Id: Type::INT8,
+        PartyId: Type::INT8,
+        Name: Type::TEXT,
+        Topic: Type::VARCHAR,
+        DeletedAt: Type::TIMESTAMP,
+        Flags: Type::INT2,
+        AvatarId: Type::INT8,
+        SortOrder: Type::INT2,
+        ParentId: Type::INT8,
+    }
 
-#[derive(Debug, Clone, Copy, Iden)]
-pub enum DMs {
-    #[iden = "dms"]
-    Table,
-    UserA,
-    UserB,
-    ChannelId,
-}
+    pub struct DMs as "dms" in Lantern {
+        UserIdA: Type::INT8,
+        UserIdB: Type::INT8,
+        RoomId: Type::INT8,
+    }
 
-#[derive(Debug, Clone, Copy, Iden)]
-pub enum GroupMessage {
-    Table,
-    Id,
-    ChannelId,
-}
+    pub struct GroupMessage in Lantern {
+        Id: Type::INT8,
+        RoomId: Type::INT8,
+    }
 
-#[derive(Debug, Clone, Copy, Iden)]
-pub enum GroupMember {
-    Table,
-    GroupId,
-    UserId,
-}
+    pub struct GroupMember in Lantern {
+        GroupId: Type::INT8,
+        UserId: Type::INT8,
+    }
 
-#[derive(Debug, Clone, Copy, Iden)]
-pub enum Avatar {
-    Id,
-    FileId,
+    pub struct Messages in Lantern {
+        Id: Type::INT8,
+        UserId: Type::INT8,
+        RoomId: Type::INT8,
+        ThreadId: Type::INT8,
+        UpdatedAt: Type::TIMESTAMP,
+        EditedAt: Type::TIMESTAMP,
+        DeletedAt: Type::TIMESTAMP,
+        Content: Type::TEXT,
+        Pinned: Type::BOOL,
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-
-    // "SELECT id, username, discriminator, is_verified, COALESCE(party_member.nickname, users.nickname), custom_status, biography, COALESCE(party_member.avatar_id, users.avatar_id) FROM users LEFT JOIN party_member ON id = user_id WHERE party_id = $1"
+    use thorn::*;
 
     #[test]
     fn test_query() {
         let query = Query::select()
-            .columns(cols![Users::Id, Users::Username, Users::Discriminator])
-            .expr(Expr::col(PartyMember::Nickname).if_null(Expr::col(Users::Nickname)))
-            .columns(cols![Users::Id])
-            .from(DMs::Table)
-            .left_join(
-                Users::Table,
-                Expr::col(DMs::UserA).equals(Users::Table, Users::Id),
-            )
-            .to_owned();
+            .from_table::<Users>()
+            .cols(cols![Users::Id, Users::Username, Users::Discriminator])
+            .expr(Builtin::coalesce((PartyMember::Nickname, Users::Nickname)))
+            .col(Users::Id)
+            .join_left_table_on::<PartyMember, _>(Users::Id.equals(PartyMember::UserId))
+            .and_where(PartyMember::PartyId.equals(Var::of(Type::INT8)))
+            .to_string();
 
-        let s = query.build(PostgresQueryBuilder).0;
-
-        println!("{}", s);
+        println!("{}", query.0);
     }
 }
