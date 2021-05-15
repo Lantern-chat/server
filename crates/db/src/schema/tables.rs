@@ -163,11 +163,7 @@ mod test {
         let query = Query::select()
             .cols(cols![Users::Id, Users::Username, Users::Discriminator])
             .expr(Builtin::coalesce((PartyMember::Nickname, Users::Nickname)))
-            .col(Users::Id)
-            .from(
-                /**/
-                Users::left_join_table::<PartyMember>().on(Users::Id.equals(PartyMember::UserId)),
-            )
+            .from(Users::left_join_table::<PartyMember>().on(Users::Id.equals(PartyMember::UserId)))
             .and_where(PartyMember::PartyId.equals(Var::of(SNOWFLAKE)))
             .to_string();
 

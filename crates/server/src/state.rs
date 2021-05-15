@@ -13,7 +13,7 @@ use db::Client;
 
 use crate::{config::LanternConfig, filesystem::disk::FileStore};
 
-use super::{gateway::Gateway, rate_limit::RateLimitTable};
+use super::{rate_limit::RateLimitTable, web::gateway::Gateway};
 
 pub struct InnerServerState {
     pub is_alive: AtomicBool,

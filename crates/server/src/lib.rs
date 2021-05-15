@@ -22,11 +22,10 @@ pub mod built {
 
 pub mod config;
 pub mod filesystem;
-pub mod gateway;
 pub mod rate_limit;
-pub mod routes;
 pub mod service;
 pub mod state;
+pub mod web;
 
 pub mod tasks {
     pub mod cn_cleanup;
