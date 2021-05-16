@@ -9,12 +9,13 @@ pub mod party;
 pub mod permission;
 pub mod role;
 pub mod room;
+pub mod session;
 pub mod sf;
 pub mod user;
 
 pub use self::{
-    emote::*, file::*, invite::*, message::*, party::*, permission::*, role::*, room::*, sf::*,
-    user::*,
+    emote::*, file::*, invite::*, message::*, party::*, permission::*, role::*, room::*,
+    session::*, sf::*, user::*,
 };
 
 #[inline]

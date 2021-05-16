@@ -7,3 +7,5 @@ macro_rules! cols {
 
 pub mod tables;
 pub use tables::*;
+
+pub use tokio_postgres::types::Type;

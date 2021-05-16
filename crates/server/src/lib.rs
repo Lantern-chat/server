@@ -24,6 +24,7 @@ pub mod config;
 pub mod ctrl;
 pub mod filesystem;
 pub mod state;
+pub mod util;
 pub mod web;
 
 pub mod tasks {

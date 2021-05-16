@@ -422,3 +422,103 @@ impl Client {
             .await
     }
 }
+
+use thorn::*;
+
+impl Client {
+    pub async fn prepare_cached_typed<F, Q>(&self, query: F) -> Result<Statement, ClientError>
+    where
+        F: Any + FnOnce() -> Q,
+        Q: AnyQuery,
+    {
+        let id = TypeId::of::<F>();
+
+        // It's fine to get a cached entry if the client is disconnected
+        // since it can't be used anyway.
+        if let Some(stmt) = self.cache.load().get(&id) {
+            return Ok(stmt.clone());
+        }
+
+        let client = self.client()?;
+
+        let (query, collector) = query().to_string();
+        let types = collector.types();
+
+        let stmt = client
+            .prepare_typed(self.debug_check_readonly(&query), &types)
+            .await?;
+
+        self.cache.rcu(|cache| {
+            let mut cache = HashMap::clone(&cache);
+            cache.insert(id, stmt.clone());
+            cache
+        });
+
+        Ok(stmt)
+    }
+
+    pub async fn query_stream_cached_typed<F, Q>(
+        &self,
+        query: F,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<impl Stream<Item = Result<Row, ClientError>>, ClientError>
+    where
+        F: Any + FnOnce() -> Q,
+        Q: AnyQuery,
+    {
+        self.query_stream(&self.prepare_cached_typed(query).await?, params)
+            .await
+    }
+
+    pub async fn execute_cached_typed<F, Q>(
+        &self,
+        query: F,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<u64, ClientError>
+    where
+        F: Any + FnOnce() -> Q,
+        Q: AnyQuery,
+    {
+        self.execute(&self.prepare_cached_typed(query).await?, params)
+            .await
+    }
+
+    pub async fn query_cached_typed<F, Q>(
+        &self,
+        query: F,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Vec<Row>, ClientError>
+    where
+        F: Any + FnOnce() -> Q,
+        Q: AnyQuery,
+    {
+        self.query(&self.prepare_cached_typed(query).await?, params)
+            .await
+    }
+
+    pub async fn query_one_cached_typed<F, Q>(
+        &self,
+        query: F,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Row, ClientError>
+    where
+        F: Any + FnOnce() -> Q,
+        Q: AnyQuery,
+    {
+        self.query_one(&self.prepare_cached_typed(query).await?, params)
+            .await
+    }
+
+    pub async fn query_opt_cached_typed<F, Q>(
+        &self,
+        query: F,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Option<Row>, ClientError>
+    where
+        F: Any + FnOnce() -> Q,
+        Q: AnyQuery,
+    {
+        self.query_opt(&self.prepare_cached_typed(query).await?, params)
+            .await
+    }
+}

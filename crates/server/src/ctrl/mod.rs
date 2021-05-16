@@ -5,4 +5,5 @@ pub use error::Error;
 
 pub mod user {
     pub mod register;
+    pub mod login;
 }

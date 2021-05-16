@@ -13,7 +13,7 @@ models = { path = "../models" }
 db = { path = "../db" }
 util = { path = "../util" }
 
-thorn = { path = "F:/code/projects/active/thorn" }
+thorn = { git = "https://github.com/novacrazy/thorn" }
 
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "1.4", features = ["full"] }
@@ -29,8 +29,8 @@ base64 = "0.13.0"
 hex = "0.4.2"
 lazy_static = "1.4.0"
 rust-argon2 = "0.8.3"
-ctr = "0.6.0"
-aes = "0.6.0"
+ctr = "0.7"
+aes = "0.7"
 sha3 = "0.9.1"
 flate2 = { version = "1.0.19", default-features = false, features = ["rust_backend"] }
 miniz_oxide = "0.4.4"

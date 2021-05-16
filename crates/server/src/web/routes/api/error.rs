@@ -15,6 +15,10 @@ pub struct ApiError {
 
 impl ApiError {
     pub fn err(kind: Error) -> impl Reply {
+        if kind.is_fatal() {
+            log::error!("Error {}", kind);
+        }
+
         reply::json(&ApiError {
             message: kind.format(),
             code: kind.code(),
