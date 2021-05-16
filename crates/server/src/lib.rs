@@ -21,9 +21,8 @@ pub mod built {
 }
 
 pub mod config;
+pub mod ctrl;
 pub mod filesystem;
-pub mod rate_limit;
-pub mod service;
 pub mod state;
 pub mod web;
 
@@ -60,7 +59,7 @@ pub fn start_server(
 
                     // gracefully fail and return HTTP 500
                     async move {
-                        match tokio::spawn(service::service(remote_addr, req, state)).await {
+                        match tokio::spawn(web::service::service(remote_addr, req, state)).await {
                             Ok(resp) => resp,
                             Err(err) => {
                                 log::error!("Internal Server Error: {}", err);

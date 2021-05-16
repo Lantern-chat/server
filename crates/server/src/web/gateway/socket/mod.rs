@@ -21,7 +21,7 @@ use db::Snowflake;
 use ftl::ws::{Message as WsMessage, SinkError, WebSocket};
 use util::cancel::{Cancel, CancelableStream};
 
-use crate::{web::auth::Authorization, ServerState};
+use crate::{ctrl::auth::Authorization, ServerState};
 
 use super::{
     conn::GatewayConnection,

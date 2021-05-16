@@ -3,7 +3,7 @@ use std::{convert::Infallible, net::SocketAddr};
 use headers::HeaderValue;
 use hyper::{Body, Request, Response};
 
-use super::{web::routes, ServerState};
+use crate::{web::routes, ServerState};
 use ftl::*;
 
 pub async fn service(
