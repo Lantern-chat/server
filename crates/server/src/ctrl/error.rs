@@ -78,6 +78,12 @@ pub enum Error {
     DecodeError(#[from] base64::DecodeError),
 }
 
+impl From<db::PgError> for Error {
+    fn from(err: db::PgError) -> Error {
+        Error::DbError(err.into())
+    }
+}
+
 impl Error {
     pub fn is_fatal(&self) -> bool {
         matches!(

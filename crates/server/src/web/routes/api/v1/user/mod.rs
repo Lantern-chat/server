@@ -1,8 +1,6 @@
 use ftl::*;
 
-use db::Snowflake;
-
-//use crate::routes::api::auth::authorize;
+use crate::web::{auth::authorize, routes::api::ApiError};
 
 //pub mod check;
 pub mod register;
@@ -18,13 +16,13 @@ pub async fn user(mut route: Route<crate::ServerState>) -> impl Reply {
         (_, Exact("@me")) => me::me(route).await.into_response(),
 
         // ANY /api/v1/user/1234
-        //(_, Exact(segment)) => match segment.parse::<Snowflake>() {
-        //    Err(_) => StatusCode::BAD_REQUEST.into_response(),
-        //    Ok(user_id) => match authorize(&route).await {
-        //        Ok(auth) => "user stuff".into_response(),
-        //        Err(e) => e.into_response(),
-        //    },
-        //},
+        (_, Exact(segment)) => match segment.parse::<db::Snowflake>() {
+            Err(_) => StatusCode::BAD_REQUEST.into_response(),
+            Ok(_user_id) => match authorize(&route).await {
+                Err(e) => ApiError::err(e).into_response(),
+                Ok(_auth) => "user stuff".into_response(),
+            },
+        },
         _ => StatusCode::NOT_FOUND.into_response(),
     }
 }

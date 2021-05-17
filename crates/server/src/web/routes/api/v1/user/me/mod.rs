@@ -16,7 +16,9 @@ pub async fn me(mut route: Route<crate::ServerState>) -> impl Reply {
             Err(e) => ApiError::err(e).into_response(),
             Ok(auth) => match route.method_segment() {
                 (&Method::DELETE, End) => logout::logout(route, auth).await.into_response(),
-                (&Method::GET, Exact("sessions")) => "Not implemented".into_response(),
+                (&Method::GET, Exact("sessions")) => {
+                    sessions::sessions(route, auth).await.into_response()
+                }
                 _ => StatusCode::NOT_FOUND.into_response(),
             },
         },

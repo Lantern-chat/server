@@ -5,3 +5,9 @@ pub struct Session {
     /// Expiration timestamp encoded with RFC 3339
     pub expires: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnonymousSession {
+    /// Expiration timestamp encoded with RFC 3339
+    pub expires: String,
+}
