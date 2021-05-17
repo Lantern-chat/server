@@ -6,10 +6,10 @@ use ftl::*;
 
 use crate::{
     ctrl::{
-        user::register::{register_user, RegisterForm},
+        user::register::{register as register_user, RegisterForm},
         Error,
     },
-    web::routes::api::error::ApiError,
+    web::routes::api::ApiError,
     ServerState,
 };
 

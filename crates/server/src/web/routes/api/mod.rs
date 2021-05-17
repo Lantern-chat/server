@@ -1,4 +1,5 @@
 pub mod error;
+pub use error::ApiError;
 
 pub mod v1;
 

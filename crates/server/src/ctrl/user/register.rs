@@ -27,7 +27,7 @@ lazy_static::lazy_static! {
     static ref USERNAME_SANITIZE_REGEX: Regex = Regex::new(r#"\s+"#).unwrap();
 }
 
-pub async fn register_user(state: ServerState, mut form: RegisterForm) -> Result<Session, Error> {
+pub async fn register(state: ServerState, mut form: RegisterForm) -> Result<Session, Error> {
     if !state.config.username_len.contains(&form.username.len())
         || !USERNAME_REGEX.is_match(&form.username)
     {
@@ -101,7 +101,7 @@ pub fn hash_config() -> argon2::Config<'static> {
     let mut config = argon2::Config::default();
 
     config.ad = b"Lantern";
-    config.mem_cost = 8 * 1024; // 15 MiB
+    config.mem_cost = 8 * 1024; // 8 MiB
     config.variant = argon2::Variant::Argon2id;
     config.lanes = 1;
     config.time_cost = 3;
@@ -117,7 +117,6 @@ fn check_existing() -> query::SelectQuery {
     use db::schema::*;
 
     Query::select()
-        .expr(Literal::Int4(1))
         .from_table::<Users>()
         .and_where(Users::Email.equals(Var::of(Users::Email)))
 }

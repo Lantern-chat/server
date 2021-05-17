@@ -1,6 +1,6 @@
 use ftl::*;
 
-use crate::routes::api::auth::authorize;
+use crate::web::{auth::authorize, routes::api::ApiError};
 
 pub mod login;
 pub mod logout;
@@ -13,7 +13,7 @@ pub async fn me(mut route: Route<crate::ServerState>) -> impl Reply {
 
         // Everything else requires authorization
         _ => match authorize(&route).await {
-            Err(e) => e.into_response(),
+            Err(e) => ApiError::err(e).into_response(),
             Ok(auth) => match route.method_segment() {
                 (&Method::DELETE, End) => logout::logout(route, auth).await.into_response(),
                 (&Method::GET, Exact("sessions")) => "".into_response(),

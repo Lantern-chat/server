@@ -3,12 +3,12 @@ use std::sync::Arc;
 
 use db::{Client, ClientError, Snowflake};
 
+use crate::ctrl::auth;
 use crate::ServerState;
 
-use crate::routes::api::auth;
 use ftl::*;
 
-pub async fn logout(mut route: Route<ServerState>, auth: auth::Authorization) -> impl Reply {
+pub async fn logout(route: Route<ServerState>, auth: auth::Authorization) -> impl Reply {
     if let Err(e) = logout_user(route.state, auth).await {
         log::error!("Logout error: {}", e);
     }
@@ -26,10 +26,7 @@ async fn logout_user(state: ServerState, auth: auth::Authorization) -> Result<()
     let res = state
         .db
         .write
-        .execute_cached(
-            || "DELETE FROM lantern.sessions WHERE token = $1",
-            &[&auth.token.bytes()],
-        )
+        .execute_cached_typed(|| delete_session(), &[&auth.token.bytes()])
         .await?;
 
     if res == 0 {
@@ -41,4 +38,14 @@ async fn logout_user(state: ServerState, auth: auth::Authorization) -> Result<()
     }
 
     Ok(())
+}
+
+use thorn::*;
+
+fn delete_session() -> impl AnyQuery {
+    use db::schema::*;
+
+    Query::delete()
+        .from::<Sessions>()
+        .and_where(Sessions::Token.equals(Var::of(Sessions::Token)))
 }
