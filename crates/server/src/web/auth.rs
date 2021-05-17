@@ -20,19 +20,3 @@ pub async fn authorize(route: &Route<ServerState>) -> Result<Authorization, Erro
 
     auth::do_auth(&route.state, &header[BEARER.len()..]).await
 }
-
-//impl Reply for AuthError {
-//    fn into_response(self) -> Response {
-//        match self {
-//            // TODO: Maybe don't include decode error?
-//            AuthError::ClientError(_) | AuthError::DecodeError(_) => {
-//                log::error!("Auth Error: {}", self);
-//                StatusCode::INTERNAL_SERVER_ERROR.into_response()
-//            }
-//            _ => self
-//                .to_string()
-//                .with_status(StatusCode::BAD_REQUEST)
-//                .into_response(),
-//        }
-//    }
-//}
