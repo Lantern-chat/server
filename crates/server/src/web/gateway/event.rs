@@ -5,7 +5,12 @@ use miniz_oxide::deflate::core::TDEFLStatus;
 
 use db::Snowflake;
 
-use super::socket::{GatewayMsgEncoding, GatewayQueryParams};
+use models::ReadyEvent;
+
+use super::{
+    msg::ServerMsg,
+    socket::{GatewayMsgEncoding, GatewayQueryParams},
+};
 
 #[derive(Debug)]
 pub struct CompressedEvent {
@@ -26,10 +31,7 @@ pub enum RawEvent {
     /// This is a majority of events
     Opaque,
 
-    Ready {
-        user_id: Snowflake,
-        party_ids: Vec<Snowflake>,
-    },
+    Ready(Box<ReadyEvent>),
 }
 
 #[derive(Debug)]
@@ -54,6 +56,22 @@ impl Event {
     pub fn new_opaque<S: serde::Serialize>(value: S) -> Result<Event, EncodingError> {
         let encoded = EncodedEvent::new(&value)?;
         let raw = RawEvent::Opaque;
+        Ok(Event(Arc::new(EventInner { raw, encoded })))
+    }
+
+    pub fn new_ready(value: ReadyEvent) -> Result<Event, EncodingError> {
+        // setup message
+        let value = ServerMsg::new_ready(Box::new(value));
+
+        // encode message
+        let encoded = EncodedEvent::new(&value)?;
+
+        // extract the boxed raw event again
+        let raw = RawEvent::Ready(match value {
+            ServerMsg::Ready { payload, .. } => payload.inner,
+            _ => unsafe { std::hint::unreachable_unchecked() },
+        });
+
         Ok(Event(Arc::new(EventInner { raw, encoded })))
     }
 }

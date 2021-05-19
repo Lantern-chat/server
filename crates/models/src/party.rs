@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use super::*;
 
 bitflags::bitflags! {
@@ -53,6 +55,14 @@ pub struct PartialParty {
     /// Discription of the party, if publicly listed
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+}
+
+impl Deref for Party {
+    type Target = PartialParty;
+
+    fn deref(&self) -> &Self::Target {
+        &self.partial
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

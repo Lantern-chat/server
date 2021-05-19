@@ -3,6 +3,8 @@ use std::borrow::Cow;
 use db::ClientError;
 use ftl::StatusCode;
 
+use crate::web::gateway::event::EncodingError;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     // FATAL ERRORS
@@ -15,6 +17,10 @@ pub enum Error {
     SemaphoreError(#[from] tokio::sync::AcquireError),
     #[error("Password Hash Error {0}")]
     HashError(#[from] argon2::Error),
+    #[error("Parse Error {0}")]
+    JsonError(#[from] serde_json::Error),
+    #[error("Encoding Error {0}")]
+    EncodingError(#[from] EncodingError),
 
     // NON-FATAL ERRORS
     #[error("User Already Exists")]
@@ -92,6 +98,8 @@ impl Error {
                 | Error::JoinError(_)
                 | Error::SemaphoreError(_)
                 | Error::HashError(_)
+                | Error::JsonError(_)
+                | Error::EncodingError(_)
         )
     }
 

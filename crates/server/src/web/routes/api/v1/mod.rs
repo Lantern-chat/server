@@ -7,6 +7,8 @@ pub mod gateway;
 //pub mod room;
 pub mod user;
 
+pub mod test;
+
 pub async fn api_v1(mut route: Route<crate::ServerState>) -> impl Reply {
     match route.next().method_segment() {
         (_, Exact("user")) => user::user(route).await.into_response(),
@@ -15,6 +17,8 @@ pub async fn api_v1(mut route: Route<crate::ServerState>) -> impl Reply {
         //(_, Exact("room")) => room::room(route).await.into_response(),
         (_, Exact("gateway")) => gateway::gateway(route).into_response(),
         (&Method::GET, Exact("build")) => build::build().into_response(),
+
+        (&Method::GET, Exact("test")) => test::test(route).await.into_response(),
 
         _ => StatusCode::NOT_FOUND.into_response(),
     }

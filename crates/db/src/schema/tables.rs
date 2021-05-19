@@ -18,7 +18,6 @@ thorn::tables! {
         Email: Type::TEXT,
         Dob: Type::DATE,
         Passhash: Type::TEXT,
-        Nickname: Type::VARCHAR,
         CustomStatus: Type::VARCHAR,
         Biography: Type::VARCHAR,
         Preferences: Type::JSONB,
@@ -162,7 +161,6 @@ mod test {
     fn test_query() {
         let query = Query::select()
             .cols(&[Users::Id, Users::Username, Users::Discriminator])
-            .expr(Builtin::coalesce((PartyMember::Nickname, Users::Nickname)))
             .from(Users::left_join_table::<PartyMember>().on(Users::Id.equals(PartyMember::UserId)))
             .and_where(PartyMember::PartyId.equals(Var::of(SNOWFLAKE)))
             .to_string();

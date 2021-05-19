@@ -117,15 +117,10 @@ pub type ServerMsg = server::Message;
 pub mod server {
     use super::*;
 
+    use models::ReadyEvent;
+
     type Room = (); // TODO
     type RoomMessage = (); // TODO
-
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct ReadyPayloadInner {
-        user: models::User,
-        private_rooms: Vec<()>,
-        parties: Vec<models::Party>,
-    }
 
     // TODO: Check that this enum doesn't grow too large, allocate large payloads like Ready
     decl_msgs! {
@@ -137,7 +132,7 @@ pub mod server {
         2 => HeartbeatACK: Default {},
         3 => Ready {
             #[serde(flatten)]
-            inner: Box<ReadyPayloadInner>
+            inner: Box<ReadyEvent>
         },
         4 => InvalidSession: Default {},
 

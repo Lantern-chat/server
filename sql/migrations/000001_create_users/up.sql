@@ -9,7 +9,6 @@ CREATE TABLE lantern.users (
     dob             date                NOT NULL,
     flags           smallint            NOT NULL    DEFAULT false,
     passhash        text                NOT NULL,
-    nickname        varchar(256),
     -- custom_status tracks the little blurb that appears on users
     custom_status   varchar(128),
     -- biography is an extended user description on their profile

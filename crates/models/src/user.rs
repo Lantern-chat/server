@@ -33,6 +33,12 @@ pub struct User {
     pub flags: UserFlags,
     pub avatar_id: Option<Snowflake>,
 
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bio: Option<String>,
+
     /// Not present when user isn't self
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub email: Option<String>,
@@ -44,5 +50,12 @@ pub struct User {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserPreferences {
-    pub locale: String,
+    pub locale: Locale,
+}
+
+#[derive(Debug, Clone, Copy, Hash, serde_repr::Serialize_repr, serde_repr::Deserialize_repr)]
+#[allow(non_camel_case_types)]
+#[repr(u16)]
+pub enum Locale {
+    enUS = 0,
 }

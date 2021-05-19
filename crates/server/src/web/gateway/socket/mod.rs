@@ -119,9 +119,11 @@ pub fn client_connected(
         let mut events = stream::SelectAll::<stream::BoxStream<Item>>::new();
 
         // Push Hello event to begin stream and forward ws_rx/conn_rx into events
-        events.push(stream::once(future::ready(Item::Event(Ok(HELLO_EVENT.clone())))).boxed());
+        //events.push(stream::once(future::ready(Item::Event(Ok(HELLO_EVENT.clone())))).boxed());
         events.push(ws_rx.map(|msg| Item::Msg(msg)).boxed());
         events.push(conn_rx.map(|msg| Item::Event(Ok(msg))).boxed());
+
+        let _ = conn.tx.send(HELLO_EVENT.clone()).await;
 
         // Make the new connection known to the gateway
         state.gateway.add_connection(conn.clone()).await;
@@ -133,18 +135,18 @@ pub fn client_connected(
                     Ok(event) => {
                         match event.raw {
                             // TODO: Make this non-blocking for the event-loop?
-                            RawEvent::Ready {
-                                user_id,
-                                ref party_ids,
-                            } => {
+                            RawEvent::Ready(ref ready) => {
                                 // subscribe to all relevant party broadcasts
                                 // and activate the connection for per-user events
                                 let subs = state
                                     .gateway
                                     .sub_and_activate_connection(
-                                        user_id,
+                                        ready.user.id,
                                         conn.clone(),
-                                        party_ids.iter(),
+                                        // NOTE: https://github.com/rust-lang/rust/issues/70263
+                                        ready.parties.iter().map(crate::util::passthrough(
+                                            |p: &models::Party| &p.id,
+                                        )),
                                     )
                                     .await;
 

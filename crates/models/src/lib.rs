@@ -3,6 +3,7 @@ extern crate serde;
 
 pub mod emote;
 pub mod file;
+pub mod gateway;
 pub mod invite;
 pub mod message;
 pub mod party;
@@ -14,8 +15,8 @@ pub mod sf;
 pub mod user;
 
 pub use self::{
-    emote::*, file::*, invite::*, message::*, party::*, permission::*, role::*, room::*,
-    session::*, sf::*, user::*,
+    emote::*, file::*, gateway::*, invite::*, message::*, party::*, permission::*, role::*,
+    room::*, session::*, sf::*, user::*,
 };
 
 #[inline]
