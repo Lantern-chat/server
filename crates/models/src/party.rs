@@ -75,13 +75,12 @@ pub struct PartyMember {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nick: Option<String>,
 
-    /// Per-party status
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
-
+    // /// Per-party status
+    // #[serde(default, skip_serializing_if = "Option::is_none")]
+    // pub status: Option<String>,
     /// Per-party biography
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub bio: Option<String>,
+    // #[serde(default, skip_serializing_if = "Option::is_none")]
+    // pub bio: Option<String>,
 
     /// Per-party avatar?
     // #[serde(default, skip_serializing_if = "Option::is_none")]

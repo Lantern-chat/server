@@ -444,6 +444,8 @@ impl Client {
         let (query, collector) = query().to_string();
         let types = collector.types();
 
+        log::info!("Preparing query: \"{}\"", query);
+
         let stmt = client
             .prepare_typed(self.debug_check_readonly(&query), &types)
             .await?;
