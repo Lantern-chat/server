@@ -136,7 +136,8 @@ pub async fn ready(
                                     id: user_id,
                                     username: row.try_get(3)?,
                                     descriminator: row.try_get(4)?,
-                                    flags: UserFlags::from_bits_truncate(row.try_get(5)?),
+                                    flags: UserFlags::from_bits_truncate(row.try_get(5)?)
+                                        .publicize(),
                                     email: None,
                                     preferences: None,
                                     status: None,
