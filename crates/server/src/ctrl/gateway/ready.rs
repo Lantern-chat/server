@@ -125,9 +125,10 @@ pub async fn ready(
 
                 let party_id = row.try_get(0)?;
                 let user_id = row.try_get(2)?;
+                let role_id = row.try_get(6)?;
 
                 match members.entry((party_id, user_id)) {
-                    Entry::Occupied(mut m) => m.get_mut().member.roles.push(row.try_get(6)?),
+                    Entry::Occupied(mut m) => m.get_mut().member.roles.push(role_id),
                     Entry::Vacant(v) => {
                         v.insert(Associated {
                             party_id,
@@ -145,7 +146,7 @@ pub async fn ready(
                                     avatar_id: None,
                                 }),
                                 nick: row.try_get(1)?,
-                                roles: vec![row.try_get(6)?],
+                                roles: vec![role_id],
                             },
                         });
                     }
