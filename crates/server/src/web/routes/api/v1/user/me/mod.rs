@@ -19,7 +19,7 @@ pub async fn me(mut route: Route<crate::ServerState>) -> impl Reply {
                 (&Method::GET, Exact("sessions")) => {
                     sessions::sessions(route, auth).await.into_response()
                 }
-                _ => StatusCode::NOT_FOUND.into_response(),
+                _ => ApiError::not_found().into_response(),
             },
         },
     }

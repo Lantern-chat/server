@@ -29,7 +29,7 @@ impl UserFlags {
 pub struct User {
     pub id: Snowflake,
     pub username: String,
-    pub descriminator: i16,
+    pub discriminator: i16,
     pub flags: UserFlags,
     pub avatar_id: Option<Snowflake>,
 

@@ -1,12 +1,11 @@
-use rand::Rng;
-use std::{sync::Arc, time::SystemTime};
-
+use either::Either;
 use ftl::*;
 
-use db::{schema::Party, ClientError, Snowflake};
+use db::Snowflake;
 
 use crate::{
-    routes::api::{auth::Authorization, util::time::is_of_age},
+    ctrl::{auth::Authorization, party::get::get_party},
+    web::routes::api::ApiError,
     ServerState,
 };
 
@@ -15,13 +14,8 @@ pub async fn get(
     auth: Authorization,
     party_id: Snowflake,
 ) -> impl Reply {
-    match Party::find(&route.state.db, party_id).await {
-        Ok(Some(ref party)) => Ok(reply::json(party)),
-        Ok(None) => Err(StatusCode::NOT_FOUND),
-        Err(e) => {
-            log::error!("GetParty Error: {}", e);
-
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
+    match get_party(route.state, auth, party_id).await {
+        Ok(ref party) => Either::Left(reply::json(party)),
+        Err(e) => Either::Right(ApiError::err(e)),
     }
 }

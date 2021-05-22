@@ -30,7 +30,7 @@ pub async fn ready(
         Ok::<_, Error>(User {
             id: auth.user_id,
             username: row.try_get(0)?,
-            descriminator: row.try_get(1)?,
+            discriminator: row.try_get(1)?,
             flags: UserFlags::from_bits_truncate(row.try_get(2)?),
             email: Some(row.try_get(3)?),
             avatar_id: row.try_get(4)?,
@@ -64,7 +64,6 @@ pub async fn ready(
                 security: SecurityFlags::empty(),
                 roles: Vec::new(),
                 emotes: Vec::new(),
-                members: Vec::new(),
             }),
         });
 
@@ -112,63 +111,12 @@ pub async fn ready(
             Ok::<Vec<Associated<Emote>>, Error>(Vec::new())
         };
 
-        let members = async {
-            let rows = db
-                .query_stream_cached_typed(|| select_members(), &[&ids])
-                .await?;
-
-            let mut members = HashMap::<(Snowflake, Snowflake), Associated<PartyMember>>::new();
-
-            futures::pin_mut!(rows);
-            while let Some(row) = rows.next().await {
-                let row = row?;
-
-                let party_id = row.try_get(0)?;
-                let user_id = row.try_get(2)?;
-                let role_id = row.try_get(6)?;
-
-                match members.entry((party_id, user_id)) {
-                    Entry::Occupied(mut m) => m.get_mut().member.roles.push(role_id),
-                    Entry::Vacant(v) => {
-                        v.insert(Associated {
-                            party_id,
-                            member: PartyMember {
-                                user: Some(User {
-                                    id: user_id,
-                                    username: row.try_get(3)?,
-                                    descriminator: row.try_get(4)?,
-                                    flags: UserFlags::from_bits_truncate(row.try_get(5)?)
-                                        .publicize(),
-                                    email: None,
-                                    preferences: None,
-                                    status: None,
-                                    bio: None,
-                                    avatar_id: None,
-                                }),
-                                nick: row.try_get(1)?,
-                                roles: vec![role_id],
-                            },
-                        });
-                    }
-                }
-            }
-
-            // todo: stuff
-            Ok::<Vec<Associated<PartyMember>>, Error>(members.into_iter().map(|(_, v)| v).collect())
-        };
-
-        let (roles, emotes, members) = futures::future::join3(roles, emotes, members).await;
-        let (roles, emotes, members) = (roles?, emotes?, members?);
+        let (roles, emotes) = futures::future::join(roles, emotes).await;
+        let (roles, emotes) = (roles?, emotes?);
 
         for role in roles {
             if let Some(party) = parties.get_mut(&role.party_id) {
                 party.roles.push(role.member);
-            }
-        }
-
-        for member in members {
-            if let Some(party) = parties.get_mut(&member.party_id) {
-                party.members.push(member.member);
             }
         }
 
@@ -235,6 +183,7 @@ fn select_roles() -> impl AnyQuery {
         .and_where(Roles::PartyId.equals(Builtin::any(Var::of(Type::INT8_ARRAY))))
 }
 
+/*
 fn select_members() -> impl AnyQuery {
     use db::schema::*;
 
@@ -256,7 +205,6 @@ fn select_members() -> impl AnyQuery {
         )
 }
 
-/*
 fn select_members_old() -> impl AnyQuery {
     use db::schema::*;
 

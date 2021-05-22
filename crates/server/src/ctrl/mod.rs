@@ -3,6 +3,10 @@ pub mod error;
 
 pub use error::Error;
 
+pub mod gateway {
+    pub mod ready;
+}
+
 pub mod user {
     pub mod login;
     pub mod logout;
@@ -10,6 +14,7 @@ pub mod user {
     pub mod sessions;
 }
 
-pub mod gateway {
-    pub mod ready;
+pub mod party {
+    pub mod get;
+    pub mod members;
 }

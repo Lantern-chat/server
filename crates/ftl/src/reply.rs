@@ -48,6 +48,32 @@ where
     }
 }
 
+impl<L, R> Reply for either::Either<L, R>
+where
+    L: Reply,
+    R: Reply,
+{
+    fn into_response(self) -> Response {
+        match self {
+            either::Either::Left(l) => l.into_response(),
+            either::Either::Right(r) => r.into_response(),
+        }
+    }
+}
+
+impl<L, R> Reply for futures::future::Either<L, R>
+where
+    L: Reply,
+    R: Reply,
+{
+    fn into_response(self) -> Response {
+        match self {
+            futures::future::Either::Left(l) => l.into_response(),
+            futures::future::Either::Right(r) => r.into_response(),
+        }
+    }
+}
+
 pub fn reply() -> impl Reply {
     StatusCode::OK
 }
@@ -86,15 +112,20 @@ impl Reply for MsgPack {
     }
 }
 
+#[derive(Clone)]
 pub struct Json {
-    inner: Result<Vec<u8>, ()>,
+    inner: Result<Bytes, ()>,
 }
 
 pub fn json<T: serde::Serialize>(value: &T) -> Json {
     Json {
-        inner: serde_json::to_vec(value).map_err(|err| {
-            log::error!("JSON Reply error: {}", err);
-        }),
+        inner: match serde_json::to_vec(value) {
+            Ok(v) => Ok(v.into()),
+            Err(err) => {
+                log::error!("JSON Reply error: {}", err);
+                Err(())
+            }
+        },
     }
 }
 
@@ -181,6 +212,7 @@ impl Reply for JsonStream {
     }
 }
 
+#[derive(Clone)]
 pub struct WithStatus<R: Reply> {
     reply: R,
     status: StatusCode,

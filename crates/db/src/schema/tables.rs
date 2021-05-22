@@ -40,6 +40,7 @@ thorn::tables! {
     pub struct Party in Lantern {
         Id: SNOWFLAKE,
         Name: Type::VARCHAR,
+        Description: Type::TEXT,
         OwnerId: SNOWFLAKE,
         DeletedAt: Type::TIMESTAMP,
         IconId: SNOWFLAKE,

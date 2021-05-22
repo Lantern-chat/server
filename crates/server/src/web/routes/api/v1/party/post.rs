@@ -2,10 +2,7 @@ use ftl::*;
 
 use db::{schema::Party, ClientError, Snowflake, SnowflakeExt};
 
-use crate::{
-    routes::api::{auth::Authorization, util::time::is_of_age},
-    ServerState,
-};
+use crate::{ctrl::auth::Authorization, util::time::is_of_age, web::auth::authorize, ServerState};
 
 #[derive(Debug, Clone, Deserialize)]
 struct PartyCreateForm {

@@ -40,9 +40,6 @@ pub struct Party {
 
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub emotes: Vec<Emote>,
-
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub members: Vec<PartyMember>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

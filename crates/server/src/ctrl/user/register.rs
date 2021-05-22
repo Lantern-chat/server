@@ -58,7 +58,7 @@ pub async fn register(state: ServerState, mut form: RegisterForm) -> Result<Sess
         .await?;
 
     if existing.is_some() {
-        return Err(Error::UserAlreadyExists);
+        return Err(Error::AlreadyExists);
     }
 
     let password = std::mem::replace(&mut form.password, String::new());

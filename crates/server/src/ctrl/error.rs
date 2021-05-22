@@ -23,8 +23,8 @@ pub enum Error {
     EncodingError(#[from] EncodingError),
 
     // NON-FATAL ERRORS
-    #[error("User Already Exists")]
-    UserAlreadyExists,
+    #[error("Already Exists")]
+    AlreadyExists,
 
     #[error("Username Unavailable")]
     UsernameUnavailable,
@@ -77,6 +77,12 @@ pub enum Error {
     #[error("Missing filetype")]
     MissingFiletype,
 
+    #[error("Not Found")]
+    NotFound,
+
+    #[error("Bad Request")]
+    BadRequest,
+
     #[error("Auth Token Parse Error: {0}")]
     AuthTokenParseError(#[from] super::auth::AuthTokenFromStrError),
 
@@ -109,7 +115,9 @@ impl Error {
         }
 
         match self {
-            Error::NoSession => StatusCode::FORBIDDEN,
+            Error::NoSession => StatusCode::UNAUTHORIZED,
+            Error::NotFound => StatusCode::NOT_FOUND,
+            Error::AlreadyExists => StatusCode::CONFLICT,
             _ => StatusCode::BAD_REQUEST,
         }
     }

@@ -17,7 +17,7 @@ pub use sf::{Snowflake, SnowflakeExt};
 
 pub mod schema;
 
-pub use tokio_postgres::Error as PgError;
+pub use tokio_postgres::{Error as PgError, Row};
 
 //pub mod schema {
 //    pub(self) use super::{Client, ClientError, Snowflake, SnowflakeExt};

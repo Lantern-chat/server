@@ -3,18 +3,18 @@ use ftl::{
     *,
 };
 
-use crate::web::gateway::socket::client_connected;
+use crate::web::{gateway::socket::client_connected, routes::api::ApiError};
 
 pub fn gateway(route: Route<crate::ServerState>) -> Result<impl Reply, WsError> {
     let addr = match real_ip::get_real_ip(&route) {
         Ok(addr) => addr,
-        Err(_) => return Ok(StatusCode::BAD_REQUEST.into_response()),
+        Err(_) => return Ok(ApiError::bad_request().into_response()),
     };
 
     let query = match route.query() {
         Some(Ok(query)) => query,
         None => Default::default(),
-        _ => return Ok(StatusCode::BAD_REQUEST.into_response()),
+        _ => return Ok(ApiError::bad_request().into_response()),
     };
 
     // TODO: Move this into FTL websocket part?
