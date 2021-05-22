@@ -5,7 +5,17 @@ pub async fn logout_user(state: ServerState, auth: auth::Authorization) -> Resul
     let res = state
         .db
         .write
-        .execute_cached_typed(|| delete_session(), &[&auth.token.bytes()])
+        .execute_cached_typed(
+            || {
+                use db::schema::*;
+                use thorn::*;
+
+                Query::delete()
+                    .from::<Sessions>()
+                    .and_where(Sessions::Token.equals(Var::of(Sessions::Token)))
+            },
+            &[&auth.token.bytes()],
+        )
         .await?;
 
     if res == 0 {
@@ -17,14 +27,4 @@ pub async fn logout_user(state: ServerState, auth: auth::Authorization) -> Resul
     }
 
     Ok(())
-}
-
-use thorn::*;
-
-fn delete_session() -> impl AnyQuery {
-    use db::schema::*;
-
-    Query::delete()
-        .from::<Sessions>()
-        .and_where(Sessions::Token.equals(Var::of(Sessions::Token)))
 }

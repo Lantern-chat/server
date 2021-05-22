@@ -107,7 +107,18 @@ pub async fn do_auth(state: &ServerState, raw_token: &[u8]) -> Result<Authorizat
     let session = state
         .db
         .read
-        .query_opt_cached_typed(|| select_session(), &[&&token.0[..]])
+        .query_opt_cached_typed(
+            || {
+                use db::schema::*;
+                use thorn::*;
+
+                Query::select()
+                    .cols(&[Sessions::UserId, Sessions::Expires])
+                    .from_table::<Sessions>()
+                    .and_where(Sessions::Token.equals(Var::of(Sessions::Token)))
+            },
+            &[&&token.0[..]],
+        )
         .await?;
 
     match session {
@@ -125,15 +136,4 @@ pub async fn do_auth(state: &ServerState, raw_token: &[u8]) -> Result<Authorizat
         }
         None => Err(Error::NoSession),
     }
-}
-
-use thorn::*;
-
-fn select_session() -> impl AnyQuery {
-    use db::schema::*;
-
-    Query::select()
-        .cols(&[Sessions::UserId, Sessions::Expires])
-        .from_table::<Sessions>()
-        .and_where(Sessions::Token.equals(Var::of(Sessions::Token)))
 }

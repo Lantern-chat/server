@@ -5,7 +5,7 @@ CREATE TABLE lantern.emotes (
     alt             varchar(64),
     flags           smallint        NOT NULL,
     aspect_ratio    real            NOT NULL,
-    data            bytea           NOT NULL,
+    file_id         bigint          NOT NULL,
 
     CONSTRAINT emotes_pk PRIMARY KEY (id)
 );
@@ -17,3 +17,7 @@ CREATE UNIQUE INDEX CONCURRENTLY emote_name_idx ON lantern.emotes USING btree (n
 ALTER TABLE lantern.emotes ADD CONSTRAINT party_fk FOREIGN KEY (party_id)
     REFERENCES lantern.party (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE; -- Delete emotes on party deletion
+
+ALTER TABLE lantern.emotes ADD CONSTRAINT file_fk FOREIGN KEY (file_id)
+    REFERENCES lantern.files (id) MATCH FULL
+    ON DELETE CASCADE ON UPDATE CASCADE;

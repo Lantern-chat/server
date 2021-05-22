@@ -7,7 +7,7 @@ use std::{
     },
 };
 
-use futures::{Stream, StreamExt, TryStreamExt};
+use futures::{stream::BoxStream, Stream, StreamExt, TryStreamExt};
 use hashbrown::HashMap;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::{

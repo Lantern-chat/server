@@ -4,14 +4,14 @@ use hashbrown::{hash_map::Entry, HashMap};
 use db::Snowflake;
 
 use crate::{
-    ctrl::{auth::Authorization, Error},
+    ctrl::{auth::Authorization, Error, SearchMode},
     ServerState,
 };
 
-struct Associated<T> {
-    pub party_id: Snowflake,
-    pub member: T,
-}
+//struct Associated<T> {
+//    pub party_id: Snowflake,
+//    pub value: T,
+//}
 
 pub async fn ready(
     state: ServerState,
@@ -78,51 +78,33 @@ pub async fn ready(
             parties.insert(party.id, party);
         }
 
-        let roles = async {
-            let rows = db
-                .query_stream_cached_typed(|| select_roles(), &[&ids])
-                .await?;
+        let (roles, emotes) = futures::future::join(
+            async {
+                crate::ctrl::party::roles::get_roles_raw(&state, SearchMode::Many(&ids))
+                    .await?
+                    .try_collect::<Vec<_>>()
+                    .await
+            },
+            async {
+                crate::ctrl::party::emotes::get_custom_emotes_raw(&state, SearchMode::Many(&ids))
+                    .await?
+                    .try_collect::<Vec<_>>()
+                    .await
+            },
+        )
+        .await;
 
-            rows.map(|row| match row {
-                Err(e) => Err(Error::from(e)),
-                Ok(row) => {
-                    let permissions = Permission::unpack(row.try_get::<_, i64>(3)? as u64);
-                    let party_id = row.try_get(1)?;
-
-                    Ok(Associated {
-                        party_id,
-                        member: Role {
-                            id: row.try_get(0)?,
-                            name: row.try_get(2)?,
-                            permissions,
-                            admin: false,
-                            color: row.try_get::<_, i32>(4)? as u32,
-                            mentionable: false,
-                        },
-                    })
-                }
-            })
-            .try_collect::<Vec<_>>()
-            .await
-        };
-
-        let emotes = async {
-            // todo: stuff
-            Ok::<Vec<Associated<Emote>>, Error>(Vec::new())
-        };
-
-        let (roles, emotes) = futures::future::join(roles, emotes).await;
         let (roles, emotes) = (roles?, emotes?);
 
         for role in roles {
             if let Some(party) = parties.get_mut(&role.party_id) {
-                party.roles.push(role.member);
+                party.roles.push(role);
             }
         }
 
         for emote in emotes {
             if let Some(party) = parties.get_mut(&emote.party_id) {
-                party.emotes.push(emote.member);
+                party.emotes.push(Emote::Custom(emote));
             }
         }
 
@@ -166,21 +148,6 @@ fn select_parties() -> impl AnyQuery {
         .cols(&[Party::Id, Party::OwnerId, Party::Name])
         .from(Party::left_join_table::<PartyMember>().on(PartyMember::PartyId.equals(Party::Id)))
         .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
-}
-
-fn select_roles() -> impl AnyQuery {
-    use db::schema::*;
-
-    Query::select()
-        .from_table::<Roles>()
-        .cols(&[
-            Roles::Id,
-            Roles::PartyId,
-            Roles::Name,
-            Roles::Permissions,
-            Roles::Color,
-        ])
-        .and_where(Roles::PartyId.equals(Builtin::any(Var::of(Type::INT8_ARRAY))))
 }
 
 /*

@@ -3,11 +3,11 @@ use futures::{StreamExt, TryStreamExt};
 use db::Snowflake;
 
 use crate::{
-    ctrl::{auth::Authorization, Error},
+    ctrl::{auth::Authorization, Error, SearchMode},
     ServerState,
 };
 
-use models::{Emote, PartialParty, Party, Permission, Role, SecurityFlags};
+use models::*;
 
 pub async fn get_party(
     state: ServerState,
@@ -64,36 +64,25 @@ pub async fn get_party(
         }
     };
 
-    let roles = state
-        .db
-        .read
-        .query_stream_cached_typed(
-            || {
-                use db::schema::*;
-                use thorn::*;
+    let roles = async {
+        super::roles::get_roles_raw(&state, SearchMode::Single(party_id))
+            .await?
+            .try_collect::<Vec<_>>()
+            .await
+    };
 
-                Query::select()
-                    .from_table::<Roles>()
-                    .cols(&[Roles::Id, Roles::Name, Roles::Permissions, Roles::Color])
-                    .and_where(Roles::PartyId.equals(Var::of(Party::Id)))
-            },
-            &[&party_id],
-        )
-        .await?;
+    let emotes = async {
+        super::emotes::get_custom_emotes_raw(&state, SearchMode::Single(party_id))
+            .await?
+            .map_ok(Emote::Custom)
+            .try_collect::<Vec<_>>()
+            .await
+    };
 
-    futures::pin_mut!(roles);
-    while let Some(row) = roles.next().await {
-        let row = row?;
+    let (roles, emotes) = futures::future::join(roles, emotes).await;
 
-        party.roles.push(Role {
-            id: row.try_get(0)?,
-            name: row.try_get(1)?,
-            admin: false,
-            permissions: Permission::unpack(row.try_get::<_, i64>(2)? as u64),
-            color: row.try_get::<_, i32>(3)? as u32,
-            mentionable: false,
-        });
-    }
+    party.roles = roles?;
+    party.emotes = emotes?;
 
     Ok(party)
 }

@@ -54,7 +54,17 @@ pub async fn register(state: ServerState, mut form: RegisterForm) -> Result<Sess
     let existing = state
         .db
         .read
-        .query_opt_cached_typed(|| check_existing(), &[&form.email])
+        .query_opt_cached_typed(
+            || {
+                use db::schema::*;
+                use thorn::*;
+
+                Query::select()
+                    .from_table::<Users>()
+                    .and_where(Users::Email.equals(Var::of(Users::Email)))
+            },
+            &[&form.email],
+        )
         .await?;
 
     if existing.is_some() {
@@ -89,7 +99,18 @@ pub async fn register(state: ServerState, mut form: RegisterForm) -> Result<Sess
         .db
         .write
         .execute_cached_typed(
-            || call_register_user(),
+            || {
+                use db::schema::*;
+                use thorn::*;
+
+                Query::call(Call::custom("lantern.register_user").args((
+                    Var::of(Users::Id),
+                    Var::of(Users::Username),
+                    Var::of(Users::Email),
+                    Var::of(Users::Passhash),
+                    Var::of(Users::Dob),
+                )))
+            },
             &[&id, &username, &form.email, &password_hash, &dob],
         )
         .await?;
@@ -109,38 +130,4 @@ pub fn hash_config() -> argon2::Config<'static> {
     config.hash_length = 24;
 
     config
-}
-
-use thorn::*;
-
-fn check_existing() -> query::SelectQuery {
-    use db::schema::*;
-
-    Query::select()
-        .from_table::<Users>()
-        .and_where(Users::Email.equals(Var::of(Users::Email)))
-}
-
-fn call_register_user() -> query::CallQuery {
-    use db::schema::*;
-
-    Query::call(Call::custom("lantern.register_user").args((
-        Var::of(Users::Id),
-        Var::of(Users::Username),
-        Var::of(Users::Email),
-        Var::of(Users::Passhash),
-        Var::of(Users::Dob),
-    )))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_register_call_query() {
-        let query = call_register_user();
-
-        println!("{}", query.to_string().0);
-    }
 }

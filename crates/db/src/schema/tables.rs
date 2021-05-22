@@ -81,6 +81,7 @@ thorn::tables! {
     pub struct Emotes in Lantern {
         Id: SNOWFLAKE,
         PartyId: SNOWFLAKE,
+        FileId: SNOWFLAKE,
         Name: Type::VARCHAR,
         Alt: Type::VARCHAR,
         Flags: Type::INT2,

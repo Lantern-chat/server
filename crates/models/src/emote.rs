@@ -14,12 +14,11 @@ serde_shims::impl_serde_for_bitflags!(EmoteFlags);
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CustomEmote {
     pub id: Snowflake,
-    pub file_id: Snowflake,
+    pub party_id: Snowflake,
+    pub file: Snowflake,
     pub name: String,
     pub flags: EmoteFlags,
-
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub aspect_ratio: Option<f32>,
+    pub aspect_ratio: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

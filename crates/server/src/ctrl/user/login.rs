@@ -25,7 +25,18 @@ pub async fn login(state: ServerState, form: LoginForm) -> Result<Session, Error
     let user = state
         .db
         .read
-        .query_opt_cached_typed(|| select_user(), &[&form.email])
+        .query_opt_cached_typed(
+            || {
+                use db::schema::*;
+                use thorn::*;
+
+                Query::select()
+                    .from_table::<Users>()
+                    .cols(&[Users::Id, Users::Email, Users::Passhash, Users::DeletedAt])
+                    .and_where(Users::Email.equals(Var::of(Users::Email)))
+            },
+            &[&form.email],
+        )
         .await?;
 
     let user = match user {
@@ -77,35 +88,26 @@ pub async fn do_login(
     state
         .db
         .write
-        .execute_cached_typed(|| insert_session(), &[&&token.0[..], &id, &expires])
+        .execute_cached_typed(
+            || {
+                use db::schema::*;
+                use thorn::*;
+
+                Query::insert()
+                    .into::<Sessions>()
+                    .cols(&[Sessions::Token, Sessions::UserId, Sessions::Expires])
+                    .values(vec![
+                        Var::of(Sessions::Token),
+                        Var::of(Sessions::UserId),
+                        Var::of(Sessions::Expires),
+                    ])
+            },
+            &[&&token.0[..], &id, &expires],
+        )
         .await?;
 
     Ok(Session {
         auth: token.encode(),
         expires: time::OffsetDateTime::from(expires).format(time::Format::Rfc3339),
     })
-}
-
-use thorn::*;
-
-fn insert_session() -> impl AnyQuery {
-    use db::schema::*;
-
-    Query::insert()
-        .into::<Sessions>()
-        .cols(&[Sessions::Token, Sessions::UserId, Sessions::Expires])
-        .values(vec![
-            Var::of(Sessions::Token),
-            Var::of(Sessions::UserId),
-            Var::of(Sessions::Expires),
-        ])
-}
-
-fn select_user() -> impl AnyQuery {
-    use db::schema::*;
-
-    Query::select()
-        .from_table::<Users>()
-        .cols(&[Users::Id, Users::Email, Users::Passhash, Users::DeletedAt])
-        .and_where(Users::Email.equals(Var::of(Users::Email)))
 }

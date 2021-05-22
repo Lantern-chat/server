@@ -7,8 +7,6 @@ use crate::{
 
 use models::AnonymousSession;
 
-use thorn::*;
-
 pub async fn list_sessions(
     state: ServerState,
     auth: Authorization,
@@ -16,7 +14,19 @@ pub async fn list_sessions(
     let sessions = state
         .db
         .read
-        .query_stream_cached_typed(|| query_sessions(), &[&auth.user_id])
+        .query_stream_cached_typed(
+            || {
+                use db::schema::*;
+                use thorn::*;
+
+                Query::select()
+                    .col(Sessions::Expires)
+                    .from_table::<Sessions>()
+                    .and_where(Sessions::UserId.equals(Var::of(Sessions::UserId)))
+                    .order_by(Sessions::Expires.ascending())
+            },
+            &[&auth.user_id],
+        )
         .await?;
 
     Ok(sessions.map(|row| {
@@ -27,14 +37,4 @@ pub async fn list_sessions(
                 .format(time::Format::Rfc3339),
         })
     }))
-}
-
-fn query_sessions() -> impl AnyQuery {
-    use db::schema::*;
-
-    Query::select()
-        .col(Sessions::Expires)
-        .from_table::<Sessions>()
-        .and_where(Sessions::UserId.equals(Var::of(Sessions::UserId)))
-        .order_by(Sessions::Expires.ascending())
 }
