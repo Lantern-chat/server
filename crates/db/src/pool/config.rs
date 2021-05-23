@@ -10,6 +10,8 @@ pub struct Timeouts {
     pub create: Option<Duration>,
     /// Timeout when recycling an object
     pub recycle: Option<Duration>,
+    /// Timeout when delivering a notification
+    pub notif: Option<Duration>,
 }
 
 impl Timeouts {
@@ -27,6 +29,11 @@ impl Timeouts {
         self.recycle = Some(timeout);
         self
     }
+
+    pub fn notif(mut self, timeout: Duration) -> Self {
+        self.notif = Some(timeout);
+        self
+    }
 }
 
 impl Default for Timeouts {
@@ -36,6 +43,7 @@ impl Default for Timeouts {
             create: None,
             wait: None,
             recycle: None,
+            notif: None,
         }
     }
 }
