@@ -1,4 +1,44 @@
+use std::time::Duration;
+
 use tokio_postgres::Config as PgConfig;
+
+#[derive(Clone, Debug)]
+pub struct Timeouts {
+    /// Timeout when waiting for a slot to become available
+    pub wait: Option<Duration>,
+    /// Timeout when creating a new object
+    pub create: Option<Duration>,
+    /// Timeout when recycling an object
+    pub recycle: Option<Duration>,
+}
+
+impl Timeouts {
+    pub fn wait(mut self, timeout: Duration) -> Self {
+        self.wait = Some(timeout);
+        self
+    }
+
+    pub fn create(mut self, timeout: Duration) -> Self {
+        self.create = Some(timeout);
+        self
+    }
+
+    pub fn recycle(mut self, timeout: Duration) -> Self {
+        self.recycle = Some(timeout);
+        self
+    }
+}
+
+impl Default for Timeouts {
+    /// Create a timeout config with no timeouts set
+    fn default() -> Self {
+        Self {
+            create: None,
+            wait: None,
+            recycle: None,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecyclingMethod {
@@ -34,6 +74,7 @@ impl Default for RecyclingMethod {
 #[derive(Clone, Debug, Default)]
 pub struct PoolConfig {
     pub pg_config: PgConfig,
+    pub timeouts: Timeouts,
     pub readonly: bool,
     pub max_connections: usize,
     pub channel_size: usize,
@@ -44,6 +85,7 @@ impl PoolConfig {
     pub fn new(pg_config: PgConfig) -> Self {
         PoolConfig {
             pg_config,
+            timeouts: Timeouts::default(),
             readonly: false,
             max_connections: num_cpus::get_physical() * 4,
             channel_size: 256,
