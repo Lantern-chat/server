@@ -25,6 +25,8 @@ use failsafe::Config;
 
 use arc_swap::{ArcSwap, ArcSwapOption};
 
+use crate::Transaction;
+
 use super::{
     conn::ConnectionStream,
     startup::{self, StartupError},
@@ -226,6 +228,10 @@ impl Client {
         self.client.store(None);
         *self.conn.lock().await = None;
     }
+
+    //pub async fn transaction(&mut self) -> Result<Transaction, ClientError> {
+    //    self.
+    //}
 
     pub async fn prepare_cached<F>(&self, query: F) -> Result<Statement, ClientError>
     where

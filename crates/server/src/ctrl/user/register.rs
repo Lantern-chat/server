@@ -27,7 +27,7 @@ lazy_static::lazy_static! {
     static ref USERNAME_SANITIZE_REGEX: Regex = Regex::new(r#"\s+"#).unwrap();
 }
 
-pub async fn register(state: ServerState, mut form: RegisterForm) -> Result<Session, Error> {
+pub async fn register_user(state: ServerState, mut form: RegisterForm) -> Result<Session, Error> {
     if !state.config.username_len.contains(&form.username.len())
         || !USERNAME_REGEX.is_match(&form.username)
     {

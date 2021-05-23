@@ -1,51 +1,17 @@
 use ftl::*;
 
-use db::{schema::Party, ClientError, Snowflake, SnowflakeExt};
+use crate::{ctrl::auth::Authorization, web::routes::api::ApiError, ServerState};
 
-use crate::{ctrl::auth::Authorization, util::time::is_of_age, web::auth::authorize, ServerState};
-
-#[derive(Debug, Clone, Deserialize)]
-struct PartyCreateForm {
-    name: String,
-}
+use crate::ctrl::party::create::{create_party, PartyCreateForm};
 
 pub async fn post(mut route: Route<ServerState>, auth: Authorization) -> impl Reply {
     let form = match body::any::<PartyCreateForm, _>(&mut route).await {
         Ok(form) => form,
-        Err(e) => return e.into_response(),
+        Err(_) => return ApiError::bad_request().into_response(),
     };
 
-    match create_party(route.state, form, auth).await {
+    match create_party(route.state, auth, form).await {
         Ok(ref party) => reply::json(party).into_response(),
-        Err(err) => "".into_response(),
+        Err(e) => ApiError::err(e).into_response(),
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-enum PartyCreateError {
-    #[error("Invalid Party Name")]
-    InvalidName,
-
-    #[error("Database Error {0}")]
-    ClientError(#[from] ClientError),
-}
-
-async fn create_party(
-    state: ServerState,
-    form: PartyCreateForm,
-    auth: Authorization,
-) -> Result<Party, PartyCreateError> {
-    if !state.config.partyname_len.contains(&form.name.len()) {
-        return Err(PartyCreateError::InvalidName);
-    }
-
-    let party = Party {
-        id: Snowflake::now(),
-        owner_id: auth.user_id,
-        name: form.name,
-    };
-
-    party.insert(&state.db).await?;
-
-    Ok(party)
 }

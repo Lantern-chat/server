@@ -15,6 +15,7 @@ pub mod user {
 }
 
 pub mod party {
+    pub mod create;
     pub mod emotes;
     pub mod get;
     pub mod members;

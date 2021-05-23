@@ -7,7 +7,7 @@ use crate::web::{auth::authorize, routes::api::ApiError};
 //pub mod delete;
 pub mod get;
 //pub mod patch;
-//pub mod post;
+pub mod post;
 
 pub mod members;
 //pub mod rooms;

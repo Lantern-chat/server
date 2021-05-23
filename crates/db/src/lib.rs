@@ -7,10 +7,13 @@ extern crate tracing as log;
 
 pub mod client;
 pub mod conn;
+pub mod pool;
 pub mod startup;
+pub mod transaction;
 pub mod util;
 
 pub use client::{ClientError, ReadWriteClient as Client};
+pub use transaction::Transaction;
 
 pub mod sf;
 pub use sf::{Snowflake, SnowflakeExt};

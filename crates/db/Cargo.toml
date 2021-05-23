@@ -15,6 +15,7 @@ thorn = { git = "https://github.com/novacrazy/thorn" }
 tokio = { version = "1.4", features = ["sync", "rt", "fs"] }
 tokio-postgres = { version = "0.7.0", features = ["with-uuid-0_8", "with-chrono-0_4", "with-serde_json-1", "with-time-0_2"] }
 chrono = "0.4.19"
+async-trait = "0.1.50"
 serde = { version = "1", features = ["derive"] }
 uuid = "0.8"
 bytes = "1.0.1"
@@ -22,6 +23,7 @@ futures = "0.3.14"
 failsafe = "1.0.0"
 arc-swap = "1.2.0"
 thiserror = "1.0.24"
+parking_lot = "0.11.1"
 tracing = "0.1.25"
 time = { version = "0.2", features = ["serde"] }
 hashbrown = { version = "0.11", features = ["inline-more"] }
@@ -30,6 +32,9 @@ serde_shims = { version = "0.2", features = ["std", "mime", "bitflags"] }
 bitflags = "1.2"
 lazy_static = "1.4.0"
 regex = "1.4.6"
+num_cpus = "1.13.0"
+
+# deadpool = { version = "0.8.0", default_features = false, features = ["managed", "config", "rt_tokio_1"] }
 # sea-query = { version = "0.10", features = ["with-json", "with-chrono", "with-uuid"] }
 
 [dev-dependencies]
