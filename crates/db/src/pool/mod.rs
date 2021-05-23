@@ -18,7 +18,7 @@ use tokio::sync::{
 
 use parking_lot::{Mutex, RwLock};
 
-use futures::{Future, FutureExt, StreamExt, TryFutureExt};
+use futures::{Future, FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt};
 use tokio_postgres::{
     tls::MakeTlsConnect, tls::TlsConnect, types::Type, AsyncMessage, Client as PgClient,
     Config as PgConfig, Error as PgError, IsolationLevel, NoTls, Notification, Socket, Statement,
@@ -109,7 +109,7 @@ where
 pub struct PoolInner {
     config: PoolConfig,
     connector: Box<dyn Connector>,
-    queue: Mutex<VecDeque<InnerClient>>,
+    queue: Mutex<VecDeque<Client>>,
     semaphore: Semaphore,
 
     pub stmt_caches: StatementCaches,
@@ -140,15 +140,15 @@ impl Pool {
         }))
     }
 
-    async fn create(&self) -> Result<InnerClient, Error> {
+    async fn create(&self) -> Result<Client, Error> {
         let (client, rx) = self.connector.connect(&self.config).await?;
 
         let stmt_cache = Arc::new(StatementCache::new());
 
         // TODO: Find a good way to remove these laters
-        //self.stmt_caches.insert(&stmt_cache);
+        self.stmt_caches.attach(&stmt_cache);
 
-        Ok(InnerClient {
+        Ok(Client {
             readonly: self.config.readonly,
             client,
             rx,
@@ -157,13 +157,13 @@ impl Pool {
     }
 
     async fn recycle(&self, client: &Client) -> Result<(), Error> {
-        if client.inner().client.is_closed() {
+        if client.client.is_closed() {
             log::info!("Connection could not be recycled because it was closed");
             return Err(Error::RecyclingError);
         }
 
         if let Some(sql) = self.config.recycling_method.query() {
-            if let Err(e) = client.inner().client.simple_query(sql).await {
+            if let Err(e) = client.client.simple_query(sql).await {
                 log::info!("Connection could not be recycled: {}", e);
                 return Err(Error::RecyclingError);
             }
@@ -172,8 +172,8 @@ impl Pool {
         Ok(())
     }
 
-    pub async fn timeout_get(&self, timeouts: &Timeouts) -> Result<Client, Error> {
-        let mut client = Client {
+    pub async fn timeout_get(&self, timeouts: &Timeouts) -> Result<Object, Error> {
+        let mut client = Object {
             inner: None,
             state: State::Waiting,
             pool: Arc::downgrade(&self.0),
@@ -241,9 +241,14 @@ pub struct StatementCaches {
 }
 
 impl StatementCaches {
-    pub fn insert(&self, cache: &Arc<StatementCache>) {
+    pub fn attach(&self, cache: &Arc<StatementCache>) {
         let cache = Arc::downgrade(cache);
         self.caches.write().push(cache);
+    }
+
+    pub fn detach(&self, cache: &Arc<StatementCache>) {
+        let cache = Arc::downgrade(cache);
+        self.caches.write().retain(|sc| !sc.ptr_eq(&cache));
     }
 
     pub fn clear(&self) {
@@ -253,6 +258,87 @@ impl StatementCaches {
                 cache.clear();
             }
         }
+    }
+
+    pub fn cleanup(&self) {
+        self.caches.write().retain(|sc| sc.strong_count() > 0)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum State {
+    Waiting,
+    Receiving,
+    Creating,
+    Recycling,
+    Ready,
+    Taken,
+    Dropped,
+}
+
+pub struct Object {
+    inner: Option<Client>,
+    pool: Weak<PoolInner>,
+    state: State,
+}
+
+impl Object {
+    fn inner(&self) -> &Client {
+        match self.inner {
+            Some(ref inner) => inner,
+            None => unsafe { std::hint::unreachable_unchecked() },
+        }
+    }
+
+    fn inner_mut(&mut self) -> &mut Client {
+        match self.inner {
+            Some(ref mut inner) => inner,
+            None => unsafe { std::hint::unreachable_unchecked() },
+        }
+    }
+
+    pub fn take(mut this: Self) -> Client {
+        this.state = State::Taken;
+        if let Some(pool) = this.pool.upgrade() {
+            pool.stmt_caches.detach(&this.stmt_cache);
+        }
+        this.inner.take().expect("Double-take of client")
+    }
+}
+
+impl Deref for Object {
+    type Target = Client;
+
+    fn deref(&self) -> &Self::Target {
+        self.inner()
+    }
+}
+
+impl DerefMut for Object {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.inner_mut()
+    }
+}
+
+impl Drop for Object {
+    fn drop(&mut self) {
+        if let Some(pool) = self.pool.upgrade() {
+            match self.state {
+                State::Receiving | State::Creating | State::Taken => pool.semaphore.add_permits(1),
+                State::Recycling | State::Ready => {
+                    let client = self.inner.take().expect("Double-take of dropped client");
+                    {
+                        let mut queue = pool.queue.lock();
+                        queue.push_back(client);
+                    }
+
+                    pool.semaphore.add_permits(1);
+                }
+                State::Waiting | State::Dropped => {}
+            }
+        }
+        self.inner = None;
+        self.state = State::Dropped;
     }
 }
 
@@ -284,17 +370,7 @@ impl StatementCache {
     }
 }
 
-enum State {
-    Waiting,
-    Receiving,
-    Creating,
-    Recycling,
-    Ready,
-    Taken,
-    Dropped,
-}
-
-struct InnerClient {
+pub struct Client {
     readonly: bool,
     client: PgClient,
     rx: Receiver<Notification>,
@@ -303,50 +379,325 @@ struct InnerClient {
     pub stmt_cache: Arc<StatementCache>,
 }
 
-pub struct Client {
-    inner: Option<InnerClient>,
-    pool: Weak<PoolInner>,
-    state: State,
+pub struct Transaction<'a> {
+    t: PgTransaction<'a>,
+    stmt_cache: Arc<StatementCache>,
+    readonly: bool,
 }
 
 impl Client {
-    fn inner(&self) -> &InnerClient {
-        match self.inner {
-            Some(ref inner) => inner,
-            None => unsafe { std::hint::unreachable_unchecked() },
-        }
-    }
-
-    fn inner_mut(&mut self) -> &mut InnerClient {
-        match self.inner {
-            Some(ref mut inner) => inner,
-            None => unsafe { std::hint::unreachable_unchecked() },
-        }
-    }
-
     pub async fn recv_notif(&mut self) -> Option<Notification> {
-        self.inner_mut().rx.recv().await
+        self.rx.recv().await
+    }
+
+    pub async fn transaction<'a>(&'a mut self) -> Result<Transaction<'a>, Error> {
+        Ok(Transaction {
+            readonly: self.readonly,
+            stmt_cache: self.stmt_cache.clone(),
+            t: self.client.transaction().await?,
+        })
     }
 }
 
-impl Drop for Client {
-    fn drop(&mut self) {
-        if let Some(pool) = self.pool.upgrade() {
-            match self.state {
-                State::Receiving | State::Creating | State::Taken => pool.semaphore.add_permits(1),
-                State::Recycling | State::Ready => {
-                    let client = self.inner.take().expect("Double-take of dropped client");
-                    {
-                        let mut queue = pool.queue.lock();
-                        queue.push_back(client);
-                    }
+use std::any::Any;
+use thorn::AnyQuery;
 
-                    pool.semaphore.add_permits(1);
-                }
-                State::Waiting | State::Dropped => {}
-            }
+use tokio_postgres::{
+    types::{BorrowToSql, ToSql},
+    Row, RowStream, ToStatement,
+};
+
+impl Client {
+    #[inline(always)]
+    fn debug_check_readonly<'a>(&self, query: &'a str) -> &'a str {
+        // TODO: I'm sure there is something better than a regex for this
+        lazy_static::lazy_static! {
+            static ref WRITE_REGEX: regex::Regex =
+                regex::RegexBuilder::new(r#"\b(UPDATE|INSERT|ALTER|CREATE|DROP|GRANT|REVOKE|DELETE|TRUNCATE)\b"#).build().unwrap();
         }
-        self.inner = None;
-        self.state = State::Dropped;
+
+        if cfg!(debug_assertions) && self.readonly {
+            assert!(!WRITE_REGEX.is_match(query));
+        }
+
+        return query;
+    }
+
+    pub async fn prepare_cached<F>(&self, query: F) -> Result<Statement, Error>
+    where
+        F: Any + FnOnce() -> &'static str,
+    {
+        let id = TypeId::of::<F>();
+
+        // It's fine to get a cached entry if the client is disconnected
+        // since it can't be used anyway.
+        if let Some(stmt) = self.stmt_cache.get(id) {
+            return Ok(stmt.clone());
+        }
+
+        let stmt = self
+            .client
+            .prepare(self.debug_check_readonly(query()))
+            .await?;
+
+        self.stmt_cache.insert(id, &stmt);
+
+        Ok(stmt)
+    }
+
+    pub async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, Error>
+    where
+        T: ?Sized + ToStatement,
+        P: BorrowToSql,
+        I: IntoIterator<Item = P>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        self.client
+            .query_raw(statement, params)
+            .await
+            .map_err(Error::from)
+    }
+
+    pub async fn query_raw_cached<F, P, I>(&self, query: F, params: I) -> Result<RowStream, Error>
+    where
+        F: Any + FnOnce() -> &'static str,
+        P: BorrowToSql,
+        I: IntoIterator<Item = P>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        self.query_raw(&self.prepare_cached(query).await?, params)
+            .await
+    }
+
+    pub async fn query_stream<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<impl Stream<Item = Result<Row, Error>>, Error>
+    where
+        T: ?Sized + ToStatement,
+    {
+        fn slice_iter<'a>(
+            s: &'a [&'a (dyn ToSql + Sync)],
+        ) -> impl ExactSizeIterator<Item = &'a dyn ToSql> + 'a {
+            s.iter().map(|s| *s as _)
+        }
+
+        Ok(self
+            .query_raw(statement, slice_iter(params))
+            .await?
+            .map_err(Error::from))
+    }
+
+    pub async fn query_stream_cached<F>(
+        &self,
+        query: F,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<impl Stream<Item = Result<Row, Error>>, Error>
+    where
+        F: Any + FnOnce() -> &'static str,
+    {
+        self.query_stream(&self.prepare_cached(query).await?, params)
+            .await
+    }
+
+    pub async fn execute<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<u64, Error>
+    where
+        T: ?Sized + ToStatement,
+    {
+        self.client
+            .execute(statement, params)
+            .await
+            .map_err(Error::from)
+    }
+
+    pub async fn execute_cached<F>(
+        &self,
+        query: F,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<u64, Error>
+    where
+        F: Any + FnOnce() -> &'static str,
+    {
+        self.client
+            .execute(&self.prepare_cached(query).await?, params)
+            .await
+            .map_err(Error::from)
+    }
+
+    pub async fn query<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Vec<Row>, Error>
+    where
+        T: ?Sized + ToStatement,
+    {
+        self.client
+            .query(statement, params)
+            .await
+            .map_err(Error::from)
+    }
+
+    pub async fn query_cached<F>(
+        &self,
+        query: F,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Vec<Row>, Error>
+    where
+        F: Any + FnOnce() -> &'static str,
+    {
+        self.query(&self.prepare_cached(query).await?, params).await
+    }
+
+    pub async fn query_one<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Row, Error>
+    where
+        T: ?Sized + ToStatement,
+    {
+        self.client
+            .query_one(statement, params)
+            .await
+            .map_err(Error::from)
+    }
+
+    pub async fn query_one_cached<F>(
+        &self,
+        query: F,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Row, Error>
+    where
+        F: Any + FnOnce() -> &'static str,
+    {
+        self.query_one(&self.prepare_cached(query).await?, params)
+            .await
+    }
+
+    pub async fn query_opt<T>(
+        &self,
+        statement: &T,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Option<Row>, Error>
+    where
+        T: ?Sized + ToStatement,
+    {
+        self.client
+            .query_opt(statement, params)
+            .await
+            .map_err(Error::from)
+    }
+
+    pub async fn query_opt_cached<F>(
+        &self,
+        query: F,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Option<Row>, Error>
+    where
+        F: Any + FnOnce() -> &'static str,
+    {
+        self.query_opt(&self.prepare_cached(query).await?, params)
+            .await
+    }
+}
+
+impl Client {
+    pub async fn prepare_cached_typed<F, Q>(&self, query: F) -> Result<Statement, Error>
+    where
+        F: Any + FnOnce() -> Q,
+        Q: AnyQuery,
+    {
+        let id = TypeId::of::<F>();
+
+        // It's fine to get a cached entry if the client is disconnected
+        // since it can't be used anyway.
+        if let Some(stmt) = self.stmt_cache.get(id) {
+            return Ok(stmt.clone());
+        }
+
+        let (query, collector) = query().to_string();
+        let types = collector.types();
+
+        log::info!("Preparing query: \"{}\"", query);
+
+        let stmt = self
+            .client
+            .prepare_typed(self.debug_check_readonly(&query), &types)
+            .await?;
+
+        self.stmt_cache.insert(id, &stmt);
+
+        Ok(stmt)
+    }
+
+    pub async fn query_stream_cached_typed<F, Q>(
+        &self,
+        query: F,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<impl Stream<Item = Result<Row, Error>>, Error>
+    where
+        F: Any + FnOnce() -> Q,
+        Q: AnyQuery,
+    {
+        self.query_stream(&self.prepare_cached_typed(query).await?, params)
+            .await
+    }
+
+    pub async fn execute_cached_typed<F, Q>(
+        &self,
+        query: F,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<u64, Error>
+    where
+        F: Any + FnOnce() -> Q,
+        Q: AnyQuery,
+    {
+        self.execute(&self.prepare_cached_typed(query).await?, params)
+            .await
+    }
+
+    pub async fn query_cached_typed<F, Q>(
+        &self,
+        query: F,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Vec<Row>, Error>
+    where
+        F: Any + FnOnce() -> Q,
+        Q: AnyQuery,
+    {
+        self.query(&self.prepare_cached_typed(query).await?, params)
+            .await
+    }
+
+    pub async fn query_one_cached_typed<F, Q>(
+        &self,
+        query: F,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Row, Error>
+    where
+        F: Any + FnOnce() -> Q,
+        Q: AnyQuery,
+    {
+        self.query_one(&self.prepare_cached_typed(query).await?, params)
+            .await
+    }
+
+    pub async fn query_opt_cached_typed<F, Q>(
+        &self,
+        query: F,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Option<Row>, Error>
+    where
+        F: Any + FnOnce() -> Q,
+        Q: AnyQuery,
+    {
+        self.query_opt(&self.prepare_cached_typed(query).await?, params)
+            .await
     }
 }
