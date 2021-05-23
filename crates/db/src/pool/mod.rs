@@ -12,7 +12,7 @@ use arc_swap::{ArcSwap, ArcSwapOption};
 use hashbrown::HashMap;
 
 use tokio::sync::{
-    mpsc::{self, Receiver, Sender},
+    mpsc::{self, error::RecvError, Receiver, Sender},
     Semaphore,
 };
 
@@ -21,7 +21,7 @@ use parking_lot::{Mutex, RwLock};
 use futures::{FutureExt, StreamExt};
 use tokio_postgres::{
     tls::MakeTlsConnect, tls::TlsConnect, types::Type, AsyncMessage, Client as PgClient,
-    Config as PgConfig, Error as PgError, IsolationLevel, NoTls, Socket, Statement,
+    Config as PgConfig, Error as PgError, IsolationLevel, NoTls, Notification, Socket, Statement,
     Transaction as PgTransaction, TransactionBuilder as PgTransactionBuilder,
 };
 
@@ -36,7 +36,7 @@ pub trait Connector {
     async fn connect(
         &self,
         config: PoolConfig,
-    ) -> Result<(PgClient, Receiver<AsyncMessage>), PgError>;
+    ) -> Result<(PgClient, Receiver<Notification>), PgError>;
 }
 
 #[async_trait]
@@ -50,7 +50,7 @@ where
     async fn connect(
         &self,
         config: PoolConfig,
-    ) -> Result<(PgClient, Receiver<AsyncMessage>), PgError> {
+    ) -> Result<(PgClient, Receiver<Notification>), PgError> {
         let (client, connection) = config.pg_config.connect(self.clone()).await?;
 
         let (tx, rx) = mpsc::channel(config.channel_size);
@@ -60,11 +60,14 @@ where
 
             loop {
                 match stream.next().await {
-                    Some(Ok(msg)) => match tx.send(msg).await {
-                        Err(e) => {
-                            log::error!("Error forwarding database message: {}", e);
-                            break;
+                    Some(Ok(msg)) => match msg {
+                        AsyncMessage::Notification(notif) => {
+                            if let Err(e) = tx.send(notif).await {
+                                log::error!("Error forwarding database message: {}", e);
+                                break;
+                            }
                         }
+                        AsyncMessage::Notice(notice) => log::info!("Database notice: {}", notice),
                         _ => {}
                     },
                     Some(Err(e)) => {
@@ -99,6 +102,14 @@ pub struct PoolInner {
 #[derive(Clone)]
 pub struct Pool(Arc<PoolInner>);
 
+impl Deref for Pool {
+    type Target = PoolInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl Pool {
     pub fn new<C>(config: PoolConfig, conn: C) -> Pool
     where
@@ -111,6 +122,20 @@ impl Pool {
             stmt_caches: StatementCaches::default(),
             config,
         }))
+    }
+
+    async fn recycle(&self, inner: &InnerClient) -> Result<(), PgError> {
+        if inner.client.is_closed() {
+            log::info!("Connection could not be recycled because it was closed");
+        }
+
+        if let Some(sql) = self.config.recycling_method.query() {
+            if let Err(e) = inner.client.simple_query(sql).await {
+                log::info!("Connection could not be recycled: {}", e);
+            }
+        }
+
+        Ok(())
     }
 
     //pub async fn get(&self) -> Result<Client
@@ -173,14 +198,35 @@ enum State {
 struct InnerClient {
     readonly: bool,
     client: PgClient,
+    rx: Receiver<Notification>,
 }
 
 pub struct Client {
-    client: Option<InnerClient>,
+    inner: Option<InnerClient>,
     pool: Weak<PoolInner>,
     state: State,
 
     pub stmt_cache: Arc<StatementCache>,
+}
+
+impl Client {
+    fn inner(&self) -> &InnerClient {
+        match self.inner {
+            Some(ref inner) => inner,
+            None => unsafe { std::hint::unreachable_unchecked() },
+        }
+    }
+
+    fn inner_mut(&mut self) -> &mut InnerClient {
+        match self.inner {
+            Some(ref mut inner) => inner,
+            None => unsafe { std::hint::unreachable_unchecked() },
+        }
+    }
+
+    pub async fn recv_notif(&mut self) -> Option<Notification> {
+        self.inner_mut().rx.recv().await
+    }
 }
 
 impl Drop for Client {
@@ -190,7 +236,7 @@ impl Drop for Client {
                 State::Waiting => {}
                 State::Receiving | State::Creating | State::Taken => pool.semaphore.add_permits(1),
                 State::Recycling | State::Ready => {
-                    let client = self.client.take().expect("Double-take of dropped client");
+                    let client = self.inner.take().expect("Double-take of dropped client");
                     {
                         let mut queue = pool.queue.lock();
                         queue.push_back(client);
@@ -201,7 +247,7 @@ impl Drop for Client {
                 State::Dropped => {}
             }
         }
-        self.client = None;
+        self.inner = None;
         self.state = State::Dropped;
     }
 }
