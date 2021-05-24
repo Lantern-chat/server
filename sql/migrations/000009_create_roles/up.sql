@@ -1,7 +1,7 @@
 CREATE TABLE lantern.roles (
     id              bigint      NOT NULL,
     party_id        bigint      NOT NULL,
-    name            varchar(32) NOT NULL,
+    name            varchar(32),
     -- Actually contains 3 16-bit fields
     permissions     bigint      NOT NULL    DEFAULT 0,
     color           integer,

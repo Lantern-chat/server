@@ -19,6 +19,12 @@ bitflags::bitflags! {
 
 serde_shims::impl_serde_for_bitflags!(SecurityFlags);
 
+impl Default for SecurityFlags {
+    fn default() -> Self {
+        SecurityFlags::empty()
+    }
+}
+
 //#[derive(Debug, Clone, Serialize, Deserialize)]
 //#[serde(untagged)]
 //pub enum UnvailableParty {

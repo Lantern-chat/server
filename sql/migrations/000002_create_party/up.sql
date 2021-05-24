@@ -13,7 +13,7 @@ CREATE TABLE lantern.party (
 );
 ALTER TABLE lantern.party OWNER TO postgres;
 
-CREATE UNIQUE INDEX CONCURRENTLY name_idx ON lantern.party USING btree (name);
+CREATE INDEX CONCURRENTLY party_name_idx ON lantern.party USING btree (name);
 
 ALTER TABLE lantern.party ADD CONSTRAINT owner_fk FOREIGN KEY (owner_id)
     REFERENCES lantern.users (id) MATCH FULL

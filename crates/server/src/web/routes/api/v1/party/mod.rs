@@ -20,7 +20,7 @@ pub async fn party(mut route: Route<crate::ServerState>) -> impl Reply {
 
     match route.next().method_segment() {
         // POST /api/v1/party
-        //(&Method::POST, End) => post::post(route, auth).await.into_response(),
+        (&Method::POST, End) => post::post(route, auth).await.into_response(),
 
         // ANY /api/v1/party/1234
         (_, Exact(_)) => match route.param::<Snowflake>() {

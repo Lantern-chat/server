@@ -17,6 +17,8 @@ bitflags::bitflags! {
         const MANAGE_EMOJIS     = 1 << 11;
         const MOVE_MEMBERS      = 1 << 12;
         const CHANGE_NICKNAME   = 1 << 13;
+
+        const DEFAULT           = Self::CHANGE_NICKNAME.bits;
     }
 }
 
@@ -36,6 +38,15 @@ bitflags::bitflags! {
         const ATTACH_FILES          = 1 << 10;
         const USE_SLASH_COMMANDS    = 1 << 11;
         const SEND_TTS_MESSAGES     = 1 << 12;
+
+        const DEFAULT               = Self::VIEW_ROOM.bits |
+                                      Self::READ_MESSAGES.bits |
+                                      Self::SEND_MESSAGES.bits |
+                                      Self::USE_EXTERNAL_EMOTES.bits |
+                                      Self::ADD_REACTIONS.bits |
+                                      Self::EMBED_LINKS.bits |
+                                      Self::ATTACH_FILES.bits |
+                                      Self::SEND_TTS_MESSAGES.bits;
     }
 }
 
@@ -50,6 +61,8 @@ bitflags::bitflags! {
         const SPEAK             = 1 << 2;
         /// Allows a user to acquire priority speaker
         const PRIORITY_SPEAKER  = 1 << 3;
+
+        const DEFAULT           = Self::CONNECT.bits | Self::SPEAK.bits;
     }
 }
 
@@ -57,7 +70,25 @@ serde_shims::impl_serde_for_bitflags!(PartyPermissions);
 serde_shims::impl_serde_for_bitflags!(RoomPermissions);
 serde_shims::impl_serde_for_bitflags!(StreamPermissions);
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+impl Default for PartyPermissions {
+    fn default() -> Self {
+        PartyPermissions::DEFAULT
+    }
+}
+
+impl Default for RoomPermissions {
+    fn default() -> Self {
+        RoomPermissions::DEFAULT
+    }
+}
+
+impl Default for StreamPermissions {
+    fn default() -> Self {
+        StreamPermissions::DEFAULT
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 pub struct Permission {
     pub party: PartyPermissions,
     pub room: RoomPermissions,
