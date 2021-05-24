@@ -10,6 +10,11 @@ thorn::tables! {
         Migrated: Type::TIMESTAMP,
     }
 
+    pub struct EventLog in Lantern {
+        Code: Type::INT2,
+        Id: SNOWFLAKE,
+    }
+
     pub struct Users in Lantern {
         Id: SNOWFLAKE,
         DeletedAt: Type::TIMESTAMP,
