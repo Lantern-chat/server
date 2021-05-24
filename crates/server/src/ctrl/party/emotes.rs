@@ -27,7 +27,7 @@ pub async fn get_custom_emotes_raw<'a>(
     state: &ServerState,
     party_id: SearchMode<'a>,
 ) -> Result<impl Stream<Item = Result<CustomEmote, Error>> + 'static, Error> {
-    let client = &state.db.read;
+    let client = state.read_db().await;
 
     let stream = match party_id {
         SearchMode::Single(id) => client

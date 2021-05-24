@@ -3,8 +3,8 @@ use crate::ServerState;
 
 pub async fn logout_user(state: ServerState, auth: auth::Authorization) -> Result<(), Error> {
     let res = state
-        .db
-        .write
+        .write_db()
+        .await
         .execute_cached_typed(
             || {
                 use db::schema::*;

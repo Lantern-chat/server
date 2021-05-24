@@ -20,7 +20,7 @@ pub async fn ready(
 ) -> Result<models::ReadyEvent, Error> {
     use models::*;
 
-    let db = &state.db.read;
+    let db = state.read_db().await;
 
     let user = async {
         let row = db

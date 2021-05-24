@@ -1,5 +1,5 @@
+use pg::types::Type;
 use sea_query::*;
-use tokio_postgres::types::Type;
 
 pub fn value_to_type(v: Value) -> Option<Type> {
     Some(match v {

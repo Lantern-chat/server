@@ -1,5 +1,3 @@
-use db::{ClientError, Snowflake};
-
 use ftl::*;
 
 use crate::{

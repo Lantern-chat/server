@@ -19,11 +19,14 @@ use tokio::sync::{
 use parking_lot::{Mutex, RwLock};
 
 use futures::{Future, FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt};
-use tokio_postgres::{
+use pg::{
     tls::MakeTlsConnect, tls::TlsConnect, types::Type, AsyncMessage, Client as PgClient,
     Config as PgConfig, Error as PgError, IsolationLevel, NoTls, Notification, Socket, Statement,
     Transaction as PgTransaction, TransactionBuilder as PgTransactionBuilder,
 };
+
+use failsafe::futures::CircuitBreaker;
+use failsafe::Config;
 
 async fn timeout<O, E>(
     duration: Option<Duration>,
@@ -47,12 +50,20 @@ pub use config::{PoolConfig, Timeouts};
 
 use crate::conn::ConnectionStream;
 
+fn ro(readonly: bool) -> &'static str {
+    if readonly {
+        "read-only"
+    } else {
+        "writable"
+    }
+}
+
 #[async_trait]
 pub trait Connector {
     async fn connect(
         &self,
         config: &PoolConfig,
-    ) -> Result<(PgClient, Receiver<Notification>), PgError>;
+    ) -> Result<(PgClient, Receiver<Notification>), Error>;
 }
 
 #[async_trait]
@@ -66,12 +77,59 @@ where
     async fn connect(
         &self,
         config: &PoolConfig,
-    ) -> Result<(PgClient, Receiver<Notification>), PgError> {
-        let (client, connection) = config.pg_config.connect(self.clone()).await?;
+    ) -> Result<(PgClient, Receiver<Notification>), Error> {
+        let name = config.pg_config.get_dbname().unwrap_or("Unnamed");
+
+        let circuit_breaker = Config::new().build();
+
+        let mut attempt = 1;
+        let (client, connection) = loop {
+            // NOTE: This async block is not evaluated until polled, and when the circuitbreaker rejects
+            // a future for rate-limiting, it is not polled, therefore this doesn't run on rejection.
+            let connecting = async {
+                log::info!(
+                    "Connecting ({}) to {} database {} at {:?}:{:?}...",
+                    attempt,
+                    ro(config.readonly),
+                    name,
+                    config.pg_config.get_hosts(),
+                    config.pg_config.get_ports(),
+                );
+
+                config.pg_config.connect(self.clone()).await
+            };
+
+            match circuit_breaker.call(connecting).await {
+                Ok(res) => break res,
+                Err(failsafe::Error::Inner(e)) => {
+                    log::error!("Error connecting to database {}: {}", name, e);
+
+                    attempt += 1;
+
+                    if attempt > config.max_retries {
+                        return Err(e.into());
+                    }
+                }
+                Err(failsafe::Error::Rejected) => {
+                    log::warn!("Connecting to database {} rate-limited", name);
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                }
+            }
+        };
 
         let (tx, rx) = mpsc::channel(config.channel_size);
 
-        let notif_timeout = config.timeouts.notif;
+        //
+        //
+        //
+        // IDEA: Take this `mpsc` channel and forward it into a `watcher` channel for event-log streaming,
+        // so it only needs to track the latest event (or any event at all, as a signal)
+        //
+        //
+        //
+
+        let name = name.to_owned();
+        let readonly = config.readonly;
 
         tokio::spawn(async move {
             let mut stream = ConnectionStream(connection);
@@ -80,21 +138,25 @@ where
                 match stream.next().await {
                     Some(Ok(msg)) => match msg {
                         AsyncMessage::Notification(notif) => {
-                            match tokio::time::timeout(Duration::from_secs(5), tx.send(notif)).await
-                            {
-                                Ok(Err(e)) => {
-                                    log::error!("Error forwarding database message: {}", e);
+                            use mpsc::error::SendTimeoutError;
+
+                            match tx.send_timeout(notif, Duration::from_secs(3)).await {
+                                Ok(_) => {}
+                                Err(SendTimeoutError::Closed(n)) => {
+                                    // other half has been closed, implying a drop, so exit early
+                                    log::error!("Failed to forward database notification: {:?}", n);
                                     break;
                                 }
-                                Err(_) => {
-                                    log::error!("Failed to send database notification in time");
-                                    break;
+                                Err(SendTimeoutError::Timeout(n)) => {
+                                    log::error!(
+                                        "Forwarding database notification timed out: {:?}",
+                                        n
+                                    );
                                 }
-                                _ => {}
                             }
                         }
                         AsyncMessage::Notice(notice) => log::info!("Database notice: {}", notice),
-                        _ => {}
+                        _ => unreachable!("AsyncMessage is non-exhaustive"),
                     },
                     Some(Err(e)) => {
                         log::error!("Database connection error: {}", e);
@@ -106,10 +168,7 @@ where
 
             drop(tx);
 
-            //log::info!(
-            //    "Disconnected from database {:?}",
-            //    config.pg_config.get_dbname().unwrap_or("Unnamed")
-            //);
+            log::info!("Disconnected from {} database {:?}", ro(readonly), name);
         });
 
         Ok((client, rx))
@@ -118,7 +177,7 @@ where
 
 pub struct PoolInner {
     config: PoolConfig,
-    connector: Box<dyn Connector>,
+    connector: Box<dyn Connector + Send + Sync + 'static>,
     queue: Mutex<VecDeque<Client>>,
     semaphore: Semaphore,
 
@@ -139,7 +198,7 @@ impl Deref for Pool {
 impl Pool {
     pub fn new<C>(config: PoolConfig, conn: C) -> Pool
     where
-        C: Connector + 'static,
+        C: Connector + Send + Sync + 'static,
     {
         Pool(Arc::new(PoolInner {
             semaphore: Semaphore::new(config.max_connections),
@@ -154,8 +213,6 @@ impl Pool {
         let (client, rx) = self.connector.connect(&self.config).await?;
 
         let stmt_cache = Arc::new(StatementCache::new());
-
-        // TODO: Find a good way to remove these laters
         self.stmt_caches.attach(&stmt_cache);
 
         Ok(Client {
@@ -180,6 +237,16 @@ impl Pool {
         }
 
         Ok(())
+    }
+
+    pub async fn get(&self) -> Result<Object, Error> {
+        self.timeout_get(&self.config.timeouts).await
+    }
+
+    pub async fn try_get(&self) -> Result<Object, Error> {
+        let mut timeouts = self.config.timeouts.clone();
+        timeouts.wait = Some(Duration::from_secs(0));
+        self.timeout_get(&timeouts).await
     }
 
     pub async fn timeout_get(&self, timeouts: &Timeouts) -> Result<Object, Error> {
@@ -242,6 +309,11 @@ impl Pool {
         client.state = State::Ready;
 
         Ok(client)
+    }
+
+    pub async fn close(&self) {
+        self.semaphore.close();
+        self.queue.lock().clear();
     }
 }
 
@@ -412,7 +484,7 @@ impl Client {
 use std::any::Any;
 use thorn::AnyQuery;
 
-use tokio_postgres::{
+use pg::{
     types::{BorrowToSql, ToSql},
     Row, RowStream, ToStatement,
 };
@@ -740,7 +812,7 @@ impl Transaction<'_> {
         })
     }
 
-    pub fn cancel_token(&self) -> tokio_postgres::CancelToken {
+    pub fn cancel_token(&self) -> pg::CancelToken {
         self.t.cancel_token()
     }
 }

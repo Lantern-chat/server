@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use db::ClientError;
+use db::pool::Error as DbError;
 use ftl::StatusCode;
 
 use crate::web::gateway::event::EncodingError;
@@ -10,7 +10,7 @@ pub enum Error {
     // FATAL ERRORS
     // TODO: Add backtraces when https://github.com/dtolnay/thiserror/pull/131 lands
     #[error("Database Error {0}")]
-    DbError(#[from] ClientError),
+    DbError(#[from] DbError),
     #[error("Join Error {0}")]
     JoinError(#[from] tokio::task::JoinError),
     #[error("Semaphore Error: {0}")]
@@ -90,8 +90,8 @@ pub enum Error {
     DecodeError(#[from] base64::DecodeError),
 }
 
-impl From<db::PgError> for Error {
-    fn from(err: db::PgError) -> Error {
+impl From<db::pg::Error> for Error {
+    fn from(err: db::pg::Error) -> Error {
         Error::DbError(err.into())
     }
 }

@@ -1,14 +1,7 @@
-use std::{sync::Arc, time::SystemTime};
-
-use db::{ClientError, Snowflake, SnowflakeExt};
-
 use ftl::*;
 
 use crate::{
-    ctrl::{
-        user::register::{register_user, RegisterForm},
-        Error,
-    },
+    ctrl::user::register::{register_user, RegisterForm},
     web::routes::api::ApiError,
     ServerState,
 };

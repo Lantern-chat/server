@@ -1,6 +1,6 @@
 use hashbrown::hash_map::{Entry, HashMap};
 
-use db::{ClientError, Snowflake};
+use db::Snowflake;
 
 use crate::{
     ctrl::{auth::AuthToken, Error},
@@ -22,9 +22,7 @@ pub fn get_members(
     party_id: Snowflake,
 ) -> impl Stream<Item = Result<PartyMember, Error>> {
     async_stream::stream! {
-        let rows = state
-            .db
-            .read
+        let rows = state.read_db().await
             .query_stream_cached_typed(|| select_members(), &[&party_id])
             .await;
 

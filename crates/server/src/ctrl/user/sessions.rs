@@ -12,8 +12,8 @@ pub async fn list_sessions(
     auth: Authorization,
 ) -> Result<impl Stream<Item = Result<AnonymousSession, Error>>, Error> {
     let sessions = state
-        .db
-        .read
+        .read_db()
+        .await
         .query_stream_cached_typed(
             || {
                 use db::schema::*;

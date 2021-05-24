@@ -79,7 +79,7 @@ impl AuthToken {
     }
 }
 
-use db::{ClientError, Snowflake};
+use db::Snowflake;
 
 use crate::ServerState;
 
@@ -105,8 +105,8 @@ pub async fn do_auth(state: &ServerState, raw_token: &[u8]) -> Result<Authorizat
 
     // TODO: Cache this
     let session = state
-        .db
-        .read
+        .read_db()
+        .await
         .query_opt_cached_typed(
             || {
                 use db::schema::*;

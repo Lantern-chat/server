@@ -11,18 +11,23 @@ pub async fn cleanup_sessions(state: ServerState) {
 
         let _ = interval.tick().await;
 
-        // TODO: Only execute this on the actual write-server
-        let res = state
-            .db
-            .write
-            .execute_cached(
-                || "DELETE FROM lantern.sessions WHERE expires < $1",
-                &[&SystemTime::now()],
-            )
-            .await;
+        match state.db.write.get().await {
+            Ok(db) => {
+                let res = db
+                    .execute_cached(
+                        || "DELETE FROM lantern.sessions WHERE expires < $1",
+                        &[&SystemTime::now()],
+                    )
+                    .await;
 
-        if let Err(e) = res {
-            log::error!("{}", e);
+                if let Err(e) = res {
+                    log::error!("Error during session cleanup: {}", e);
+                }
+            }
+            Err(e) => {
+                log::error!("Unable to run session cleanup task due to error: {}\nTrying again in 1 second.", e);
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            }
         }
     }
 }

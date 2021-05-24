@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::SystemTime};
 
-use db::{ClientError, Snowflake, SnowflakeExt};
+use db::{Snowflake, SnowflakeExt};
 
 use crate::{ctrl::Error, ServerState};
 
@@ -52,8 +52,8 @@ pub async fn register_user(state: ServerState, mut form: RegisterForm) -> Result
     }
 
     let existing = state
-        .db
-        .read
+        .read_db()
+        .await
         .query_opt_cached_typed(
             || {
                 use db::schema::*;
@@ -96,8 +96,8 @@ pub async fn register_user(state: ServerState, mut form: RegisterForm) -> Result
     drop(permit);
 
     state
-        .db
-        .write
+        .write_db()
+        .await
         .execute_cached_typed(
             || {
                 use db::schema::*;

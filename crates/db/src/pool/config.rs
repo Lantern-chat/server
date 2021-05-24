@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use tokio_postgres::Config as PgConfig;
+use pg::Config as PgConfig;
 
 #[derive(Clone, Debug)]
 pub struct Timeouts {
@@ -10,8 +10,6 @@ pub struct Timeouts {
     pub create: Option<Duration>,
     /// Timeout when recycling an object
     pub recycle: Option<Duration>,
-    /// Timeout when delivering a notification
-    pub notif: Option<Duration>,
 }
 
 impl Timeouts {
@@ -29,11 +27,6 @@ impl Timeouts {
         self.recycle = Some(timeout);
         self
     }
-
-    pub fn notif(mut self, timeout: Duration) -> Self {
-        self.notif = Some(timeout);
-        self
-    }
 }
 
 impl Default for Timeouts {
@@ -43,7 +36,6 @@ impl Default for Timeouts {
             create: None,
             wait: None,
             recycle: None,
-            notif: None,
         }
     }
 }
@@ -85,6 +77,7 @@ pub struct PoolConfig {
     pub timeouts: Timeouts,
     pub readonly: bool,
     pub max_connections: usize,
+    pub max_retries: usize,
     pub channel_size: usize,
     pub recycling_method: RecyclingMethod,
 }
@@ -96,7 +89,8 @@ impl PoolConfig {
             timeouts: Timeouts::default(),
             readonly: false,
             max_connections: num_cpus::get_physical() * 4,
-            channel_size: 256,
+            max_retries: 6,
+            channel_size: 64,
             recycling_method: RecyclingMethod::Fast,
         }
     }
@@ -113,6 +107,11 @@ impl PoolConfig {
 
     pub fn channel_size(mut self, size: usize) -> Self {
         self.channel_size = size;
+        self
+    }
+
+    pub fn max_retries(mut self, retries: usize) -> Self {
+        self.max_retries = retries;
         self
     }
 }

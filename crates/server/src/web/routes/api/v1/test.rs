@@ -16,8 +16,8 @@ pub async fn test(route: Route<ServerState>) -> impl Reply {
     ];
 
     let res = state
-        .db
-        .read
+        .read_db()
+        .await
         .query_cached_typed(
             || {
                 Query::select()

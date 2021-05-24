@@ -4,10 +4,10 @@ use std::task::{Context, Poll};
 
 use futures::Stream;
 
+use pg::{AsyncMessage, Connection as StdConnection, Error};
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio_postgres::{AsyncMessage, Connection as StdConnection, Error};
 
-/// Simple wrapper type for `tokio_postgres::Connection` that returns the actual message in the future
+/// Simple wrapper type for `pg::Connection` that returns the actual message in the future
 pub struct ConnectionStream<S, T>(pub StdConnection<S, T>);
 
 impl<S, T> Deref for ConnectionStream<S, T> {

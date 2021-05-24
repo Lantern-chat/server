@@ -26,7 +26,7 @@ pub async fn get_roles_raw<'a>(
     state: &ServerState,
     party_id: SearchMode<'a>,
 ) -> Result<impl Stream<Item = Result<Role, Error>> + 'static, Error> {
-    let client = &state.db.read;
+    let client = state.read_db().await;
 
     let stream = match party_id {
         SearchMode::Single(id) => client

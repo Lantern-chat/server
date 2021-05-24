@@ -14,8 +14,8 @@ use tokio::sync::{
     mpsc::{UnboundedReceiver, UnboundedSender},
     Mutex,
 };
-use tokio_postgres as pg;
-use tokio_postgres::{
+
+use pg::{
     types::{BorrowToSql, ToSql, Type},
     Row, RowStream, Statement, ToStatement,
 };
@@ -24,8 +24,6 @@ use failsafe::futures::CircuitBreaker;
 use failsafe::Config;
 
 use arc_swap::{ArcSwap, ArcSwapOption};
-
-use crate::Transaction;
 
 use super::{
     conn::ConnectionStream,

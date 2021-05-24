@@ -1,4 +1,5 @@
 extern crate tracing as log;
+use db::pg::NoTls;
 use tracing_subscriber::FmtSubscriber;
 
 pub mod cli;
@@ -36,7 +37,29 @@ async fn main() -> anyhow::Result<()> {
         None => SocketAddr::from(([127, 0, 0, 1], 3030)),
     };
 
-    let db = db::Client::startup().await?;
+    let db = {
+        use db::pool::{Pool, PoolConfig};
+
+        let db_str = std::env::var("DB_STR")
+            .unwrap_or_else(|_| "postgresql://user:password@db:5432".to_owned());
+
+        let migrations_path =
+            std::env::var("MIGRATIONS").unwrap_or_else(|_| "./backend/sql/migrations".to_owned());
+
+        let mut config = db_str.parse::<db::pg::Config>()?;
+        config.dbname("lantern");
+
+        let pool_config = PoolConfig::new(config);
+
+        let write_pool = Pool::new(pool_config.clone(), NoTls);
+
+        db::migrate::migrate(write_pool.clone(), migrations_path).await?;
+
+        server::DatabasePools {
+            write: write_pool,
+            read: Pool::new(pool_config.readonly(), NoTls),
+        }
+    };
 
     log::info!("Starting server...");
     let (server, state) = server::start_server(addr, db);

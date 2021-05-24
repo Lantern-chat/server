@@ -15,8 +15,8 @@ pub async fn get_party(
     party_id: Snowflake,
 ) -> Result<Party, Error> {
     let row = state
-        .db
-        .read
+        .read_db()
+        .await
         .query_opt_cached_typed(
             || {
                 use db::schema::*;

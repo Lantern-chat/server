@@ -1,4 +1,4 @@
-use db::{ClientError, Snowflake};
+use db::Snowflake;
 
 use crate::{
     ctrl::{auth::AuthToken, Error},
@@ -23,8 +23,8 @@ pub async fn login(state: ServerState, form: LoginForm) -> Result<Session, Error
     }
 
     let user = state
-        .db
-        .read
+        .read_db()
+        .await
         .query_opt_cached_typed(
             || {
                 use db::schema::*;
@@ -86,8 +86,8 @@ pub async fn do_login(
     let expires = now + state.config.login_session_duration;
 
     state
-        .db
-        .write
+        .write_db()
+        .await
         .execute_cached_typed(
             || {
                 use db::schema::*;

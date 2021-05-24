@@ -35,13 +35,19 @@ pub mod tasks {
 
 pub use state::ServerState;
 
-use db::Client;
+use db::pool::Pool;
+
+#[derive(Clone)]
+pub struct DatabasePools {
+    pub read: Pool,
+    pub write: Pool,
+}
 
 use ftl::Reply;
 
 pub fn start_server(
     addr: SocketAddr,
-    db: Client,
+    db: DatabasePools,
 ) -> (impl Future<Output = Result<(), hyper::Error>>, ServerState) {
     let (snd, rcv) = tokio::sync::oneshot::channel();
     let state = ServerState::new(snd, db);

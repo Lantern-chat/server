@@ -10,8 +10,8 @@ pub async fn get_members(
 ) -> impl Reply {
     let is_member = route
         .state
-        .db
-        .read
+        .read_db()
+        .await
         .query_opt_cached_typed(
             || {
                 use db::schema::*;

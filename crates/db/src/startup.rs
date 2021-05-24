@@ -2,26 +2,26 @@ use std::str::FromStr;
 use std::sync::{atomic::Ordering, Arc};
 use std::{borrow::Cow, path::PathBuf};
 
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 
+use pg::Connection;
 use tokio::sync::mpsc;
 
-use tokio_postgres as pg;
+use super::conn::ConnectionStream;
 
-use super::{client::Client, ClientError};
-
-pub fn log_connection(client: Client) {
+pub fn log_connection(
+    conn: impl Stream<Item = Result<pg::AsyncMessage, pg::Error>> + Send + 'static,
+) {
     tokio::spawn(async move {
+        futures::pin_mut!(conn);
         loop {
-            let mut conn = client.conn.lock().await;
-            if let Some(ref mut rx) = *conn {
-                while let Some(_msg) = rx.recv().await {
-                    // TODO
+            match conn.next().await {
+                Some(Ok(msg)) => log::info!("Database message: {:?}", msg),
+                Some(Err(e)) => {
+                    log::error!("Database error: {}", e);
+                    break;
                 }
-            }
-
-            if !client.autoreconnect.load(Ordering::SeqCst) {
-                break;
+                None => break,
             }
         }
     });
@@ -32,9 +32,6 @@ pub enum StartupError {
     #[error("Database error: {0}")]
     DatabaseError(#[from] pg::Error),
 
-    #[error("Client error: {0}")]
-    ClientError(#[from] ClientError),
-
     #[error("IO Error: {0}")]
     IoError(#[from] std::io::Error),
 
@@ -42,7 +39,7 @@ pub enum StartupError {
     NotUpToDate,
 }
 
-pub async fn startup(readonly: bool) -> Result<Client, StartupError> {
+pub async fn startup(readonly: bool) -> Result<(), StartupError> {
     let db_str =
         std::env::var("DB_STR").unwrap_or_else(|_| "postgresql://user:password@db:5432".to_owned());
 
@@ -163,69 +160,4 @@ pub async fn startup(readonly: bool) -> Result<Client, StartupError> {
     let client = Client::connect(config, readonly).await?;
 
     Ok(client)
-}
-
-pub struct Migration {
-    up: String,
-    down: String,
-}
-
-lazy_static::lazy_static! {
-    static ref SQL_COMMENT: regex::Regex = regex::Regex::new(r#"--.*"#).unwrap();
-}
-
-async fn load_sql(path: PathBuf) -> Result<String, StartupError> {
-    let mut sql = tokio::fs::read_to_string(path).await?;
-
-    sql = SQL_COMMENT.replace_all(&sql, "").into_owned();
-
-    Ok(sql)
-}
-
-async fn load_migration(path: PathBuf) -> Result<Migration, StartupError> {
-    let mut up = path.clone();
-    let mut down = path;
-
-    up.push("up.sql");
-    down.push("down.sql");
-
-    Ok(Migration {
-        up: load_sql(up).await?,
-        down: load_sql(down).await?,
-    })
-}
-
-struct SqlIterator<'a> {
-    sql: &'a str,
-}
-
-impl<'a> SqlIterator<'a> {
-    pub fn new(sql: &'a str) -> Self {
-        SqlIterator { sql }
-    }
-}
-
-impl<'a> Iterator for SqlIterator<'a> {
-    type Item = &'a str;
-
-    fn next(&mut self) -> Option<&'a str> {
-        let mut in_dollar = false;
-        let mut ic = self.sql.char_indices().peekable();
-
-        loop {
-            if let Some((idx, c)) = ic.next() {
-                if c == '$' && ic.peek().map(|(_, c)| *c == '$') == Some(true) {
-                    in_dollar = !in_dollar;
-                }
-
-                if c == ';' && !in_dollar {
-                    let res = Some(&self.sql[..idx]);
-                    self.sql = &self.sql[idx + 1..];
-                    return res;
-                }
-            } else {
-                return None;
-            }
-        }
-    }
 }

@@ -1,7 +1,7 @@
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("Database Error: {0}")]
-    DbError(#[from] tokio_postgres::Error),
+    DbError(#[from] pg::Error),
 
     #[error("Error recycling connection")]
     RecyclingError,
@@ -14,4 +14,7 @@ pub enum Error {
 
     #[error("Connection Pool is closed")]
     Closed,
+
+    #[error("Could not connect to database")]
+    ConnectionFailure,
 }

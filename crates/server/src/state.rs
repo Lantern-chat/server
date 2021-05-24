@@ -9,16 +9,14 @@ use std::{
 use futures::FutureExt;
 use tokio::sync::{oneshot, Mutex, Semaphore};
 
-use db::Client;
-
 use crate::web::{gateway::Gateway, rate_limit::RateLimitTable};
-use crate::{config::LanternConfig, filesystem::disk::FileStore};
+use crate::{config::LanternConfig, filesystem::disk::FileStore, DatabasePools};
 
 pub struct InnerServerState {
     pub is_alive: AtomicBool,
     pub shutdown: Mutex<Option<oneshot::Sender<()>>>,
     pub rate_limit: RateLimitTable,
-    pub db: Client,
+    pub db: DatabasePools,
     pub config: LanternConfig,
     pub fs: FileStore,
     pub gateway: Gateway,
@@ -37,7 +35,7 @@ impl Deref for ServerState {
 }
 
 impl ServerState {
-    pub fn new(shutdown: oneshot::Sender<()>, db: Client) -> Self {
+    pub fn new(shutdown: oneshot::Sender<()>, db: DatabasePools) -> Self {
         ServerState(Arc::new(InnerServerState {
             is_alive: AtomicBool::new(true),
             shutdown: Mutex::new(Some(shutdown)),
@@ -78,5 +76,21 @@ impl ServerState {
             }
             None => log::warn!("Duplicate shutdown signals detected!"),
         }
+    }
+
+    pub async fn read_db(&self) -> db::pool::Object {
+        self.db
+            .read
+            .get()
+            .await
+            .expect("Could not acquire readonly database connection")
+    }
+
+    pub async fn write_db(&self) -> db::pool::Object {
+        self.db
+            .write
+            .get()
+            .await
+            .expect("Could not acquire writable database connection")
     }
 }
