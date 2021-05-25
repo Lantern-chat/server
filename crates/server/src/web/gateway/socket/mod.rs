@@ -119,11 +119,11 @@ pub fn client_connected(
         let mut events = stream::SelectAll::<stream::BoxStream<Item>>::new();
 
         // Push Hello event to begin stream and forward ws_rx/conn_rx into events
-        //events.push(stream::once(future::ready(Item::Event(Ok(HELLO_EVENT.clone())))).boxed());
+        events.push(stream::once(future::ready(Item::Event(Ok(HELLO_EVENT.clone())))).boxed());
         events.push(ws_rx.map(|msg| Item::Msg(msg)).boxed());
         events.push(conn_rx.map(|msg| Item::Event(Ok(msg))).boxed());
 
-        let _ = conn.tx.send(HELLO_EVENT.clone()).await;
+        //let _ = conn.tx.send(HELLO_EVENT.clone()).await;
 
         // Make the new connection known to the gateway
         state.gateway.add_connection(conn.clone()).await;
