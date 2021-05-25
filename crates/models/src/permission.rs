@@ -106,6 +106,12 @@ pub struct Overwrite {
 }
 
 impl Permission {
+    pub const ALL: Self = Permission {
+        party: PartyPermissions::all(),
+        room: RoomPermissions::all(),
+        stream: StreamPermissions::all(),
+    };
+
     #[inline]
     pub const fn pack(self) -> u64 {
         let low = self.party.bits() as u64;
