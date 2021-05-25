@@ -1,3 +1,5 @@
+use std::time::SystemTime;
+
 use db::SnowflakeExt;
 
 use models::*;
@@ -27,9 +29,11 @@ pub async fn create_party(
         return Err(Error::InvalidName);
     }
 
-    let party_id = Snowflake::now();
-    let role_id = Snowflake::now();
-    let room_id = Snowflake::now();
+    let now = SystemTime::now();
+
+    let party_id = Snowflake::at(now);
+    let role_id = Snowflake::at(now);
+    let room_id = Snowflake::at(now);
 
     let default_role = Role {
         id: role_id,
@@ -50,6 +54,7 @@ pub async fn create_party(
         security: form.security,
         roles: Vec::new(),
         emotes: Vec::new(),
+        icon_id: None,
     };
 
     let mut db = state.db.write.get().await?;

@@ -46,6 +46,9 @@ pub struct Party {
 
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub emotes: Vec<Emote>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon_id: Option<Snowflake>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -58,12 +58,13 @@ pub async fn ready(
                 partial: PartialParty {
                     id: row.try_get(0)?,
                     name: row.try_get(2)?,
-                    description: None,
+                    description: row.try_get(4)?,
                 },
                 owner: row.try_get(1)?,
                 security: SecurityFlags::empty(),
                 roles: Vec::new(),
                 emotes: Vec::new(),
+                icon_id: row.try_get(3)?,
             }),
         });
 
@@ -145,9 +146,16 @@ fn select_parties() -> impl AnyQuery {
     use db::schema::*;
 
     Query::select()
-        .cols(&[Party::Id, Party::OwnerId, Party::Name])
+        .cols(&[
+            Party::Id,
+            Party::OwnerId,
+            Party::Name,
+            Party::IconId,
+            Party::Description,
+        ])
         .from(Party::left_join_table::<PartyMember>().on(PartyMember::PartyId.equals(Party::Id)))
         .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
+        .and_where(Party::DeletedAt.is_null())
 }
 
 /*

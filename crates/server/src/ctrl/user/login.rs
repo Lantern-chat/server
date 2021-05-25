@@ -32,8 +32,9 @@ pub async fn login(state: ServerState, form: LoginForm) -> Result<Session, Error
 
                 Query::select()
                     .from_table::<Users>()
-                    .cols(&[Users::Id, Users::Email, Users::Passhash, Users::DeletedAt])
+                    .cols(&[Users::Id, Users::Passhash])
                     .and_where(Users::Email.equals(Var::of(Users::Email)))
+                    .and_where(Users::DeletedAt.is_null())
             },
             &[&form.email],
         )
@@ -44,13 +45,8 @@ pub async fn login(state: ServerState, form: LoginForm) -> Result<Session, Error
         None => return Err(Error::InvalidCredentials),
     };
 
-    let id: Snowflake = user.get(0);
-    let passhash: String = user.get(2);
-    let deleted_at: Option<time::PrimitiveDateTime> = user.get(3);
-
-    if deleted_at.is_some() {
-        return Err(Error::InvalidCredentials);
-    }
+    let id: Snowflake = user.try_get(0)?;
+    let passhash: String = user.try_get(1)?;
 
     // NOTE: Given how expensive it can be to compute an argon2 hash,
     // this only allows a given number to process at once.

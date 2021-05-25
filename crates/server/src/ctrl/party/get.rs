@@ -24,7 +24,6 @@ pub async fn get_party(
 
                 Query::select()
                     .cols(&[
-                        Party::DeletedAt,
                         Party::Name,
                         Party::OwnerId,
                         Party::IconId,
@@ -36,6 +35,7 @@ pub async fn get_party(
                             .on(PartyMember::PartyId.equals(Party::Id)),
                     )
                     .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
+                    .and_where(Party::DeletedAt.is_null())
             },
             &[&party_id, &auth.user_id],
         )
@@ -43,25 +43,18 @@ pub async fn get_party(
 
     let mut party = match row {
         None => return Err(Error::NotFound),
-        Some(row) => {
-            let deleted_at: Option<time::PrimitiveDateTime> = row.try_get(0)?;
-
-            if deleted_at.is_some() {
-                return Err(Error::NotFound);
-            }
-
-            Party {
-                partial: PartialParty {
-                    id: party_id,
-                    name: row.try_get(1)?,
-                    description: row.try_get(4)?,
-                },
-                owner: row.try_get(2)?,
-                security: SecurityFlags::empty(),
-                roles: Vec::new(),
-                emotes: Vec::new(),
-            }
-        }
+        Some(row) => Party {
+            partial: PartialParty {
+                id: party_id,
+                name: row.try_get(0)?,
+                description: row.try_get(3)?,
+            },
+            owner: row.try_get(1)?,
+            security: SecurityFlags::empty(),
+            roles: Vec::new(),
+            emotes: Vec::new(),
+            icon_id: row.try_get(2)?,
+        },
     };
 
     let roles = async {

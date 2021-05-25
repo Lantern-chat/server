@@ -2,8 +2,6 @@ use std::num::NonZeroU32;
 
 use super::*;
 
-pub enum RoomType {}
-
 bitflags::bitflags! {
     pub struct RoomFlags: i16 {
         const TEXT    = 1 << 0;
@@ -34,7 +32,7 @@ pub struct Room {
 
     /// Sort order
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pos: Option<u16>,
+    pub sort_order: Option<u16>,
 
     pub flags: RoomFlags,
 

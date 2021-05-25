@@ -20,6 +20,7 @@ pub mod party {
     pub mod get;
     pub mod members;
     pub mod roles;
+    pub mod rooms;
 }
 
 #[derive(Debug, Clone, Copy)]
