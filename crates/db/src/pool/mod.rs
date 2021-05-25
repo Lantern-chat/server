@@ -212,7 +212,7 @@ impl Pool {
     async fn create(&self) -> Result<Client, Error> {
         let (client, rx) = self.connector.connect(&self.config).await?;
 
-        let stmt_cache = Arc::new(StatementCache::new());
+        let stmt_cache = Arc::new(StatementCache::default());
         self.stmt_caches.attach(&stmt_cache);
 
         Ok(Client {
@@ -428,13 +428,15 @@ pub struct StatementCache {
     cache: ArcSwap<HashMap<TypeId, Statement>>,
 }
 
-impl StatementCache {
-    pub fn new() -> StatementCache {
+impl Default for StatementCache {
+    fn default() -> Self {
         StatementCache {
             cache: ArcSwap::new(Arc::new(HashMap::new())),
         }
     }
+}
 
+impl StatementCache {
     pub fn insert(&self, key: TypeId, stmt: &Statement) {
         self.cache.rcu(|cache| {
             let mut cache = HashMap::clone(&cache);
@@ -502,7 +504,7 @@ impl Client {
             assert!(!WRITE_REGEX.is_match(query));
         }
 
-        return query;
+        query
     }
 
     pub async fn prepare_cached<F>(&self, query: F) -> Result<Statement, Error>
@@ -514,7 +516,7 @@ impl Client {
         // It's fine to get a cached entry if the client is disconnected
         // since it can't be used anyway.
         if let Some(stmt) = self.stmt_cache.get(id) {
-            return Ok(stmt.clone());
+            return Ok(stmt);
         }
 
         let stmt = self
@@ -700,7 +702,7 @@ impl Client {
         // It's fine to get a cached entry if the client is disconnected
         // since it can't be used anyway.
         if let Some(stmt) = self.stmt_cache.get(id) {
-            return Ok(stmt.clone());
+            return Ok(stmt);
         }
 
         let (query, collector) = query().to_string();
@@ -824,7 +826,7 @@ impl Transaction<'_> {
             assert!(!WRITE_REGEX.is_match(query));
         }
 
-        return query;
+        query
     }
 
     pub async fn prepare_cached<F>(&self, query: F) -> Result<Statement, Error>
@@ -836,7 +838,7 @@ impl Transaction<'_> {
         // It's fine to get a cached entry if the client is disconnected
         // since it can't be used anyway.
         if let Some(stmt) = self.stmt_cache.get(id) {
-            return Ok(stmt.clone());
+            return Ok(stmt);
         }
 
         let stmt = self.t.prepare(self.debug_check_readonly(query())).await?;
@@ -1013,7 +1015,7 @@ impl Transaction<'_> {
         // It's fine to get a cached entry if the client is disconnected
         // since it can't be used anyway.
         if let Some(stmt) = self.stmt_cache.get(id) {
-            return Ok(stmt.clone());
+            return Ok(stmt);
         }
 
         let (query, collector) = query().to_string();
