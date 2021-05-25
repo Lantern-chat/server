@@ -32,11 +32,10 @@ pub async fn create_party(
     let now = SystemTime::now();
 
     let party_id = Snowflake::at(now);
-    let role_id = Snowflake::at(now);
     let room_id = Snowflake::at(now);
 
     let default_role = Role {
-        id: role_id,
+        id: party_id,
         party_id,
         name: None,
         permissions: Permission::default(),
