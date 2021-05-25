@@ -32,7 +32,7 @@ pub struct Room {
 
     /// Sort order
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sort_order: Option<u16>,
+    pub sort_order: Option<i16>,
 
     pub flags: RoomFlags,
 
@@ -47,8 +47,7 @@ pub struct Room {
     /// Permission overwrites for this room
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub overwrites: Vec<Overwrite>,
-
-    /// Direct/Group Message Users
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub recipients: Vec<User>,
+    // /// Direct/Group Message Users
+    // #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    // pub recipients: Vec<User>,
 }

@@ -1,8 +1,8 @@
 use ftl::*;
 
-use db::{schema::Room, Snowflake};
+use db::Snowflake;
 
-use crate::routes::api::auth::Authorization;
+use crate::ctrl::auth::Authorization;
 
 pub async fn get_rooms(
     route: Route<crate::ServerState>,

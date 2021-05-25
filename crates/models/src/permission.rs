@@ -124,4 +124,56 @@ impl Permission {
             stream: StreamPermissions::from_bits_truncate((bits >> 32) as i16),
         }
     }
+
+    pub fn remove(&mut self, other: Self) {
+        self.party.remove(other.party);
+        self.room.remove(other.room);
+        self.stream.remove(other.stream);
+    }
+}
+
+use std::ops::{BitAnd, BitOr, BitXor, Not};
+
+impl Not for Permission {
+    type Output = Self;
+
+    fn not(self) -> Self {
+        Permission {
+            party: self.party.not(),
+            room: self.room.not(),
+            stream: self.stream.not(),
+        }
+    }
+}
+
+macro_rules! impl_bitwise {
+    ($($op_trait:ident::$op:ident),*) => {$(
+        impl $op_trait for Permission {
+            type Output = Permission;
+
+            fn $op(self, rhs: Self) -> Self {
+                Permission {
+                    party: $op_trait::$op(self.party, rhs.party),
+                    room: $op_trait::$op(self.room, rhs.room),
+                    stream: $op_trait::$op(self.stream, rhs.stream),
+                }
+            }
+        }
+    )*};
+}
+
+impl_bitwise!(BitAnd::bitand, BitOr::bitor, BitXor::bitxor);
+
+impl Overwrite {
+    pub fn combine(&self, other: Self) -> Overwrite {
+        Overwrite {
+            id: self.id,
+            allow: self.allow | other.allow,
+            deny: self.deny | other.deny,
+        }
+    }
+
+    pub fn apply(&self, base: Permission) -> Permission {
+        (base & !self.deny) | self.allow
+    }
 }

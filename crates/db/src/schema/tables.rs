@@ -3,6 +3,7 @@ use thorn::pg::Type;
 use super::*;
 
 pub const SNOWFLAKE: Type = Type::INT8;
+pub const SNOWFLAKE_ARRAY: Type = Type::INT8_ARRAY;
 
 thorn::tables! {
     pub struct Host in Lantern {
@@ -113,6 +114,14 @@ thorn::tables! {
         AvatarId: SNOWFLAKE,
         SortOrder: Type::INT2,
         ParentId: SNOWFLAKE,
+    }
+
+    pub struct Overwrites in Lantern {
+        RoomId: SNOWFLAKE,
+        RoleId: SNOWFLAKE,
+        UserId: SNOWFLAKE,
+        Allow: Type::INT8,
+        Deny: Type::INT8,
     }
 
     pub struct DMs as "dms" in Lantern {

@@ -23,7 +23,7 @@ pub async fn test(route: Route<ServerState>) -> impl Reply {
                 Query::select()
                     .col(Users::Username)
                     .from_table::<Users>()
-                    .and_where(Users::Id.equals(Builtin::any(Var::of(Type::INT8_ARRAY))))
+                    .and_where(Users::Id.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))
             },
             &[&ids],
         )

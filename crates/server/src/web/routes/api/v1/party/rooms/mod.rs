@@ -2,11 +2,11 @@ use ftl::*;
 
 use db::Snowflake;
 
-use crate::routes::api::auth::Authorization;
+use crate::ctrl::auth::Authorization;
 
 pub mod get;
 pub mod patch;
-pub mod post;
+//pub mod post;
 
 pub async fn party_rooms(
     mut route: Route<crate::ServerState>,
@@ -15,7 +15,7 @@ pub async fn party_rooms(
 ) -> impl Reply {
     match route.next().method_segment() {
         // POST /api/v1/party/1234/rooms
-        (&Method::POST, End) => post::post_room(route, auth, party_id).await.into_response(),
+        //(&Method::POST, End) => post::post_room(route, auth, party_id).await.into_response(),
 
         // GET /api/v1/party/1234/rooms
         (&Method::GET, End) => get::get_rooms(route, auth, party_id).await.into_response(),

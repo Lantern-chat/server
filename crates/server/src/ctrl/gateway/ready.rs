@@ -163,7 +163,7 @@ fn select_members() -> impl AnyQuery {
     use db::schema::*;
 
     Query::select()
-        .and_where(PartyMember::PartyId.equals(Builtin::any(Var::of(Type::INT8_ARRAY))))
+        .and_where(PartyMember::PartyId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))
         .cols(&[PartyMember::PartyId, PartyMember::Nickname])
         .cols(&[
             Users::Id,
@@ -184,7 +184,7 @@ fn select_members_old() -> impl AnyQuery {
     use db::schema::*;
 
     Query::select()
-        .and_where(PartyMember::PartyId.equals(Builtin::any(Var::of(Type::INT8_ARRAY))))
+        .and_where(PartyMember::PartyId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))
         .cols(&[PartyMember::PartyId, PartyMember::Nickname])
         .cols(&[
             Users::Id,
