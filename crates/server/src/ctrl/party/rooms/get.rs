@@ -11,6 +11,13 @@ use crate::{
     ServerState,
 };
 
+#[derive(Clone, Copy)]
+struct RawOverwrite {
+    id: Snowflake,
+    deny: u64,
+    allow: u64,
+}
+
 pub async fn get_rooms(
     state: ServerState,
     auth: Authorization,
@@ -38,8 +45,8 @@ pub async fn get_rooms(
     };
 
     let rooms_future = async {
-        let stream = db
-            .query_stream_cached_typed(
+        let rows = db
+            .query_cached_typed(
                 || {
                     use db::schema::*;
                     use thorn::*;
@@ -67,11 +74,9 @@ pub async fn get_rooms(
             .await?;
 
         let mut rooms = HashMap::new();
+        let mut ids = Vec::new();
 
-        futures::pin_mut!(stream);
-        while let Some(row) = stream.next().await {
-            let row = row?;
-
+        for row in &rows {
             let room = Room {
                 id: row.try_get(0)?,
                 party_id: Some(party_id),
@@ -85,10 +90,55 @@ pub async fn get_rooms(
                 overwrites: Vec::new(),
             };
 
+            ids.push(room.id);
             rooms.insert(room.id, room);
         }
 
-        Ok::<_, Error>(rooms)
+        let overwrites = db
+            .query_stream_cached_typed(
+                || {
+                    use db::schema::*;
+                    use thorn::*;
+
+                    Query::select()
+                        .from_table::<Overwrites>()
+                        .cols(&[Overwrites::RoomId, Overwrites::Allow, Overwrites::Deny])
+                        .expr(Builtin::coalesce((Overwrites::RoleId, Overwrites::UserId)))
+                        .and_where(
+                            Overwrites::RoomId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))),
+                        )
+                        .order_by(Overwrites::RoomId.ascending()) // group by room_id
+                        .order_by(Overwrites::RoleId.ascending().nulls_last()) // sort role overwrites first
+                },
+                &[&ids],
+            )
+            .await?;
+
+        let mut raw_overwrites = HashMap::<Snowflake, Vec<RawOverwrite>>::new();
+
+        futures::pin_mut!(overwrites);
+        while let Some(row) = overwrites.next().await {
+            let row = row?;
+            let room_id = row.try_get(0)?;
+
+            if let Some(room) = rooms.get_mut(&room_id) {
+                let raw = RawOverwrite {
+                    allow: row.try_get::<_, i64>(1)? as u64,
+                    deny: row.try_get::<_, i64>(2)? as u64,
+                    id: row.try_get(3)?,
+                };
+
+                raw_overwrites.entry(room_id).or_default().push(raw);
+
+                room.overwrites.push(Overwrite {
+                    id: raw.id,
+                    allow: Permission::unpack(raw.allow),
+                    deny: Permission::unpack(raw.deny),
+                });
+            }
+        }
+
+        Ok::<_, Error>((rooms, raw_overwrites))
     };
 
     let roles_future = async {
@@ -111,63 +161,19 @@ pub async fn get_rooms(
             )
             .await?;
 
-        let mut roles = HashMap::<Snowflake, i64>::new();
+        let mut roles = HashMap::<Snowflake, u64>::new();
 
         futures::pin_mut!(stream);
         while let Some(row) = stream.next().await {
             let row = row?;
-
-            let role_id = row.try_get(0)?;
-
-            roles.insert(role_id, row.try_get(1)?);
+            roles.insert(row.try_get(0)?, row.try_get::<_, i64>(1)? as u64);
         }
 
         Ok(roles)
     };
 
-    let (owner_id, mut rooms, roles) =
+    let (owner_id, (mut rooms, mut raw_overwrites), roles) =
         futures::future::try_join3(owner_id_future, rooms_future, roles_future).await?;
-
-    let ids: Vec<Snowflake> = rooms.keys().copied().collect();
-
-    let overwrites = db
-        .query_stream_cached_typed(
-            || {
-                use db::schema::*;
-                use thorn::*;
-
-                Query::select()
-                    .from_table::<Overwrites>()
-                    .cols(&[Overwrites::RoomId, Overwrites::Allow, Overwrites::Deny])
-                    .expr(Builtin::coalesce((Overwrites::RoleId, Overwrites::UserId)))
-                    .and_where(Overwrites::RoomId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))
-                    .order_by(Overwrites::RoomId.ascending()) // group by room_id
-                    .order_by(Overwrites::RoleId.ascending().nulls_last()) // sort role overwrites first
-            },
-            &[&ids],
-        )
-        .await?;
-
-    /*
-     * TODO: Filter rooms based on the overwrites. Structure the above query such that overwrites for roles are first
-     * (ORDER BY role_id NULLS LAST), compute effective permission for roles, then by member overwrites, and reject room
-     * if the user is unable to view it
-     */
-
-    futures::pin_mut!(overwrites);
-    while let Some(row) = overwrites.next().await {
-        let row = row?;
-        let room_id = row.try_get(0)?;
-
-        match rooms.get_mut(&room_id) {
-            None => {}
-            Some(room) => room.overwrites.push(Overwrite {
-                allow: Permission::unpack(row.try_get::<_, i64>(1)? as u64),
-                deny: Permission::unpack(row.try_get::<_, i64>(2)? as u64),
-                id: row.try_get(3)?,
-            }),
-        }
-    }
 
     // owner can view all rooms, so don't bother with this logic otherwise
     if auth.user_id != owner_id {
@@ -175,45 +181,43 @@ pub async fn get_rooms(
         let everyone = roles.get(&party_id).unwrap().clone();
 
         // base party permissions for user
-        let base = Permission::unpack({
-            let mut base = everyone;
-            for role in roles.values() {
-                base |= *role;
-            }
-            base as u64
-        });
+        let mut base = everyone;
+        for role in roles.values() {
+            base |= *role;
+        }
 
-        // if admin, skip
-        if !base.party.contains(PartyPermissions::ADMINISTRATOR) {
+        // if not admin, continue to filtering
+        if (base & Permission::PACKED_ADMIN) != Permission::PACKED_ADMIN {
             rooms.retain(|_, room| {
-                let mut room_perm = base.room;
+                let mut room_perm = base;
 
-                let mut allow = RoomPermissions::empty();
-                let mut deny = RoomPermissions::empty();
+                let mut allow = 0;
+                let mut deny = 0;
 
                 let mut user_overwrite = None;
 
-                // overwrites are sorted role-first
-                for overwrite in &room.overwrites {
-                    if roles.contains_key(&overwrite.id) {
-                        deny |= overwrite.deny.room;
-                        allow |= overwrite.allow.room;
-                    } else if overwrite.id == auth.user_id {
-                        user_overwrite = Some((overwrite.deny.room, overwrite.allow.room));
+                let raws = raw_overwrites.remove(&room.id).unwrap();
 
+                // overwrites are sorted role-first
+                for overwrite in &raws {
+                    if roles.contains_key(&overwrite.id) {
+                        deny |= overwrite.deny;
+                        allow |= overwrite.allow;
+                    } else if overwrite.id == auth.user_id {
+                        user_overwrite = Some((overwrite.deny, overwrite.allow));
                         break;
                     }
                 }
 
-                room_perm.remove(deny);
-                room_perm.insert(allow);
+                room_perm &= !deny;
+                room_perm |= allow;
 
                 if let Some((user_deny, user_allow)) = user_overwrite {
-                    room_perm.remove(user_deny);
-                    room_perm.insert(user_allow);
+                    room_perm &= !user_deny;
+                    room_perm |= user_allow;
                 }
 
-                room_perm.contains(RoomPermissions::VIEW_ROOM)
+                (room_perm & Permission::PACKED_VIEW_ROOM) == Permission::PACKED_VIEW_ROOM
             });
         }
     }

@@ -3,7 +3,7 @@ use ftl::*;
 use db::Snowflake;
 
 use crate::{
-    ctrl::{auth::Authorization, party::rooms::get_rooms},
+    ctrl::{auth::Authorization, party::rooms::get::get_rooms},
     web::routes::api::ApiError,
 };
 

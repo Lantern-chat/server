@@ -112,6 +112,20 @@ impl Permission {
         stream: StreamPermissions::all(),
     };
 
+    pub const PACKED_ADMIN: u64 = Permission {
+        party: PartyPermissions::ADMINISTRATOR,
+        room: RoomPermissions::empty(),
+        stream: StreamPermissions::empty(),
+    }
+    .pack();
+
+    pub const PACKED_VIEW_ROOM: u64 = Permission {
+        party: PartyPermissions::empty(),
+        room: RoomPermissions::VIEW_ROOM,
+        stream: StreamPermissions::empty(),
+    }
+    .pack();
+
     #[inline]
     pub const fn pack(self) -> u64 {
         let low = self.party.bits() as u64;
