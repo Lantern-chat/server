@@ -12,8 +12,9 @@ thorn::tables! {
     }
 
     pub struct EventLog in Lantern {
+        Id: Type::INT8,
         Code: Type::INT2,
-        Id: SNOWFLAKE,
+        PartyId: SNOWFLAKE,
     }
 
     pub struct Users in Lantern {

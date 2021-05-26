@@ -1,7 +1,9 @@
+CREATE SEQUENCE lantern.event_id;
+
 CREATE TABLE lantern.event_log (
-    code        smallint    NOT NULL,
-    party_id    bigint,
     id          bigint      NOT NULL
+    code        smallint    NOT NULL,
+    party_id    bigint      NOT NULL DEFAULT nextval('event_id'),
 );
 ALTER TABLE lantern.event_log OWNER TO postgres;
 
@@ -11,7 +13,7 @@ ALTER TABLE lantern.event_log ADD CONSTRAINT party_fk FOREIGN KEY (party_id)
 
 CREATE INDEX event_log_idx ON lantern.event_log USING btree(id);
 
-
+CREATE INDEX event_log_party_idx ON lantern.event_log USING btree(party_id) WHERE NOT NULL;
 
 
 CREATE TABLE lantern.event_log_last_notification (
@@ -34,8 +36,8 @@ BEGIN
         _last_notif, _max_interval
     FROM lantern.event_log_last_notification;
 
-    IF age(_now, _last_notif) < _max_interval THEN
-        CALL pg_notify('event_log', (NEW.id)::text);
+    IF (_now - _last_notif) >= _max_interval THEN
+        PERFORM pg_notify('event_log', (NEW.id)::text);
         UPDATE lantern.event_log_last_notification SET
             last_notif = _now;
     END IF;
