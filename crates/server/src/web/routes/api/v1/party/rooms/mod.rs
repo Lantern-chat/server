@@ -18,7 +18,7 @@ pub async fn party_rooms(
         //(&Method::POST, End) => post::post_room(route, auth, party_id).await.into_response(),
 
         // GET /api/v1/party/1234/rooms
-        (&Method::GET, End) => get::get_rooms(route, auth, party_id).await.into_response(),
+        (&Method::GET, End) => get::get(route, auth, party_id).await.into_response(),
 
         // ANY /api/v1/party/1234/rooms/5678
         _ => match route.param::<Snowflake>() {

@@ -2,18 +2,18 @@ use ftl::*;
 
 use db::Snowflake;
 
-use crate::ctrl::auth::Authorization;
+use crate::{
+    ctrl::{auth::Authorization, party::rooms::get_rooms},
+    web::routes::api::ApiError,
+};
 
-pub async fn get_rooms(
+pub async fn get(
     route: Route<crate::ServerState>,
     auth: Authorization,
     party_id: Snowflake,
 ) -> impl Reply {
-    //match Room::of_party(&route.state.db, party_id).await {
-    //    Ok(rooms) => reply::json(&rooms).into_response(),
-    //    Err(err) => {
-    //        log::error!("Error getting party rooms: {}", err);
-    //        return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-    //    }
-    //}
+    match get_rooms(route.state, auth, party_id).await {
+        Ok(ref rooms) => reply::json(rooms).into_response(),
+        Err(e) => ApiError::err(e).into_response(),
+    }
 }
