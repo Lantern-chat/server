@@ -1,9 +1,14 @@
 CREATE SEQUENCE lantern.event_id;
 
 CREATE TABLE lantern.event_log (
-    id          bigint      NOT NULL
+    counter     bigint      NOT NULL DEFAULT nextval('event_id'),
     code        smallint    NOT NULL,
-    party_id    bigint      NOT NULL DEFAULT nextval('event_id'),
+
+    -- the snowflake ID of whatever this event is pointing to
+    id          bigint      NOT NULL,
+
+    -- If it's a party event, place the ID here for better throughput on application layer
+    party_id    bigint
 );
 ALTER TABLE lantern.event_log OWNER TO postgres;
 
@@ -11,17 +16,22 @@ ALTER TABLE lantern.event_log ADD CONSTRAINT party_fk FOREIGN KEY (party_id)
     REFERENCES lantern.party (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
-CREATE INDEX event_log_idx ON lantern.event_log USING btree(id);
+CREATE INDEX event_log_counter_idx ON lantern.event_log USING btree(counter);
 
 CREATE INDEX event_log_party_idx ON lantern.event_log USING btree(party_id) WHERE NOT NULL;
 
-
+-- Notification rate-limiting table
 CREATE TABLE lantern.event_log_last_notification (
     last_notif timestamp NOT NULL DEFAULT now(),
     max_interval interval NOT NULL DEFAULT INTERVAL '100 milliseconds'
 );
 ALTER TABLE lantern.event_log_last_notification OWNER TO postgres;
 
+-- Default values
+INSERT INTO lantern.event_log_last_notification (last_notif, max_interval)
+    VALUES (now(), '100 milliseconds');
+
+-- Trigger function for rate-limited notifications
 CREATE OR REPLACE FUNCTION ev_notify()
 RETURNS trigger
 LANGUAGE plpgsql AS

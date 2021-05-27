@@ -6,10 +6,14 @@ use crate::ServerState;
 pub async fn cleanup_sessions(state: ServerState) {
     let mut interval = tokio::time::interval(Duration::from_secs(60 * 5));
 
-    while state.is_alive() {
-        log::trace!("Cleaning up old user sessions");
+    loop {
+        tokio::select! {
+            biased;
+            _ = interval.tick() => {},
+            _ = state.notify_shutdown.notified() => { break; }
+        }
 
-        let _ = interval.tick().await;
+        log::trace!("Cleaning up old user sessions");
 
         match state.db.write.get().await {
             Ok(db) => {

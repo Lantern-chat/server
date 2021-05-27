@@ -1,4 +1,5 @@
 use std::ops::{Deref, DerefMut};
+use std::pin::Pin;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, Weak,
@@ -13,7 +14,7 @@ use hashbrown::HashMap;
 
 use tokio::sync::{
     mpsc::{self, error::RecvError, Receiver, Sender},
-    Semaphore, TryAcquireError,
+    Notify, Semaphore, TryAcquireError,
 };
 
 use parking_lot::{Mutex, RwLock};
@@ -58,12 +59,94 @@ fn ro(readonly: bool) -> &'static str {
     }
 }
 
+use futures::stream::BoxStream;
+
+#[derive(Clone)]
+pub struct Connection {
+    pub readonly: bool,
+    pub stream: Arc<tokio::sync::Mutex<BoxStream<'static, Result<AsyncMessage, PgError>>>>,
+    pub release: Arc<Notify>,
+}
+
+impl Connection {
+    pub fn spawn_notifications(
+        &self,
+        size: usize,
+        name_hint: Option<String>,
+    ) -> Receiver<Notification> {
+        let (tx, rx) = mpsc::channel(size);
+
+        let this = self.clone();
+
+        let name_hint = name_hint.unwrap_or_else(|| "Unnamed".to_owned());
+
+        tokio::spawn(async move {
+            let mut stream = this.stream.lock().await;
+
+            let released = loop {
+                let item = tokio::select! {
+                    biased;
+                    item = stream.next() => { item }
+                    _ = this.release.notified() => { break true; }
+                };
+
+                match item {
+                    Some(Ok(msg)) => match msg {
+                        AsyncMessage::Notification(notif) => {
+                            use mpsc::error::SendTimeoutError;
+                            match tx.send_timeout(notif, Duration::from_secs(3)).await {
+                                Ok(_) => {}
+                                Err(SendTimeoutError::Closed(n)) => {
+                                    // other half has been closed, implying a drop, so exit early
+                                    log::warn!("Failed to forward database notification: {:?}", n);
+                                    break false;
+                                }
+                                Err(SendTimeoutError::Timeout(n)) => {
+                                    log::error!(
+                                        "Forwarding database notification timed out: {:?}",
+                                        n
+                                    );
+                                }
+                            }
+                        }
+                        AsyncMessage::Notice(notice) => log::info!("Database notice: {}", notice),
+                        _ => unreachable!("AsyncMessage is non-exhaustive"),
+                    },
+                    Some(Err(e)) => {
+                        log::error!("Database connection error: {}", e);
+                        break false;
+                    }
+                    None => break false,
+                }
+            };
+
+            drop(tx);
+
+            if released {
+                log::info!(
+                    "Released {} connection loop to database {}",
+                    ro(this.readonly),
+                    name_hint
+                );
+            } else {
+                log::info!(
+                    "Disconnected from {} database {}",
+                    ro(this.readonly),
+                    name_hint
+                );
+            }
+        });
+
+        rx
+    }
+}
+
 #[async_trait]
 pub trait Connector {
     async fn connect(
         &self,
         config: &PoolConfig,
-    ) -> Result<(PgClient, Receiver<Notification>), Error>;
+    ) -> Result<(PgClient, Connection, Receiver<Notification>), Error>;
 }
 
 #[async_trait]
@@ -77,7 +160,7 @@ where
     async fn connect(
         &self,
         config: &PoolConfig,
-    ) -> Result<(PgClient, Receiver<Notification>), Error> {
+    ) -> Result<(PgClient, Connection, Receiver<Notification>), Error> {
         let name = config.pg_config.get_dbname().unwrap_or("Unnamed");
 
         let circuit_breaker = Config::new().build();
@@ -117,61 +200,17 @@ where
             }
         };
 
-        let (tx, rx) = mpsc::channel(config.channel_size);
+        let conn = Connection {
+            readonly: config.readonly,
+            stream: Arc::new(tokio::sync::Mutex::new(
+                ConnectionStream(connection).boxed(),
+            )),
+            release: Arc::new(Notify::new()),
+        };
 
-        //
-        //
-        //
-        // IDEA: Take this `mpsc` channel and forward it into a `watcher` channel for event-log streaming,
-        // so it only needs to track the latest event (or any event at all, as a signal)
-        //
-        //
-        //
+        let rx = conn.spawn_notifications(config.channel_size, Some(name.to_owned()));
 
-        let name = name.to_owned();
-        let readonly = config.readonly;
-
-        tokio::spawn(async move {
-            let mut stream = ConnectionStream(connection);
-
-            loop {
-                match stream.next().await {
-                    Some(Ok(msg)) => match msg {
-                        AsyncMessage::Notification(notif) => {
-                            use mpsc::error::SendTimeoutError;
-
-                            match tx.send_timeout(notif, Duration::from_secs(3)).await {
-                                Ok(_) => {}
-                                Err(SendTimeoutError::Closed(n)) => {
-                                    // other half has been closed, implying a drop, so exit early
-                                    log::error!("Failed to forward database notification: {:?}", n);
-                                    break;
-                                }
-                                Err(SendTimeoutError::Timeout(n)) => {
-                                    log::error!(
-                                        "Forwarding database notification timed out: {:?}",
-                                        n
-                                    );
-                                }
-                            }
-                        }
-                        AsyncMessage::Notice(notice) => log::info!("Database notice: {}", notice),
-                        _ => unreachable!("AsyncMessage is non-exhaustive"),
-                    },
-                    Some(Err(e)) => {
-                        log::error!("Database connection error: {}", e);
-                        break;
-                    }
-                    None => break,
-                }
-            }
-
-            drop(tx);
-
-            log::info!("Disconnected from {} database {:?}", ro(readonly), name);
-        });
-
-        Ok((client, rx))
+        Ok((client, conn, rx))
     }
 }
 
@@ -210,7 +249,7 @@ impl Pool {
     }
 
     async fn create(&self) -> Result<Client, Error> {
-        let (client, rx) = self.connector.connect(&self.config).await?;
+        let (client, conn, rx) = self.connector.connect(&self.config).await?;
 
         let stmt_cache = Arc::new(StatementCache::default());
         self.stmt_caches.attach(&stmt_cache);
@@ -219,6 +258,7 @@ impl Pool {
             readonly: self.config.readonly,
             client,
             rx,
+            conn,
             stmt_cache,
         })
     }
@@ -457,6 +497,7 @@ impl StatementCache {
 pub struct Client {
     readonly: bool,
     client: PgClient,
+    conn: Connection,
     rx: Receiver<Notification>,
 
     // NOTE: This is an Arc to allow cloning it to transactions without needing a ref
@@ -470,6 +511,12 @@ pub struct Transaction<'a> {
 }
 
 impl Client {
+    pub async fn take_connection(&self) -> Connection {
+        self.conn.release.notify_one();
+        drop(self.conn.stream.lock().await);
+        self.conn.clone()
+    }
+
     pub async fn recv_notif(&mut self) -> Option<Notification> {
         self.rx.recv().await
     }

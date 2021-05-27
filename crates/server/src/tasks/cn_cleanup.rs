@@ -6,9 +6,13 @@ pub async fn cleanup_connections(state: ServerState) {
     let mut interval = tokio::time::interval(Duration::from_secs(5));
 
     while state.is_alive() {
-        log::trace!("Cleaning up dead connections");
+        let _now = tokio::select! {
+            biased;
+            now = interval.tick() => { now },
+            _ = state.notify_shutdown.notified() => { break; }
+        };
 
-        let _now = interval.tick().await;
+        log::trace!("Cleaning up dead connections");
 
         // TODO: Cleanup dead connections by checking last-heartbeat
     }

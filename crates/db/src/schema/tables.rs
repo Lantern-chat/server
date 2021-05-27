@@ -12,8 +12,13 @@ thorn::tables! {
     }
 
     pub struct EventLog in Lantern {
-        Id: Type::INT8,
+        /// Incrementing counter for sorting
+        Counter: Type::INT8,
+        /// Event code
         Code: Type::INT2,
+        /// Associated Snowflake for whatever the event points to
+        Id: SNOWFLAKE,
+        /// If the event is for a party, have this to sort with
         PartyId: SNOWFLAKE,
     }
 

@@ -47,12 +47,29 @@ pub struct DatabasePools {
 
 use ftl::Reply;
 
-pub fn start_server(
+pub async fn start_server(
     addr: SocketAddr,
     db: DatabasePools,
 ) -> (impl Future<Output = Result<(), hyper::Error>>, ServerState) {
     let (snd, rcv) = tokio::sync::oneshot::channel();
     let state = ServerState::new(snd, db);
+
+    log::info!("Starting interval tasks...");
+
+    let task_state = state.clone();
+
+    *state.all_tasks.lock().await = Some(
+        tokio::spawn(async move {
+            tokio::try_join!(
+                tokio::spawn(tasks::rl_cleanup::cleanup_ratelimits(task_state.clone())),
+                tokio::spawn(tasks::cn_cleanup::cleanup_connections(task_state.clone())),
+                tokio::spawn(tasks::session_cleanup::cleanup_sessions(task_state.clone())),
+                tokio::spawn(tasks::events::task::start(task_state.clone())),
+            )
+            .map(|_| {})
+        })
+        .boxed(),
+    );
 
     let inner_state = state.clone();
     let server = Server::bind(&addr)
@@ -81,12 +98,6 @@ pub fn start_server(
             }
         }))
         .with_graceful_shutdown(rcv.map(|_| { /* ignore errors */ }));
-
-    log::info!("Starting interval tasks...");
-
-    tokio::spawn(tasks::rl_cleanup::cleanup_ratelimits(state.clone()));
-    tokio::spawn(tasks::cn_cleanup::cleanup_connections(state.clone()));
-    tokio::spawn(tasks::session_cleanup::cleanup_sessions(state.clone()));
 
     (server, state)
 }

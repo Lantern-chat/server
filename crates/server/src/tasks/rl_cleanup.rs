@@ -5,10 +5,14 @@ use crate::ServerState;
 pub async fn cleanup_ratelimits(state: ServerState) {
     let mut interval = tokio::time::interval(Duration::from_secs(10));
 
-    while state.is_alive() {
-        log::trace!("Cleaning up rate-limits");
+    loop {
+        let now = tokio::select! {
+            biased;
+            now = interval.tick() => { now },
+            _ = state.notify_shutdown.notified() => { break; }
+        };
 
-        let now = interval.tick().await;
+        log::trace!("Cleaning up rate-limits");
         state.rate_limit.cleanup_at(now.into_std()).await;
     }
 }

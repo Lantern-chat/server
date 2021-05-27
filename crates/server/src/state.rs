@@ -6,14 +6,15 @@ use std::{
     },
 };
 
-use futures::FutureExt;
-use tokio::sync::{oneshot, Mutex, Semaphore};
+use futures::{future::BoxFuture, FutureExt};
+use tokio::sync::{oneshot, Mutex, Notify, Semaphore};
 
 use crate::web::{gateway::Gateway, rate_limit::RateLimitTable};
 use crate::{config::LanternConfig, filesystem::disk::FileStore, DatabasePools};
 
 pub struct InnerServerState {
     pub is_alive: AtomicBool,
+    pub notify_shutdown: Arc<Notify>,
     pub shutdown: Mutex<Option<oneshot::Sender<()>>>,
     pub rate_limit: RateLimitTable,
     pub db: DatabasePools,
@@ -21,6 +22,11 @@ pub struct InnerServerState {
     pub fs: FileStore,
     pub gateway: Gateway,
     pub hashing_semaphore: Semaphore,
+    pub all_tasks: Mutex<
+        Option<
+            BoxFuture<'static, Result<Result<(), tokio::task::JoinError>, tokio::task::JoinError>>,
+        >,
+    >,
 }
 
 #[derive(Clone)]
@@ -38,6 +44,7 @@ impl ServerState {
     pub fn new(shutdown: oneshot::Sender<()>, db: DatabasePools) -> Self {
         ServerState(Arc::new(InnerServerState {
             is_alive: AtomicBool::new(true),
+            notify_shutdown: Arc::new(Notify::new()),
             shutdown: Mutex::new(Some(shutdown)),
             rate_limit: RateLimitTable::new(),
             //gateway_conns: HostConnections::default(),
@@ -46,6 +53,7 @@ impl ServerState {
             fs: FileStore::new("./data"), // TODO: Set from config
             gateway: Gateway::default(),
             hashing_semaphore: Semaphore::new(16), // TODO: Set from available memory?
+            all_tasks: Mutex::new(None),
         }))
     }
 
@@ -60,9 +68,17 @@ impl ServerState {
                 log::info!("Sending server shutdown signal.");
 
                 self.is_alive.store(false, Ordering::Relaxed);
+                self.notify_shutdown.notify_waiters();
 
                 self.db.read.close().await;
                 self.db.write.close().await;
+
+                if let Some(all_tasks) = self.all_tasks.lock().await.take() {
+                    match all_tasks.await {
+                        Ok(Ok(_)) => log::info!("Tasks ended successfully!"),
+                        Err(e) | Ok(Err(e)) => log::error!("Tasks errored on shutdown: {}", e),
+                    }
+                }
 
                 if let Err(err) = shutdown.send(()) {
                     log::error!("Could not shutdown server gracefully! Error: {:?}", err);
