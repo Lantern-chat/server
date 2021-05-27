@@ -16,7 +16,7 @@ util = { path = "../util" }
 thorn = { git = "https://github.com/novacrazy/thorn" }
 
 serde = { version = "1", features = ["derive"] }
-tokio = { version = "1.4", features = ["full"] }
+tokio = { version = "1.4", features = ["full", "parking_lot"] }
 tokio-util = { version = "0.6", features = ["io"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 async-stream = "0.3"
@@ -47,6 +47,7 @@ regex = "1.4.6"
 tokio-tungstenite = "0.14.0"
 ahash = "0.7.2"
 either = "1.6.0"
+failsafe = "1.0.0"
 
 [build-dependencies]
 built = { version = "0.5", features = ["git2", "chrono"] }
