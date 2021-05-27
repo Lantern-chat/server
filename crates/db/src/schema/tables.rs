@@ -28,9 +28,14 @@ thorn::tables! {
         CustomStatus: Type::VARCHAR,
         Biography: Type::VARCHAR,
         Preferences: Type::JSONB,
-        Away: Type::INT2,
         AvatarId: SNOWFLAKE,
         Flags: Type::INT2,
+    }
+
+    pub struct UserStatus in Lantern {
+        UserId: SNOWFLAKE,
+        Updated: Type::TIMESTAMP,
+        Active: Type::INT2,
     }
 
     pub struct UsersFreelist in Lantern {

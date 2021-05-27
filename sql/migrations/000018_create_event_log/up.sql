@@ -20,6 +20,7 @@ CREATE TABLE lantern.event_log_last_notification (
     last_notif timestamp NOT NULL DEFAULT now(),
     max_interval interval NOT NULL DEFAULT INTERVAL '100 milliseconds'
 );
+ALTER TABLE lantern.event_log_last_notification OWNER TO postgres;
 
 CREATE OR REPLACE FUNCTION ev_notify()
 RETURNS trigger
