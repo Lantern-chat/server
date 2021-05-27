@@ -31,6 +31,8 @@ pub mod tasks {
     pub mod cn_cleanup;
     pub mod rl_cleanup;
     pub mod session_cleanup;
+
+    pub mod events;
 }
 
 pub use state::ServerState;
