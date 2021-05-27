@@ -3,6 +3,12 @@ pub mod error;
 
 pub use error::Error;
 
+#[derive(Debug, Clone, Copy)]
+pub enum SearchMode<'a> {
+    Single(db::Snowflake),
+    Many(&'a [db::Snowflake]),
+}
+
 pub mod gateway {
     pub mod ready;
 }
@@ -26,8 +32,6 @@ pub mod party {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum SearchMode<'a> {
-    Single(db::Snowflake),
-    Many(&'a [db::Snowflake]),
+pub mod room {
+    pub mod get;
 }
