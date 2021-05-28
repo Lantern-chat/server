@@ -27,6 +27,7 @@ pub async fn start(state: ServerState) {
     let mut latest_event = 0;
 
     while state.is_alive() {
+        // as async {} blocks are lazy, only call `event_loop` within one, so rejections don't invoke it.
         match circuit_breaker
             .call(async { event_loop(&state, &mut latest_event).await })
             .await
@@ -74,9 +75,6 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
         *latest_event = row.try_get(0)?;
     }
 
-    // begin listening on current task to allow it to fail gracefully
-    listener.execute("LISTEN event_log", &[]).await?;
-
     // when `kill` is dropped, `dead` will be resolved
 
     // signifies if the query loop is dead
@@ -86,8 +84,11 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
 
     // repeatable data-less notification
     let event_notify = Arc::new(Notify::new());
-
     let event_notify2 = event_notify.clone();
+
+    // begin listening on current task to allow it to fail gracefully
+    listener.execute("LISTEN event_log", &[]).await?;
+
     let forwarding_subtask = tokio::spawn(async move {
         futures::pin_mut!(query_dead);
 
@@ -98,7 +99,7 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
         // receive and notify of events until kill signal is received
         loop {
             let event = tokio::select! {
-                //biased;
+                biased;
                 event = stream.next() => { event }
                 _ = &mut query_dead => { break; }
             };
@@ -121,8 +122,27 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
             }
         }
 
+        // trigger kill of event loop ASAP
         drop(event_kill);
+        // free stream lock
+        drop(stream);
+        // drop client
+        drop(listener);
+
+        // ensure connection is dropped
+        assert_eq!(Arc::strong_count(&conn.stream), 1);
+        drop(conn);
+
+        log::info!("Disconnected from listener connection");
     });
+
+    // Note that because futures are lazy, this does nothing until awaited upon
+    let stop_subtask = async {
+        drop(query_kill); // trigger exit of notification subtask
+
+        log::info!("Waiting on event notification subtask to complete...");
+        let _ = forwarding_subtask.await;
+    };
 
     #[derive(Debug, Clone, Copy)]
     pub struct EventCode {
@@ -155,61 +175,69 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
             _ = state.notify_shutdown.notified() => { break; }
         }
 
-        let stream = db
-            .query_stream_cached_typed(
-                || {
-                    use db::schema::*;
-                    use thorn::*;
+        // wrap in async block to coalesce errors to be handled below
+        let res = async {
+            let stream = db
+                .query_stream_cached_typed(
+                    || {
+                        use db::schema::*;
+                        use thorn::*;
 
-                    Query::select()
-                        .from_table::<EventLog>()
-                        .cols(&[
-                            EventLog::Counter,
-                            EventLog::Code,
-                            EventLog::Id,
-                            EventLog::PartyId,
-                        ])
-                        .order_by(EventLog::Counter.ascending())
-                        .and_where(EventLog::Counter.greater_than(Var::of(EventLog::Counter)))
-                },
-                &[latest_event],
-            )
-            .await?;
+                        Query::select()
+                            .from_table::<EventLog>()
+                            .cols(&[
+                                EventLog::Counter,
+                                EventLog::Code,
+                                EventLog::Id,
+                                EventLog::PartyId,
+                            ])
+                            .order_by(EventLog::Counter.ascending())
+                            .and_where(EventLog::Counter.greater_than(Var::of(EventLog::Counter)))
+                    },
+                    &[latest_event],
+                )
+                .await?;
 
-        // track this separately so that if anything in the upcoming loop fails it doesn't leave the
-        // latest_event in an incomplete state. Only assign it when everything has been completed.
-        let mut next_latest_event = *latest_event;
+            // track this separately so that if anything in the upcoming loop fails it doesn't leave the
+            // latest_event in an incomplete state. Only assign it when everything has been completed.
+            let mut next_latest_event = *latest_event;
 
-        // partition events by party or generic user events
-        futures::pin_mut!(stream);
-        while let Some(row) = stream.next().await {
-            let row = row?;
+            // partition events by party or generic user events
+            futures::pin_mut!(stream);
+            while let Some(row) = stream.next().await {
+                let row = row?;
 
-            next_latest_event = row.try_get(0)?;
+                next_latest_event = row.try_get(0)?;
 
-            let event = EventCode {
-                code: row.try_get(1)?,
-                id: row.try_get(2)?,
-            };
+                let event = EventCode {
+                    code: row.try_get(1)?,
+                    id: row.try_get(2)?,
+                };
 
-            match row.try_get(3)? {
-                Some(party_id) => party_events.entry(party_id).or_default().push(event),
-                None => user_events.push(event),
+                match row.try_get(3)? {
+                    Some(party_id) => party_events.entry(party_id).or_default().push(event),
+                    None => user_events.push(event),
+                }
             }
+
+            log::info!("{:?} {:?}", party_events.len(), user_events.len());
+
+            party_events.clear();
+            user_events.clear();
+
+            *latest_event = next_latest_event;
+
+            Ok(())
+        };
+
+        // if there is an error, ensure the forwarding subtask exits first
+        if let Err(e) = res.await {
+            stop_subtask.await;
+            return Err(e);
         }
-
-        log::info!("{:?} {:?}", party_events.len(), user_events.len());
-
-        party_events.clear();
-        user_events.clear();
-
-        *latest_event = next_latest_event;
     }
 
-    drop(query_kill);
-
-    log::info!("Waiting on event notification subtask to complete...");
-    let _ = forwarding_subtask.await;
+    stop_subtask.await;
 
     Ok(())
 }
