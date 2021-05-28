@@ -5,7 +5,7 @@ CREATE TABLE lantern.event_log (
     code        smallint    NOT NULL,
 
     -- the snowflake ID of whatever this event is pointing to
-    id          bigint      NOT NULL,
+    id          bigint      NOT NULL CONSTRAINT id_check CHECK (id > 0),
 
     -- If it's a party event, place the ID here for better throughput on application layer
     party_id    bigint
