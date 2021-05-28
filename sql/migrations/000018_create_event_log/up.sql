@@ -2,13 +2,14 @@ CREATE SEQUENCE lantern.event_id;
 
 CREATE TABLE lantern.event_log (
     counter     bigint      NOT NULL DEFAULT nextval('event_id'),
-    code        smallint    NOT NULL,
 
     -- the snowflake ID of whatever this event is pointing to
     id          bigint      NOT NULL CONSTRAINT id_check CHECK (id > 0),
 
     -- If it's a party event, place the ID here for better throughput on application layer
-    party_id    bigint
+    party_id    bigint,
+
+    code        smallint    NOT NULL
 );
 ALTER TABLE lantern.event_log OWNER TO postgres;
 
@@ -57,5 +58,4 @@ END
 $$;
 
 CREATE TRIGGER event_log_notify AFTER INSERT ON lantern.event_log
-FOR EACH ROW
-EXECUTE FUNCTION lantern.ev_notify();
+FOR EACH ROW EXECUTE FUNCTION lantern.ev_notify();

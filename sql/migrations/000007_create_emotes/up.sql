@@ -4,8 +4,8 @@ CREATE TABLE lantern.emotes (
     name            varchar(64)     NOT NULL,
     alt             varchar(64),
     flags           smallint        NOT NULL,
-    aspect_ratio    real            NOT NULL,
     file_id         bigint          NOT NULL,
+    aspect_ratio    real            NOT NULL,
 
     CONSTRAINT emotes_pk PRIMARY KEY (id)
 );
