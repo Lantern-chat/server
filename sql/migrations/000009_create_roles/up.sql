@@ -1,11 +1,11 @@
 CREATE TABLE lantern.roles (
     id              bigint      NOT NULL,
     party_id        bigint      NOT NULL,
-    name            varchar(32),
     -- Actually contains 3 16-bit fields
     permissions     bigint      NOT NULL    DEFAULT 0,
     color           integer,
     flags           smallint    NOT NULL    DEFAULT 0,
+    name            varchar(32),
 
     CONSTRAINT role_pk PRIMARY KEY (id)
 );

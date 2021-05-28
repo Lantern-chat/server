@@ -12,7 +12,7 @@ ALTER TABLE lantern.threads OWNER TO postgres;
 ALTER TABLE lantern.threads ADD CONSTRAINT parent_uq UNIQUE (parent_id);
 
 -- Add `thread_id` to messages
-ALTER TABLE lantern.messages ADD COLUMN thread_id bigint;
+---- ALTER TABLE lantern.messages ADD COLUMN thread_id bigint;
 
 ALTER TABLE lantern.messages ADD CONSTRAINT thread_fk FOREIGN KEY (thread_id)
     REFERENCES lantern.threads (id) MATCH FULL

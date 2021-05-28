@@ -3,27 +3,25 @@ CREATE TABLE lantern.files (
     -- Snowflake ID
     id      bigint      NOT NULL,
 
+    -- Size of file in bytes
+    size    int         NOT NULL,
+
+    -- Offset of file write
+    "offset"  int       NOT NULL DEFAULT 0,
+
+    -- Bitflags for state
+    flags   smallint    NOT NULL,
+
     -- filename given at upload
     name    text        NOT NULL,
+
+    -- MIME type
+    mime    text,
 
     -- blurhash preview (first frame of video if video)
     -- this shouldn't be too large, less than 128 bytes
     preview bytea,
 
-    -- MIME type
-    mime    text,
-
-    -- Size of file in bytes
-    size    int         NOT NULL,
-
-    -- Offset of file write
-    "offset"  int         NOT NULL DEFAULT 0,
-
-    -- Bitflags for state
-    flags   smallint    NOT NULL,
-
-    -- SHA3-256 hash for error-checking and deduplication
-    sha3    bytea       NOT NULL UNIQUE,
 
     CONSTRAINT file_pk PRIMARY KEY (id)
 );

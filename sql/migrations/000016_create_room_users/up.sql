@@ -21,6 +21,9 @@ ALTER TABLE lantern.room_users ADD CONSTRAINT user_id_fk FOREIGN KEY (user_id)
     REFERENCES lantern.users (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
+-- If the last read/sent messages are deleted, the room is still visible to the user
+-- so don't do anything
+
 -- On delete, don't update this as the stored id still contains the timestamp
 ALTER TABLE lantern.room_users ADD CONSTRAINT last_read_fk FOREIGN KEY (last_read)
     REFERENCES lantern.messages (id) MATCH FULL

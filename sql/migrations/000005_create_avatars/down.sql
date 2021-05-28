@@ -1,14 +1,7 @@
 -- Clear avatar_id constraints
-ALTER TABLE IF EXISTS lantern.party_member DROP CONSTRAINT IF EXISTS avatar_fk CASCADE;
 ALTER TABLE IF EXISTS lantern.users DROP CONSTRAINT IF EXISTS avatar_fk CASCADE;
 ALTER TABLE IF EXISTS lantern.party DROP CONSTRAINT IF EXISTS avatar_fk CASCADE;
 ALTER TABLE IF EXISTS lantern.rooms DROP CONSTRAINT IF EXISTS avatar_fk CASCADE;
-
--- Drop avatar_id columns
-ALTER TABLE IF EXISTS lantern.party_member DROP COLUMN IF EXISTS avatar_id CASCADE;
-ALTER TABLE IF EXISTS lantern.users DROP COLUMN IF EXISTS avatar_id CASCADE;
-ALTER TABLE IF EXISTS lantern.party DROP COLUMN IF EXISTS avatar_id CASCADE;
-ALTER TABLE IF EXISTS lantern.rooms DROP COLUMN IF EXISTS avatar_id CASCADE;
 
 -- Drop avatar file_fk
 ALTER TABLE IF EXISTS lantern.avatar DROP CONSTRAINT IF EXISTS file_fk CASCADE;

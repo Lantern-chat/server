@@ -14,35 +14,20 @@ ALTER TABLE lantern.avatar ADD CONSTRAINT file_fk FOREIGN KEY (file_id)
 
 
 --
--- Update existing tables with avatars
+-- Update existing tables with avatars fks
 --
 
 -- Add avatar to users
-ALTER TABLE lantern.users ADD COLUMN avatar_id bigint;
-
 ALTER TABLE lantern.users ADD CONSTRAINT avatar_fk FOREIGN KEY (avatar_id)
     REFERENCES lantern.avatar (id) MATCH FULL
     ON DELETE SET NULL ON UPDATE CASCADE; -- IMPORTANT: Only set NULL when deleting avatars, DO NOT CASCADE
 
-
 -- Add avatar to party
-ALTER TABLE lantern.party ADD COLUMN avatar_id bigint;
-
 ALTER TABLE lantern.party ADD CONSTRAINT avatar_fk FOREIGN KEY (avatar_id)
     REFERENCES lantern.avatar (id) MATCH FULL
     ON DELETE SET NULL ON UPDATE CASCADE; -- IMPORTANT: Only set NULL when deleting avatars, DO NOT CASCADE
 
-
--- Add icon to rooms
-ALTER TABLE lantern.rooms ADD COLUMN icon_id bigint;
-
-ALTER TABLE lantern.rooms ADD CONSTRAINT icon_fk FOREIGN KEY (icon_id)
-    REFERENCES lantern.icon (id) MATCH FULL
-    ON DELETE SET NULL ON UPDATE CASCADE; -- IMPORTANT: Only set NULL when deleting icons, DO NOT CASCADE
-
--- Add per-party user avatars
-ALTER TABLE lantern.party_member ADD COLUMN avatar_id bigint;
-
-ALTER TABLE lantern.party_member ADD CONSTRAINT avatar_fk FOREIGN KEY (avatar_id)
+-- Add avatar to rooms
+ALTER TABLE lantern.rooms ADD CONSTRAINT avatar_fk FOREIGN KEY (avatar_id)
     REFERENCES lantern.avatar (id) MATCH FULL
-    ON DELETE SET NULL ON UPDATE CASCADE; -- IMPORTANT: Only set NULL when deleting avatars, DO NOT CASCADE
+    ON DELETE SET NULL ON UPDATE CASCADE; -- IMPORTANT: Only set NULL when deleting icons, DO NOT CASCADE

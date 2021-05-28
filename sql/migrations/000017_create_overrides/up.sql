@@ -1,11 +1,11 @@
 CREATE TABLE lantern.overwrites (
     room_id         bigint      NOT NULL,
 
-    role_id         bigint,
-    user_id         bigint,
-
     allow           bigint      NOT NULL    DEFAULT 0,
-    deny            bigint      NOT NULL    DEFAULT 0
+    deny            bigint      NOT NULL    DEFAULT 0,
+
+    role_id         bigint,
+    user_id         bigint
 );
 ALTER TABLE lantern.overwrites OWNER TO postgres;
 

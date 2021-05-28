@@ -3,12 +3,11 @@ CREATE TABLE lantern.messages (
     id          bigint      NOT NULL,
     user_id     bigint      NOT NULL,
     room_id     bigint      NOT NULL,
-    editor_id   bigint,
+    thread_id   bigint,
     updated_at  timestamp               DEFAULT now(),
     edited_at   timestamp,
-    deleted_at  timestamp,
+    flags       smallint    NOT NULL    DEFAULT 0,
     content     text,
-    pinned      bool        NOT NULL    DEFAULT false,
 
     CONSTRAINT messages_pk PRIMARY KEY (id)
 );
@@ -29,10 +28,6 @@ ALTER TABLE lantern.messages ADD CONSTRAINT room_fk FOREIGN KEY (room_id)
 ALTER TABLE lantern.messages ADD CONSTRAINT user_fk FOREIGN KEY (user_id)
     REFERENCES lantern.users (id) MATCH FULL
     ON DELETE SET NULL ON UPDATE CASCADE; -- If user is deleted, just set to NULL
-
-ALTER TABLE lantern.messages ADD CONSTRAINT editor_fk FOREIGN KEY (editor_id)
-    REFERENCES lantern.users (id) MATCH FULL
-    ON DELETE SET NULL ON UPDATE CASCADE; -- Same as user
 
 
 

@@ -1,13 +1,14 @@
 CREATE TABLE lantern.users (
     --- Snowflake id
     id              bigint              NOT NULL,
+    avatar_id       bigint,
     deleted_at      timestamp,
-    username        varchar(64)         NOT NULL,
+    dob             date                NOT NULL,
+    flags           smallint            NOT NULL    DEFAULT 0,
     -- 2-byte integer that can be displayed as 4 hex digits
     discriminator   smallint            NOT NULL,
+    username        varchar(64)         NOT NULL,
     email           text                NOT NULL,
-    dob             date                NOT NULL,
-    flags           smallint            NOT NULL    DEFAULT false,
     passhash        text                NOT NULL,
     -- custom_status tracks the little blurb that appears on users
     custom_status   varchar(128),

@@ -4,10 +4,11 @@
 
 CREATE TABLE lantern.party (
     id          bigint          NOT NULL,
-    name        varchar(256)    NOT NULL,
-    -- If NULL, it's a private chat/DM
-    owner_id    bigint,
+    avatar_id   bigint,
+    owner_id    bigint          NOT NULL,
     deleted_at  timestamp,
+    flags       int             NOT NULL DEFAULT 0,
+    name        varchar(256)    NOT NULL,
 
     CONSTRAINT party_pk PRIMARY KEY (id)
 );
@@ -26,13 +27,12 @@ ALTER TABLE lantern.party ADD CONSTRAINT owner_fk FOREIGN KEY (owner_id)
 CREATE TABLE lantern.party_member (
     party_id    bigint      NOT NULL,
     user_id     bigint      NOT NULL,
-
-    -- same as for user, but per-party
-    nickname    varchar(256),
-    -- same as for user, but per-party
-    away        smallint,
-
+    invite_id   bigint,
     joined_at   timestamp   NOT NULL      DEFAULT now(),
+
+    -- same as for user, but per-party
+    nickname        varchar(256),
+    custom_status   varchar(128),
 
     -- Composite primary key
     CONSTRAINT party_member_pk PRIMARY KEY (party_id, user_id)
