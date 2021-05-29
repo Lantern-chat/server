@@ -15,11 +15,11 @@ ALTER TABLE lantern.messages OWNER TO postgres;
 
 -- Since id is a snowflake, it's always sorted by time
 -- so index with btree for the times when we need to fetch by timestamps
-CREATE INDEX CONCURRENTLY msg_id_idx ON lantern.messages USING btree (id);
+CREATE INDEX msg_id_idx ON lantern.messages USING btree (id);
 
 -- Index user and room ids for faster lookups
-CREATE INDEX CONCURRENTLY msg_user_idx ON lantern.messages USING hash (user_id);
-CREATE INDEX CONCURRENTLY msg_room_idx ON lantern.messages USING hash (room_id);
+CREATE INDEX msg_user_idx ON lantern.messages USING hash (user_id);
+CREATE INDEX msg_room_idx ON lantern.messages USING hash (room_id);
 
 ALTER TABLE lantern.messages ADD CONSTRAINT room_fk FOREIGN KEY (room_id)
     REFERENCES lantern.rooms (id) MATCH FULL
@@ -39,6 +39,8 @@ CREATE TABLE lantern.attachments (
     CONSTRAINT attachment_pk PRIMARY KEY (message_id, file_id)
 );
 ALTER TABLE lantern.attachments OWNER TO postgres;
+
+CREATE INDEX attachment_msg_idx ON lantern.attachments USING hash(message_id);
 
 ALTER TABLE lantern.attachments ADD CONSTRAINT message_fk FOREIGN KEY (message_id)
     REFERENCES lantern.messages (id) MATCH FULL

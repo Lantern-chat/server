@@ -1,6 +1,7 @@
 CREATE TABLE lantern.sessions (
     user_id bigint      NOT NULL,
     expires timestamp   NOT NULL,
+    addr    inet        NOT NULL,
     token   bytea       NOT NULL
 );
 ALTER TABLE lantern.sessions OWNER TO postgres;

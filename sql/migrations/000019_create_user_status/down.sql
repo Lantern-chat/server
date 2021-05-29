@@ -1,4 +1,4 @@
-DROP PROCEDURE IF EXISTS lantern.set_user_status(bigint, smallint);
+DROP PROCEDURE IF EXISTS lantern.set_user_status(bigint, smallint) CASCADE;
 
 DROP INDEX IF EXISTS lantern.user_status_time_idx CASCADE;
 DROP INDEX IF EXISTS lantern.user_status_user_idx CASCADE;

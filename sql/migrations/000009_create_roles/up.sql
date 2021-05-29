@@ -12,7 +12,7 @@ CREATE TABLE lantern.roles (
 ALTER TABLE lantern.roles OWNER TO postgres;
 
 -- faster lookup `WHERE party_id`
-CREATE INDEX CONCURRENTLY role_party_idx ON lantern.roles USING hash (party_id);
+CREATE INDEX role_party_idx ON lantern.roles USING hash (party_id);
 
 ALTER TABLE lantern.roles ADD CONSTRAINT party_fk FOREIGN KEY (party_id)
     REFERENCES lantern.party (id) MATCH FULL

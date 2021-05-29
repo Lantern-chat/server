@@ -1,4 +1,4 @@
-DROP TRIGGER event_log_notify ON lantern.event_log CASCADE;
+DROP TRIGGER IF EXISTS event_log_notify ON lantern.event_log CASCADE;
 DROP FUNCTION IF EXISTS lantern.ev_notify() CASCADE;
 
 DROP TABLE IF EXISTS lantern.event_log_last_notification CASCADE;

@@ -26,7 +26,7 @@ CREATE TABLE lantern.files (
     CONSTRAINT file_pk PRIMARY KEY (id)
 );
 
-CREATE INDEX CONCURRENTLY file_hash_idx ON lantern.files USING HASH(sha3);
+CREATE INDEX file_idx ON lantern.files USING hash(id);
 
 CREATE OR REPLACE PROCEDURE lantern.upsert_file(
     _id bigint,
@@ -35,17 +35,16 @@ CREATE OR REPLACE PROCEDURE lantern.upsert_file(
     _mime text,
     _size int,
     _offset int,
-    _flags smallint,
-    _sha3 bytea
+    _flags smallint
 )
 LANGUAGE plpgsql AS
 $$
 BEGIN
-    INSERT INTO lantern.files (id, name, preview, mime, size, "offset", flags, sha3)
-    VALUES (_id, _name, _preview, _mime, _size, _offset, _flags, _sha3)
+    INSERT INTO lantern.files (id, name, preview, mime, size, "offset", flags)
+    VALUES (_id, _name, _preview, _mime, _size, _offset, _flags)
     ON CONFLICT ON CONSTRAINT file_pk DO
-        UPDATE SET name = _name, preview = _preview, mime = _mime,
-                   size = _size, "offset" = _offset, flags = _flags,
-                   sha3 = _sha3;
+        UPDATE SET preview = _preview,
+                   "offset" = _offset,
+                   flags = _flags;
 END
 $$;

@@ -1,7 +1,7 @@
 ALTER TABLE IF EXISTS lantern.role_members DROP CONSTRAINT IF EXISTS user_fk CASCADE;
 ALTER TABLE IF EXISTS lantern.role_members DROP CONSTRAINT IF EXISTS role_fk CASCADE;
 
-DROP TABLE IF EXISTS lantern.role_members;
+DROP TABLE IF EXISTS lantern.role_members CASCADE;
 
 ALTER TABLE IF EXISTS lantern.roles DROP CONSTRAINT IF EXISTS party_fk CASCADE;
 

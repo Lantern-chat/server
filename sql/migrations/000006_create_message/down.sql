@@ -2,13 +2,15 @@ ALTER TABLE IF EXISTS lantern.attachments DROP CONSTRAINT IF EXISTS file_fk CASC
 ALTER TABLE IF EXISTS lantern.attachments DROP CONSTRAINT IF EXISTS attachment_eq CASCADE;
 ALTER TABLE IF EXISTS lantern.attachments DROP CONSTRAINT IF EXISTS message_fk CASCADE;
 
-DROP INDEX IF EXISTS lantern.msg_room_idx CASCADE;
-DROP INDEX IF EXISTS lantern.msg_user_idx CASCADE;
-DROP INDEX IF EXISTS lantern.msg_id_idx CASCADE;
+DROP INDEX IF EXISTS lantern.attachment_msg_idx CASCADE;
 
-DROP TABLE IF EXISTS lantern.attachments;
+DROP TABLE IF EXISTS lantern.attachments CASCADE;
 
 ALTER TABLE IF EXISTS lantern.messages DROP CONSTRAINT IF EXISTS user_fk CASCADE;
 ALTER TABLE IF EXISTS lantern.messages DROP CONSTRAINT IF EXISTS room_fk CASCADE;
 
-DROP TABLE IF EXISTS lantern.messages;
+DROP INDEX IF EXISTS lantern.msg_room_idx CASCADE;
+DROP INDEX IF EXISTS lantern.msg_user_idx CASCADE;
+DROP INDEX IF EXISTS lantern.msg_id_idx CASCADE;
+
+DROP TABLE IF EXISTS lantern.messages CASCADE;

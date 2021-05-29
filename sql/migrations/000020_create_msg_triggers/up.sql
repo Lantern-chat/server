@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION msg_trigger()
+CREATE OR REPLACE FUNCTION lantern.msg_trigger()
 RETURNS trigger
 LANGUAGE plpgsql AS
 $$

@@ -6,8 +6,9 @@ CREATE TABLE lantern.party (
     id          bigint          NOT NULL,
     avatar_id   bigint,
     owner_id    bigint          NOT NULL,
+    -- packed party flags
+    flags       bigint          NOT NULL DEFAULT 0,
     deleted_at  timestamp,
-    flags       int             NOT NULL DEFAULT 0,
     name        varchar(256)    NOT NULL,
 
     CONSTRAINT party_pk PRIMARY KEY (id)
@@ -28,7 +29,8 @@ CREATE TABLE lantern.party_member (
     party_id    bigint      NOT NULL,
     user_id     bigint      NOT NULL,
     invite_id   bigint,
-    joined_at   timestamp   NOT NULL      DEFAULT now(),
+    joined_at   timestamp   NOT NULL    DEFAULT now(),
+    flags       smallint    NOT NULL    DEFAULT 0,
 
     -- same as for user, but per-party
     nickname        varchar(256),

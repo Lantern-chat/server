@@ -2,14 +2,12 @@ CREATE TABLE lantern.rooms (
     id          bigint              NOT NULL,
     party_id    bigint,
     avatar_id   bigint,
-    name        text                NOT NULL,
-    topic       varchar(2048),
-    deleted_at  timestamp,
     parent_id   bigint,
+    deleted_at  timestamp,
     sort_order  smallint            NOT NULL,
-
-    -- contains info on NSFW, channel type, etc.
     flags       smallint            NOT NULL    DEFAULT 0,
+    name        varchar(128)        NOT NULL,
+    topic       varchar(2048),
 
     CONSTRAINT room_pk PRIMARY KEY (id)
 );
@@ -27,12 +25,13 @@ ALTER TABLE lantern.rooms ADD CONSTRAINT parent_fk FOREIGN KEY (parent_id)
 
 
 CREATE TABLE lantern.subscriptions (
-    user_id         bigint NOT NULL,
-    room_id         bigint NOT NULL,
-    mentions        bool DEFAULT true,
+    user_id         bigint      NOT NULL,
+    room_id         bigint      NOT NULL,
 
     -- If NULL, there is no mute
     mute_expires    timestamp,
+
+    flags           smallint    NOT NULL DEFAULT 0,
 
     CONSTRAINT subscription_pk PRIMARY KEY (room_id, user_id)
 );
