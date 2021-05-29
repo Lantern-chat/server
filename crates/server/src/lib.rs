@@ -28,6 +28,7 @@ pub mod util;
 pub mod web;
 
 pub mod tasks {
+    pub mod cache_cleanup;
     pub mod cn_cleanup;
     pub mod rl_cleanup;
     pub mod session_cleanup;
@@ -64,6 +65,7 @@ pub async fn start_server(
                 tokio::spawn(tasks::rl_cleanup::cleanup_ratelimits(task_state.clone())),
                 tokio::spawn(tasks::cn_cleanup::cleanup_connections(task_state.clone())),
                 tokio::spawn(tasks::session_cleanup::cleanup_sessions(task_state.clone())),
+                tokio::spawn(tasks::cache_cleanup::cache_cleanup(task_state.clone())),
                 tokio::spawn(tasks::events::task::start(task_state.clone())),
             )
             .map(|_| {})

@@ -8,3 +8,9 @@ enum_from_primitive! {
         MessageDelete = 3,
     }
 }
+
+impl EventCode {
+    pub fn from_i16(value: i16) -> Option<EventCode> {
+        FromPrimitive::from_i16(value)
+    }
+}

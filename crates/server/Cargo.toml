@@ -50,6 +50,7 @@ either = "1.6.0"
 failsafe = "1.0.0"
 parking_lot = "0.11.1"
 
+
 [build-dependencies]
 built = { version = "0.5", features = ["git2", "chrono"] }
 

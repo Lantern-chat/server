@@ -2,8 +2,6 @@ use std::borrow::Borrow;
 use std::hash::{BuildHasher, Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 
-use futures::FutureExt;
-
 use hashbrown::hash_map::{DefaultHashBuilder, HashMap, RawEntryMut};
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
@@ -99,12 +97,13 @@ where
     where
         F: Fn(&K, &mut T) -> bool,
     {
-        use futures::StreamExt;
+        for shard in &self.shards {
+            shard.write().await.retain(&f);
+        }
+    }
 
-        let f = &f;
-        futures::stream::iter(self.shards.iter())
-            .for_each(|shard| shard.write().map(|mut shard| shard.retain(f)))
-            .await;
+    pub fn shards(&self) -> &[RwLock<HashMap<K, T, S>>] {
+        &self.shards
     }
 
     fn hash_and_shard<Q>(&self, key: &Q) -> (u64, usize)

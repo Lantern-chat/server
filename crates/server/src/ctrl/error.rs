@@ -21,6 +21,10 @@ pub enum Error {
     JsonError(#[from] serde_json::Error),
     #[error("Encoding Error {0}")]
     EncodingError(#[from] EncodingError),
+    #[error("Internal Error: {0}")]
+    InternalError(String),
+    #[error("Internal Error: {0}")]
+    InternalErrorStatic(&'static str),
 
     // NON-FATAL ERRORS
     #[error("Already Exists")]
@@ -106,6 +110,8 @@ impl Error {
                 | Error::HashError(_)
                 | Error::JsonError(_)
                 | Error::EncodingError(_)
+                | Error::InternalError(_)
+                | Error::InternalErrorStatic(_)
         )
     }
 

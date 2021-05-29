@@ -18,6 +18,8 @@ impl Default for RoleFlags {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Role {
     pub id: Snowflake,
+
+    // TODO: Revist removing this
     pub party_id: Snowflake,
     pub name: Option<String>,
     pub permissions: Permission,

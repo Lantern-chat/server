@@ -19,6 +19,8 @@ use tokio::{
     time::{Duration, Instant, Sleep},
 };
 
+use super::RawEventCode;
+
 pub async fn start(state: ServerState) {
     let circuit_breaker = Config::new().build();
 
@@ -144,14 +146,8 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
         let _ = forwarding_subtask.await;
     };
 
-    #[derive(Debug, Clone, Copy)]
-    pub struct EventCode {
-        pub id: Snowflake,
-        pub code: i16,
-    }
-
-    let mut party_events: HashMap<Snowflake, Vec<EventCode>> = HashMap::new();
-    let mut user_events: Vec<EventCode> = Vec::new();
+    let mut party_events: HashMap<Snowflake, Vec<RawEventCode>> = HashMap::new();
+    let mut user_events: Vec<RawEventCode> = Vec::new();
 
     const DEBOUNCE_PERIOD: Duration = Duration::from_millis(100);
 
@@ -204,19 +200,28 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
 
             // partition events by party or generic user events
             futures::pin_mut!(stream);
-            while let Some(row) = stream.next().await {
-                let row = row?;
+            if let Some(mut row_res) = stream.next().await {
+                loop {
+                    let row = row_res?;
 
-                next_latest_event = row.try_get(0)?;
+                    let event = RawEventCode {
+                        code: row.try_get(1)?,
+                        id: row.try_get(2)?,
+                    };
 
-                let event = EventCode {
-                    code: row.try_get(1)?,
-                    id: row.try_get(2)?,
-                };
+                    match row.try_get(3)? {
+                        Some(party_id) => party_events.entry(party_id).or_default().push(event),
+                        None => user_events.push(event),
+                    }
 
-                match row.try_get(3)? {
-                    Some(party_id) => party_events.entry(party_id).or_default().push(event),
-                    None => user_events.push(event),
+                    row_res = match stream.next().await {
+                        Some(row) => row,
+                        None => {
+                            // defer parsing this field until it's the last event
+                            next_latest_event = row.try_get(0)?;
+                            break;
+                        }
+                    };
                 }
             }
 

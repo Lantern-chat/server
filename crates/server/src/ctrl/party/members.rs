@@ -84,20 +84,19 @@ fn parse_row(
     let user_id = row.try_get(1)?;
     let role_id = row.try_get(5)?;
 
-    match existing {
-        Some(PartyMember {
-            user: Some(ref user),
-            ref mut roles,
-            ..
-        }) => {
-            // fast path, existing member with same id
-            if user.id == user_id {
+    // fast path, existing member with same id
+    if let Some(PartyMember {
+        user: Some(ref user),
+        ref mut roles,
+        ..
+    }) = existing
+    {
+        if user.id == user_id {
+            if let Some(role_id) = role_id {
                 roles.push(role_id);
-                return Ok(None);
             }
+            return Ok(None);
         }
-        Some(_) => unreachable!(),
-        None => {}
     }
 
     let previous = existing.take();
@@ -115,7 +114,13 @@ fn parse_row(
             avatar_id: None,
         }),
         nick: row.try_get(0)?,
-        roles: vec![role_id],
+        roles: {
+            let mut roles = Vec::new();
+            if let Some(role_id) = role_id {
+                roles.push(role_id);
+            }
+            roles
+        },
     });
 
     Ok(previous)
