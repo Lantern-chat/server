@@ -52,6 +52,7 @@ thorn::tables! {
         Token: Type::BYTEA,
         UserId: SNOWFLAKE,
         Expires: Type::TIMESTAMP,
+        Addr: Type::INET,
     }
 
     pub struct Party in Lantern {

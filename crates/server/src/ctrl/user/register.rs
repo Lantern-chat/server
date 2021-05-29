@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::SystemTime};
+use std::{net::SocketAddr, sync::Arc, time::SystemTime};
 
 use db::{Snowflake, SnowflakeExt};
 
@@ -27,7 +27,11 @@ lazy_static::lazy_static! {
     static ref USERNAME_SANITIZE_REGEX: Regex = Regex::new(r#"\s+"#).unwrap();
 }
 
-pub async fn register_user(state: ServerState, mut form: RegisterForm) -> Result<Session, Error> {
+pub async fn register_user(
+    state: ServerState,
+    addr: SocketAddr,
+    mut form: RegisterForm,
+) -> Result<Session, Error> {
     if !state.config.username_len.contains(&form.username.len())
         || !USERNAME_REGEX.is_match(&form.username)
     {
@@ -115,7 +119,7 @@ pub async fn register_user(state: ServerState, mut form: RegisterForm) -> Result
         )
         .await?;
 
-    super::login::do_login(state, id, now).await
+    super::login::do_login(state, addr, id, now).await
 }
 
 pub fn hash_config() -> argon2::Config<'static> {

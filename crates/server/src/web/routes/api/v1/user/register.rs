@@ -12,7 +12,7 @@ pub async fn register(mut route: Route<ServerState>) -> impl Reply {
         Err(e) => return e.into_response(),
     };
 
-    match register_user(route.state, form).await {
+    match register_user(route.state, route.addr, form).await {
         Ok(ref session) => reply::json(session).into_response(),
         Err(e) => ApiError::err(e).into_response(),
     }

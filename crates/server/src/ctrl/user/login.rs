@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use db::Snowflake;
 
 use crate::{
@@ -17,7 +19,11 @@ use super::register::{hash_config, EMAIL_REGEX};
 
 // TODO: Determine if I should give any feedback at all or
 // just say catchall "invalid username/email/password"
-pub async fn login(state: ServerState, form: LoginForm) -> Result<Session, Error> {
+pub async fn login(
+    state: ServerState,
+    addr: SocketAddr,
+    form: LoginForm,
+) -> Result<Session, Error> {
     if !EMAIL_REGEX.is_match(&form.email) {
         return Err(Error::InvalidCredentials);
     }
@@ -69,11 +75,12 @@ pub async fn login(state: ServerState, form: LoginForm) -> Result<Session, Error
         return Err(Error::InvalidCredentials);
     }
 
-    do_login(state, id, std::time::SystemTime::now()).await
+    do_login(state, addr, id, std::time::SystemTime::now()).await
 }
 
 pub async fn do_login(
     state: ServerState,
+    addr: SocketAddr,
     id: Snowflake,
     now: std::time::SystemTime,
 ) -> Result<Session, Error> {
@@ -96,9 +103,10 @@ pub async fn do_login(
                         Var::of(Sessions::Token),
                         Var::of(Sessions::UserId),
                         Var::of(Sessions::Expires),
+                        Var::of(Sessions::Addr),
                     ])
             },
-            &[&&token.0[..], &id, &expires],
+            &[&&token.0[..], &id, &expires, &addr.ip()],
         )
         .await?;
 
