@@ -26,7 +26,7 @@ pub async fn get_party(
                     .cols(&[
                         Party::Name,
                         Party::OwnerId,
-                        Party::IconId,
+                        Party::AvatarId,
                         Party::Description,
                     ])
                     .and_where(Party::Id.equals(Var::of(Party::Id)))

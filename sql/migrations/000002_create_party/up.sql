@@ -10,6 +10,7 @@ CREATE TABLE lantern.party (
     flags       bigint          NOT NULL DEFAULT 0,
     deleted_at  timestamp,
     name        varchar(256)    NOT NULL,
+    description text,
 
     CONSTRAINT party_pk PRIMARY KEY (id)
 );

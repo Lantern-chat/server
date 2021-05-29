@@ -150,7 +150,7 @@ fn select_parties() -> impl AnyQuery {
             Party::Id,
             Party::OwnerId,
             Party::Name,
-            Party::IconId,
+            Party::AvatarId,
             Party::Description,
         ])
         .from(Party::left_join_table::<PartyMember>().on(PartyMember::PartyId.equals(Party::Id)))

@@ -98,7 +98,12 @@ pub async fn do_login(
 
                 Query::insert()
                     .into::<Sessions>()
-                    .cols(&[Sessions::Token, Sessions::UserId, Sessions::Expires])
+                    .cols(&[
+                        Sessions::Token,
+                        Sessions::UserId,
+                        Sessions::Expires,
+                        Sessions::Addr,
+                    ])
                     .values(vec![
                         Var::of(Sessions::Token),
                         Var::of(Sessions::UserId),
