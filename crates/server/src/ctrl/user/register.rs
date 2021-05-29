@@ -22,7 +22,7 @@ lazy_static::lazy_static! {
     pub static ref EMAIL_REGEX: Regex = Regex::new(r#"^[^@\s]{1,64}@[^@\s]+\.[^.@\s]+$"#).unwrap();
     pub static ref USERNAME_REGEX: Regex = Regex::new(r#"^[^\s].*[^\s]$"#).unwrap();
 
-    static ref PASSWORD_REGEX: Regex = Regex::new(r#"\P{L}|\p{N}"#).unwrap();
+    static ref PASSWORD_REGEX: Regex = Regex::new(r#"[^\P{L}]|\p{N}"#).unwrap();
 
     static ref USERNAME_SANITIZE_REGEX: Regex = Regex::new(r#"\s+"#).unwrap();
 }
