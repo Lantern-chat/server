@@ -1,6 +1,6 @@
 CREATE TABLE lantern.emotes (
     id              bigint          NOT NULL,
-    party_id        bigint          NOT NULL,
+    party_id        bigint,
     file_id         bigint          NOT NULL,
     aspect_ratio    real            NOT NULL,
     flags           smallint        NOT NULL,
