@@ -13,8 +13,11 @@ use futures::{future::BoxFuture, FutureExt};
 use tokio::sync::{oneshot, Mutex, Notify, Semaphore};
 use util::cmap::CHashMap;
 
-use crate::web::{gateway::Gateway, rate_limit::RateLimitTable};
 use crate::{config::LanternConfig, filesystem::disk::FileStore, DatabasePools};
+use crate::{
+    tasks::events::cache::EventItemCache,
+    web::{gateway::Gateway, rate_limit::RateLimitTable},
+};
 
 pub struct InnerServerState {
     pub is_alive: AtomicBool,
@@ -31,7 +34,7 @@ pub struct InnerServerState {
             BoxFuture<'static, Result<Result<(), tokio::task::JoinError>, tokio::task::JoinError>>,
         >,
     >,
-    pub item_cache: CHashMap<Snowflake, (Instant, Box<dyn Any + Send + Sync>)>,
+    pub item_cache: EventItemCache,
 }
 
 #[derive(Clone)]
@@ -59,7 +62,7 @@ impl ServerState {
             gateway: Gateway::default(),
             hashing_semaphore: Semaphore::new(16), // TODO: Set from available memory?
             all_tasks: Mutex::new(None),
-            item_cache: CHashMap::default(),
+            item_cache: EventItemCache::default(),
         }))
     }
 

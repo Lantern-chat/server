@@ -2,6 +2,7 @@ use db::Snowflake;
 
 use crate::{ctrl::Error, ServerState};
 
+pub mod cache;
 pub mod task;
 
 pub mod processors {

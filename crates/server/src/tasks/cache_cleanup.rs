@@ -18,6 +18,7 @@ pub async fn cache_cleanup(state: ServerState) {
 
         state
             .item_cache
+            .map
             .retain(|_, (t, _)| now.duration_since(*t) < CLEANUP_INTERVAL)
             .await;
     }

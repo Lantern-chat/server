@@ -1,6 +1,7 @@
 use std::borrow::Borrow;
 use std::hash::{BuildHasher, Hash, Hasher};
 use std::ops::{Deref, DerefMut};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use hashbrown::hash_map::{DefaultHashBuilder, HashMap, RawEntryMut};
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -11,6 +12,7 @@ pub type CHashSet<K, S = DefaultHashBuilder> = CHashMap<K, (), S>;
 pub struct CHashMap<K, T, S = DefaultHashBuilder> {
     hash_builder: S,
     shards: Vec<RwLock<HashMap<K, T, S>>>,
+    size: AtomicUsize,
 }
 
 impl<K, T> CHashMap<K, T, DefaultHashBuilder> {
@@ -43,6 +45,7 @@ where
                 .map(|_| RwLock::new(HashMap::with_hasher(hash_builder.clone())))
                 .collect(),
             hash_builder,
+            size: AtomicUsize::new(0),
         }
     }
 }
@@ -98,12 +101,22 @@ where
         F: Fn(&K, &mut T) -> bool,
     {
         for shard in &self.shards {
-            shard.write().await.retain(&f);
+            shard.write().await.retain(|k, v| {
+                let retained = f(k, v);
+                if !retained {
+                    self.size.fetch_sub(1, Ordering::Relaxed);
+                }
+                retained
+            });
         }
     }
 
     pub fn shards(&self) -> &[RwLock<HashMap<K, T, S>>] {
         &self.shards
+    }
+
+    pub fn len(&self) -> usize {
+        self.size.load(Ordering::Relaxed)
     }
 
     fn hash_and_shard<Q>(&self, key: &Q) -> (u64, usize)
@@ -168,6 +181,23 @@ where
         }
     }
 
+    pub async fn remove<Q: ?Sized>(&self, key: &Q) -> Option<T>
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq,
+    {
+        let (hash, shard_idx) = self.hash_and_shard(&key);
+        let mut shard = unsafe { self.shards.get_unchecked(shard_idx).write().await };
+
+        match shard.raw_entry_mut().from_key_hashed_nocheck(hash, &key) {
+            RawEntryMut::Occupied(occupied) => {
+                self.size.fetch_sub(1, Ordering::Relaxed);
+                Some(occupied.remove())
+            }
+            RawEntryMut::Vacant(_) => None,
+        }
+    }
+
     pub async fn insert(&self, key: K, value: T) -> Option<T> {
         let (hash, shard_idx) = self.hash_and_shard(&key);
         unsafe {
@@ -179,6 +209,7 @@ where
                 RawEntryMut::Occupied(mut occupied) => Some(occupied.insert(value)),
                 RawEntryMut::Vacant(vacant) => {
                     vacant.insert_hashed_nocheck(hash, key, value);
+                    self.size.fetch_add(1, Ordering::Relaxed);
                     None
                 }
             }
@@ -200,7 +231,10 @@ where
         let (_, value) = shard
             .raw_entry_mut()
             .from_key_hashed_nocheck(hash, key)
-            .or_insert_with(|| (key.clone(), on_insert()));
+            .or_insert_with(|| {
+                self.size.fetch_add(1, Ordering::Relaxed);
+                (key.clone(), on_insert())
+            });
 
         ReadValue {
             value: unsafe { std::mem::transmute(value) },
@@ -223,7 +257,11 @@ where
         let (_, value) = shard
             .raw_entry_mut()
             .from_key_hashed_nocheck(hash, key)
-            .or_insert_with(|| (key.clone(), on_insert()));
+            .or_insert_with(|| {
+                self.size.fetch_add(1, Ordering::Relaxed);
+
+                (key.clone(), on_insert())
+            });
 
         WriteValue {
             value: unsafe { std::mem::transmute(value) },
