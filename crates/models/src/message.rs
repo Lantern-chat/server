@@ -59,14 +59,18 @@ pub struct Message {
 
     pub flags: MessageFlags,
 
-    #[serde(default, skip_serializing_if = "crate::is_false")]
-    pub tts: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub user_mentions: Vec<Snowflake>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub role_mentions: Vec<Snowflake>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub room_mentions: Vec<Snowflake>,
 
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub reactions: Vec<Reaction>,
 
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub mentions: Vec<Mention>,
+    pub mentions: Vec<Snowflake>,
 
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub attachments: Vec<Attachment>,
@@ -79,16 +83,6 @@ pub struct Message {
 pub struct Reaction {
     pub emote: Emote,
     pub users: Vec<User>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "lowercase")]
-pub enum Mention {
-    Everyone,
-    Here,
-    Member(PartyMember),
-    Role(Snowflake),
-    Channel(Snowflake),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
