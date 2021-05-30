@@ -8,8 +8,8 @@ DECLARE
     _id bigint;
 BEGIN
     IF OLD IS NOT NULL AND
-       OLD.deleted_at IS NOT NULL AND
-       OLD.deleted_at != NEW.deleted_at
+       OLD.flags != NEW.flags AND
+       (NEW.flags & (1 << 5) != 0)
     THEN
         _code := 3;
     ELSE

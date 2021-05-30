@@ -14,6 +14,19 @@ pub struct MessageCreateForm {
     pub attachments: Vec<File>,
 }
 
+bitflags::bitflags! {
+    pub struct MessageFlags: i16 {
+        const TTS               = 1 << 0;
+        const MENTIONS_EVERYONE = 1 << 1;
+        const MENTIONS_HERE     = 1 << 2;
+        const SUPRESS_EMBEDS    = 1 << 3;
+        const PINNED            = 1 << 4;
+        const DELETED           = 1 << 5;
+    }
+}
+
+serde_shims::impl_serde_for_bitflags!(MessageFlags);
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
     pub id: Snowflake,
@@ -44,8 +57,7 @@ pub struct Message {
 
     pub content: String,
 
-    #[serde(default, skip_serializing_if = "crate::is_false")]
-    pub pinned: bool,
+    pub flags: MessageFlags,
 
     #[serde(default, skip_serializing_if = "crate::is_false")]
     pub tts: bool,
