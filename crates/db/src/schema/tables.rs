@@ -1,9 +1,4 @@
-use thorn::pg::Type;
-
 use super::*;
-
-pub const SNOWFLAKE: Type = Type::INT8;
-pub const SNOWFLAKE_ARRAY: Type = Type::INT8_ARRAY;
 
 thorn::tables! {
     pub struct Host in Lantern {
@@ -181,6 +176,13 @@ thorn::tables! {
         EditedAt: Type::TIMESTAMP,
         Flags: Type::INT2,
         Content: Type::TEXT,
+    }
+
+    pub struct Mentions in Lantern {
+        MsgId: SNOWFLAKE,
+        UserId: SNOWFLAKE,
+        RoleId: SNOWFLAKE,
+        RoomId: SNOWFLAKE,
     }
 
     pub struct Attachments in Lantern {

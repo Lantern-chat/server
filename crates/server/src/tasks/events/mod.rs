@@ -9,6 +9,7 @@ pub mod processors {
     use thorn::*;
 
     use db::Snowflake;
+    use models::*;
 
     use crate::{ctrl::Error, ServerState};
 

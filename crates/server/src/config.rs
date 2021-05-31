@@ -4,6 +4,7 @@ use std::ops::Range;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LanternConfig {
+    pub num_parallel_tasks: usize,
     pub login_session_duration: Duration,
     pub min_user_age_in_years: u8,
     pub password_len: Range<usize>,
@@ -18,6 +19,7 @@ pub struct LanternConfig {
 impl Default for LanternConfig {
     fn default() -> Self {
         LanternConfig {
+            num_parallel_tasks: num_cpus::get(),
             login_session_duration: Duration::from_secs(90 * 24 * 60 * 60), // 3 months
             min_user_age_in_years: 13,
             password_len: 8..9999,

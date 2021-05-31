@@ -42,18 +42,12 @@ pub struct Message {
     pub member: Option<PartyMember>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub editor_id: Option<Snowflake>,
-
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thread_id: Option<Snowflake>,
 
-    pub created_at: time::PrimitiveDateTime,
+    pub created_at: String,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub updated_at: Option<time::PrimitiveDateTime>,
-
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub deleted_at: Option<time::PrimitiveDateTime>,
+    pub edited_at: Option<String>,
 
     pub content: String,
 
@@ -68,9 +62,6 @@ pub struct Message {
 
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub reactions: Vec<Reaction>,
-
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub mentions: Vec<Snowflake>,
 
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub attachments: Vec<Attachment>,

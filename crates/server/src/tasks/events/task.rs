@@ -225,7 +225,27 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
                 }
             }
 
-            log::info!("{:?} {:?}", party_events.len(), user_events.len());
+            log::info!(
+                "Received {} party_events and {} user_events",
+                party_events.len(),
+                user_events.len()
+            );
+
+            // process events from each party in parallel,
+            // but within each party process them sequentially
+            futures::stream::iter(party_events.iter())
+                .for_each_concurrent(
+                    state.config.num_parallel_tasks,
+                    |(party_id, events)| async move {
+                        for event in events {
+                            if let Err(e) = super::process(&state, *event, Some(*party_id)).await {
+                                log::error!("Error processing event: {:?} {}", event, e);
+                                // TODO: Disconnect party
+                            }
+                        }
+                    },
+                )
+                .await;
 
             party_events.clear();
             user_events.clear();

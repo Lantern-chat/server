@@ -30,3 +30,16 @@ ALTER TABLE lantern.mentions ADD CONSTRAINT role_fk FOREIGN KEY (role_id)
 ALTER TABLE lantern.mentions ADD CONSTRAINT room_fk FOREIGN KEY (room_id)
     REFERENCES lantern.rooms (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE lantern.mentions ADD CONSTRAINT check_all CHECK (
+    1 = (user_id IS NOT NULL)::int4 + (role_id IS NOT NULL)::int4 + (room_id IS NOT NULL)::int4
+);
+
+CREATE OR REPLACE VIEW lantern.agg_mentions AS
+SELECT mentions.msg_id,
+       array_agg(CASE WHEN mentions.user_id IS NOT NULL THEN 1
+                      WHEN mentions.role_id IS NOT NULL THEN 2
+                      WHEN mentions.room_id IS NOT NULL THEN 3
+                 END) AS kinds,
+       array_agg(COALESCE(mentions.user_id, mentions.role_id, mentions.room_id)) AS ids
+FROM mentions GROUP BY msg_id;

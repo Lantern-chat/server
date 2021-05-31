@@ -1,3 +1,5 @@
+DROP VIEW IF EXISTS lantern.agg_mentions CASCADE;
+
 ALTER TABLE IF EXISTS lantern.mentions DROP CONSTRAINT room_fk CASCADE;
 ALTER TABLE IF EXISTS lantern.mentions DROP CONSTRAINT role_fk CASCADE;
 ALTER TABLE IF EXISTS lantern.mentions DROP CONSTRAINT user_fk CASCADE;
