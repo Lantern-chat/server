@@ -33,10 +33,10 @@ pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
     }
 }
 
-use aho_corasick::AhoCorasick;
+use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 
 lazy_static::lazy_static! {
-    static ref BAD_PATTERNS: AhoCorasick = AhoCorasick::new(&[
+    static ref BAD_PATTERNS: AhoCorasick = AhoCorasickBuilder::new().dfa(true).build(&[
         "wp-includes", "wp-login", "wp-content", "wordpress", "xmlrpc.php", "wlwmanifest"
     ]);
 }
