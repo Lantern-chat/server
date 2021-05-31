@@ -97,6 +97,32 @@ pub struct Gateway {
 }
 
 impl Gateway {
+    pub async fn broadcast_event(&self, event: Event, id: Snowflake, user: bool) {
+        if user {
+            if let Some(users) = self.users.get(&id).await {
+                for conn in users.values() {
+                    if let Err(e) = conn.tx.try_send(event.clone()) {
+                        log::warn!("Could not send message to user connection: {}", e);
+                        conn.is_active
+                            .store(false, std::sync::atomic::Ordering::Relaxed);
+                        conn.kill.notify_waiters();
+
+                        // TODO: Better handling of this
+                    }
+                }
+            }
+        } else {
+            if let Some(party) = self.parties.get(&id).await {
+                log::info!("Sending event to party tx: {}", id);
+                if let Err(e) = party.tx.send(event) {
+                    log::error!("Could not broadcast to party: {}", e);
+                }
+            } else {
+                log::warn!("Could not find party {}!", id);
+            }
+        }
+    }
+
     /// After identifying, a connection can be added to active subscriptions
     #[rustfmt::skip]
     pub async fn sub_and_activate_connection(
@@ -145,6 +171,7 @@ impl Gateway {
         if !missing.is_empty() {
             self.parties
                 .batch_write(missing, Some(&mut cache), |key, value| {
+                    log::info!("Added gateway entry for missing party: {}", key);
                     subs.push(
                         value
                             .or_insert_with(|| (*key, PartyEmitter::new(*key)))

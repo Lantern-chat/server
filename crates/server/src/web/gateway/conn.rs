@@ -11,11 +11,12 @@ use db::{Snowflake, SnowflakeExt};
 
 use super::Event;
 
-use tokio::sync::{broadcast, mpsc, RwLock};
+use tokio::sync::{broadcast, mpsc, Notify, RwLock};
 
 pub struct GatewayConnectionInner {
     pub id: Snowflake,
     pub is_active: AtomicBool,
+    pub kill: Notify,
     pub last_msg: RwLock<Instant>,
     pub tx: mpsc::Sender<Event>,
 }
@@ -35,6 +36,7 @@ impl GatewayConnection {
         let (tx, rx) = mpsc::channel(1);
         let conn = GatewayConnection(Arc::new(GatewayConnectionInner {
             id: Snowflake::now(),
+            kill: Notify::new(),
             is_active: AtomicBool::new(false),
             last_msg: RwLock::new(Instant::now()),
             tx,

@@ -1,3 +1,5 @@
+use crate::web::gateway::{msg::ServerMsg, Event};
+
 use super::*;
 
 pub async fn message_create(
@@ -100,7 +102,14 @@ pub async fn message_create(
         }
     }
 
-    println!("{}", serde_json::to_string_pretty(&msg).unwrap());
+    if let Some(party_id) = msg.party_id {
+        let event = ServerMsg::new_messagecreate(msg);
+
+        state
+            .gateway
+            .broadcast_event(Event::new_opaque(event)?, party_id, false)
+            .await;
+    }
 
     Ok(())
 }

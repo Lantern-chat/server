@@ -117,10 +117,9 @@ pub type ServerMsg = server::Message;
 pub mod server {
     use super::*;
 
-    use models::ReadyEvent;
+    use models::{Message as RoomMessage, ReadyEvent};
 
     type Room = (); // TODO
-    type RoomMessage = (); // TODO
 
     // TODO: Check that this enum doesn't grow too large, allocate large payloads like Ready
     decl_msgs! {
@@ -130,19 +129,16 @@ pub mod server {
         },
 
         2 => HeartbeatACK: Default {},
-        3 => Ready {
-            #[serde(flatten)]
-            inner: Box<ReadyEvent>
-        },
+        3 => Ready { #[serde(flatten)] inner: Box<ReadyEvent> },
         4 => InvalidSession: Default {},
 
-        5 => RoomCreate { r: Room },
-        6 => RoomUpdate { r: Room },
-        7 => RoomDelete { r: Snowflake },
+        5 => RoomCreate { #[serde(flatten)] room: Room },
+        6 => RoomUpdate { #[serde(flatten)] room: Room },
+        7 => RoomDelete { id: Snowflake },
 
-        8 => MessageCreate { msg: RoomMessage },
-        9 => MessageUpdate { msg: RoomMessage },
-        10 => MessageDelete { msg: Snowflake },
+        8 => MessageCreate { #[serde(flatten)] msg: RoomMessage },
+        9 => MessageUpdate { #[serde(flatten)] msg: RoomMessage },
+        10 => MessageDelete { id: Snowflake },
 
         11 => PresenceUpdate {
             user: Snowflake,
