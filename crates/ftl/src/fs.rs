@@ -341,7 +341,7 @@ fn file_body(
 
         let elapsed = route_start.elapsed().as_secs_f64() * 1000.0;
 
-        log::info!("File transfer finished in {:.4}ms", elapsed);
+        log::debug!("File transfer finished in {:.4}ms", elapsed);
 
         let mut trailers = HeaderMap::new();
         if let Ok(value) = HeaderValue::from_str(&format!("end;dur={:.4}", elapsed)) {

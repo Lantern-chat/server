@@ -1,7 +1,7 @@
 use db::Snowflake;
 use ftl::*;
 
-use crate::routes::api::auth::{authorize, Authorization};
+use crate::web::auth::{authorize, Authorization};
 
 pub mod get;
 

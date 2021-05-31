@@ -1,7 +1,11 @@
+use futures::FutureExt;
+
 use ftl::Route;
 
+pub use crate::ctrl::auth::Authorization;
+
 use crate::ctrl::{
-    auth::{self, AuthToken, Authorization},
+    auth::{self, AuthToken},
     Error,
 };
 use crate::ServerState;
