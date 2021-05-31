@@ -18,3 +18,12 @@ pub enum Error {
     #[error("Could not connect to database")]
     ConnectionFailure,
 }
+
+impl Error {
+    pub fn as_db_error(&self) -> Option<&pg::error::DbError> {
+        match self {
+            Error::DbError(e) => e.as_db_error(),
+            _ => None,
+        }
+    }
+}
