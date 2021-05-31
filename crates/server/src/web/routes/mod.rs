@@ -1,3 +1,5 @@
+use futures::FutureExt;
+
 use ftl::*;
 
 use headers::ContentType;
@@ -22,10 +24,14 @@ pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
         _ if BAD_PATTERNS.is_match(route.path()) => StatusCode::IM_A_TEAPOT.into_response(),
 
         (&Method::GET, Exact("static")) | (&Method::HEAD, Exact("static")) => {
-            fs::dir(&route, "frontend/dist").await.into_response()
+            fs::dir(&route, "frontend/dist")
+                .boxed()
+                .await
+                .into_response()
         }
 
         (&Method::GET, _) | (&Method::HEAD, _) => fs::file(&route, "frontend/dist/index.html")
+            .boxed()
             .await
             .into_response(),
 
