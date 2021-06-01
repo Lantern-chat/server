@@ -29,6 +29,7 @@ ALTER TABLE lantern.party ADD CONSTRAINT owner_fk FOREIGN KEY (owner_id)
 CREATE TABLE lantern.party_member (
     party_id    bigint      NOT NULL,
     user_id     bigint      NOT NULL,
+    avatar_id   bigint,
     invite_id   bigint,
     joined_at   timestamp   NOT NULL    DEFAULT now(),
     flags       smallint    NOT NULL    DEFAULT 0,

@@ -1,33 +1,42 @@
-CREATE TABLE lantern.avatar (
-    id      bigint NOT NULL,
-    file_id bigint NOT NULL,
+-- Users can have multiple avatars, with one main avatar
+CREATE TABLE lantern.user_avatars (
+    id          bigint  NOT NULL,
+    user_id     bigint  NOT NULL,
+    file_id     bigint  NOT NULL,
+    is_main     bool    NOT NULL DEFAULT false,
 
-    CONSTRAINT avatar_pk PRIMARY KEY (id)
+    CONSTRAINT user_avatars_pk PRIMARY KEY(id)
 );
-ALTER TABLE lantern.avatar OWNER TO postgres;
+ALTER TABLE lantern.user_avatars OWNER TO postgres;
 
--- Avatar references one file from files
-ALTER TABLE lantern.avatar ADD CONSTRAINT avatar_uq UNIQUE (file_id);
-ALTER TABLE lantern.avatar ADD CONSTRAINT file_fk FOREIGN KEY (file_id)
+CREATE UNIQUE INDEX user_avatars_main_idx ON lantern.user_avatars
+    USING btree(user_id, is_main) WHERE is_main IS NOT FALSE;
+
+CREATE INDEX user_avatars_user_idx ON lantern.user_avatars USING hash(user_id);
+
+ALTER TABLE lantern.user_avatars ADD CONSTRAINT user_fk FOREIGN KEY(user_id)
+    REFERENCES lantern.users (id) MATCH FULL
+    ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE lantern.user_avatars ADD CONSTRAINT file_fk FOREIGN KEY(file_id)
     REFERENCES lantern.files (id) MATCH FULL
-    ON DELETE CASCADE ON UPDATE CASCADE; -- If there is no file, then just delete the whole avatar
-
+    ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- Update existing tables with avatars fks
 --
 
--- Add avatar to users
-ALTER TABLE lantern.users ADD CONSTRAINT avatar_fk FOREIGN KEY (avatar_id)
-    REFERENCES lantern.avatar (id) MATCH FULL
-    ON DELETE SET NULL ON UPDATE CASCADE; -- IMPORTANT: Only set NULL when deleting avatars, DO NOT CASCADE
-
 -- Add avatar to party
 ALTER TABLE lantern.party ADD CONSTRAINT avatar_fk FOREIGN KEY (avatar_id)
-    REFERENCES lantern.avatar (id) MATCH FULL
+    REFERENCES lantern.files (id) MATCH FULL
     ON DELETE SET NULL ON UPDATE CASCADE; -- IMPORTANT: Only set NULL when deleting avatars, DO NOT CASCADE
 
 -- Add avatar to rooms
 ALTER TABLE lantern.rooms ADD CONSTRAINT avatar_fk FOREIGN KEY (avatar_id)
-    REFERENCES lantern.avatar (id) MATCH FULL
-    ON DELETE SET NULL ON UPDATE CASCADE; -- IMPORTANT: Only set NULL when deleting icons, DO NOT CASCADE
+    REFERENCES lantern.files (id) MATCH FULL
+    ON DELETE SET NULL ON UPDATE CASCADE; -- IMPORTANT: Only set NULL when deleting avatars, DO NOT CASCADE
+
+-- Add avatar to party member
+ALTER TABLE lantern.party_member ADD CONSTRAINT avatar_fk FOREIGN KEY (avatar_id)
+    REFERENCES lantern.user_avatars (id) MATCH FULL
+    ON DELETE SET NULL ON UPDATE CASCADE; -- IMPORTANT: Only set NULL when deleting avatars, DO NOT CASCADE

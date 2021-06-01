@@ -1,7 +1,6 @@
 CREATE TABLE lantern.users (
     --- Snowflake id
     id              bigint              NOT NULL,
-    avatar_id       bigint,
     deleted_at      timestamp,
     dob             date                NOT NULL,
     flags           smallint            NOT NULL    DEFAULT 0,

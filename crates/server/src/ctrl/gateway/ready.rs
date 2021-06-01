@@ -33,11 +33,11 @@ pub async fn ready(
             discriminator: row.try_get(1)?,
             flags: UserFlags::from_bits_truncate(row.try_get(2)?),
             email: Some(row.try_get(3)?),
-            avatar_id: row.try_get(4)?,
-            status: row.try_get(5)?,
-            bio: row.try_get(6)?,
+            avatar_id: row.try_get(7)?,
+            status: row.try_get(4)?,
+            bio: row.try_get(5)?,
             preferences: {
-                let value: Option<serde_json::Value> = row.try_get(7)?;
+                let value: Option<serde_json::Value> = row.try_get(6)?;
 
                 match value {
                     None => None,
@@ -128,18 +128,19 @@ fn select_user() -> impl AnyQuery {
     use db::schema::*;
 
     Query::select()
-        .from_table::<Users>()
         .and_where(Users::Id.equals(Var::of(Users::Id)))
         .cols(&[
             Users::Username,      // 0
             Users::Discriminator, // 1
             Users::Flags,         // 2
             Users::Email,         // 3
-            Users::AvatarId,      // 4
-            Users::CustomStatus,  // 5
-            Users::Biography,     // 6
-            Users::Preferences,   // 7
+            Users::CustomStatus,  // 4
+            Users::Biography,     // 5
+            Users::Preferences,   // 6
         ])
+        .col(UserAvatars::FileId) // 7
+        .from(Users::left_join_table::<UserAvatars>().on(UserAvatars::UserId.equals(Users::Id)))
+        .and_where(UserAvatars::IsMain.is_not_false())
 }
 
 fn select_parties() -> impl AnyQuery {

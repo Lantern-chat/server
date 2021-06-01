@@ -24,7 +24,6 @@ thorn::tables! {
 
     pub struct Users in Lantern {
         Id: SNOWFLAKE,
-        AvatarId: SNOWFLAKE,
         DeletedAt: Type::TIMESTAMP,
         Dob: Type::DATE,
         Flags: Type::INT2,
@@ -37,27 +36,34 @@ thorn::tables! {
         Preferences: Type::JSONB,
     }
 
+    pub struct UsersFreelist in Lantern {
+        Username: Type::VARCHAR,
+        Descriminator: Type::INT2,
+    }
+
     pub struct UserTokens in Lantern {
         Id: SNOWFLAKE,
-        UserId: SNOWFLAKE,
+        UserId: Users::Id,
         Expires: Type::TIMESTAMP,
         Kind: Type::INT2,
         Token: Type::BYTEA,
     }
 
     pub struct UserStatus in Lantern {
-        UserId: SNOWFLAKE,
+        UserId: Users::Id,
         Updated: Type::TIMESTAMP,
         Active: Type::INT2,
     }
 
-    pub struct UsersFreelist in Lantern {
-        Username: Type::VARCHAR,
-        Descriminator: Type::INT2,
+    pub struct UserAvatars in Lantern {
+        Id: SNOWFLAKE,
+        UserId: Users::Id,
+        FileId: Files::Id,
+        IsMain: Type::BOOL,
     }
 
     pub struct Sessions in Lantern {
-        UserId: SNOWFLAKE,
+        UserId: Users::Id,
         Expires: Type::TIMESTAMP,
         Addr: Type::INET,
         Token: Type::BYTEA,
@@ -65,8 +71,8 @@ thorn::tables! {
 
     pub struct Party in Lantern {
         Id: SNOWFLAKE,
-        AvatarId: SNOWFLAKE,
-        OwnerId: SNOWFLAKE,
+        AvatarId: Files::Id,
+        OwnerId: Users::Id,
         Flags: Type::INT8,
         DeletedAt: Type::TIMESTAMP,
         Name: Type::VARCHAR,
@@ -74,9 +80,10 @@ thorn::tables! {
     }
 
     pub struct PartyMember in Lantern {
-        PartyId: SNOWFLAKE,
-        UserId: SNOWFLAKE,
-        InviteId: SNOWFLAKE,
+        PartyId: Party::Id,
+        UserId: Users::Id,
+        InviteId: Invite::Id,
+        AvatarId: SNOWFLAKE,
         JoinedAt: Type::TIMESTAMP,
         Flags: Type::INT2,
         Nickname: Type::VARCHAR,
@@ -84,15 +91,15 @@ thorn::tables! {
     }
 
     pub struct Subscriptions in Lantern {
-        UserId: SNOWFLAKE,
-        RoomId: SNOWFLAKE,
+        UserId: Users::Id,
+        RoomId: Rooms::Id,
         MuteExpires: Type::TIMESTAMP,
         Flags: Type::INT2,
     }
 
     pub struct Roles in Lantern {
         Id: SNOWFLAKE,
-        PartyId: SNOWFLAKE,
+        PartyId: Party::Id,
         Permissions: Type::INT8,
         /// Color encoded as a 32-bit integer
         Color: Type::INT4,
@@ -101,14 +108,14 @@ thorn::tables! {
     }
 
     pub struct RoleMembers in Lantern {
-        RoleId: SNOWFLAKE,
-        UserId: SNOWFLAKE,
+        RoleId: Roles::Id,
+        UserId: Users::Id,
     }
 
     pub struct Emotes in Lantern {
         Id: SNOWFLAKE,
-        PartyId: SNOWFLAKE,
-        FileId: SNOWFLAKE,
+        PartyId: Party::Id,
+        FileId: Files::Id,
         AspectRatio: Type::FLOAT4,
         Flags: Type::INT2,
         Name: Type::VARCHAR,
@@ -116,15 +123,15 @@ thorn::tables! {
     }
 
     pub struct Reactions in Lantern {
-        EmoteId: SNOWFLAKE,
-        MsgId: SNOWFLAKE,
+        EmoteId: Emotes::Id,
+        MsgId: Messages::Id,
         UserIds: SNOWFLAKE_ARRAY,
     }
 
     pub struct Invite in Lantern {
         Id: SNOWFLAKE,
-        PartyId: SNOWFLAKE,
-        UserId: SNOWFLAKE,
+        PartyId: Party::Id,
+        UserId: Users::Id,
         Expires: Type::TIMESTAMP,
         Uses: Type::INT2,
         Code: Type::VARCHAR,
@@ -135,7 +142,7 @@ thorn::tables! {
         Id: SNOWFLAKE,
         PartyId: SNOWFLAKE,
         AvatarId: SNOWFLAKE,
-        ParentId: SNOWFLAKE,
+        ParentId: Rooms::Id,
         DeletedAt: Type::TIMESTAMP,
         SortOrder: Type::INT2,
         Flags: Type::INT2,
@@ -144,33 +151,33 @@ thorn::tables! {
     }
 
     pub struct Overwrites in Lantern {
-        RoomId: SNOWFLAKE,
+        RoomId: Rooms::Id,
         Allow: Type::INT8,
         Deny: Type::INT8,
-        RoleId: SNOWFLAKE,
-        UserId: SNOWFLAKE,
+        RoleId: Roles::Id,
+        UserId: Users::Id,
     }
 
     pub struct DMs as "dms" in Lantern {
-        UserIdA: SNOWFLAKE,
-        UserIdB: SNOWFLAKE,
-        RoomId: SNOWFLAKE,
+        UserIdA: Users::Id,
+        UserIdB: Users::Id,
+        RoomId: Rooms::Id,
     }
 
     pub struct GroupMessage in Lantern {
         Id: SNOWFLAKE,
-        RoomId: SNOWFLAKE,
+        RoomId: Rooms::Id,
     }
 
     pub struct GroupMember in Lantern {
-        GroupId: SNOWFLAKE,
-        UserId: SNOWFLAKE,
+        GroupId: GroupMessage::Id,
+        UserId: Users::Id,
     }
 
     pub struct Messages in Lantern {
         Id: SNOWFLAKE,
-        UserId: SNOWFLAKE,
-        RoomId: SNOWFLAKE,
+        UserId: Users::Id,
+        RoomId: Rooms::Id,
         ThreadId: SNOWFLAKE,
         UpdatedAt: Type::TIMESTAMP,
         EditedAt: Type::TIMESTAMP,
@@ -179,15 +186,15 @@ thorn::tables! {
     }
 
     pub struct Mentions in Lantern {
-        MsgId: SNOWFLAKE,
-        UserId: SNOWFLAKE,
-        RoleId: SNOWFLAKE,
-        RoomId: SNOWFLAKE,
+        MsgId: Messages::Id,
+        UserId: Users::Id,
+        RoleId: Roles::Id,
+        RoomId: Rooms::Id,
     }
 
     pub struct Attachments in Lantern {
-        MessageId: SNOWFLAKE,
-        FileId: SNOWFLAKE,
+        MessageId: Messages::Id,
+        FileId: Files::Id,
     }
 
     pub struct Files in Lantern {
