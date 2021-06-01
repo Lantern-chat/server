@@ -21,6 +21,13 @@ pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
             .with_header(ContentType::text())
             .into_response(),
 
+        (&Method::GET, Exact("favicon.ico")) | (&Method::HEAD, Exact("favicon.ico")) => {
+            fs::file(&route, "frontend/dist/favicon.ico")
+                .boxed()
+                .await
+                .into_response()
+        }
+
         _ if BAD_PATTERNS.is_match(route.path()) => StatusCode::IM_A_TEAPOT.into_response(),
 
         (&Method::GET, Exact("static")) | (&Method::HEAD, Exact("static")) => {
