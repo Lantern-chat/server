@@ -51,6 +51,8 @@ failsafe = "1.0.0"
 parking_lot = "0.11.1"
 num_cpus = "1.13.0"
 aho-corasick = "0.7"
+xorf = "0.7.0"
+arc-swap = "1.2.0"
 
 [build-dependencies]
 built = { version = "0.5", features = ["git2", "chrono"] }

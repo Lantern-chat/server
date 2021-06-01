@@ -3,7 +3,8 @@ use std::hash::{BuildHasher, Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use hashbrown::hash_map::{DefaultHashBuilder, HashMap, RawEntryMut};
+pub use hashbrown::hash_map::DefaultHashBuilder;
+use hashbrown::hash_map::{HashMap, RawEntryMut};
 use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 pub type CHashSet<K, S = DefaultHashBuilder> = CHashMap<K, (), S>;
@@ -21,13 +22,13 @@ impl<K, T> CHashMap<K, T, DefaultHashBuilder> {
     }
 }
 
+lazy_static::lazy_static! {
+    static ref NUM_CPUS: usize = num_cpus::get();
+}
+
 impl<K, T> Default for CHashMap<K, T, DefaultHashBuilder> {
     fn default() -> Self {
-        lazy_static::lazy_static! {
-            static ref NUM_CPUS: usize = num_cpus::get();
-        }
-
-        Self::new(32 * *NUM_CPUS)
+        Self::new(Self::default_num_shards())
     }
 }
 
@@ -38,6 +39,10 @@ impl<K, T, S> CHashMap<K, T, S>
 where
     S: Clone,
 {
+    pub fn default_num_shards() -> usize {
+        return *NUM_CPUS * 32;
+    }
+
     pub fn with_hasher(num_shards: usize, hash_builder: S) -> Self {
         CHashMap {
             shards: (0..num_shards)
@@ -117,6 +122,31 @@ where
 
     pub fn len(&self) -> usize {
         self.size.load(Ordering::Relaxed)
+    }
+
+    pub fn try_maybe_contains_hash(&self, hash: u64) -> bool {
+        let shard_idx = hash as usize % self.shards.len();
+
+        let shard = unsafe { self.shards.get_unchecked(shard_idx) };
+
+        if let Ok(shard) = shard.try_read() {
+            shard.raw_entry().from_hash(hash, |_| true).is_some()
+        } else {
+            false
+        }
+    }
+
+    pub async fn contains_hash(&self, hash: u64) -> bool {
+        let shard_idx = hash as usize % self.shards.len();
+
+        let shard = unsafe { self.shards.get_unchecked(shard_idx) };
+
+        shard
+            .read()
+            .await
+            .raw_entry()
+            .from_hash(hash, |_| true)
+            .is_some()
     }
 
     fn hash_and_shard<Q>(&self, key: &Q) -> (u64, usize)

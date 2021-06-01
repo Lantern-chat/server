@@ -16,7 +16,7 @@ use util::cmap::CHashMap;
 use crate::{config::LanternConfig, filesystem::disk::FileStore, DatabasePools};
 use crate::{
     tasks::events::cache::EventItemCache,
-    web::{gateway::Gateway, rate_limit::RateLimitTable},
+    web::{gateway::Gateway, ip_bans::IpBans, rate_limit::RateLimitTable},
 };
 
 pub struct InnerServerState {
@@ -35,6 +35,7 @@ pub struct InnerServerState {
         >,
     >,
     pub item_cache: EventItemCache,
+    pub ip_bans: IpBans,
 }
 
 #[derive(Clone)]
@@ -63,6 +64,7 @@ impl ServerState {
             hashing_semaphore: Semaphore::new(16), // TODO: Set from available memory?
             all_tasks: Mutex::new(None),
             item_cache: EventItemCache::default(),
+            ip_bans: IpBans::new(),
         }))
     }
 

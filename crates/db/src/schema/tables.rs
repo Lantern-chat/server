@@ -22,6 +22,16 @@ thorn::tables! {
         MaxInterval: Type::INTERVAL,
     }
 
+    pub struct RateLimits in Lantern {
+        Violations: Type::INT4,
+        Addr: Type::INET,
+    }
+
+    pub struct IpBans in Lantern {
+        Expires: Type::TIMESTAMP,
+        Addr: Type::INET,
+    }
+
     pub struct Users in Lantern {
         Id: SNOWFLAKE,
         DeletedAt: Type::TIMESTAMP,
@@ -205,22 +215,5 @@ thorn::tables! {
         Name: Type::TEXT,
         Mime: Type::TEXT,
         Preview: Type::BYTEA,
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use thorn::*;
-
-    #[test]
-    fn test_query() {
-        let query = Query::select()
-            .cols(&[Users::Id, Users::Username, Users::Discriminator])
-            .from(Users::left_join_table::<PartyMember>().on(Users::Id.equals(PartyMember::UserId)))
-            .and_where(PartyMember::PartyId.equals(Var::of(SNOWFLAKE)))
-            .to_string();
-
-        println!("{}", query.0);
     }
 }

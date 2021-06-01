@@ -11,6 +11,18 @@ pub async fn service(
     req: Request<Body>,
     state: ServerState,
 ) -> Result<Response<Body>, Infallible> {
+    //if state.ip_bans.is_probably_banned(addr.ip()) {
+    //    let check = async {};
+    //
+    //    match check.await {
+    //        Ok(false) => {}
+    //        Ok(true) => return Ok(StatusCode::FORBIDDEN.into_response()),
+    //        Err(e) => {
+    //            log::error!("Error checking if IP is banned")
+    //        }
+    //    };
+    //}
+
     let route = Route::new(addr, req, state);
 
     let info = format!(
