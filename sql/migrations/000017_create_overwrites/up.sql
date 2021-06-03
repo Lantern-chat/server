@@ -5,15 +5,14 @@ CREATE TABLE lantern.overwrites (
     deny            bigint      NOT NULL    DEFAULT 0,
 
     role_id         bigint,
-    user_id         bigint,
-
-    CONSTRAINT overwrites_pk PRIMARY KEY (room_id)
+    user_id         bigint
 );
 ALTER TABLE lantern.overwrites OWNER TO postgres;
 
-CREATE INDEX CONCURRENTLY overwrites_room_role_idx ON lantern.overwrites
+CREATE INDEX overwrites_room_idx ON lantern.overwrites USING hash(room_id);
+CREATE INDEX overwrites_room_role_idx ON lantern.overwrites
     USING btree(room_id, role_id) WHERE role_id IS NOT NULL;
-CREATE INDEX CONCURRENTLY overwrites_room_user_idx ON lantern.overwrites
+CREATE INDEX overwrites_room_user_idx ON lantern.overwrites
     USING btree(room_id, user_id) WHERE user_id IS NOT NULL;
 
 ALTER TABLE lantern.overwrites ADD CONSTRAINT room_id_fk FOREIGN KEY (room_id)

@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod error;
+pub mod perm;
 
 pub use error::Error;
 
@@ -34,4 +35,10 @@ pub mod party {
 
 pub mod room {
     pub mod get;
+
+    pub mod messages {
+        //pub mod create;
+        pub mod get_many;
+        pub mod get_one;
+    }
 }

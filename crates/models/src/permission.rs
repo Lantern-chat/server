@@ -112,19 +112,21 @@ impl Permission {
         stream: StreamPermissions::all(),
     };
 
-    pub const PACKED_ADMIN: u64 = Permission {
+    pub const ADMIN: Self = Permission {
         party: PartyPermissions::ADMINISTRATOR,
         room: RoomPermissions::empty(),
         stream: StreamPermissions::empty(),
-    }
-    .pack();
+    };
 
-    pub const PACKED_VIEW_ROOM: u64 = Permission {
+    pub const VIEW_ROOM: Self = Permission {
         party: PartyPermissions::empty(),
         room: RoomPermissions::VIEW_ROOM,
         stream: StreamPermissions::empty(),
-    }
-    .pack();
+    };
+
+    pub const PACKED_ALL: u64 = Self::ALL.pack();
+    pub const PACKED_ADMIN: u64 = Self::ADMIN.pack();
+    pub const PACKED_VIEW_ROOM: u64 = Self::VIEW_ROOM.pack();
 
     #[inline]
     pub const fn pack(self) -> u64 {
@@ -149,6 +151,10 @@ impl Permission {
         self.party.remove(other.party);
         self.room.remove(other.room);
         self.stream.remove(other.stream);
+    }
+
+    pub fn is_admin(&self) -> bool {
+        self.party.contains(PartyPermissions::ADMINISTRATOR)
     }
 }
 

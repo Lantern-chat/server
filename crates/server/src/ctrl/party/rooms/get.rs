@@ -7,12 +7,13 @@ use db::Snowflake;
 use models::*;
 
 use crate::{
-    ctrl::{auth::Authorization, Error},
+    ctrl::{auth::Authorization, perm::get_party_permissions, Error},
     ServerState,
 };
 
 #[derive(Clone, Copy)]
 struct RawOverwrite {
+    room_id: Snowflake,
     id: Snowflake,
     deny: u64,
     allow: u64,
@@ -25,7 +26,7 @@ pub async fn get_rooms(
 ) -> Result<Vec<Room>, Error> {
     let db = state.read_db().await;
 
-    let owner_id_future = async {
+    let base_perm_future = async {
         let row = db
             .query_one_cached_typed(
                 || {
@@ -33,15 +34,44 @@ pub async fn get_rooms(
                     use thorn::*;
 
                     Query::select()
-                        .from_table::<Party>()
                         .col(Party::OwnerId)
+                        .expr(Builtin::bit_or(Roles::Permissions))
+                        .expr(Builtin::array_agg(Roles::Id))
+                        .from(
+                            RoleMembers::right_join(
+                                Roles::left_join_table::<Party>()
+                                    .on(Roles::PartyId.equals(Party::Id)),
+                            )
+                            .on(RoleMembers::RoleId.equals(Roles::Id)),
+                        )
                         .and_where(Party::Id.equals(Var::of(Party::Id)))
+                        .and_where(
+                            RoleMembers::UserId
+                                .is_null()
+                                .or(RoleMembers::UserId.equals(Var::of(Users::Id))),
+                        )
+                        .group_by(Party::OwnerId)
                 },
-                &[&party_id],
+                &[&party_id, &auth.user_id],
             )
             .await?;
 
-        Ok::<Snowflake, Error>(row.try_get(0)?)
+        let owner_id: Snowflake = row.try_get(0)?;
+        let role_ids: Vec<Snowflake> = row.try_get(2)?;
+
+        let mut permissions;
+
+        if owner_id == auth.user_id {
+            permissions = Permission::PACKED_ALL;
+        } else {
+            permissions = row.try_get::<_, i64>(1)? as u64;
+
+            if (permissions as u64 & Permission::PACKED_ADMIN) == Permission::PACKED_ADMIN {
+                permissions = Permission::PACKED_ALL;
+            }
+        }
+
+        Ok((permissions, role_ids))
     };
 
     let rooms_future = async {
@@ -74,7 +104,6 @@ pub async fn get_rooms(
             .await?;
 
         let mut rooms = HashMap::new();
-        let mut ids = Vec::new();
 
         for row in &rows {
             let room = Room {
@@ -90,12 +119,15 @@ pub async fn get_rooms(
                 overwrites: Vec::new(),
             };
 
-            ids.push(room.id);
             rooms.insert(room.id, room);
         }
 
-        let overwrites = db
-            .query_stream_cached_typed(
+        Ok(rooms)
+    };
+
+    let overwrites_future = async {
+        let rows = db
+            .query_cached_typed(
                 || {
                     use db::schema::*;
                     use thorn::*;
@@ -104,122 +136,92 @@ pub async fn get_rooms(
                         .from_table::<Overwrites>()
                         .cols(&[Overwrites::RoomId, Overwrites::Allow, Overwrites::Deny])
                         .expr(Builtin::coalesce((Overwrites::RoleId, Overwrites::UserId)))
-                        .and_where(
-                            Overwrites::RoomId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))),
-                        )
                         .order_by(Overwrites::RoomId.ascending()) // group by room_id
                         .order_by(Overwrites::RoleId.ascending().nulls_last()) // sort role overwrites first
-                },
-                &[&ids],
-            )
-            .await?;
-
-        let mut raw_overwrites = HashMap::<Snowflake, Vec<RawOverwrite>>::new();
-
-        futures::pin_mut!(overwrites);
-        while let Some(row) = overwrites.next().await {
-            let row = row?;
-            let room_id = row.try_get(0)?;
-
-            if let Some(room) = rooms.get_mut(&room_id) {
-                let raw = RawOverwrite {
-                    allow: row.try_get::<_, i64>(1)? as u64,
-                    deny: row.try_get::<_, i64>(2)? as u64,
-                    id: row.try_get(3)?,
-                };
-
-                raw_overwrites.entry(room_id).or_default().push(raw);
-
-                room.overwrites.push(Overwrite {
-                    id: raw.id,
-                    allow: Permission::unpack(raw.allow),
-                    deny: Permission::unpack(raw.deny),
-                });
-            }
-        }
-
-        Ok::<_, Error>((rooms, raw_overwrites))
-    };
-
-    let roles_future = async {
-        let stream = db
-            .query_stream_cached_typed(
-                || {
-                    use db::schema::*;
-                    use thorn::*;
-
-                    Query::select()
                         .from(
-                            Roles::left_join_table::<RoleMembers>()
-                                .on(RoleMembers::RoleId.equals(Roles::Id)),
+                            Overwrites::left_join_table::<Rooms>()
+                                .on(Overwrites::RoomId.equals(Rooms::Id)),
                         )
-                        .and_where(RoleMembers::UserId.equals(Var::of(Users::Id)))
-                        .cols(&[Roles::Id, Roles::Permissions])
-                        .and_where(Roles::PartyId.equals(Var::of(Party::Id)))
+                        .and_where(Rooms::PartyId.equals(Var::of(Party::Id)))
                 },
-                &[&auth.user_id, &party_id],
+                &[&party_id],
             )
             .await?;
 
-        let mut roles = HashMap::<Snowflake, u64>::new();
+        let mut raw_overwrites = Vec::new();
 
-        futures::pin_mut!(stream);
-        while let Some(row) = stream.next().await {
-            let row = row?;
-            roles.insert(row.try_get(0)?, row.try_get::<_, i64>(1)? as u64);
-        }
-
-        Ok(roles)
-    };
-
-    let (owner_id, (mut rooms, mut raw_overwrites), roles) =
-        futures::future::try_join3(owner_id_future, rooms_future, roles_future).await?;
-
-    // owner can view all rooms, so don't bother with this logic otherwise
-    if auth.user_id != owner_id {
-        // permissions for @everyone
-        let everyone = roles.get(&party_id).unwrap().clone();
-
-        // base party permissions for user
-        let mut base = everyone;
-        for role in roles.values() {
-            base |= *role;
-        }
-
-        // if not admin, continue to filtering
-        if (base & Permission::PACKED_ADMIN) != Permission::PACKED_ADMIN {
-            rooms.retain(|_, room| {
-                let mut room_perm = base;
-
-                let mut allow = 0;
-                let mut deny = 0;
-
-                let mut user_overwrite = None;
-
-                let raws = raw_overwrites.remove(&room.id).unwrap();
-
-                // overwrites are sorted role-first
-                for overwrite in &raws {
-                    if roles.contains_key(&overwrite.id) {
-                        deny |= overwrite.deny;
-                        allow |= overwrite.allow;
-                    } else if overwrite.id == auth.user_id {
-                        user_overwrite = Some((overwrite.deny, overwrite.allow));
-                        break;
-                    }
-                }
-
-                room_perm &= !deny;
-                room_perm |= allow;
-
-                if let Some((user_deny, user_allow)) = user_overwrite {
-                    room_perm &= !user_deny;
-                    room_perm |= user_allow;
-                }
-
-                (room_perm & Permission::PACKED_VIEW_ROOM) == Permission::PACKED_VIEW_ROOM
+        for row in rows {
+            raw_overwrites.push(RawOverwrite {
+                room_id: row.try_get(0)?,
+                allow: row.try_get::<_, i64>(1)? as u64,
+                deny: row.try_get::<_, i64>(2)? as u64,
+                id: row.try_get(3)?,
             });
         }
+
+        Ok::<_, Error>(raw_overwrites)
+    };
+
+    let ((base_perm, roles), mut rooms, raw_overwrites) =
+        futures::future::try_join3(base_perm_future, rooms_future, overwrites_future).await?;
+
+    let mut raw_overwrites = raw_overwrites.into_iter();
+
+    if let Some(raw) = raw_overwrites.next() {
+        let mut room = rooms.get_mut(&raw.room_id).unwrap();
+
+        room.overwrites.push(Overwrite {
+            id: raw.id,
+            allow: Permission::unpack(raw.allow),
+            deny: Permission::unpack(raw.deny),
+        });
+
+        while let Some(raw) = raw_overwrites.next() {
+            if room.id != raw.room_id {
+                room = rooms.get_mut(&raw.room_id).unwrap();
+            }
+
+            room.overwrites.push(Overwrite {
+                id: raw.id,
+                allow: Permission::unpack(raw.allow),
+                deny: Permission::unpack(raw.deny),
+            });
+        }
+    }
+
+    if (base_perm & Permission::PACKED_ADMIN) != Permission::PACKED_ADMIN {
+        // base user permissions for user
+        let base = Permission::unpack(base_perm).room;
+
+        rooms.retain(|_, room| {
+            let mut room_perm = base;
+
+            let mut allow = RoomPermissions::empty();
+            let mut deny = RoomPermissions::empty();
+
+            let mut user_overwrite = None;
+
+            // overwrites are sorted role-first
+            for overwrite in &room.overwrites {
+                if roles.contains(&overwrite.id) {
+                    deny |= overwrite.deny.room;
+                    allow |= overwrite.allow.room;
+                } else if overwrite.id == auth.user_id {
+                    user_overwrite = Some((overwrite.deny.room, overwrite.allow.room));
+                    break;
+                }
+            }
+
+            room_perm &= !deny;
+            room_perm |= allow;
+
+            if let Some((user_deny, user_allow)) = user_overwrite {
+                room_perm &= !user_deny;
+                room_perm |= user_allow;
+            }
+
+            room_perm.contains(RoomPermissions::VIEW_ROOM)
+        });
     }
 
     Ok(rooms.into_iter().map(|(_, v)| v).collect())
