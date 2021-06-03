@@ -119,7 +119,7 @@ pub async fn register_user(
         )
         .await?;
 
-    super::login::do_login(state, addr, id, now).await
+    super::me::login::do_login(state, addr, id, now).await
 }
 
 pub fn hash_config() -> argon2::Config<'static> {

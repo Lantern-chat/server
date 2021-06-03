@@ -15,10 +15,14 @@ pub mod gateway {
 }
 
 pub mod user {
-    pub mod login;
-    pub mod logout;
     pub mod register;
-    pub mod sessions;
+
+    pub mod me {
+        pub mod friends;
+        pub mod login;
+        pub mod logout;
+        pub mod sessions;
+    }
 }
 
 pub mod party {

@@ -79,6 +79,14 @@ thorn::tables! {
         Token: Type::BYTEA,
     }
 
+    pub struct Friendlist in Lantern {
+        UserAId: Users::Id,
+        UserBId: Users::Id,
+        Flags: Type::INT2,
+        NoteA: Type::VARCHAR,
+        NoteB: Type::VARCHAR
+    }
+
     pub struct Party in Lantern {
         Id: SNOWFLAKE,
         AvatarId: Files::Id,

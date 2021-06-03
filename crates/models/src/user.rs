@@ -59,3 +59,19 @@ pub struct UserPreferences {
 pub enum Locale {
     enUS = 0,
 }
+
+bitflags::bitflags! {
+    pub struct FriendFlags: i16 {
+        const SOMETHING = 0;
+    }
+}
+
+serde_shims::impl_serde_for_bitflags!(FriendFlags);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Friend {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+    pub flags: FriendFlags,
+    pub user: User,
+}

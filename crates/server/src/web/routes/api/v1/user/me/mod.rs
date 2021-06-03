@@ -2,6 +2,7 @@ use ftl::*;
 
 use crate::web::{auth::authorize, routes::api::ApiError};
 
+pub mod friends;
 pub mod login;
 pub mod logout;
 pub mod sessions;
@@ -18,6 +19,9 @@ pub async fn me(mut route: Route<crate::ServerState>) -> impl Reply {
                 (&Method::DELETE, End) => logout::logout(route, auth).await.into_response(),
                 (&Method::GET, Exact("sessions")) => {
                     sessions::sessions(route, auth).await.into_response()
+                }
+                (&Method::GET, Exact("friends")) => {
+                    friends::friends(route, auth).await.into_response()
                 }
                 _ => ApiError::not_found().into_response(),
             },

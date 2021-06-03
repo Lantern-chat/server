@@ -20,4 +20,11 @@ thorn::tables! {
         Flags: Messages::Flags,
         Content: Messages::Content,
     }
+
+    pub struct AggFriends in Lantern {
+        UserId: Users::Id,
+        FriendId: Users::Id,
+        Flags: Type::INT2,
+        Note: Type::VARCHAR,
+    }
 }

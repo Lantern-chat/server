@@ -1,7 +1,7 @@
 use ftl::*;
 
 use crate::{
-    ctrl::user::login::{login as login_user, LoginForm},
+    ctrl::user::me::login::{login as login_user, LoginForm},
     web::routes::api::ApiError,
     ServerState,
 };

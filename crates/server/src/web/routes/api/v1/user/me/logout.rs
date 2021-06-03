@@ -1,4 +1,4 @@
-use crate::ctrl::{auth, user::logout::logout_user};
+use crate::ctrl::{auth, user::me::logout::logout_user};
 use crate::ServerState;
 
 use ftl::*;

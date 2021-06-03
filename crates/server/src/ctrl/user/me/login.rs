@@ -15,7 +15,7 @@ pub struct LoginForm {
 
 use models::Session;
 
-use super::register::{hash_config, EMAIL_REGEX};
+use crate::ctrl::user::register::{hash_config, EMAIL_REGEX};
 
 // TODO: Determine if I should give any feedback at all or
 // just say catchall "invalid username/email/password"
