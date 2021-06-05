@@ -26,6 +26,7 @@ pub async fn party_rooms(
                 // PATCH /api/v1/party/1234/room/5678
                 (&Method::PATCH, End) => "Unimplemented".into_response(),
 
+
                 _ => StatusCode::NOT_FOUND.into_response(),
             },
             _ => return StatusCode::BAD_REQUEST.into_response(),

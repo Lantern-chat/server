@@ -47,8 +47,8 @@ pub async fn get_rooms(
                         .and_where(Party::Id.equals(Var::of(Party::Id)))
                         .and_where(
                             RoleMembers::UserId
-                                .is_null()
-                                .or(RoleMembers::UserId.equals(Var::of(Users::Id))),
+                                .equals(Var::of(Users::Id))
+                                .is_not_false(),
                         )
                         .group_by(Party::OwnerId)
                 },
@@ -133,7 +133,6 @@ pub async fn get_rooms(
                     use thorn::*;
 
                     Query::select()
-                        .from_table::<Overwrites>()
                         .cols(&[Overwrites::RoomId, Overwrites::Allow, Overwrites::Deny])
                         .expr(Builtin::coalesce((Overwrites::RoleId, Overwrites::UserId)))
                         .order_by(Overwrites::RoomId.ascending()) // group by room_id
@@ -191,23 +190,23 @@ pub async fn get_rooms(
 
     if (base_perm & Permission::PACKED_ADMIN) != Permission::PACKED_ADMIN {
         // base user permissions for user
-        let base = Permission::unpack(base_perm).room;
+        let base = Permission::unpack(base_perm);
 
         rooms.retain(|_, room| {
             let mut room_perm = base;
 
-            let mut allow = RoomPermissions::empty();
-            let mut deny = RoomPermissions::empty();
+            let mut allow = Permission::empty();
+            let mut deny = Permission::empty();
 
             let mut user_overwrite = None;
 
             // overwrites are sorted role-first
             for overwrite in &room.overwrites {
                 if roles.contains(&overwrite.id) {
-                    deny |= overwrite.deny.room;
-                    allow |= overwrite.allow.room;
+                    deny |= overwrite.deny;
+                    allow |= overwrite.allow;
                 } else if overwrite.id == auth.user_id {
-                    user_overwrite = Some((overwrite.deny.room, overwrite.allow.room));
+                    user_overwrite = Some((overwrite.deny, overwrite.allow));
                     break;
                 }
             }
@@ -220,7 +219,16 @@ pub async fn get_rooms(
                 room_perm |= user_allow;
             }
 
-            room_perm.contains(RoomPermissions::VIEW_ROOM)
+            let can_view = room_perm.room.contains(RoomPermissions::VIEW_ROOM);
+
+            if can_view {
+                // Do not display overwrites to users without the permission to manage permissions
+                if !room_perm.party.contains(PartyPermissions::MANAGE_PERMS) {
+                    room.overwrites.clear();
+                }
+            }
+
+            can_view
         });
     }
 

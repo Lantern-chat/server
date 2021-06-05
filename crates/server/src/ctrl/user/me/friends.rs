@@ -29,7 +29,7 @@ pub async fn friends(
                         Users::Biography,
                     ])
                     .from(
-                        AggFriends::left_join_table::<Users>()
+                        AggFriends::inner_join_table::<Users>()
                             .on(Users::Id.equals(AggFriends::FriendId)),
                     )
                     .and_where(AggFriends::UserId.equals(Var::of(Users::Id)))

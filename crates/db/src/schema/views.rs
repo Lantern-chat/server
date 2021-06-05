@@ -27,4 +27,21 @@ thorn::tables! {
         Flags: Type::INT2,
         Note: Type::VARCHAR,
     }
+
+    pub struct AggRoomperms in Lantern {
+        RoomId: Overwrites::RoomId,
+        UserId: Overwrites::UserId,
+        UserAllow: Overwrites::Allow,
+        UserDeny: Overwrites::Deny,
+        Allow: Overwrites::Allow,
+        Deny: Overwrites::Deny,
+    }
+
+    pub struct AggPartypermsFromRoom in Lantern {
+        PartyId: Party::Id,
+        OwnerId: Party::OwnerId,
+        RoomId: Rooms::Id,
+        UserId: RoleMembers::UserId,
+        Permissions: Roles::Permissions,
+    }
 }

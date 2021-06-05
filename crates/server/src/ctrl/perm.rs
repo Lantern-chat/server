@@ -57,6 +57,42 @@ pub async fn get_room_permissions(
     db: &Client,
     user_id: Snowflake,
     room_id: Snowflake,
+) -> Result<Permission, Error> {
+    let row = db
+        .query_opt_cached_typed(
+            || {
+                use db::schema::*;
+                use thorn::*;
+
+                tables! {
+                    struct GetRoomPermissions in Lantern {
+                        Perm: Type::INT8,
+                    }
+                }
+
+                Query::select().col(GetRoomPermissions::Perm).from(
+                    Call::custom(GetRoomPermissions::full_name())
+                        .args((Var::of(Users::Id), Var::of(Rooms::Id))),
+                )
+            },
+            &[&user_id, &room_id],
+        )
+        .await?;
+
+    let mut perm = Permission::empty();
+
+    if let Some(row) = row {
+        perm = Permission::unpack(row.try_get::<_, i64>(0)? as u64);
+    }
+
+    Ok(perm)
+}
+
+/*
+pub async fn get_room_permissions(
+    db: &Client,
+    user_id: Snowflake,
+    room_id: Snowflake,
     party_permissions: Permission,
 ) -> Result<Permission, Error> {
     if party_permissions.is_admin() {
@@ -147,3 +183,4 @@ pub async fn get_room_permissions(
 
     Ok(Permission::unpack(perms))
 }
+*/

@@ -8,7 +8,7 @@ pub mod build;
 //pub mod file;
 pub mod gateway;
 pub mod party;
-//pub mod room;
+pub mod room;
 pub mod user;
 
 pub mod test;
@@ -18,7 +18,7 @@ pub async fn api_v1(mut route: Route<crate::ServerState>) -> impl Reply {
         (_, Exact("user")) => user::user(route).boxed().await.into_response(),
         (_, Exact("party")) => party::party(route).boxed().await.into_response(),
         //(_, Exact("file")) => file::file(route).boxed().await.into_response(),
-        //(_, Exact("room")) => room::room(route).boxed().await.into_response(),
+        (_, Exact("room")) => room::room(route).boxed().await.into_response(),
         (_, Exact("gateway")) => gateway::gateway(route).into_response(),
         (&Method::GET, Exact("build")) => build::build().into_response(),
 

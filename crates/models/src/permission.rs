@@ -17,6 +17,7 @@ bitflags::bitflags! {
         const MANAGE_EMOJIS     = 1 << 11;
         const MOVE_MEMBERS      = 1 << 12;
         const CHANGE_NICKNAME   = 1 << 13;
+        const MANAGE_PERMS      = 1 << 14;
 
         const DEFAULT           = Self::CHANGE_NICKNAME.bits;
     }
@@ -106,6 +107,14 @@ pub struct Overwrite {
 }
 
 impl Permission {
+    pub const fn empty() -> Self {
+        Permission {
+            party: PartyPermissions::empty(),
+            room: RoomPermissions::empty(),
+            stream: StreamPermissions::empty(),
+        }
+    }
+
     pub const ALL: Self = Permission {
         party: PartyPermissions::all(),
         room: RoomPermissions::all(),
@@ -147,22 +156,25 @@ impl Permission {
         }
     }
 
+    #[inline]
     pub fn remove(&mut self, other: Self) {
         self.party.remove(other.party);
         self.room.remove(other.room);
         self.stream.remove(other.stream);
     }
 
+    #[inline]
     pub fn is_admin(&self) -> bool {
         self.party.contains(PartyPermissions::ADMINISTRATOR)
     }
 }
 
-use std::ops::{BitAnd, BitOr, BitXor, Not};
+use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not};
 
 impl Not for Permission {
     type Output = Self;
 
+    #[inline(always)]
     fn not(self) -> Self {
         Permission {
             party: self.party.not(),
@@ -173,10 +185,11 @@ impl Not for Permission {
 }
 
 macro_rules! impl_bitwise {
-    ($($op_trait:ident::$op:ident),*) => {$(
+    (@BINARY $($op_trait:ident::$op:ident),*) => {$(
         impl $op_trait for Permission {
             type Output = Permission;
 
+            #[inline(always)]
             fn $op(self, rhs: Self) -> Self {
                 Permission {
                     party: $op_trait::$op(self.party, rhs.party),
@@ -186,11 +199,24 @@ macro_rules! impl_bitwise {
             }
         }
     )*};
+
+    (@ASSIGN $($op_trait:ident::$op:ident),*) => {$(
+        impl $op_trait for Permission {
+            #[inline(always)]
+            fn $op(&mut self, rhs: Self) {
+                $op_trait::$op(&mut self.party, rhs.party);
+                $op_trait::$op(&mut self.room, rhs.room);
+                $op_trait::$op(&mut self.stream, rhs.stream);
+            }
+        }
+    )*};
 }
 
-impl_bitwise!(BitAnd::bitand, BitOr::bitor, BitXor::bitxor);
+impl_bitwise!(@BINARY BitAnd::bitand, BitOr::bitor, BitXor::bitxor);
+impl_bitwise!(@ASSIGN BitAndAssign::bitand_assign, BitOrAssign::bitor_assign, BitXorAssign::bitxor_assign);
 
 impl Overwrite {
+    #[inline]
     pub fn combine(&self, other: Self) -> Overwrite {
         Overwrite {
             id: self.id,
@@ -199,6 +225,7 @@ impl Overwrite {
         }
     }
 
+    #[inline]
     pub fn apply(&self, base: Permission) -> Permission {
         (base & !self.deny) | self.allow
     }
