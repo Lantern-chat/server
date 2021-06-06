@@ -48,6 +48,8 @@ bitflags::bitflags! {
                                       Self::EMBED_LINKS.bits |
                                       Self::ATTACH_FILES.bits |
                                       Self::SEND_TTS_MESSAGES.bits;
+
+        const CREATE_MESSAGE        = Self::SEND_MESSAGES.bits | Self::VIEW_ROOM.bits;
     }
 }
 
@@ -130,6 +132,12 @@ impl Permission {
     pub const VIEW_ROOM: Self = Permission {
         party: PartyPermissions::empty(),
         room: RoomPermissions::VIEW_ROOM,
+        stream: StreamPermissions::empty(),
+    };
+
+    pub const CREATE_MESSAGE: Self = Permission {
+        party: PartyPermissions::empty(),
+        room: RoomPermissions::CREATE_MESSAGE,
         stream: StreamPermissions::empty(),
     };
 
