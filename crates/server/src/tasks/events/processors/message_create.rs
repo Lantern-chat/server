@@ -29,6 +29,7 @@ pub async fn message_create(
                         /* 8*/ AggMessages::EditedAt,
                         /* 9*/ AggMessages::Flags,
                         /*10*/ AggMessages::Content,
+                        /*11*/ AggMessages::Roles,
                     ])
             },
             &[&id],
@@ -69,7 +70,7 @@ pub async fn message_create(
             Some(_) => Some(PartyMember {
                 user: None,
                 nick: row.try_get(3)?,
-                roles: Vec::new(),
+                roles: row.try_get(11)?,
             }),
         },
         thread_id: None,

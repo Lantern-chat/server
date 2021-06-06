@@ -19,6 +19,7 @@ thorn::tables! {
         EditedAt: Messages::EditedAt,
         Flags: Messages::Flags,
         Content: Messages::Content,
+        Roles: SNOWFLAKE_ARRAY,
     }
 
     pub struct AggFriends in Lantern {
