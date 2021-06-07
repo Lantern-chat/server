@@ -13,11 +13,12 @@ thorn::tables! {
         RoomId: Messages::RoomId,
         Nickname: PartyMember::Nickname,
         Username: Users::Username,
+        UserFlags: Users::Flags,
         Discriminator: Users::Discriminator,
         MentionKinds: AggMentions::Kinds,
         MentionIds: AggMentions::Ids,
         EditedAt: Messages::EditedAt,
-        Flags: Messages::Flags,
+        MessageFlags: Messages::Flags,
         Content: Messages::Content,
         Roles: SNOWFLAKE_ARRAY,
     }

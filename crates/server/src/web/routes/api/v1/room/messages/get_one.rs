@@ -1,21 +1,17 @@
 use ftl::*;
 
-use db::{schema::Message, Snowflake};
+use db::Snowflake;
 
-use crate::routes::api::auth::Authorization;
+use crate::{ctrl::auth::Authorization, web::routes::api::ApiError, ServerState};
 
 pub async fn get_one(
-    mut route: Route<crate::ServerState>,
+    route: Route<ServerState>,
     auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,
 ) -> impl Reply {
-    match Message::find(msg_id, &route.state.db).await {
-        Ok(Some(ref msg)) => reply::json(msg).into_response(),
-        Ok(None) => StatusCode::NOT_FOUND.into_response(),
-        Err(e) => {
-            log::error!("Error getting message: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
-        }
+    match crate::ctrl::room::messages::get_one::get_one(route.state, auth, room_id, msg_id).await {
+        Ok(ref msg) => reply::json(msg).into_response(),
+        Err(e) => ApiError::err(e).into_response(),
     }
 }

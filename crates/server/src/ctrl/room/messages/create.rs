@@ -1,5 +1,3 @@
-use futures::{StreamExt, TryStreamExt};
-
 use db::{Snowflake, SnowflakeExt};
 
 use crate::{
@@ -45,7 +43,12 @@ pub async fn create_message(
                     }
                 }
 
-                const CREATE_MESSAGE: i64 = Permission::CREATE_MESSAGE.pack() as i64;
+                const CREATE_MESSAGE: i64 = Permission {
+                    party: PartyPermissions::empty(),
+                    room: RoomPermissions::SEND_MESSAGES,
+                    stream: StreamPermissions::empty(),
+                }
+                .pack() as i64;
 
                 let user_id_var = Var::at(Users::Id, 1);
                 let room_id_var = Var::at(Rooms::Id, 2);

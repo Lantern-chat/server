@@ -24,10 +24,10 @@ pub async fn message_create(
                         /* 3*/ AggMessages::Nickname,
                         /* 4*/ AggMessages::Username,
                         /* 5*/ AggMessages::Discriminator,
-                        /* 6*/ AggMessages::MentionIds,
-                        /* 7*/ AggMessages::MentionKinds,
-                        /* 8*/ AggMessages::EditedAt,
-                        /* 9*/ AggMessages::Flags,
+                        /* 6*/ AggMessages::UserFlags,
+                        /* 7*/ AggMessages::MentionIds,
+                        /* 8*/ AggMessages::MentionKinds,
+                        /* 9*/ AggMessages::MessageFlags,
                         /*10*/ AggMessages::Content,
                         /*11*/ AggMessages::Roles,
                     ])
@@ -50,15 +50,13 @@ pub async fn message_create(
             .format(time::Format::Rfc3339),
         room_id: row.try_get(2)?,
         flags: MessageFlags::from_bits_truncate(row.try_get(9)?),
-        edited_at: row
-            .try_get::<_, Option<time::PrimitiveDateTime>>(8)?
-            .map(|t| t.assume_utc().format(time::Format::Rfc3339)),
+        edited_at: None, // new message, not edited
         content: row.try_get(10)?,
         author: User {
             id: row.try_get(0)?,
             username: row.try_get(4)?,
             discriminator: row.try_get(5)?,
-            flags: UserFlags::from_bits_truncate(row.try_get(9)?).publicize(),
+            flags: UserFlags::from_bits_truncate(row.try_get(6)?).publicize(),
             status: None,
             bio: None,
             email: None,
@@ -82,10 +80,10 @@ pub async fn message_create(
         reactions: Vec::new(),
     };
 
-    let mention_kinds: Option<Vec<i32>> = row.try_get(7)?;
+    let mention_kinds: Option<Vec<i32>> = row.try_get(8)?;
     if let Some(mention_kinds) = mention_kinds {
         // lazily parse ids
-        let mention_ids: Vec<Snowflake> = row.try_get(6)?;
+        let mention_ids: Vec<Snowflake> = row.try_get(7)?;
 
         if mention_ids.len() != mention_kinds.len() {
             return Err(Error::InternalErrorStatic("Mismatched Mention aggregates!"));

@@ -8,6 +8,7 @@ bitflags::bitflags! {
         const BOT         = 1 << 3;
         const STAFF       = 1 << 4;
         const PREMIUM     = 1 << 5;
+        const DELETED     = 1 << 6;
 
         /// Always strip these from public responses
         const PRIVATE_FLAGS = Self::VERIFIED.bits | Self::MFA_ENABLED.bits;

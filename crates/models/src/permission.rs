@@ -27,8 +27,8 @@ bitflags::bitflags! {
     /// Permissions that make sense with per-room overrides
     pub struct RoomPermissions: i16 {
         const VIEW_ROOM             = 1 << 0;
-        const READ_MESSAGES         = 1 << 1;
-        const SEND_MESSAGES         = 1 << 2;
+        const READ_MESSAGES         = 1 << 1 | Self::VIEW_ROOM.bits;
+        const SEND_MESSAGES         = 1 << 2 | Self::VIEW_ROOM.bits;
         const MANAGE_MESSAGES       = 1 << 3;
         const MUTE_MEMBERS          = 1 << 4;
         const DEAFEN_MEMBERS        = 1 << 5;
@@ -48,8 +48,6 @@ bitflags::bitflags! {
                                       Self::EMBED_LINKS.bits |
                                       Self::ATTACH_FILES.bits |
                                       Self::SEND_TTS_MESSAGES.bits;
-
-        const CREATE_MESSAGE        = Self::SEND_MESSAGES.bits | Self::VIEW_ROOM.bits;
     }
 }
 
@@ -132,12 +130,6 @@ impl Permission {
     pub const VIEW_ROOM: Self = Permission {
         party: PartyPermissions::empty(),
         room: RoomPermissions::VIEW_ROOM,
-        stream: StreamPermissions::empty(),
-    };
-
-    pub const CREATE_MESSAGE: Self = Permission {
-        party: PartyPermissions::empty(),
-        room: RoomPermissions::CREATE_MESSAGE,
         stream: StreamPermissions::empty(),
     };
 

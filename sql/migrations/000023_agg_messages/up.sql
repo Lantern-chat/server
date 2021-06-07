@@ -7,10 +7,11 @@ SELECT
     party_member.nickname,
     users.username,
     users.discriminator,
+    users.flags AS user_flags,
     agg_mentions.kinds AS mention_kinds,
     agg_mentions.ids AS mention_ids,
     messages.edited_at,
-    messages.flags,
+    messages.flags as message_flags,
     messages.content,
     (SELECT array_agg(role_members.role_id)
         FROM role_members JOIN roles ON role_members.role_id = roles.id

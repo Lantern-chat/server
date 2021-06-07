@@ -1,23 +1,10 @@
 use ftl::*;
 
-use db::{
-    schema::{Message, MessageSearch, Room},
-    Snowflake,
-};
+use db::Snowflake;
 
-use crate::routes::api::auth::Authorization;
+use crate::{ctrl::auth::Authorization, web::routes::api::ApiError};
 
-#[derive(Deserialize)]
-pub struct GetManyMessagesForm {
-    #[serde(flatten)]
-    query: MessageSearch,
-
-    #[serde(default = "default_limit")]
-    limit: u8,
-}
-
-#[rustfmt::skip]
-const fn default_limit() -> u8 { 50 }
+use crate::ctrl::room::messages::get_many::{GetManyMessagesForm, MessageSearch};
 
 pub async fn get_many(
     mut route: Route<crate::ServerState>,
@@ -29,11 +16,8 @@ pub async fn get_many(
         Err(e) => return e.into_response(),
     };
 
-    match Message::search(&route.state.db, room_id, form.limit, form.query).await {
+    match crate::ctrl::room::messages::get_many::get_many(route.state, auth, room_id, form).await {
         Ok(msg) => reply::json_stream(msg).into_response(),
-        Err(e) => {
-            log::error!("Error getting many messsages: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
-        }
+        Err(e) => ApiError::err(e).into_response(),
     }
 }

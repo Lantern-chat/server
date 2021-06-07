@@ -22,6 +22,7 @@ bitflags::bitflags! {
         const SUPRESS_EMBEDS    = 1 << 3;
         const PINNED            = 1 << 4;
         const DELETED           = 1 << 5;
+        const REMOVED           = 1 << 6;
     }
 }
 

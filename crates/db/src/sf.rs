@@ -20,6 +20,10 @@ pub trait SnowflakeExt {
         NonZeroU64::new(id as u64).map(Snowflake)
     }
 
+    fn max_value() -> Snowflake {
+        Snowflake(unsafe { NonZeroU64::new_unchecked(9223372036854775807) })
+    }
+
     // Constructs a Snowflake from the given timestamp with any of the deduplication
     // values. This is ideal for database searches using simple operators.
     fn timestamp_only(ts: SystemTime) -> Snowflake {
