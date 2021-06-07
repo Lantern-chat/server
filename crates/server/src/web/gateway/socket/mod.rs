@@ -224,6 +224,8 @@ pub fn client_connected(
         }
 
         // TODO: Cleanup connection
+
+        state.gateway.conns.remove(&conn.id).await;
     });
 }
 

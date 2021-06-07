@@ -1,7 +1,7 @@
 use db::Snowflake;
 use ftl::*;
 
-use crate::ctrl::perm::get_room_permissions;
+use crate::ctrl::perm::get_cached_room_permissions;
 use crate::web::auth::{authorize, Authorization};
 
 pub mod get;
@@ -34,9 +34,7 @@ use crate::web::routes::api::ApiError;
 use crate::ServerState;
 
 async fn test(state: ServerState, auth: Authorization, room_id: Snowflake) -> impl Reply {
-    let db = state.read_db().await;
-
-    match get_room_permissions(&db, auth.user_id, room_id).await {
+    match get_cached_room_permissions(&state, auth.user_id, room_id).await {
         Ok(ref perm) => reply::json(perm).into_response(),
         Err(e) => {
             log::error!("Error getting room permissions");

@@ -3,7 +3,7 @@ use futures::{StreamExt, TryStreamExt};
 use db::Snowflake;
 
 use crate::{
-    ctrl::{auth::Authorization, perm::get_room_permissions, Error, SearchMode},
+    ctrl::{auth::Authorization, perm::get_cached_room_permissions, Error, SearchMode},
     ServerState,
 };
 
@@ -16,7 +16,7 @@ pub async fn get_room(
 ) -> Result<Room, Error> {
     let db = state.db.read.get().await?;
 
-    let perms = get_room_permissions(&db, auth.user_id, room_id).await?;
+    let perms = get_cached_room_permissions(&state, auth.user_id, room_id).await?;
 
     if !perms.room.contains(RoomPermissions::VIEW_ROOM) {
         return Err(Error::NotFound);

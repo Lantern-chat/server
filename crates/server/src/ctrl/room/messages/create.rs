@@ -1,7 +1,7 @@
 use db::{Snowflake, SnowflakeExt};
 
 use crate::{
-    ctrl::{auth::Authorization, perm::get_room_permissions, Error, SearchMode},
+    ctrl::{auth::Authorization, perm::get_cached_room_permissions, Error, SearchMode},
     ServerState,
 };
 
@@ -18,6 +18,12 @@ pub async fn create_message(
     room_id: Snowflake,
     form: CreateMessageForm,
 ) -> Result<Message, Error> {
+    let permissions = get_cached_room_permissions(&state, auth.user_id, room_id).await?;
+
+    if !permissions.room.contains(RoomPermissions::SEND_MESSAGES) {
+        return Err(Error::NotFound);
+    }
+
     let db = state.db.write.get().await?;
 
     let msg_id = Snowflake::now();
@@ -29,54 +35,19 @@ pub async fn create_message(
                 use thorn::*;
 
                 tables! {
-                    struct GetRoomPermissions in Lantern {
-                        Perm: Type::INT8,
-                    }
-
-                    struct AggPerm {
-                        Perm: GetRoomPermissions::Perm,
-                    }
-
                     struct AggMsg {
                         UserId: Users::Id,
                         RoomId: Rooms::Id,
                     }
                 }
 
-                const CREATE_MESSAGE: i64 = Permission {
-                    party: PartyPermissions::empty(),
-                    room: RoomPermissions::SEND_MESSAGES,
-                    stream: StreamPermissions::empty(),
-                }
-                .pack() as i64;
-
                 let user_id_var = Var::at(Users::Id, 1);
                 let room_id_var = Var::at(Rooms::Id, 2);
                 let msg_id_var = Var::at(Messages::Id, 3);
                 let content_var = Var::at(Messages::Content, 4);
 
-                let permissions = AggPerm::as_query(
-                    Query::select()
-                        .expr(GetRoomPermissions::Perm.alias_to(AggPerm::Perm))
-                        .from(
-                            Call::custom(GetRoomPermissions::full_name())
-                                .args((user_id_var.clone(), room_id_var.clone())),
-                        ),
-                );
-
-                let insert_values = Query::select()
-                    .from_table::<AggPerm>()
-                    .and_where(
-                        AggPerm::Perm
-                            .bit_and(Literal::Int8(CREATE_MESSAGE))
-                            .equals(Literal::Int8(CREATE_MESSAGE)),
-                    )
-                    .exprs(vec![msg_id_var, user_id_var, room_id_var, content_var]);
-
                 let insert = AggMsg::as_query(
-                    Query::with()
-                        .with(permissions)
-                        .insert()
+                    Query::insert()
                         .into::<Messages>()
                         .cols(&[
                             Messages::Id,
@@ -84,7 +55,7 @@ pub async fn create_message(
                             Messages::RoomId,
                             Messages::Content,
                         ])
-                        .query(insert_values.as_value())
+                        .values(vec![msg_id_var, user_id_var, room_id_var, content_var])
                         .returning(Messages::UserId.alias_to(AggMsg::UserId))
                         .returning(Messages::RoomId.alias_to(AggMsg::RoomId)),
                 );

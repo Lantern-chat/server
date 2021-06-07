@@ -101,6 +101,10 @@ where
     K: Hash + Eq,
     S: BuildHasher,
 {
+    pub fn hash_builder(&self) -> &S {
+        &self.hash_builder
+    }
+
     pub async fn retain<F>(&self, f: F)
     where
         F: Fn(&K, &mut T) -> bool,

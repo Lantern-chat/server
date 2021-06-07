@@ -2,6 +2,8 @@ use futures::StreamExt;
 
 use db::pool::Client;
 
+use crate::ServerState;
+
 use models::*;
 
 use super::*;
@@ -51,6 +53,20 @@ pub async fn get_party_permissions(
     }
 
     Ok(Permission::unpack(permissions as u64))
+}
+
+pub async fn get_cached_room_permissions(
+    state: &ServerState,
+    user_id: Snowflake,
+    room_id: Snowflake,
+) -> Result<Permission, Error> {
+    if let Some(perm) = state.perm_cache.get(user_id, room_id).await {
+        return Ok(perm);
+    }
+
+    let db = state.db.read.get().await?;
+
+    get_room_permissions(&db, user_id, room_id).await
 }
 
 pub async fn get_room_permissions(

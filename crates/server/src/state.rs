@@ -13,7 +13,10 @@ use futures::{future::BoxFuture, FutureExt};
 use tokio::sync::{oneshot, Mutex, Notify, Semaphore};
 use util::cmap::CHashMap;
 
-use crate::{config::LanternConfig, filesystem::disk::FileStore, DatabasePools};
+use crate::{
+    config::LanternConfig, filesystem::disk::FileStore, permission_cache::PermissionCache,
+    DatabasePools,
+};
 use crate::{
     tasks::events::cache::EventItemCache,
     web::{gateway::Gateway, ip_bans::IpBans, rate_limit::RateLimitTable},
@@ -36,6 +39,7 @@ pub struct InnerServerState {
     >,
     pub item_cache: EventItemCache,
     pub ip_bans: IpBans,
+    pub perm_cache: PermissionCache,
 }
 
 #[derive(Clone)]
@@ -65,6 +69,7 @@ impl ServerState {
             all_tasks: Mutex::new(None),
             item_cache: EventItemCache::default(),
             ip_bans: IpBans::new(),
+            perm_cache: PermissionCache::new(),
         }))
     }
 
