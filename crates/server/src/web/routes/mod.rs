@@ -50,6 +50,7 @@ use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 
 lazy_static::lazy_static! {
     static ref BAD_PATTERNS: AhoCorasick = AhoCorasickBuilder::new().dfa(true).build(&[
-        "wp-includes", "wp-login", "wp-content", "wordpress", "xmlrpc.php", "wlwmanifest"
+        "wp-includes", "wp-login", "wp-content", "wordpress", "xmlrpc.php",
+        "wlwmanifest", ".git", "drupal", "ajax", "claro",
     ]);
 }
