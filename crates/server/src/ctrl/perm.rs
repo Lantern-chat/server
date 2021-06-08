@@ -96,7 +96,7 @@ pub async fn get_room_permissions(
         let raw_perm = row.try_get::<_, i64>(0)? as u64;
 
         if (raw_perm & Permission::PACKED_ADMIN) == Permission::PACKED_ADMIN {
-            perm = Permission::ADMIN;
+            perm = Permission::ALL;
         } else {
             perm = Permission::unpack(raw_perm);
         }

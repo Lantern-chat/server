@@ -19,12 +19,8 @@ pub async fn get_one(
                 use thorn::*;
 
                 tables! {
-                    struct GetRoomPermissions in Lantern {
-                        Perm: Type::INT8,
-                    }
-
                     struct AggPerm {
-                        Perm: GetRoomPermissions::Perm,
+                        Perms: AggRoomPerms::Perms,
                     }
                 }
 
@@ -41,18 +37,17 @@ pub async fn get_one(
 
                 let permissions = AggPerm::as_query(
                     Query::select()
-                        .expr(GetRoomPermissions::Perm.alias_to(AggPerm::Perm))
-                        .from(
-                            Call::custom(GetRoomPermissions::full_name())
-                                .args((user_id_var.clone(), room_id_var.clone())),
-                        ),
+                        .expr(AggRoomPerms::Perms.alias_to(AggPerm::Perms))
+                        .from_table::<AggRoomPerms>()
+                        .and_where(AggRoomPerms::UserId.equals(user_id_var.clone()))
+                        .and_where(AggRoomPerms::RoomId.equals(room_id_var.clone())),
                 );
 
                 Query::with()
                     .with(permissions)
                     .select()
                     .and_where(
-                        AggPerm::Perm
+                        AggPerm::Perms
                             .bit_and(Literal::Int8(READ_MESSAGE))
                             .equals(Literal::Int8(READ_MESSAGE)),
                     )

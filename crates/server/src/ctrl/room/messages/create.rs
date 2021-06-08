@@ -21,6 +21,7 @@ pub async fn create_message(
     let permissions = get_cached_room_permissions(&state, auth.user_id, room_id).await?;
 
     if !permissions.room.contains(RoomPermissions::SEND_MESSAGES) {
+        log::error!("Invalid permissions: {:?}", permissions);
         return Err(Error::NotFound);
     }
 
