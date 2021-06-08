@@ -55,6 +55,7 @@ pub async fn get_party_permissions(
     Ok(Permission::unpack(permissions as u64))
 }
 
+/*
 pub async fn get_cached_room_permissions(
     state: &ServerState,
     user_id: Snowflake,
@@ -68,6 +69,7 @@ pub async fn get_cached_room_permissions(
 
     get_room_permissions(&db, user_id, room_id).await
 }
+*/
 
 pub async fn get_room_permissions(
     db: &Client,
