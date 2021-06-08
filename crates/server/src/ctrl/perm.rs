@@ -80,16 +80,11 @@ pub async fn get_room_permissions(
                 use db::schema::*;
                 use thorn::*;
 
-                tables! {
-                    struct GetRoomPermissions in Lantern {
-                        Perm: Type::INT8,
-                    }
-                }
-
-                Query::select().col(GetRoomPermissions::Perm).from(
-                    Call::custom(GetRoomPermissions::full_name())
-                        .args((Var::of(Users::Id), Var::of(Rooms::Id))),
-                )
+                Query::select()
+                    .col(AggRoomPerms::Perms)
+                    .from_table::<AggRoomPerms>()
+                    .and_where(AggRoomPerms::UserId.equals(Var::of(Users::Id)))
+                    .and_where(AggRoomPerms::RoomId.equals(Var::of(Rooms::Id)))
             },
             &[&user_id, &room_id],
         )
@@ -98,7 +93,13 @@ pub async fn get_room_permissions(
     let mut perm = Permission::empty();
 
     if let Some(row) = row {
-        perm = Permission::unpack(row.try_get::<_, i64>(0)? as u64);
+        let raw_perm = row.try_get::<_, i64>(0)? as u64;
+
+        if (raw_perm & Permission::PACKED_ADMIN) == Permission::PACKED_ADMIN {
+            perm = Permission::ADMIN;
+        } else {
+            perm = Permission::unpack(raw_perm);
+        }
     }
 
     Ok(perm)
