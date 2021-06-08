@@ -36,13 +36,17 @@ pub async fn get_many(
     room_id: Snowflake,
     form: GetManyMessagesForm,
 ) -> Result<impl Stream<Item = Result<Message, Error>>, Error> {
+    let had_perms = if let Some(perm) = state.perm_cache.get(auth.user_id, room_id).await {
+        if !perm.perm.room.contains(RoomPermissions::READ_MESSAGES) {
+            return Err(Error::NotFound);
+        }
+
+        true
+    } else {
+        false
+    };
+
     let db = state.db.read.get().await?;
-
-    let perm = get_cached_room_permissions_with_conn(&state, &db, auth.user_id, room_id).await?;
-
-    if !perm.room.contains(RoomPermissions::READ_MESSAGES) {
-        return Err(Error::NotFound);
-    }
 
     let msg_id = match form.query {
         Some(MessageSearch::After(id)) => id,
@@ -53,21 +57,58 @@ pub async fn get_many(
 
     let limit = 100.min(form.limit as i16);
 
-    let params: &[&(dyn ToSql + Sync)] = &[&room_id, &msg_id, &limit];
+    let stream = if had_perms {
+        let params: &[&(dyn ToSql + Sync)] = &[&room_id, &msg_id, &limit];
 
-    let stream = match form.query {
-        None | Some(MessageSearch::Before(_)) => db
-            .query_stream_cached_typed(|| query(MessageSearch::Before(Snowflake::null())), params)
-            .await?
-            .boxed(),
-        Some(MessageSearch::After(_)) => db
-            .query_stream_cached_typed(|| query(MessageSearch::After(Snowflake::null())), params)
-            .await?
-            .boxed(),
-        Some(MessageSearch::Around(_)) => db
-            .query_stream_cached_typed(|| query(MessageSearch::Around(Snowflake::null())), params)
-            .await?
-            .boxed(),
+        match form.query {
+            None | Some(MessageSearch::Before(_)) => db
+                .query_stream_cached_typed(
+                    || query(MessageSearch::Before(Snowflake::null()), false),
+                    params,
+                )
+                .await?
+                .boxed(),
+            Some(MessageSearch::After(_)) => db
+                .query_stream_cached_typed(
+                    || query(MessageSearch::After(Snowflake::null()), false),
+                    params,
+                )
+                .await?
+                .boxed(),
+            Some(MessageSearch::Around(_)) => db
+                .query_stream_cached_typed(
+                    || query(MessageSearch::Around(Snowflake::null()), false),
+                    params,
+                )
+                .await?
+                .boxed(),
+        }
+    } else {
+        let params: &[&(dyn ToSql + Sync)] = &[&room_id, &msg_id, &limit, &auth.user_id];
+
+        match form.query {
+            None | Some(MessageSearch::Before(_)) => db
+                .query_stream_cached_typed(
+                    || query(MessageSearch::Before(Snowflake::null()), true),
+                    params,
+                )
+                .await?
+                .boxed(),
+            Some(MessageSearch::After(_)) => db
+                .query_stream_cached_typed(
+                    || query(MessageSearch::After(Snowflake::null()), true),
+                    params,
+                )
+                .await?
+                .boxed(),
+            Some(MessageSearch::Around(_)) => db
+                .query_stream_cached_typed(
+                    || query(MessageSearch::Around(Snowflake::null()), true),
+                    params,
+                )
+                .await?
+                .boxed(),
+        }
     };
 
     Ok(stream.map(move |row| match row {
@@ -142,7 +183,7 @@ pub async fn get_many(
     }))
 }
 
-fn query(mode: MessageSearch) -> impl thorn::AnyQuery {
+fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
     use db::schema::*;
     use thorn::*;
 
@@ -156,8 +197,9 @@ fn query(mode: MessageSearch) -> impl thorn::AnyQuery {
     let room_id_var = Var::at(Rooms::Id, 1);
     let msg_id_var = Var::at(Messages::Id, 2);
     let limit_var = Var::at(Type::INT2, 3);
+    let user_id_var = Var::at(Users::Id, 4);
 
-    let query = Query::select()
+    let mut query = Query::select()
         .from_table::<AggMessages>()
         .cols(&[
             /* 0*/ AggMessages::MsgId,
@@ -174,7 +216,7 @@ fn query(mode: MessageSearch) -> impl thorn::AnyQuery {
             /*11*/ AggMessages::Content,
             /*12*/ AggMessages::Roles,
         ])
-        .and_where(AggMessages::RoomId.equals(room_id_var))
+        .and_where(AggMessages::RoomId.equals(room_id_var.clone()))
         .and_where(
             // test if message is deleted
             AggMessages::MessageFlags
@@ -184,9 +226,40 @@ fn query(mode: MessageSearch) -> impl thorn::AnyQuery {
         .order_by(AggMessages::MsgId.descending())
         .limit(limit_var);
 
-    match mode {
+    query = match mode {
         MessageSearch::After(_) => query.and_where(AggMessages::MsgId.greater_than(msg_id_var)),
         MessageSearch::Before(_) => query.and_where(AggMessages::MsgId.less_than(msg_id_var)),
         MessageSearch::Around(_) => unimplemented!(),
+    };
+
+    if check_perms {
+        tables! {
+            struct AggPerm {
+                Perms: AggRoomPerms::Perms,
+            }
+        }
+
+        const READ_MESSAGE: i64 = Permission {
+            party: PartyPermissions::empty(),
+            room: RoomPermissions::READ_MESSAGES,
+            stream: StreamPermissions::empty(),
+        }
+        .pack() as i64;
+
+        query = query
+            .with(AggPerm::as_query(
+                Query::select()
+                    .expr(AggRoomPerms::Perms.alias_to(AggPerm::Perms))
+                    .from_table::<AggRoomPerms>()
+                    .and_where(AggRoomPerms::UserId.equals(user_id_var))
+                    .and_where(AggRoomPerms::RoomId.equals(room_id_var)),
+            ))
+            .and_where(
+                AggPerm::Perms
+                    .bit_and(Literal::Int8(READ_MESSAGE))
+                    .equals(Literal::Int8(READ_MESSAGE)),
+            )
     }
+
+    query
 }
