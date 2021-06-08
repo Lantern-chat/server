@@ -22,7 +22,7 @@ pub async fn ready(
 
     let db = state.read_db().await;
 
-    let user = async {
+    let user_future = async {
         let row = db
             .query_one_cached_typed(|| select_user(), &[&auth.user_id])
             .await?;
@@ -47,7 +47,7 @@ pub async fn ready(
         })
     };
 
-    let parties = async {
+    let parties_future = async {
         let rows = db
             .query_stream_cached_typed(|| select_parties(), &[&auth.user_id])
             .await?;
@@ -112,7 +112,7 @@ pub async fn ready(
         Ok::<_, Error>(parties.into_iter().map(|(_, v)| v).collect())
     };
 
-    let (user, parties) = futures::future::join(user, parties).await;
+    let (user, parties) = futures::future::join(user_future, parties_future).await;
 
     Ok(ReadyEvent {
         user: user?,
