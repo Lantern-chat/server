@@ -41,7 +41,7 @@ pub trait SnowflakeExt {
         // update incremenent counter, making sure it wraps at 12 bits
         let incr = INCR
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |incr| {
-                Some((incr + 1) & 0x3FF)
+                Some((incr + 1) & 0xFFF)
             })
             .unwrap() as u64;
 
