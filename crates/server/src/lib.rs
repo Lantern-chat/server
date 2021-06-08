@@ -29,8 +29,9 @@ pub mod util;
 pub mod web;
 
 pub mod tasks {
-    pub mod cache_cleanup;
     pub mod cn_cleanup;
+    pub mod item_cache_cleanup;
+    pub mod perm_cache_cleanup;
     pub mod refresh_ip_bans;
     pub mod rl_cleanup;
     pub mod session_cleanup;
@@ -59,16 +60,17 @@ pub async fn start_server(
 
     log::info!("Starting interval tasks...");
 
-    let task_state = state.clone();
+    let ts = state.clone();
 
     *state.all_tasks.lock().await = Some(
         tokio::spawn(async move {
             tokio::try_join!(
-                tokio::spawn(tasks::rl_cleanup::cleanup_ratelimits(task_state.clone())),
-                tokio::spawn(tasks::cn_cleanup::cleanup_connections(task_state.clone())),
-                tokio::spawn(tasks::session_cleanup::cleanup_sessions(task_state.clone())),
-                tokio::spawn(tasks::cache_cleanup::cache_cleanup(task_state.clone())),
-                tokio::spawn(tasks::events::task::start(task_state.clone())),
+                tokio::spawn(tasks::rl_cleanup::cleanup_ratelimits(ts.clone())),
+                tokio::spawn(tasks::cn_cleanup::cleanup_connections(ts.clone())),
+                tokio::spawn(tasks::session_cleanup::cleanup_sessions(ts.clone())),
+                tokio::spawn(tasks::item_cache_cleanup::item_cache_cleanup(ts.clone())),
+                tokio::spawn(tasks::perm_cache_cleanup::perm_cache_cleanup(ts.clone())),
+                tokio::spawn(tasks::events::task::start(ts.clone())),
                 //tokio::spawn(tasks::refresh_ip_bans::refresh_ip_bans(task_state.clone())),
             )
             .map(|_| {})

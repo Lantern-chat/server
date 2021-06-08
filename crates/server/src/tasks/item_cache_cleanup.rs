@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::ServerState;
 
-pub async fn cache_cleanup(state: ServerState) {
+pub async fn item_cache_cleanup(state: ServerState) {
     const CLEANUP_INTERVAL: Duration = Duration::from_secs(5);
 
     let mut interval = tokio::time::interval(CLEANUP_INTERVAL);
