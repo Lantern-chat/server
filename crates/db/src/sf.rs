@@ -72,9 +72,33 @@ pub trait SnowflakeExt {
     fn at(ts: SystemTime) -> Snowflake {
         Self::at_ms(ts.duration_since(UNIX_EPOCH).unwrap().as_millis() as u64)
     }
+
+    fn low_complexity(self) -> u64;
 }
 
-impl SnowflakeExt for Snowflake {}
+impl SnowflakeExt for Snowflake {
+    fn low_complexity(self) -> u64 {
+        const ID_MASK: u64 = 0b11111_11111;
+        let raw = self.to_u64();
+
+        // shift high bits of timestamp down, since the timestamp occupies the top 42 bits,
+        // shifting it down by 42 will leave only the high bits
+        let ts_high = raw >> 42;
+        // shift IDs down to lsb and mask them out
+        let ids = (raw >> 12) & ID_MASK;
+        // combine 22 timestamp bits with 10 id bits
+        let high = ts_high << 10 | ids;
+        // to get the low timestamp bits, shift out high bits,
+        // then shift back down, then shift down again to lsb
+        let ts_low = (raw << 22) >> (22 + 22);
+
+        // to get low bits, shift timestamp over to make room for increment counter, then OR with counter
+        let low = (ts_low << 12) | (raw & 0xFFF);
+
+        // recombine
+        (high << 32) | low
+    }
+}
 
 #[cfg(test)]
 mod test {
