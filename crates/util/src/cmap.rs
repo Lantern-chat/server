@@ -140,6 +140,14 @@ where
         }
     }
 
+    pub async fn contains<Q>(&self, key: &Q) -> bool
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq,
+    {
+        self.contains_hash(self.hash_and_shard(key).0).await
+    }
+
     pub async fn contains_hash(&self, hash: u64) -> bool {
         let shard_idx = hash as usize % self.shards.len();
 
@@ -153,6 +161,7 @@ where
             .is_some()
     }
 
+    #[inline]
     fn hash_and_shard<Q>(&self, key: &Q) -> (u64, usize)
     where
         Q: Hash + Eq,

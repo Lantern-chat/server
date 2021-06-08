@@ -1,7 +1,7 @@
 use db::{Snowflake, SnowflakeExt};
 
 use crate::{
-    ctrl::{auth::Authorization, perm::get_room_permissions, Error, SearchMode},
+    ctrl::{auth::Authorization, perm::get_cached_room_permissions, Error, SearchMode},
     ServerState,
 };
 
@@ -18,9 +18,7 @@ pub async fn create_message(
     room_id: Snowflake,
     form: CreateMessageForm,
 ) -> Result<Message, Error> {
-    let ro = state.db.read.get().await?;
-    let permissions = get_room_permissions(&ro, auth.user_id, room_id).await?;
-    drop(ro);
+    let permissions = get_cached_room_permissions(&state, auth.user_id, room_id).await?;
 
     if !permissions.room.contains(RoomPermissions::SEND_MESSAGES) {
         log::error!("Invalid permissions: {:?}", permissions);

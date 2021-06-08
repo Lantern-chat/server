@@ -1,7 +1,6 @@
 use db::Snowflake;
 use ftl::*;
 
-use crate::ctrl::perm::get_room_permissions;
 use crate::web::auth::{authorize, Authorization};
 
 pub mod get;

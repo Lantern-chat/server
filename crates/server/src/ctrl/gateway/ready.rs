@@ -5,6 +5,7 @@ use db::Snowflake;
 
 use crate::{
     ctrl::{auth::Authorization, Error, SearchMode},
+    permission_cache::PermMute,
     ServerState,
 };
 
@@ -22,9 +23,79 @@ pub async fn ready(
 
     let db = state.read_db().await;
 
+    let perms_future = async {
+        if state.perm_cache.add_reference(auth.user_id).await {
+            return Ok::<_, Error>(());
+        }
+
+        let stream = db
+            .query_stream_cached_typed(
+                || {
+                    use db::schema::*;
+                    use thorn::*;
+
+                    Query::select()
+                        .from_table::<AggRoomPerms>()
+                        .cols(&[AggRoomPerms::RoomId, AggRoomPerms::Perms])
+                        .and_where(AggRoomPerms::UserId.equals(Var::of(Users::Id)))
+                },
+                &[&auth.user_id],
+            )
+            .await?;
+
+        let mut cache = Vec::new();
+
+        futures::pin_mut!(stream);
+        while let Some(row) = stream.next().await {
+            let row = row?;
+
+            let room_id: Snowflake = row.try_get(0)?;
+            let perm: i64 = row.try_get(1)?;
+
+            cache.push((
+                room_id,
+                PermMute {
+                    perm: Permission::unpack(perm as u64),
+                    muted: false,
+                },
+            ));
+        }
+
+        state
+            .perm_cache
+            .batch_set(auth.user_id, cache.into_iter())
+            .await;
+
+        Ok(())
+    };
+
     let user_future = async {
         let row = db
-            .query_one_cached_typed(|| select_user(), &[&auth.user_id])
+            .query_one_cached_typed(
+                || {
+                    use db::schema::*;
+                    use thorn::*;
+
+                    Query::select()
+                        .and_where(Users::Id.equals(Var::of(Users::Id)))
+                        .cols(&[
+                            Users::Username,      // 0
+                            Users::Discriminator, // 1
+                            Users::Flags,         // 2
+                            Users::Email,         // 3
+                            Users::CustomStatus,  // 4
+                            Users::Biography,     // 5
+                            Users::Preferences,   // 6
+                        ])
+                        .col(UserAvatars::FileId) // 7
+                        .from(
+                            Users::left_join_table::<UserAvatars>()
+                                .on(UserAvatars::UserId.equals(Users::Id)),
+                        )
+                        .and_where(UserAvatars::IsMain.is_not_false())
+                },
+                &[&auth.user_id],
+            )
             .await?;
 
         Ok::<_, Error>(User {
@@ -49,7 +120,28 @@ pub async fn ready(
 
     let parties_future = async {
         let rows = db
-            .query_stream_cached_typed(|| select_parties(), &[&auth.user_id])
+            .query_stream_cached_typed(
+                || {
+                    use db::schema::*;
+                    use thorn::*;
+
+                    Query::select()
+                        .cols(&[
+                            Party::Id,
+                            Party::OwnerId,
+                            Party::Name,
+                            Party::AvatarId,
+                            Party::Description,
+                        ])
+                        .from(
+                            Party::left_join_table::<PartyMember>()
+                                .on(PartyMember::PartyId.equals(Party::Id)),
+                        )
+                        .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
+                        .and_where(Party::DeletedAt.is_null())
+                },
+                &[&auth.user_id],
+            )
             .await?;
 
         let parties_stream = rows.map(|row| match row {
@@ -112,51 +204,15 @@ pub async fn ready(
         Ok::<_, Error>(parties.into_iter().map(|(_, v)| v).collect())
     };
 
-    let (user, parties) = futures::future::join(user_future, parties_future).await;
+    let (user, parties, _) =
+        futures::future::try_join3(user_future, parties_future, perms_future).await?;
 
     Ok(ReadyEvent {
-        user: user?,
+        user,
         dms: Vec::new(),
-        parties: parties?,
+        parties,
         session: conn_id,
     })
-}
-
-use thorn::*;
-
-fn select_user() -> impl AnyQuery {
-    use db::schema::*;
-
-    Query::select()
-        .and_where(Users::Id.equals(Var::of(Users::Id)))
-        .cols(&[
-            Users::Username,      // 0
-            Users::Discriminator, // 1
-            Users::Flags,         // 2
-            Users::Email,         // 3
-            Users::CustomStatus,  // 4
-            Users::Biography,     // 5
-            Users::Preferences,   // 6
-        ])
-        .col(UserAvatars::FileId) // 7
-        .from(Users::left_join_table::<UserAvatars>().on(UserAvatars::UserId.equals(Users::Id)))
-        .and_where(UserAvatars::IsMain.is_not_false())
-}
-
-fn select_parties() -> impl AnyQuery {
-    use db::schema::*;
-
-    Query::select()
-        .cols(&[
-            Party::Id,
-            Party::OwnerId,
-            Party::Name,
-            Party::AvatarId,
-            Party::Description,
-        ])
-        .from(Party::left_join_table::<PartyMember>().on(PartyMember::PartyId.equals(Party::Id)))
-        .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
-        .and_where(Party::DeletedAt.is_null())
 }
 
 /*

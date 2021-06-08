@@ -39,7 +39,7 @@ pub struct InnerServerState {
     >,
     pub item_cache: EventItemCache,
     pub ip_bans: IpBans,
-    //pub perm_cache: PermissionCache,
+    pub perm_cache: PermissionCache,
 }
 
 #[derive(Clone)]
@@ -68,7 +68,7 @@ impl ServerState {
             all_tasks: Mutex::new(None),
             item_cache: EventItemCache::default(),
             ip_bans: IpBans::new(),
-            //perm_cache: PermissionCache::new(),
+            perm_cache: PermissionCache::new(),
         }))
     }
 

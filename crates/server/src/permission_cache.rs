@@ -1,8 +1,14 @@
-use std::{hash::BuildHasher, sync::Arc};
+use std::{
+    hash::BuildHasher,
+    sync::{
+        atomic::{AtomicIsize, Ordering},
+        Arc,
+    },
+};
 
 use hashbrown::HashMap;
 
-use util::cmap::{CHashMap, DefaultHashBuilder};
+use util::cmap::{CHashMap, DefaultHashBuilder, ReadValue, WriteValue};
 
 #[derive(Default, Clone)]
 struct SharedBuildHasher<S: BuildHasher>(Arc<S>);
@@ -24,8 +30,19 @@ type RoomId = Snowflake;
 
 type SHB = SharedBuildHasher<DefaultHashBuilder>;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PermMute {
+    pub perm: Permission,
+    pub muted: bool,
+}
+
+struct RoomCache {
+    cache: HashMap<RoomId, PermMute, SHB>,
+    rc: AtomicIsize,
+}
+
 pub struct PermissionCache {
-    map: CHashMap<UserId, HashMap<RoomId, Permission, SHB>, SHB>,
+    map: CHashMap<UserId, RoomCache, SHB>,
 }
 
 impl PermissionCache {
@@ -38,36 +55,68 @@ impl PermissionCache {
         }
     }
 
-    pub async fn get(&self, user_id: Snowflake, room_id: Snowflake) -> Option<Permission> {
+    pub async fn has_user(&self, user_id: Snowflake) -> bool {
+        self.map.contains(&user_id).await
+    }
+
+    pub async fn get(&self, user_id: Snowflake, room_id: Snowflake) -> Option<PermMute> {
         self.map
             .get(&user_id)
             .await
-            .and_then(|rooms| rooms.get(&room_id).copied())
+            .and_then(|rooms| rooms.cache.get(&room_id).copied())
     }
 
-    pub async fn set(&self, user_id: Snowflake, room_id: Snowflake, perm: Permission) {
+    #[inline]
+    async fn get_cache(
+        &self,
+        user_id: Snowflake,
+    ) -> Option<ReadValue<'_, Snowflake, RoomCache, SHB>> {
+        self.map.get(&user_id).await
+    }
+
+    async fn get_cache_mut(&self, user_id: Snowflake) -> WriteValue<'_, Snowflake, RoomCache, SHB> {
         self.map
-            .get_mut_or_insert(&user_id, || {
-                HashMap::with_hasher(self.map.hash_builder().clone())
+            .get_mut_or_insert(&user_id, || RoomCache {
+                cache: HashMap::with_hasher(self.map.hash_builder().clone()),
+                rc: AtomicIsize::new(1),
             })
             .await
+    }
+
+    pub async fn set(&self, user_id: Snowflake, room_id: Snowflake, perm: PermMute) {
+        self.get_cache_mut(user_id)
+            .await
+            .cache
             .insert(room_id, perm);
     }
 
     pub async fn batch_set(
         &self,
         user_id: Snowflake,
-        iter: impl IntoIterator<Item = (Snowflake, Permission)>,
+        iter: impl IntoIterator<Item = (Snowflake, PermMute)>,
     ) {
-        self.map
-            .get_mut_or_insert(&user_id, || {
-                HashMap::with_hasher(self.map.hash_builder().clone())
-            })
-            .await
-            .extend(iter);
+        self.get_cache_mut(user_id).await.cache.extend(iter);
     }
 
-    pub async fn clear(&self, user_id: Snowflake) {
-        self.map.remove(&user_id).await;
+    pub async fn add_reference(&self, user_id: Snowflake) -> bool {
+        if let Some(cache) = self.get_cache(user_id).await {
+            cache.rc.fetch_add(1, Ordering::SeqCst);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub async fn remove_reference(&self, user_id: Snowflake) {
+        if let Some(cache) = self.get_cache(user_id).await {
+            cache.rc.fetch_sub(1, Ordering::SeqCst);
+        }
+    }
+
+    /// Cleanup any cache entries with no active users
+    pub async fn cleanup(&self) {
+        self.map
+            .retain(|_, cache| cache.rc.load(Ordering::SeqCst) > 0)
+            .await
     }
 }

@@ -4,7 +4,11 @@ use futures::{Stream, StreamExt};
 use models::*;
 use thorn::pg::ToSql;
 
-use crate::{ctrl::Error, web::auth::Authorization, ServerState};
+use crate::{
+    ctrl::{perm::get_cached_room_permissions_with_conn, Error},
+    web::auth::Authorization,
+    ServerState,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -34,6 +38,12 @@ pub async fn get_many(
 ) -> Result<impl Stream<Item = Result<Message, Error>>, Error> {
     let db = state.db.read.get().await?;
 
+    let perm = get_cached_room_permissions_with_conn(&state, &db, auth.user_id, room_id).await?;
+
+    if !perm.room.contains(RoomPermissions::READ_MESSAGES) {
+        return Err(Error::NotFound);
+    }
+
     let msg_id = match form.query {
         Some(MessageSearch::After(id)) => id,
         Some(MessageSearch::Around(id)) => id,
@@ -43,7 +53,7 @@ pub async fn get_many(
 
     let limit = 100.min(form.limit as i16);
 
-    let params: &[&(dyn ToSql + Sync)] = &[&auth.user_id, &room_id, &msg_id, &limit];
+    let params: &[&(dyn ToSql + Sync)] = &[&room_id, &msg_id, &limit];
 
     let stream = match form.query {
         None | Some(MessageSearch::Before(_)) => db
@@ -137,44 +147,17 @@ fn query(mode: MessageSearch) -> impl thorn::AnyQuery {
     use thorn::*;
 
     tables! {
-        struct AggPerm {
-            Perms: AggRoomPerms::Perms,
-        }
-
         struct AggNumberedMsg {
             MsgId: AggMessages::MsgId,
             RowNumber: Type::INT8,
         }
     }
 
-    const READ_MESSAGE: i64 = Permission {
-        party: PartyPermissions::empty(),
-        room: RoomPermissions::READ_MESSAGES,
-        stream: StreamPermissions::empty(),
-    }
-    .pack() as i64;
+    let room_id_var = Var::at(Rooms::Id, 1);
+    let msg_id_var = Var::at(Messages::Id, 2);
+    let limit_var = Var::at(Type::INT2, 3);
 
-    let user_id_var = Var::at(Users::Id, 1);
-    let room_id_var = Var::at(Rooms::Id, 2);
-    let msg_id_var = Var::at(Messages::Id, 3);
-    let limit_var = Var::at(Type::INT2, 4);
-
-    let permissions = AggPerm::as_query(
-        Query::select()
-            .expr(AggRoomPerms::Perms.alias_to(AggPerm::Perms))
-            .from_table::<AggRoomPerms>()
-            .and_where(AggRoomPerms::UserId.equals(user_id_var.clone()))
-            .and_where(AggRoomPerms::RoomId.equals(room_id_var.clone())),
-    );
-
-    let query = Query::with()
-        .with(permissions)
-        .select()
-        .and_where(
-            AggPerm::Perms
-                .bit_and(Literal::Int8(READ_MESSAGE))
-                .equals(Literal::Int8(READ_MESSAGE)),
-        )
+    let query = Query::select()
         .from_table::<AggMessages>()
         .cols(&[
             /* 0*/ AggMessages::MsgId,

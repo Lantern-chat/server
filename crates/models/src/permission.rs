@@ -89,7 +89,7 @@ impl Default for StreamPermissions {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Permission {
     pub party: PartyPermissions,
     pub room: RoomPermissions,

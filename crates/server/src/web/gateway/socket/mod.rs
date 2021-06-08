@@ -128,6 +128,8 @@ pub fn client_connected(
         // Make the new connection known to the gateway
         state.gateway.add_connection(conn.clone()).await;
 
+        let mut user_id = None;
+
         while let Some(event) = events.next().await {
             let resp = match event {
                 Item::MissedHeartbeat => Err(MessageOutgoingError::SocketClosed),
@@ -136,6 +138,8 @@ pub fn client_connected(
                         match event.raw {
                             // TODO: Make this non-blocking for the event-loop?
                             RawEvent::Ready(ref ready) => {
+                                user_id = Some(ready.user.id);
+
                                 // subscribe to all relevant party broadcasts
                                 // and activate the connection for per-user events
                                 let subs = state
@@ -224,8 +228,15 @@ pub fn client_connected(
         }
 
         // TODO: Cleanup connection
-
-        state.gateway.conns.remove(&conn.id).await;
+        // still missing per-user connection cleanup
+        tokio::join! {
+            state.gateway.conns.remove(&conn.id),
+            async {
+                if let Some(user_id) = user_id {
+                    state.perm_cache.remove_reference(user_id).await;
+                }
+            },
+        };
     });
 }
 
