@@ -86,11 +86,11 @@ impl SnowflakeExt for Snowflake {
         let ts_high = raw >> 42;
         // shift IDs down to lsb and mask them out
         let ids = (raw >> 12) & ID_MASK;
-        // combine 22 timestamp bits with 10 id bits
-        let high = ts_high << 10 | ids;
+        // combine 22 timestamp bits with 10 id bits, placing the IDs first
+        let high = ts_high | (ids << 22);
         // to get the low timestamp bits, shift out high bits,
         // then shift back down, then shift down again to lsb
-        let ts_low = (raw << 22) >> (22 + 22);
+        let ts_low = (raw << 22) >> 44;
 
         // to get low bits, shift timestamp over to make room for increment counter, then OR with counter
         let low = (ts_low << 12) | (raw & 0xFFF);
