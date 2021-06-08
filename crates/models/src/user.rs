@@ -63,7 +63,8 @@ pub enum Locale {
 
 bitflags::bitflags! {
     pub struct FriendFlags: i16 {
-        const SOMETHING = 0;
+        /// Pins the user to the top of their friendlist
+        const FAVORITE = 1 << 0;
     }
 }
 
