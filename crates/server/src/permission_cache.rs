@@ -36,13 +36,14 @@ pub struct PermMute {
     pub muted: bool,
 }
 
-struct RoomCache {
-    cache: HashMap<RoomId, PermMute, SHB>,
+// TODO: Maybe add per-party caching as well?
+struct UserCache {
+    room: HashMap<RoomId, PermMute, SHB>,
     rc: AtomicIsize,
 }
 
 pub struct PermissionCache {
-    map: CHashMap<UserId, RoomCache, SHB>,
+    map: CHashMap<UserId, UserCache, SHB>,
 }
 
 impl PermissionCache {
@@ -63,31 +64,28 @@ impl PermissionCache {
         self.map
             .get(&user_id)
             .await
-            .and_then(|rooms| rooms.cache.get(&room_id).copied())
+            .and_then(|rooms| rooms.room.get(&room_id).copied())
     }
 
     #[inline]
     async fn get_cache(
         &self,
         user_id: Snowflake,
-    ) -> Option<ReadValue<'_, Snowflake, RoomCache, SHB>> {
+    ) -> Option<ReadValue<'_, Snowflake, UserCache, SHB>> {
         self.map.get(&user_id).await
     }
 
-    async fn get_cache_mut(&self, user_id: Snowflake) -> WriteValue<'_, Snowflake, RoomCache, SHB> {
+    async fn get_cache_mut(&self, user_id: Snowflake) -> WriteValue<'_, Snowflake, UserCache, SHB> {
         self.map
-            .get_mut_or_insert(&user_id, || RoomCache {
-                cache: HashMap::with_hasher(self.map.hash_builder().clone()),
+            .get_mut_or_insert(&user_id, || UserCache {
+                room: HashMap::with_hasher(self.map.hash_builder().clone()),
                 rc: AtomicIsize::new(1),
             })
             .await
     }
 
     pub async fn set(&self, user_id: Snowflake, room_id: Snowflake, perm: PermMute) {
-        self.get_cache_mut(user_id)
-            .await
-            .cache
-            .insert(room_id, perm);
+        self.get_cache_mut(user_id).await.room.insert(room_id, perm);
     }
 
     pub async fn batch_set(
@@ -95,7 +93,7 @@ impl PermissionCache {
         user_id: Snowflake,
         iter: impl IntoIterator<Item = (Snowflake, PermMute)>,
     ) {
-        self.get_cache_mut(user_id).await.cache.extend(iter);
+        self.get_cache_mut(user_id).await.room.extend(iter);
     }
 
     pub async fn add_reference(&self, user_id: Snowflake) -> bool {

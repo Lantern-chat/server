@@ -25,7 +25,7 @@ FROM lantern.overwrites INNER JOIN lantern.role_members ON overwrites.role_id = 
 
 UNION ALL
 
--- @everyone role overrides, which are roles with the same id as the party
+-- at-everyone role overrides, which are roles with the same id as the party
 SELECT
     overwrites.room_id,
     party_member.user_id,
