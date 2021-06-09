@@ -153,12 +153,7 @@ where
 
         let shard = unsafe { self.shards.get_unchecked(shard_idx) };
 
-        shard
-            .read()
-            .await
-            .raw_entry()
-            .from_hash(hash, |_| true)
-            .is_some()
+        shard.read().await.raw_entry().from_hash(hash, |_| true).is_some()
     }
 
     #[inline]
@@ -259,11 +254,7 @@ where
         }
     }
 
-    pub async fn get_or_insert(
-        &self,
-        key: &K,
-        on_insert: impl FnOnce() -> T,
-    ) -> ReadValue<'_, K, T, S>
+    pub async fn get_or_insert(&self, key: &K, on_insert: impl FnOnce() -> T) -> ReadValue<'_, K, T, S>
     where
         K: Clone,
     {
@@ -285,11 +276,7 @@ where
         }
     }
 
-    pub async fn get_mut_or_insert(
-        &self,
-        key: &K,
-        on_insert: impl FnOnce() -> T,
-    ) -> WriteValue<'_, K, T, S>
+    pub async fn get_mut_or_insert(&self, key: &K, on_insert: impl FnOnce() -> T) -> WriteValue<'_, K, T, S>
     where
         K: Clone,
     {
@@ -376,9 +363,7 @@ where
             while cache[i].2 == current_shard {
                 f(
                     cache[i].0,
-                    shard
-                        .raw_entry()
-                        .from_key_hashed_nocheck(cache[i].1, cache[i].0),
+                    shard.raw_entry().from_key_hashed_nocheck(cache[i].1, cache[i].0),
                 );
                 i += 1;
 

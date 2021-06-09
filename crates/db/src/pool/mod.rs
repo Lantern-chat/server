@@ -21,9 +21,9 @@ use parking_lot::{Mutex, RwLock};
 
 use futures::{Future, FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt};
 use pg::{
-    tls::MakeTlsConnect, tls::TlsConnect, types::Type, AsyncMessage, Client as PgClient,
-    Config as PgConfig, Error as PgError, IsolationLevel, NoTls, Notification, Socket, Statement,
-    Transaction as PgTransaction, TransactionBuilder as PgTransactionBuilder,
+    tls::MakeTlsConnect, tls::TlsConnect, types::Type, AsyncMessage, Client as PgClient, Config as PgConfig,
+    Error as PgError, IsolationLevel, NoTls, Notification, Socket, Statement, Transaction as PgTransaction,
+    TransactionBuilder as PgTransactionBuilder,
 };
 
 use failsafe::futures::CircuitBreaker;
@@ -69,11 +69,7 @@ pub struct Connection {
 }
 
 impl Connection {
-    pub fn spawn_notifications(
-        &self,
-        size: usize,
-        name_hint: Option<String>,
-    ) -> Receiver<Notification> {
+    pub fn spawn_notifications(&self, size: usize, name_hint: Option<String>) -> Receiver<Notification> {
         let (tx, rx) = mpsc::channel(size);
 
         let this = self.clone();
@@ -102,10 +98,7 @@ impl Connection {
                                     break false;
                                 }
                                 Err(SendTimeoutError::Timeout(n)) => {
-                                    log::error!(
-                                        "Forwarding database notification timed out: {:?}",
-                                        n
-                                    );
+                                    log::error!("Forwarding database notification timed out: {:?}", n);
                                 }
                             }
                         }
@@ -129,11 +122,7 @@ impl Connection {
                     name_hint
                 );
             } else {
-                log::info!(
-                    "Disconnected from {} database {}",
-                    ro(this.readonly),
-                    name_hint
-                );
+                log::info!("Disconnected from {} database {}", ro(this.readonly), name_hint);
             }
         });
 
@@ -202,9 +191,7 @@ where
 
         let conn = Connection {
             readonly: config.readonly,
-            stream: Arc::new(tokio::sync::Mutex::new(
-                ConnectionStream(connection).boxed(),
-            )),
+            stream: Arc::new(tokio::sync::Mutex::new(ConnectionStream(connection).boxed())),
             release: Arc::new(Notify::new()),
         };
 
@@ -307,11 +294,7 @@ impl Pool {
                 TryAcquireError::NoPermits => Error::Timeout,
             })?
         } else {
-            timeout(
-                timeouts.wait,
-                self.semaphore.acquire().map_err(|_| Error::Closed),
-            )
-            .await?
+            timeout(timeouts.wait, self.semaphore.acquire().map_err(|_| Error::Closed)).await?
         };
 
         permit.forget();
@@ -566,10 +549,7 @@ impl Client {
             return Ok(stmt);
         }
 
-        let stmt = self
-            .client
-            .prepare(self.debug_check_readonly(query()))
-            .await?;
+        let stmt = self.client.prepare(self.debug_check_readonly(query())).await?;
 
         self.stmt_cache.insert(id, &stmt);
 
@@ -596,8 +576,7 @@ impl Client {
         I: IntoIterator<Item = P>,
         I::IntoIter: ExactSizeIterator,
     {
-        self.query_raw(&self.prepare_cached(query).await?, params)
-            .await
+        self.query_raw(&self.prepare_cached(query).await?, params).await
     }
 
     pub async fn query_stream<T>(
@@ -632,25 +611,14 @@ impl Client {
             .await
     }
 
-    pub async fn execute<T>(
-        &self,
-        statement: &T,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<u64, Error>
+    pub async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
     where
         T: ?Sized + ToStatement,
     {
-        self.client
-            .execute(statement, params)
-            .await
-            .map_err(Error::from)
+        self.client.execute(statement, params).await.map_err(Error::from)
     }
 
-    pub async fn execute_cached<F>(
-        &self,
-        query: F,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<u64, Error>
+    pub async fn execute_cached<F>(&self, query: F, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
     where
         F: Any + FnOnce() -> &'static str,
     {
@@ -660,36 +628,21 @@ impl Client {
             .map_err(Error::from)
     }
 
-    pub async fn query<T>(
-        &self,
-        statement: &T,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Vec<Row>, Error>
+    pub async fn query<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<Vec<Row>, Error>
     where
         T: ?Sized + ToStatement,
     {
-        self.client
-            .query(statement, params)
-            .await
-            .map_err(Error::from)
+        self.client.query(statement, params).await.map_err(Error::from)
     }
 
-    pub async fn query_cached<F>(
-        &self,
-        query: F,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Vec<Row>, Error>
+    pub async fn query_cached<F>(&self, query: F, params: &[&(dyn ToSql + Sync)]) -> Result<Vec<Row>, Error>
     where
         F: Any + FnOnce() -> &'static str,
     {
         self.query(&self.prepare_cached(query).await?, params).await
     }
 
-    pub async fn query_one<T>(
-        &self,
-        statement: &T,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Row, Error>
+    pub async fn query_one<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<Row, Error>
     where
         T: ?Sized + ToStatement,
     {
@@ -699,16 +652,11 @@ impl Client {
             .map_err(Error::from)
     }
 
-    pub async fn query_one_cached<F>(
-        &self,
-        query: F,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Row, Error>
+    pub async fn query_one_cached<F>(&self, query: F, params: &[&(dyn ToSql + Sync)]) -> Result<Row, Error>
     where
         F: Any + FnOnce() -> &'static str,
     {
-        self.query_one(&self.prepare_cached(query).await?, params)
-            .await
+        self.query_one(&self.prepare_cached(query).await?, params).await
     }
 
     pub async fn query_opt<T>(
@@ -733,8 +681,7 @@ impl Client {
     where
         F: Any + FnOnce() -> &'static str,
     {
-        self.query_opt(&self.prepare_cached(query).await?, params)
-            .await
+        self.query_opt(&self.prepare_cached(query).await?, params).await
     }
 }
 
@@ -802,8 +749,7 @@ impl Client {
         F: Any + FnOnce() -> Q,
         Q: AnyQuery,
     {
-        self.query(&self.prepare_cached_typed(query).await?, params)
-            .await
+        self.query(&self.prepare_cached_typed(query).await?, params).await
     }
 
     pub async fn query_one_cached_typed<F, Q>(
@@ -902,10 +848,7 @@ impl Transaction<'_> {
         I: IntoIterator<Item = P>,
         I::IntoIter: ExactSizeIterator,
     {
-        self.t
-            .query_raw(statement, params)
-            .await
-            .map_err(Error::from)
+        self.t.query_raw(statement, params).await.map_err(Error::from)
     }
 
     pub async fn query_raw_cached<F, P, I>(&self, query: F, params: I) -> Result<RowStream, Error>
@@ -915,8 +858,7 @@ impl Transaction<'_> {
         I: IntoIterator<Item = P>,
         I::IntoIter: ExactSizeIterator,
     {
-        self.query_raw(&self.prepare_cached(query).await?, params)
-            .await
+        self.query_raw(&self.prepare_cached(query).await?, params).await
     }
 
     pub async fn query_stream<T>(
@@ -951,22 +893,14 @@ impl Transaction<'_> {
             .await
     }
 
-    pub async fn execute<T>(
-        &self,
-        statement: &T,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<u64, Error>
+    pub async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
     where
         T: ?Sized + ToStatement,
     {
         self.t.execute(statement, params).await.map_err(Error::from)
     }
 
-    pub async fn execute_cached<F>(
-        &self,
-        query: F,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<u64, Error>
+    pub async fn execute_cached<F>(&self, query: F, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
     where
         F: Any + FnOnce() -> &'static str,
     {
@@ -976,52 +910,32 @@ impl Transaction<'_> {
             .map_err(Error::from)
     }
 
-    pub async fn query<T>(
-        &self,
-        statement: &T,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Vec<Row>, Error>
+    pub async fn query<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<Vec<Row>, Error>
     where
         T: ?Sized + ToStatement,
     {
         self.t.query(statement, params).await.map_err(Error::from)
     }
 
-    pub async fn query_cached<F>(
-        &self,
-        query: F,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Vec<Row>, Error>
+    pub async fn query_cached<F>(&self, query: F, params: &[&(dyn ToSql + Sync)]) -> Result<Vec<Row>, Error>
     where
         F: Any + FnOnce() -> &'static str,
     {
         self.query(&self.prepare_cached(query).await?, params).await
     }
 
-    pub async fn query_one<T>(
-        &self,
-        statement: &T,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Row, Error>
+    pub async fn query_one<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<Row, Error>
     where
         T: ?Sized + ToStatement,
     {
-        self.t
-            .query_one(statement, params)
-            .await
-            .map_err(Error::from)
+        self.t.query_one(statement, params).await.map_err(Error::from)
     }
 
-    pub async fn query_one_cached<F>(
-        &self,
-        query: F,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Row, Error>
+    pub async fn query_one_cached<F>(&self, query: F, params: &[&(dyn ToSql + Sync)]) -> Result<Row, Error>
     where
         F: Any + FnOnce() -> &'static str,
     {
-        self.query_one(&self.prepare_cached(query).await?, params)
-            .await
+        self.query_one(&self.prepare_cached(query).await?, params).await
     }
 
     pub async fn query_opt<T>(
@@ -1032,10 +946,7 @@ impl Transaction<'_> {
     where
         T: ?Sized + ToStatement,
     {
-        self.t
-            .query_opt(statement, params)
-            .await
-            .map_err(Error::from)
+        self.t.query_opt(statement, params).await.map_err(Error::from)
     }
 
     pub async fn query_opt_cached<F>(
@@ -1046,8 +957,7 @@ impl Transaction<'_> {
     where
         F: Any + FnOnce() -> &'static str,
     {
-        self.query_opt(&self.prepare_cached(query).await?, params)
-            .await
+        self.query_opt(&self.prepare_cached(query).await?, params).await
     }
 }
 
@@ -1115,8 +1025,7 @@ impl Transaction<'_> {
         F: Any + FnOnce() -> Q,
         Q: AnyQuery,
     {
-        self.query(&self.prepare_cached_typed(query).await?, params)
-            .await
+        self.query(&self.prepare_cached_typed(query).await?, params).await
     }
 
     pub async fn query_one_cached_typed<F, Q>(

@@ -29,7 +29,10 @@ pub async fn cleanup_sessions(state: ServerState) {
                 }
             }
             Err(e) => {
-                log::error!("Unable to run session cleanup task due to error: {}\nTrying again in 1 second.", e);
+                log::error!(
+                    "Unable to run session cleanup task due to error: {}\nTrying again in 1 second.",
+                    e
+                );
                 tokio::time::sleep(Duration::from_secs(1)).await;
             }
         }

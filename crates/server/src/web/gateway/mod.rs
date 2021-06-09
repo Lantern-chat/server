@@ -103,8 +103,7 @@ impl Gateway {
                 for conn in users.values() {
                     if let Err(e) = conn.tx.try_send(event.clone()) {
                         log::warn!("Could not send message to user connection: {}", e);
-                        conn.is_active
-                            .store(false, std::sync::atomic::Ordering::Relaxed);
+                        conn.is_active.store(false, std::sync::atomic::Ordering::Relaxed);
                         conn.kill.notify_waiters();
 
                         // TODO: Better handling of this
@@ -149,10 +148,7 @@ impl Gateway {
             .insert(conn.id, conn);
     }
 
-    async fn subscribe(
-        &self,
-        party_ids: impl IntoIterator<Item = &PartyId>,
-    ) -> Vec<PartySubscription> {
+    async fn subscribe(&self, party_ids: impl IntoIterator<Item = &PartyId>) -> Vec<PartySubscription> {
         let mut subs = Vec::new();
         let mut missing = Vec::new();
         let mut cache = Vec::new();

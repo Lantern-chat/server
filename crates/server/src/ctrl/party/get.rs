@@ -9,11 +9,7 @@ use crate::{
 
 use models::*;
 
-pub async fn get_party(
-    state: ServerState,
-    auth: Authorization,
-    party_id: Snowflake,
-) -> Result<Party, Error> {
+pub async fn get_party(state: ServerState, auth: Authorization, party_id: Snowflake) -> Result<Party, Error> {
     let row = state
         .read_db()
         .await
@@ -23,17 +19,9 @@ pub async fn get_party(
                 use thorn::*;
 
                 Query::select()
-                    .cols(&[
-                        Party::Name,
-                        Party::OwnerId,
-                        Party::AvatarId,
-                        Party::Description,
-                    ])
+                    .cols(&[Party::Name, Party::OwnerId, Party::AvatarId, Party::Description])
                     .and_where(Party::Id.equals(Var::of(Party::Id)))
-                    .from(
-                        Party::left_join_table::<PartyMember>()
-                            .on(PartyMember::PartyId.equals(Party::Id)),
-                    )
+                    .from(Party::left_join_table::<PartyMember>().on(PartyMember::PartyId.equals(Party::Id)))
                     .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
                     .and_where(Party::DeletedAt.is_null())
             },

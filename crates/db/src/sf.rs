@@ -54,19 +54,12 @@ pub trait SnowflakeExt {
         debug_assert!(worker < (1 << 6));
 
         // Shift into position and bitwise-OR everything together
-        Snowflake(unsafe {
-            NonZeroU64::new_unchecked((ms << 22) | (worker << 17) | (inst << 12) | incr)
-        })
+        Snowflake(unsafe { NonZeroU64::new_unchecked((ms << 22) | (worker << 17) | (inst << 12) | incr) })
     }
 
     /// Creates a new Snowflake at this moment
     fn now() -> Snowflake {
-        Self::at_ms(
-            UNIX_EPOCH
-                .elapsed()
-                .expect("Could not get time")
-                .as_millis() as u64,
-        )
+        Self::at_ms(UNIX_EPOCH.elapsed().expect("Could not get time").as_millis() as u64)
     }
 
     fn at(ts: SystemTime) -> Snowflake {
@@ -106,8 +99,6 @@ mod test {
 
     #[test]
     fn test_snowflake_ser() {
-        assert!(serde_json::to_string(&Snowflake::now())
-            .unwrap()
-            .contains("\""));
+        assert!(serde_json::to_string(&Snowflake::now()).unwrap().contains("\""));
     }
 }

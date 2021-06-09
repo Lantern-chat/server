@@ -68,10 +68,7 @@ impl PermissionCache {
     }
 
     #[inline]
-    async fn get_cache(
-        &self,
-        user_id: Snowflake,
-    ) -> Option<ReadValue<'_, Snowflake, UserCache, SHB>> {
+    async fn get_cache(&self, user_id: Snowflake) -> Option<ReadValue<'_, Snowflake, UserCache, SHB>> {
         self.map.get(&user_id).await
     }
 
@@ -88,11 +85,7 @@ impl PermissionCache {
         self.get_cache_mut(user_id).await.room.insert(room_id, perm);
     }
 
-    pub async fn batch_set(
-        &self,
-        user_id: Snowflake,
-        iter: impl IntoIterator<Item = (Snowflake, PermMute)>,
-    ) {
+    pub async fn batch_set(&self, user_id: Snowflake, iter: impl IntoIterator<Item = (Snowflake, PermMute)>) {
         self.get_cache_mut(user_id).await.room.extend(iter);
     }
 

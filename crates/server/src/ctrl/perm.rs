@@ -30,9 +30,7 @@ pub async fn get_party_permissions(
                     )
                     .and_where(Party::Id.equals(Var::of(Party::Id)))
                     .and_where(
-                        RoleMembers::UserId
-                            .equals(Var::of(Users::Id))
-                            .is_not_false(), // null trickery
+                        RoleMembers::UserId.equals(Var::of(Users::Id)).is_not_false(), // null trickery
                     )
                     .group_by(Party::OwnerId)
             },

@@ -40,8 +40,8 @@ async fn main() -> anyhow::Result<()> {
     let db = {
         use db::pool::{Pool, PoolConfig};
 
-        let db_str = std::env::var("DB_STR")
-            .unwrap_or_else(|_| "postgresql://user:password@db:5432".to_owned());
+        let db_str =
+            std::env::var("DB_STR").unwrap_or_else(|_| "postgresql://user:password@db:5432".to_owned());
 
         let migrations_path =
             std::env::var("MIGRATIONS").unwrap_or_else(|_| "./backend/sql/migrations".to_owned());

@@ -20,9 +20,7 @@ pub async fn messages(
         (&Method::POST, End) => post::post(route, auth, room_id).await.into_response(),
 
         // GET /api/v1/room/1234/messages
-        (&Method::GET, End) => get_many::get_many(route, auth, room_id)
-            .await
-            .into_response(),
+        (&Method::GET, End) => get_many::get_many(route, auth, room_id).await.into_response(),
 
         // ANY /api/v1/room/1234/messages/5678
         (_, Exact(_)) => match route.param::<Snowflake>() {

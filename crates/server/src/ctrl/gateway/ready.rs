@@ -61,10 +61,7 @@ pub async fn ready(
             ));
         }
 
-        state
-            .perm_cache
-            .batch_set(auth.user_id, cache.into_iter())
-            .await;
+        state.perm_cache.batch_set(auth.user_id, cache.into_iter()).await;
 
         Ok(())
     };
@@ -89,8 +86,7 @@ pub async fn ready(
                         ])
                         .col(UserAvatars::FileId) // 7
                         .from(
-                            Users::left_join_table::<UserAvatars>()
-                                .on(UserAvatars::UserId.equals(Users::Id)),
+                            Users::left_join_table::<UserAvatars>().on(UserAvatars::UserId.equals(Users::Id)),
                         )
                         .and_where(UserAvatars::IsMain.is_not_false())
                 },
@@ -204,8 +200,7 @@ pub async fn ready(
         Ok::<_, Error>(parties.into_iter().map(|(_, v)| v).collect())
     };
 
-    let (user, parties, _) =
-        futures::future::try_join3(user_future, parties_future, perms_future).await?;
+    let (user, parties, _) = futures::future::try_join3(user_future, parties_future, perms_future).await?;
 
     Ok(ReadyEvent {
         user,

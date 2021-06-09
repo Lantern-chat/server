@@ -63,10 +63,7 @@ pub async fn create_message(
 
                 let roles = Query::select()
                     .expr(Builtin::array_agg(RoleMembers::RoleId))
-                    .from(
-                        RoleMembers::inner_join_table::<Roles>()
-                            .on(RoleMembers::RoleId.equals(Roles::Id)),
-                    )
+                    .from(RoleMembers::inner_join_table::<Roles>().on(RoleMembers::RoleId.equals(Roles::Id)))
                     .and_where(RoleMembers::UserId.equals(AggMsg::UserId))
                     .and_where(Roles::PartyId.equals(Party::Id));
 

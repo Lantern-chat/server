@@ -19,11 +19,7 @@ use crate::ctrl::user::register::{hash_config, EMAIL_REGEX};
 
 // TODO: Determine if I should give any feedback at all or
 // just say catchall "invalid username/email/password"
-pub async fn login(
-    state: ServerState,
-    addr: SocketAddr,
-    form: LoginForm,
-) -> Result<Session, Error> {
+pub async fn login(state: ServerState, addr: SocketAddr, form: LoginForm) -> Result<Session, Error> {
     if !EMAIL_REGEX.is_match(&form.email) {
         return Err(Error::InvalidCredentials);
     }
@@ -60,12 +56,7 @@ pub async fn login(
 
     let verified = tokio::task::spawn_blocking(move || {
         let config = hash_config();
-        argon2::verify_encoded_ext(
-            &passhash,
-            form.password.as_bytes(),
-            config.secret,
-            config.ad,
-        )
+        argon2::verify_encoded_ext(&passhash, form.password.as_bytes(), config.secret, config.ad)
     })
     .await??;
 

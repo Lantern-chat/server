@@ -32,12 +32,7 @@ impl FileStore {
 
         let mut options = fs::OpenOptions::new();
 
-        let mut file = options
-            .read(read)
-            .write(!read)
-            .create(!read)
-            .open(path)
-            .await?;
+        let mut file = options.read(read).write(!read).create(!read).open(path).await?;
 
         if offset != 0 {
             file.seek(SeekFrom::Start(offset)).await?;

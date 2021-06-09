@@ -62,18 +62,13 @@ impl RateLimitTable {
     }
 
     pub async fn req(&self, key: RateLimitKey, req_per_sec: f32) -> bool {
-        self.table
-            .get_mut_or_default(&key)
-            .await
-            .update(req_per_sec)
+        self.table.get_mut_or_default(&key).await.update(req_per_sec)
     }
 
     pub async fn cleanup_at(&self, now: Instant) {
         log::trace!("Cleaning old rate-limit entries");
 
         let one_second_ago = now - Duration::from_secs(1);
-        self.table
-            .retain(|_, value| value.last < one_second_ago)
-            .await;
+        self.table.retain(|_, value| value.last < one_second_ago).await;
     }
 }

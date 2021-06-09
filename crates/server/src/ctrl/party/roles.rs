@@ -48,8 +48,7 @@ pub async fn get_roles_raw<'a>(
                     use db::schema::*;
                     use thorn::*;
 
-                    base_query()
-                        .and_where(Roles::PartyId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))
+                    base_query().and_where(Roles::PartyId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))
                 },
                 &[&ids],
             )

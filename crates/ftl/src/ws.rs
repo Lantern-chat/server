@@ -4,9 +4,7 @@ use futures::{future, ready, Future, Sink, Stream};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use headers::{
-    Connection, HeaderMapExt, SecWebsocketAccept, SecWebsocketKey, SecWebsocketVersion, Upgrade,
-};
+use headers::{Connection, HeaderMapExt, SecWebsocketAccept, SecWebsocketKey, SecWebsocketVersion, Upgrade};
 use http::{Method, StatusCode};
 use hyper::{upgrade::OnUpgrade, Body};
 use tokio_tungstenite::{
@@ -168,8 +166,7 @@ where
                     Ok(upgraded) => {
                         log::trace!("websocket upgrade complete");
                         let socket =
-                            WebSocket::from_raw_socket(upgraded, protocol::Role::Server, config)
-                                .await;
+                            WebSocket::from_raw_socket(upgraded, protocol::Role::Server, config).await;
 
                         on_upgrade_cb(socket);
                     }

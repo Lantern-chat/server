@@ -45,9 +45,7 @@ pub fn id_to_path(buf: &mut PathBuf, id: Snowflake) {
 pub fn id_to_name(id: Snowflake, buf: &mut PathBuf) {
     // shuffle bytes for file name
 
-    let ordered_bytes = outer_perfect_shuffle(id.to_u64())
-        .swap_bytes()
-        .to_le_bytes();
+    let ordered_bytes = outer_perfect_shuffle(id.to_u64()).swap_bytes().to_le_bytes();
 
     const SHUFFLE: [usize; 8] = [7, 4, 2, 0, 1, 6, 3, 5]; // randomly generated
 

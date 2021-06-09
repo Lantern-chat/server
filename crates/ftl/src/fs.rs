@@ -156,12 +156,7 @@ pub async fn file<S>(route: &Route<S>, path: impl AsRef<Path>) -> impl Reply {
 pub async fn dir<S>(route: &Route<S>, base: impl AsRef<Path>) -> impl Reply {
     let mut buf = match sanitize_path(base, route.tail()) {
         Ok(buf) => buf,
-        Err(e) => {
-            return e
-                .to_string()
-                .with_status(StatusCode::BAD_REQUEST)
-                .into_response()
-        }
+        Err(e) => return e.to_string().with_status(StatusCode::BAD_REQUEST).into_response(),
     };
 
     let is_dir = tokio::fs::metadata(&buf)
@@ -228,9 +223,8 @@ async fn file_reply<S>(route: &Route<S>, path: impl AsRef<Path>) -> impl Reply {
 
                 if sub_len != len {
                     *resp.status_mut() = StatusCode::PARTIAL_CONTENT;
-                    resp.headers_mut().typed_insert(
-                        ContentRange::bytes(start..end, len).expect("valid ContentRange"),
-                    );
+                    resp.headers_mut()
+                        .typed_insert(ContentRange::bytes(start..end, len).expect("valid ContentRange"));
 
                     len = sub_len;
                 }
@@ -285,12 +279,7 @@ fn bytes_range(range: Option<Range>, max_len: u64) -> Result<(u64, u64), BadRang
 use futures::Stream;
 use std::io::SeekFrom;
 
-fn file_body(
-    route_start: Instant,
-    mut file: TkFile,
-    buf_size: usize,
-    (start, end): (u64, u64),
-) -> Body {
+fn file_body(route_start: Instant, mut file: TkFile, buf_size: usize, (start, end): (u64, u64)) -> Body {
     //return Body::wrap_stream(file_stream(file, buf_size, (start, end)));
 
     let (mut sender, body) = Body::channel();
@@ -428,10 +417,7 @@ mod tests {
             s.as_ref()
         }
 
-        assert_eq!(
-            sanitize_path(base, "/foo.html").unwrap(),
-            p("/var/www/foo.html")
-        );
+        assert_eq!(sanitize_path(base, "/foo.html").unwrap(), p("/var/www/foo.html"));
 
         // bad paths
         sanitize_path(base, "/../foo.html").expect_err("dot dot");

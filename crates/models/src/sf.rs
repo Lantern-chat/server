@@ -71,8 +71,7 @@ mod pg_impl {
 
     impl<'a> FromSql<'a> for Snowflake {
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
-            <i64 as FromSql<'a>>::from_sql(ty, raw)
-                .map(|raw| Snowflake(NonZeroU64::new(raw as u64).unwrap()))
+            <i64 as FromSql<'a>>::from_sql(ty, raw).map(|raw| Snowflake(NonZeroU64::new(raw as u64).unwrap()))
         }
 
         fn accepts(ty: &Type) -> bool {
@@ -81,11 +80,7 @@ mod pg_impl {
     }
 
     impl ToSql for Snowflake {
-        fn to_sql(
-            &self,
-            ty: &Type,
-            out: &mut BytesMut,
-        ) -> Result<IsNull, Box<dyn Error + Sync + Send>>
+        fn to_sql(&self, ty: &Type, out: &mut BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>>
         where
             Self: Sized,
         {
@@ -154,8 +149,7 @@ mod serde_impl {
                 }
 
                 fn visit_str<E: Error>(self, v: &str) -> Result<Self::Value, E> {
-                    Snowflake::from_str(v)
-                        .map_err(|e| E::custom(&format!("Invalid Snowflake: {}", e)))
+                    Snowflake::from_str(v).map_err(|e| E::custom(&format!("Invalid Snowflake: {}", e)))
                 }
             }
 

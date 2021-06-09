@@ -84,9 +84,7 @@ impl<S> Route<S> {
     }
 
     /// Parse the URI query
-    pub fn query<T: serde::de::DeserializeOwned>(
-        &self,
-    ) -> Option<Result<T, serde_urlencoded::de::Error>> {
+    pub fn query<T: serde::de::DeserializeOwned>(&self) -> Option<Result<T, serde_urlencoded::de::Error>> {
         self.req.uri().query().map(serde_urlencoded::de::from_str)
     }
 
@@ -142,10 +140,7 @@ impl<S> Route<S> {
 
     /// Parse a header value using `FromStr`
     #[inline]
-    pub fn parse_raw_header<T: FromStr>(
-        &self,
-        name: &str,
-    ) -> Option<Result<Result<T, T::Err>, ToStrError>> {
+    pub fn parse_raw_header<T: FromStr>(&self, name: &str) -> Option<Result<Result<T, T::Err>, ToStrError>> {
         self.raw_header(name)
             .map(|header| header.to_str().map(FromStr::from_str))
     }
@@ -162,10 +157,8 @@ impl<S> Route<S> {
         &'a self,
     ) -> Option<Result<impl Iterator<Item = Result<IpAddr, AddrParseError>> + 'a, ToStrError>> {
         self.req.headers().get("x-forwarded-for").map(|ff| {
-            ff.to_str().map(|ff| {
-                ff.split(',')
-                    .map(|segment| IpAddr::from_str(segment.trim()))
-            })
+            ff.to_str()
+                .map(|ff| ff.split(',').map(|segment| IpAddr::from_str(segment.trim())))
         })
     }
 

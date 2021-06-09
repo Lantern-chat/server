@@ -47,10 +47,7 @@ impl IpBans {
         IpBans {
             inner: ArcSwap::from_pointee(IpBansInner {
                 old: Xor16::try_from(&[] as &'static [u64]).unwrap(),
-                new: CHashSet::with_hasher(
-                    CHashSet::<()>::default_num_shards(),
-                    hash_builder.clone(),
-                ),
+                new: CHashSet::with_hasher(CHashSet::<()>::default_num_shards(), hash_builder.clone()),
             }),
             hash_builder,
         }
@@ -87,10 +84,7 @@ impl IpBans {
 
         self.inner.store(Arc::new(IpBansInner {
             old: filter,
-            new: CHashSet::with_hasher(
-                CHashSet::<()>::default_num_shards(),
-                self.hash_builder.clone(),
-            ),
+            new: CHashSet::with_hasher(CHashSet::<()>::default_num_shards(), self.hash_builder.clone()),
         }));
 
         Ok(())

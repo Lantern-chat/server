@@ -3,11 +3,7 @@ use ftl::*;
 
 use crate::{ctrl::auth::Authorization, ctrl::Error, web::routes::api::ApiError, ServerState};
 
-pub async fn get_members(
-    route: Route<ServerState>,
-    auth: Authorization,
-    party_id: Snowflake,
-) -> impl Reply {
+pub async fn get_members(route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> impl Reply {
     let is_member = route
         .state
         .read_db()
@@ -29,10 +25,7 @@ pub async fn get_members(
     match is_member {
         Err(e) => ApiError::err(e.into()).into_response(),
         Ok(None) => ApiError::err(Error::NoSession).into_response(),
-        Ok(Some(_)) => reply::json_stream(crate::ctrl::party::members::get_members(
-            route.state,
-            party_id,
-        ))
-        .into_response(),
+        Ok(Some(_)) => reply::json_stream(crate::ctrl::party::members::get_members(route.state, party_id))
+            .into_response(),
     }
 }

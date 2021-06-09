@@ -64,12 +64,7 @@ lazy_static::lazy_static! {
     pub static ref INVALID_SESSION: Event = Event::new(ServerMsg::new_invalidsession()).unwrap();
 }
 
-pub fn client_connected(
-    ws: WebSocket,
-    query: GatewayQueryParams,
-    _addr: IpAddr,
-    state: ServerState,
-) {
+pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr, state: ServerState) {
     tokio::spawn(async move {
         let (conn, conn_rx) = GatewayConnection::new();
         let conn_rx = ReceiverStream::new(conn_rx);
@@ -87,16 +82,15 @@ pub fn client_connected(
                     Ok(msg) if msg.is_close() => Err(MessageIncomingError::SocketClosed),
                     Ok(msg) => {
                         // Block to decompress and parse
-                        let block = tokio::task::spawn_blocking(
-                            move || -> Result<_, MessageIncomingError> {
+                        let block =
+                            tokio::task::spawn_blocking(move || -> Result<_, MessageIncomingError> {
                                 let msg = decompress_if(query.compress, msg.as_bytes())?;
 
                                 Ok(match query.encoding {
                                     GatewayMsgEncoding::Json => serde_json::from_slice(&msg)?,
                                     GatewayMsgEncoding::MsgPack => rmp_serde::from_slice(&msg)?,
                                 })
-                            },
-                        );
+                            });
 
                         // do the parsing/decompressing at the same time as updating the heartbeat
                         // TODO: Only count heartbeats on the actual event?
@@ -155,9 +149,10 @@ pub fn client_connected(
                                         ready.user.id,
                                         conn.clone(),
                                         // NOTE: https://github.com/rust-lang/rust/issues/70263
-                                        ready.parties.iter().map(crate::util::passthrough(
-                                            |p: &models::Party| &p.id,
-                                        )),
+                                        ready
+                                            .parties
+                                            .iter()
+                                            .map(crate::util::passthrough(|p: &models::Party| &p.id)),
                                     )
                                     .await;
 
@@ -167,9 +162,7 @@ pub fn client_connected(
 
                                     listener_table.insert(sub.party_id, cancel);
 
-                                    stream
-                                        .map(|event| Item::Event(event.map_err(Into::into)))
-                                        .boxed()
+                                    stream.map(|event| Item::Event(event.map_err(Into::into))).boxed()
                                 }));
                             }
                             _ => match user_id {

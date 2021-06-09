@@ -39,17 +39,12 @@ pub async fn get_rooms(
                         .expr(Builtin::array_agg(Roles::Id))
                         .from(
                             RoleMembers::right_join(
-                                Roles::left_join_table::<Party>()
-                                    .on(Roles::PartyId.equals(Party::Id)),
+                                Roles::left_join_table::<Party>().on(Roles::PartyId.equals(Party::Id)),
                             )
                             .on(RoleMembers::RoleId.equals(Roles::Id)),
                         )
                         .and_where(Party::Id.equals(Var::of(Party::Id)))
-                        .and_where(
-                            RoleMembers::UserId
-                                .equals(Var::of(Users::Id))
-                                .is_not_false(),
-                        )
+                        .and_where(RoleMembers::UserId.equals(Var::of(Users::Id)).is_not_false())
                         .group_by(Party::OwnerId)
                 },
                 &[&party_id, &auth.user_id],
@@ -137,10 +132,7 @@ pub async fn get_rooms(
                         .expr(Builtin::coalesce((Overwrites::RoleId, Overwrites::UserId)))
                         .order_by(Overwrites::RoomId.ascending()) // group by room_id
                         .order_by(Overwrites::RoleId.ascending().nulls_last()) // sort role overwrites first
-                        .from(
-                            Overwrites::left_join_table::<Rooms>()
-                                .on(Overwrites::RoomId.equals(Rooms::Id)),
-                        )
+                        .from(Overwrites::left_join_table::<Rooms>().on(Overwrites::RoomId.equals(Rooms::Id)))
                         .and_where(Rooms::PartyId.equals(Var::of(Party::Id)))
                 },
                 &[&party_id],

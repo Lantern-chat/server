@@ -32,15 +32,11 @@ pub async fn register_user(
     addr: SocketAddr,
     mut form: RegisterForm,
 ) -> Result<Session, Error> {
-    if !state.config.username_len.contains(&form.username.len())
-        || !USERNAME_REGEX.is_match(&form.username)
-    {
+    if !state.config.username_len.contains(&form.username.len()) || !USERNAME_REGEX.is_match(&form.username) {
         return Err(Error::InvalidUsername);
     }
 
-    if !state.config.password_len.contains(&form.password.len())
-        || !PASSWORD_REGEX.is_match(&form.password)
-    {
+    if !state.config.password_len.contains(&form.password.len()) || !PASSWORD_REGEX.is_match(&form.password) {
         return Err(Error::InvalidPassword);
     }
 

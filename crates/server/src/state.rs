@@ -14,8 +14,7 @@ use tokio::sync::{oneshot, Mutex, Notify, Semaphore};
 use util::cmap::CHashMap;
 
 use crate::{
-    config::LanternConfig, filesystem::disk::FileStore, permission_cache::PermissionCache,
-    DatabasePools,
+    config::LanternConfig, filesystem::disk::FileStore, permission_cache::PermissionCache, DatabasePools,
 };
 use crate::{
     tasks::events::cache::EventItemCache,
@@ -32,11 +31,8 @@ pub struct InnerServerState {
     pub fs: FileStore,
     pub gateway: Gateway,
     pub hashing_semaphore: Semaphore,
-    pub all_tasks: Mutex<
-        Option<
-            BoxFuture<'static, Result<Result<(), tokio::task::JoinError>, tokio::task::JoinError>>,
-        >,
-    >,
+    pub all_tasks:
+        Mutex<Option<BoxFuture<'static, Result<Result<(), tokio::task::JoinError>, tokio::task::JoinError>>>>,
     pub item_cache: EventItemCache,
     pub ip_bans: IpBans,
     pub perm_cache: PermissionCache,
@@ -100,8 +96,7 @@ impl ServerState {
                     log::error!("Forcing process exit in 5 seconds!");
 
                     tokio::spawn(
-                        tokio::time::sleep(std::time::Duration::from_secs(5))
-                            .map(|_| std::process::exit(1)),
+                        tokio::time::sleep(std::time::Duration::from_secs(5)).map(|_| std::process::exit(1)),
                     );
                 }
             }

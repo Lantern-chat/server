@@ -61,12 +61,7 @@ fn select_members() -> impl AnyQuery {
     Query::select()
         .and_where(PartyMember::PartyId.equals(Var::of(Party::Id)))
         .cols(&[PartyMember::Nickname])
-        .cols(&[
-            Users::Id,
-            Users::Username,
-            Users::Discriminator,
-            Users::Flags,
-        ])
+        .cols(&[Users::Id, Users::Username, Users::Discriminator, Users::Flags])
         .col(RoleMembers::RoleId)
         .from(
             RoleMembers::right_join(
@@ -77,10 +72,7 @@ fn select_members() -> impl AnyQuery {
         .order_by(Users::Id.ascending())
 }
 
-fn parse_row(
-    row: db::Row,
-    existing: &mut Option<PartyMember>,
-) -> Result<Option<PartyMember>, Error> {
+fn parse_row(row: db::Row, existing: &mut Option<PartyMember>) -> Result<Option<PartyMember>, Error> {
     let user_id = row.try_get(1)?;
     let role_id = row.try_get(5)?;
 

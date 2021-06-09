@@ -28,9 +28,7 @@ impl EventItemCache {
         T: Any + Send + Sync,
     {
         if self.map.len() < self.max_len {
-            self.map
-                .insert(key, (Instant::now(), Box::new(value)))
-                .await;
+            self.map.insert(key, (Instant::now(), Box::new(value))).await;
         }
     }
 

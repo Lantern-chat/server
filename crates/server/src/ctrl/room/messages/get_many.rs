@@ -62,24 +62,15 @@ pub async fn get_many(
 
         match form.query {
             None | Some(MessageSearch::Before(_)) => db
-                .query_stream_cached_typed(
-                    || query(MessageSearch::Before(Snowflake::null()), false),
-                    params,
-                )
+                .query_stream_cached_typed(|| query(MessageSearch::Before(Snowflake::null()), false), params)
                 .await?
                 .boxed(),
             Some(MessageSearch::After(_)) => db
-                .query_stream_cached_typed(
-                    || query(MessageSearch::After(Snowflake::null()), false),
-                    params,
-                )
+                .query_stream_cached_typed(|| query(MessageSearch::After(Snowflake::null()), false), params)
                 .await?
                 .boxed(),
             Some(MessageSearch::Around(_)) => db
-                .query_stream_cached_typed(
-                    || query(MessageSearch::Around(Snowflake::null()), false),
-                    params,
-                )
+                .query_stream_cached_typed(|| query(MessageSearch::Around(Snowflake::null()), false), params)
                 .await?
                 .boxed(),
         }
@@ -88,24 +79,15 @@ pub async fn get_many(
 
         match form.query {
             None | Some(MessageSearch::Before(_)) => db
-                .query_stream_cached_typed(
-                    || query(MessageSearch::Before(Snowflake::null()), true),
-                    params,
-                )
+                .query_stream_cached_typed(|| query(MessageSearch::Before(Snowflake::null()), true), params)
                 .await?
                 .boxed(),
             Some(MessageSearch::After(_)) => db
-                .query_stream_cached_typed(
-                    || query(MessageSearch::After(Snowflake::null()), true),
-                    params,
-                )
+                .query_stream_cached_typed(|| query(MessageSearch::After(Snowflake::null()), true), params)
                 .await?
                 .boxed(),
             Some(MessageSearch::Around(_)) => db
-                .query_stream_cached_typed(
-                    || query(MessageSearch::Around(Snowflake::null()), true),
-                    params,
-                )
+                .query_stream_cached_typed(|| query(MessageSearch::Around(Snowflake::null()), true), params)
                 .await?
                 .boxed(),
         }

@@ -17,10 +17,7 @@ pub trait Reply: Sized {
     where
         H: Header,
     {
-        WithHeader {
-            reply: self,
-            header,
-        }
+        WithHeader { reply: self, header }
     }
 }
 
@@ -132,9 +129,7 @@ pub fn json<T: serde::Serialize>(value: &T) -> Json {
 impl Reply for Json {
     fn into_response(self) -> Response {
         match self.inner {
-            Ok(body) => Body::from(body)
-                .with_header(ContentType::json())
-                .into_response(),
+            Ok(body) => Body::from(body).with_header(ContentType::json()).into_response(),
 
             Err(()) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         }

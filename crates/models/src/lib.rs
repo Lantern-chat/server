@@ -15,8 +15,8 @@ pub mod sf;
 pub mod user;
 
 pub use self::{
-    emote::*, file::*, gateway::*, invite::*, message::*, party::*, permission::*, role::*,
-    room::*, session::*, sf::*, user::*,
+    emote::*, file::*, gateway::*, invite::*, message::*, party::*, permission::*, role::*, room::*,
+    session::*, sf::*, user::*,
 };
 
 #[inline]
