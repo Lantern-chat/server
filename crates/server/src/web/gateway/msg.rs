@@ -138,7 +138,7 @@ pub mod server {
 
         8 => MessageCreate { #[serde(flatten)] msg: RoomMessage },
         9 => MessageUpdate { #[serde(flatten)] msg: RoomMessage },
-        10 => MessageDelete { id: Snowflake },
+        10 => MessageDelete { #[serde(flatten)] msg: RoomMessage },
 
         11 => PresenceUpdate {
             user: Snowflake,

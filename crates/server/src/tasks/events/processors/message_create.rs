@@ -106,7 +106,7 @@ pub async fn message_create(
 
         state
             .gateway
-            .broadcast_event(Event::new_opaque(event)?, party_id, false)
+            .broadcast_event(Event::new(event)?, party_id, false)
             .await;
     }
 

@@ -22,6 +22,9 @@ async fn do_identify(
 ) -> Result<(), Error> {
     let auth = do_auth(&state, auth.as_bytes()).await?;
     let ready = ready(state, conn.id, auth).await?;
-    let _ = conn.tx.send(Event::new_ready(ready)?).await;
+    let _ = conn
+        .tx
+        .send(Event::new(ServerMsg::new_ready(Box::new(ready)))?)
+        .await;
     Ok(())
 }

@@ -25,18 +25,8 @@ pub struct EncodedEvent {
 }
 
 #[derive(Debug)]
-pub enum RawEvent {
-    /// The socket doens't care about opaque events and should just send them
-    ///
-    /// This is a majority of events
-    Opaque,
-
-    Ready(Box<ReadyEvent>),
-}
-
-#[derive(Debug)]
 pub struct EventInner {
-    pub raw: RawEvent,
+    pub msg: ServerMsg,
     pub encoded: EncodedEvent,
 }
 
@@ -53,26 +43,10 @@ impl Deref for Event {
 }
 
 impl Event {
-    pub fn new_opaque<S: serde::Serialize>(value: S) -> Result<Event, EncodingError> {
-        let encoded = EncodedEvent::new(&value)?;
-        let raw = RawEvent::Opaque;
-        Ok(Event(Arc::new(EventInner { raw, encoded })))
-    }
+    pub fn new(msg: ServerMsg) -> Result<Event, EncodingError> {
+        let encoded = EncodedEvent::new(&msg)?;
 
-    pub fn new_ready(value: ReadyEvent) -> Result<Event, EncodingError> {
-        // setup message
-        let value = ServerMsg::new_ready(Box::new(value));
-
-        // encode message
-        let encoded = EncodedEvent::new(&value)?;
-
-        // extract the boxed raw event again
-        let raw = RawEvent::Ready(match value {
-            ServerMsg::Ready { payload, .. } => payload.inner,
-            _ => unsafe { std::hint::unreachable_unchecked() },
-        });
-
-        Ok(Event(Arc::new(EventInner { raw, encoded })))
+        Ok(Event(Arc::new(EventInner { msg, encoded })))
     }
 }
 

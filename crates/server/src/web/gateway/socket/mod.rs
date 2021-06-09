@@ -12,6 +12,7 @@ use futures::{
     stream, Future, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
 };
 
+use models::RoomPermissions;
 use tokio::sync::{broadcast::error::RecvError, mpsc};
 use tokio_stream::wrappers::{errors::BroadcastStreamRecvError, BroadcastStream, ReceiverStream};
 
@@ -21,11 +22,11 @@ use db::Snowflake;
 use ftl::ws::{Message as WsMessage, SinkError, WebSocket};
 use util::cancel::{Cancel, CancelableStream};
 
-use crate::{ctrl::auth::Authorization, ServerState};
+use crate::{ctrl::auth::Authorization, permission_cache::PermMute, ServerState};
 
 use super::{
     conn::GatewayConnection,
-    event::{EncodedEvent, Event, RawEvent},
+    event::{EncodedEvent, Event},
     msg::{ClientMsg, ServerMsg},
 };
 
@@ -58,9 +59,9 @@ pub enum Item {
 }
 
 lazy_static::lazy_static! {
-    pub static ref HELLO_EVENT: Event = Event::new_opaque(ServerMsg::new_hello(45000)).unwrap();
-    pub static ref HEARTBEAT_ACK: Event = Event::new_opaque(ServerMsg::new_heartbeatack()).unwrap();
-    pub static ref INVALID_SESSION: Event = Event::new_opaque(ServerMsg::new_invalidsession()).unwrap();
+    pub static ref HELLO_EVENT: Event = Event::new(ServerMsg::new_hello(45000)).unwrap();
+    pub static ref HEARTBEAT_ACK: Event = Event::new(ServerMsg::new_heartbeatack()).unwrap();
+    pub static ref INVALID_SESSION: Event = Event::new(ServerMsg::new_invalidsession()).unwrap();
 }
 
 pub fn client_connected(
@@ -130,14 +131,20 @@ pub fn client_connected(
 
         let mut user_id = None;
 
-        while let Some(event) = events.next().await {
+        'event_loop: while let Some(event) = events.next().await {
             let resp = match event {
                 Item::MissedHeartbeat => Err(MessageOutgoingError::SocketClosed),
                 Item::Event(event) => match event {
                     Ok(event) => {
-                        match event.raw {
+                        use super::msg::server::payloads::*;
+
+                        match event.msg {
+                            ServerMsg::Hello { .. } => {}
                             // TODO: Make this non-blocking for the event-loop?
-                            RawEvent::Ready(ref ready) => {
+                            ServerMsg::Ready {
+                                payload: ReadyPayload { inner: ref ready },
+                                ..
+                            } => {
                                 user_id = Some(ready.user.id);
 
                                 // subscribe to all relevant party broadcasts
@@ -165,9 +172,34 @@ pub fn client_connected(
                                         .boxed()
                                 }));
                             }
-                            // TODO: Party ADD
-                            // TODO: Party REMOVE
-                            _ => {}
+                            _ => match user_id {
+                                None => break 'event_loop,
+                                Some(user_id) => match event.msg {
+                                    ServerMsg::MessageCreate {
+                                        payload: MessageCreatePayload { ref msg },
+                                        ..
+                                    }
+                                    | ServerMsg::MessageUpdate {
+                                        payload: MessageUpdatePayload { ref msg },
+                                        ..
+                                    }
+                                    | ServerMsg::MessageDelete {
+                                        payload: MessageDeletePayload { ref msg },
+                                        ..
+                                    } => match state.perm_cache.get(user_id, msg.room_id).await {
+                                        None => break,
+                                        Some(PermMute { perm, .. }) => {
+                                            if !perm.room.contains(RoomPermissions::READ_MESSAGES) {
+                                                continue 'event_loop;
+                                            }
+                                        }
+                                    },
+
+                                    // TODO: Party ADD subscribe
+                                    // TODO: Party REMOVE unsubscribe
+                                    _ => {}
+                                },
+                            },
                         }
 
                         Ok(event) // forward event directly to tx
