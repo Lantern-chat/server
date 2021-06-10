@@ -1,3 +1,5 @@
+pub mod admin;
+
 pub mod auth;
 pub mod error;
 pub mod perm;
