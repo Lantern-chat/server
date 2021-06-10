@@ -99,11 +99,9 @@ pub async fn do_auth(state: &ServerState, raw_token: &[u8]) -> Result<Authorizat
     let auth = match state.session_cache.get(&token).await {
         Some(auth) => Some(auth),
         None => {
-            let row = state
-                .db
-                .read
-                .get()
-                .await?
+            let db = state.db.read.get().await?;
+
+            let row = db
                 .query_opt_cached_typed(
                     || {
                         use db::schema::*;
@@ -136,7 +134,7 @@ pub async fn do_auth(state: &ServerState, raw_token: &[u8]) -> Result<Authorizat
     };
 
     match auth {
-        Some(auth) if auth.expires >= SystemTime::now() => Ok(auth),
+        Some(auth) if auth.expires > SystemTime::now() => Ok(auth),
         _ => Err(Error::NoSession),
     }
 }

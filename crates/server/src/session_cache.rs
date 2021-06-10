@@ -6,6 +6,7 @@ use db::Snowflake;
 
 use crate::ctrl::auth::{AuthToken, Authorization};
 
+#[derive(Debug, Clone, Copy)]
 struct PartialAuthorization {
     user_id: Snowflake,
     expires: SystemTime,

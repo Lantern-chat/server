@@ -90,11 +90,12 @@ impl PermissionCache {
     }
 
     pub async fn add_reference(&self, user_id: Snowflake) -> bool {
-        if let Some(cache) = self.get_cache(user_id).await {
-            cache.rc.fetch_add(1, Ordering::SeqCst);
-            true
-        } else {
-            false
+        match self.get_cache(user_id).await {
+            None => false,
+            Some(cache) => {
+                cache.rc.fetch_add(1, Ordering::SeqCst);
+                true
+            }
         }
     }
 
