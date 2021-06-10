@@ -14,9 +14,20 @@ use crate::{
 #[derive(Clone, Copy)]
 struct RawOverwrite {
     room_id: Snowflake,
-    id: Snowflake,
+    user_id: Option<Snowflake>,
+    role_id: Option<Snowflake>,
     deny: u64,
     allow: u64,
+}
+
+impl From<RawOverwrite> for Overwrite {
+    fn from(raw: RawOverwrite) -> Self {
+        Overwrite {
+            id: raw.user_id.or(raw.role_id).expect("No valid ID given"),
+            allow: Permission::unpack(raw.allow),
+            deny: Permission::unpack(raw.deny),
+        }
+    }
 }
 
 pub async fn get_rooms(
@@ -128,8 +139,13 @@ pub async fn get_rooms(
                     use thorn::*;
 
                     Query::select()
-                        .cols(&[Overwrites::RoomId, Overwrites::Allow, Overwrites::Deny])
-                        .expr(Builtin::coalesce((Overwrites::RoleId, Overwrites::UserId)))
+                        .cols(&[
+                            Overwrites::RoomId,
+                            Overwrites::Allow,
+                            Overwrites::Deny,
+                            Overwrites::RoleId,
+                            Overwrites::UserId,
+                        ])
                         .order_by(Overwrites::RoomId.ascending()) // group by room_id
                         .order_by(Overwrites::RoleId.ascending().nulls_last()) // sort role overwrites first
                         .from(Overwrites::left_join_table::<Rooms>().on(Overwrites::RoomId.equals(Rooms::Id)))
@@ -146,7 +162,8 @@ pub async fn get_rooms(
                 room_id: row.try_get(0)?,
                 allow: row.try_get::<_, i64>(1)? as u64,
                 deny: row.try_get::<_, i64>(2)? as u64,
-                id: row.try_get(3)?,
+                role_id: row.try_get(3)?,
+                user_id: row.try_get(4)?,
             });
         }
 
@@ -161,22 +178,14 @@ pub async fn get_rooms(
     if let Some(raw) = raw_overwrites.next() {
         let mut room = rooms.get_mut(&raw.room_id).unwrap();
 
-        room.overwrites.push(Overwrite {
-            id: raw.id,
-            allow: Permission::unpack(raw.allow),
-            deny: Permission::unpack(raw.deny),
-        });
+        room.overwrites.push(raw.into());
 
         while let Some(raw) = raw_overwrites.next() {
             if room.id != raw.room_id {
                 room = rooms.get_mut(&raw.room_id).unwrap();
             }
 
-            room.overwrites.push(Overwrite {
-                id: raw.id,
-                allow: Permission::unpack(raw.allow),
-                deny: Permission::unpack(raw.deny),
-            });
+            room.overwrites.push(raw.into());
         }
     }
 

@@ -22,12 +22,17 @@ pub async fn get_room(state: ServerState, auth: Authorization, room_id: Snowflak
     let db = state.db.read.get().await?;
 
     let row = if had_perms {
-        db.query_opt_cached_typed(|| query(false), &[&room_id]).await?
+        db.query_opt_cached_typed(|| query(false), &[&room_id]).await
     } else {
-        db.query_opt_cached_typed(|| query(true), &[&room_id]).await?
+        db.query_opt_cached_typed(|| query(true), &[&room_id, &auth.user_id])
+            .await
     };
 
-    unimplemented!()
+    match row {
+        Ok(None) => Err(Error::NotFound),
+        Err(e) => Err(e.into()),
+        Ok(Some(row)) => Ok(unimplemented!()),
+    }
 }
 
 use thorn::*;
@@ -35,7 +40,15 @@ use thorn::*;
 fn query(perm: bool) -> impl AnyQuery {
     use db::schema::*;
 
-    let query = Query::select();
+    let query = Query::select().cols(&[
+        Rooms::PartyId,
+        Rooms::AvatarId,
+        Rooms::ParentId,
+        Rooms::SortOrder,
+        Rooms::Flags,
+        Rooms::Name,
+        Rooms::Topic,
+    ]);
 
     query
 }

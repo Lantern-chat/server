@@ -4,8 +4,7 @@ use db::Snowflake;
 
 use crate::ctrl::room::get::get_room as get;
 use crate::ctrl::Error;
-use crate::web::auth::Authorization;
-use crate::web::routes::api::ApiError;
+use crate::web::{auth::Authorization, routes::api::ApiError};
 
 pub async fn get_room(
     route: Route<crate::ServerState>,
