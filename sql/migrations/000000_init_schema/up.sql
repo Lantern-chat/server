@@ -3,6 +3,10 @@
 CREATE SCHEMA lantern;
 ALTER SCHEMA lantern OWNER TO postgres;
 
+-- ALTER SYSTEM SET enable_seqscan = 1;
+ALTER SYSTEM SET random_page_cost = 1; -- Database on SSD
+SELECT pg_reload_conf();
+
 -- host table tracks migrations
 CREATE TABLE lantern.host (
     migration int NOT NULL,
