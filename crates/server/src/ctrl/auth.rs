@@ -48,6 +48,7 @@ pub enum AuthTokenFromStrError {
 }
 
 use std::convert::TryInto;
+use std::time::SystemTime;
 
 impl FromStr for AuthToken {
     type Err = AuthTokenFromStrError;
@@ -87,15 +88,7 @@ use crate::ServerState;
 pub struct Authorization {
     pub token: AuthToken,
     pub user_id: Snowflake,
-}
-
-impl Authorization {
-    pub fn testing() -> Authorization {
-        Authorization {
-            token: AuthToken([0; AuthToken::TOKEN_LEN]),
-            user_id: Snowflake::null(),
-        }
-    }
+    pub expires: SystemTime,
 }
 
 use super::Error;
@@ -103,37 +96,47 @@ use super::Error;
 pub async fn do_auth(state: &ServerState, raw_token: &[u8]) -> Result<Authorization, Error> {
     let token = AuthToken::from_bytes(raw_token)?;
 
-    // TODO: Cache this
-    let session = state
-        .read_db()
-        .await
-        .query_opt_cached_typed(
-            || {
-                use db::schema::*;
-                use thorn::*;
+    let auth = match state.session_cache.get(&token).await {
+        Some(auth) => Some(auth),
+        None => {
+            let row = state
+                .db
+                .read
+                .get()
+                .await?
+                .query_opt_cached_typed(
+                    || {
+                        use db::schema::*;
+                        use thorn::*;
 
-                Query::select()
-                    .cols(&[Sessions::UserId, Sessions::Expires])
-                    .from_table::<Sessions>()
-                    .and_where(Sessions::Token.equals(Var::of(Sessions::Token)))
-            },
-            &[&&token.0[..]],
-        )
-        .await?;
+                        Query::select()
+                            .cols(&[Sessions::UserId, Sessions::Expires])
+                            .from_table::<Sessions>()
+                            .and_where(Sessions::Token.equals(Var::of(Sessions::Token)))
+                    },
+                    &[&&token.0[..]],
+                )
+                .await?;
 
-    match session {
-        Some(row) => {
-            let expires: std::time::SystemTime = row.get(1);
+            match row {
+                Some(row) => Some({
+                    let auth = Authorization {
+                        token,
+                        user_id: row.try_get(0)?,
+                        expires: row.try_get(1)?,
+                    };
 
-            if expires <= std::time::SystemTime::now() {
-                return Err(Error::NoSession);
+                    state.session_cache.set(auth).await;
+
+                    auth
+                }),
+                None => None,
             }
-
-            Ok(Authorization {
-                token,
-                user_id: row.get(0),
-            })
         }
-        None => Err(Error::NoSession),
+    };
+
+    match auth {
+        Some(auth) if auth.expires >= SystemTime::now() => Ok(auth),
+        _ => Err(Error::NoSession),
     }
 }

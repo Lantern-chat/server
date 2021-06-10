@@ -15,26 +15,27 @@ pub async fn cleanup_sessions(state: ServerState) {
 
         log::trace!("Cleaning up old user sessions");
 
-        match state.db.write.get().await {
-            Ok(db) => {
-                let res = db
-                    .execute_cached(
-                        || "DELETE FROM lantern.sessions WHERE expires < $1",
-                        &[&SystemTime::now()],
-                    )
-                    .await;
+        let now = SystemTime::now();
 
-                if let Err(e) = res {
-                    log::error!("Error during session cleanup: {}", e);
+        tokio::join! {
+            state.session_cache.cleanup(now),
+            async {
+                match state.db.write.get().await {
+                    Ok(db) => {
+                        let res = db
+                            .execute_cached(
+                                || "DELETE FROM lantern.sessions WHERE expires < $1",
+                                &[&now],
+                            )
+                            .await;
+
+                        if let Err(e) = res {
+                            log::error!("Error during session cleanup: {}", e);
+                        }
+                    }
+                    Err(e) => log::error!("Database connection error during session cleanup: {}", e),
                 }
             }
-            Err(e) => {
-                log::error!(
-                    "Unable to run session cleanup task due to error: {}\nTrying again in 1 second.",
-                    e
-                );
-                tokio::time::sleep(Duration::from_secs(1)).await;
-            }
-        }
+        };
     }
 }

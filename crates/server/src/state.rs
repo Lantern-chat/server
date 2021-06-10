@@ -14,7 +14,8 @@ use tokio::sync::{oneshot, Mutex, Notify, Semaphore};
 use util::cmap::CHashMap;
 
 use crate::{
-    config::LanternConfig, filesystem::disk::FileStore, permission_cache::PermissionCache, DatabasePools,
+    config::LanternConfig, filesystem::disk::FileStore, permission_cache::PermissionCache,
+    session_cache::SessionCache, DatabasePools,
 };
 use crate::{
     tasks::events::cache::EventItemCache,
@@ -36,6 +37,7 @@ pub struct InnerServerState {
     pub item_cache: EventItemCache,
     pub ip_bans: IpBans,
     pub perm_cache: PermissionCache,
+    pub session_cache: SessionCache,
 }
 
 #[derive(Clone)]
@@ -65,6 +67,7 @@ impl ServerState {
             item_cache: EventItemCache::default(),
             ip_bans: IpBans::new(),
             perm_cache: PermissionCache::new(),
+            session_cache: SessionCache::default(),
         }))
     }
 
