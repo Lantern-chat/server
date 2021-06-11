@@ -66,8 +66,6 @@ impl RateLimitTable {
     }
 
     pub async fn cleanup_at(&self, now: Instant) {
-        log::trace!("Cleaning old rate-limit entries");
-
         let one_second_ago = now - Duration::from_secs(1);
         self.table.retain(|_, value| value.last < one_second_ago).await;
     }

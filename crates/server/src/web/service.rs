@@ -38,7 +38,7 @@ pub async fn service(
 
     let elapsed = start.elapsed().as_secs_f64() * 1000.0;
 
-    log::info!("{} -> {} {:.4}ms", info, resp.status(), elapsed);
+    log::debug!("{} -> {} {:.4}ms", info, resp.status(), elapsed);
     if let Ok(value) = HeaderValue::from_str(&format!("resp;dur={:.4}", elapsed)) {
         resp.headers_mut().insert("Server-Timing", value);
     }

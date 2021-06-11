@@ -39,6 +39,8 @@ impl SessionCache {
                 },
             )
             .await;
+
+        log::trace!("Cached auth {}: {}", auth.user_id, auth.token);
     }
 
     pub async fn cleanup(&self, now: SystemTime) {

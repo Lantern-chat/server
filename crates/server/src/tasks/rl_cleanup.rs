@@ -12,7 +12,7 @@ pub async fn cleanup_ratelimits(state: ServerState) {
             _ = state.notify_shutdown.notified() => { break; }
         };
 
-        log::trace!("Cleaning up rate-limits");
+        log::trace!("Cleaning old rate-limit entries");
         state.rate_limit.cleanup_at(now.into_std()).await;
     }
 }

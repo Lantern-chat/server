@@ -112,7 +112,7 @@ impl Gateway {
             }
         } else {
             if let Some(party) = self.parties.get(&id).await {
-                log::info!("Sending event to party tx: {}", id);
+                log::debug!("Sending event to party tx: {}", id);
                 if let Err(e) = party.tx.send(event) {
                     log::error!("Could not broadcast to party: {}", e);
                 }
@@ -167,7 +167,7 @@ impl Gateway {
         if !missing.is_empty() {
             self.parties
                 .batch_write(missing, Some(&mut cache), |key, value| {
-                    log::info!("Added gateway entry for missing party: {}", key);
+                    log::debug!("Added gateway entry for missing party: {}", key);
                     subs.push(
                         value
                             .or_insert_with(|| (*key, PartyEmitter::new(*key)))

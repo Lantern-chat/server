@@ -258,7 +258,7 @@ impl Pool {
 
         if let Some(sql) = self.config.recycling_method.query() {
             if let Err(e) = client.client.simple_query(sql).await {
-                log::info!("Connection could not be recycled: {}", e);
+                log::warn!("Connection could not be recycled: {}", e);
                 return Err(Error::RecyclingError);
             }
         }
@@ -284,7 +284,7 @@ impl Pool {
         };
 
         let non_blocking = match timeouts.wait {
-            Some(t) => t.as_nanos() == 0,
+            Some(t) => t == Duration::from_nanos(0),
             None => false,
         };
 
@@ -702,7 +702,7 @@ impl Client {
         let (query, collector) = query().to_string();
         let types = collector.types();
 
-        log::info!("Preparing query: \"{}\"", query);
+        log::debug!("Preparing query: \"{}\"", query);
 
         let stmt = self
             .client
@@ -978,7 +978,7 @@ impl Transaction<'_> {
         let (query, collector) = query().to_string();
         let types = collector.types();
 
-        log::info!("Preparing query: \"{}\"", query);
+        log::debug!("Preparing query: \"{}\"", query);
 
         let stmt = self
             .t

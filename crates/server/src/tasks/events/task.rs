@@ -220,7 +220,7 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
                 }
             }
 
-            log::info!(
+            log::debug!(
                 "Received {} party_events and {} user_events",
                 party_events.len(),
                 user_events.len()

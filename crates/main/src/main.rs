@@ -1,6 +1,9 @@
 extern crate tracing as log;
 use db::pg::NoTls;
-use tracing_subscriber::FmtSubscriber;
+use tracing_subscriber::{
+    filter::{EnvFilter, LevelFilter},
+    FmtSubscriber,
+};
 
 pub mod cli;
 
@@ -15,14 +18,32 @@ async fn main() -> anyhow::Result<()> {
 
     let mut args = cli::CliOptions::from_args();
 
+    let mut extreme_trace = false;
+
+    let level_filter = match args.verbose {
+        None | Some(0) => LevelFilter::INFO,
+        Some(1) => LevelFilter::DEBUG,
+        Some(2) => LevelFilter::TRACE,
+        Some(3) | _ => {
+            extreme_trace = true;
+            LevelFilter::TRACE
+        }
+    };
+
     // a builder for `FmtSubscriber`.
     let subscriber = FmtSubscriber::builder()
         // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
         // will be written to stdout.
-        .with_max_level(match args.verbose {
-            None | Some(0) => log::Level::INFO,
-            Some(1) => log::Level::DEBUG,
-            _ => log::Level::TRACE,
+        .with_env_filter({
+            let filter = EnvFilter::from_default_env()
+                .add_directive(level_filter.into())
+                .add_directive("hyper::proto=info".parse()?);
+
+            if !extreme_trace {
+                filter.add_directive("server::tasks=debug".parse()?)
+            } else {
+                filter
+            }
         })
         .finish(); // completes the builder.
 
