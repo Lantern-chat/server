@@ -213,10 +213,7 @@ impl FileCache for MainFileCache {
                 match entry {
                     RawEntryMut::Occupied(ref mut occupied) => {
                         occupied.get_mut().last_checked = SystemTime::now();
-
                         do_read = false;
-
-                        log::trace!("NOT CHANGED");
                     }
                     _ => {}
                 }
@@ -224,6 +221,10 @@ impl FileCache for MainFileCache {
         }
 
         if do_read {
+            if meta.len() > (1024 * 1024 * 10) {
+                log::warn!("Caching file larger than 10MB! {}", path.display());
+            }
+
             let mut content = Vec::new();
             file.read_to_end(&mut content).await?;
 
