@@ -65,6 +65,11 @@ pub struct WriteValue<'a, K, T, S> {
     value: &'a mut T,
 }
 
+pub struct EntryValue<'a, K, T, S> {
+    pub lock: RwLockWriteGuard<'a, HashMap<K, T, S>>,
+    pub entry: RawEntryMut<'a, K, T, S>,
+}
+
 impl<'a, K, T, S> WriteValue<'a, K, T, S> {
     pub fn downgrade(this: WriteValue<'a, K, T, S>) -> ReadValue<'a, K, T, S> {
         ReadValue {
@@ -216,6 +221,23 @@ where
                 _lock: shard,
             }),
             _ => None,
+        }
+    }
+
+    pub async fn entry<Q: ?Sized>(&self, key: &Q) -> EntryValue<'_, K, T, S>
+    where
+        K: Borrow<Q>,
+        Q: Hash + Eq,
+    {
+        let (hash, shard_idx) = self.hash_and_shard(key);
+
+        let mut shard = unsafe { self.shards.get_unchecked(shard_idx).write().await };
+
+        let entry = shard.raw_entry_mut().from_key_hashed_nocheck(hash, key);
+
+        EntryValue {
+            entry: unsafe { std::mem::transmute(entry) },
+            lock: shard,
         }
     }
 

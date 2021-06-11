@@ -15,7 +15,7 @@ use util::cmap::CHashMap;
 
 use crate::{
     config::LanternConfig, filesystem::disk::FileStore, permission_cache::PermissionCache,
-    session_cache::SessionCache, DatabasePools,
+    session_cache::SessionCache, web::file_cache::MainFileCache, DatabasePools,
 };
 use crate::{
     tasks::events::cache::EventItemCache,
@@ -38,6 +38,7 @@ pub struct InnerServerState {
     pub ip_bans: IpBans,
     pub perm_cache: PermissionCache,
     pub session_cache: SessionCache,
+    pub file_cache: MainFileCache,
 }
 
 #[derive(Clone)]
@@ -68,6 +69,7 @@ impl ServerState {
             ip_bans: IpBans::new(),
             perm_cache: PermissionCache::new(),
             session_cache: SessionCache::default(),
+            file_cache: MainFileCache::default(),
         }))
     }
 

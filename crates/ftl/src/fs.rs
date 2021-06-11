@@ -389,7 +389,7 @@ fn file_body(
             };
 
             if n == 0 {
-                log::warn!("file read found EOF before expected length");
+                log::warn!("file read found EOF before expected length: {}", len);
                 break;
             }
 

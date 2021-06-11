@@ -22,7 +22,7 @@ pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
             .into_response(),
 
         (&Method::GET, Exact("favicon.ico")) | (&Method::HEAD, Exact("favicon.ico")) => {
-            fs::file(&route, "frontend/dist/favicon.ico", &fs::NoCache)
+            fs::file(&route, "frontend/dist/favicon.ico", &route.state.file_cache)
                 .boxed()
                 .await
                 .into_response()
@@ -31,7 +31,7 @@ pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
         _ if BAD_PATTERNS.is_match(route.path()) => StatusCode::IM_A_TEAPOT.into_response(),
 
         (&Method::GET, Exact("static")) | (&Method::HEAD, Exact("static")) => {
-            fs::dir(&route, "frontend/dist", &fs::NoCache)
+            fs::dir(&route, "frontend/dist", &route.state.file_cache)
                 .boxed()
                 .await
                 .into_response()
@@ -50,7 +50,7 @@ pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
                 return StatusCode::NOT_FOUND.into_response();
             }
 
-            fs::file(&route, "frontend/dist/index.html", &fs::NoCache)
+            fs::file(&route, "frontend/dist/index.html", &route.state.file_cache)
                 .boxed()
                 .await
                 .into_response()
