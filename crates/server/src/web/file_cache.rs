@@ -108,6 +108,20 @@ pub struct MainFileCache {
     map: CHashMap<PathBuf, CacheEntry>,
 }
 
+impl MainFileCache {
+    pub async fn cleanup(&self) {
+        let now = SystemTime::now();
+        self.map
+            .retain(|_, file| match now.duration_since(file.last_checked) {
+                // retain if duration since last checked is less than 1 hour (debug) or 24 hours (release)
+                Ok(dur) => dur < Duration::from_secs(60 * 60 * if cfg!(debug_assertions) { 1 } else { 24 }),
+                // if checked since `now`, then retain (or time travel, but whatever)
+                Err(_) => true,
+            })
+            .await
+    }
+}
+
 use headers::AcceptEncoding;
 use util::cmap::EntryValue;
 
