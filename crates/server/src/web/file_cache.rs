@@ -92,6 +92,7 @@ impl AsyncSeek for CachedFile {
 
 #[derive(Clone)]
 pub struct CacheEntry {
+    best: ContentCoding,
     iden: Arc<[u8]>,
     brotli: Arc<[u8]>,
     gzip: Arc<[u8]>,
@@ -134,7 +135,12 @@ impl FileCache for MainFileCache {
                         last_modified = Some(file.last_modified);
                     }
                     Ok(_) => {
-                        let coding = match accepts.and_then(|a| a.prefered_encoding()) {
+                        let coding = match accepts.and_then(|a| {
+                            // prefer best
+                            let mut encodings = a.sorted_encodings();
+                            let preferred = encodings.next();
+                            encodings.find(|e| *e == file.best).or(preferred)
+                        }) {
                             None | Some(ContentCoding::COMPRESS) | Some(ContentCoding::IDENTITY) => {
                                 ContentCoding::IDENTITY
                             }
@@ -207,7 +213,7 @@ impl FileCache for MainFileCache {
             let mut content = Vec::new();
             file.read_to_end(&mut content).await?;
 
-            let (brotli, deflate, gzip) = {
+            let (brotli, deflate, gzip, best) = {
                 use async_compression::{
                     tokio::bufread::{BrotliEncoder, DeflateEncoder, GzipEncoder},
                     Level,
@@ -216,7 +222,7 @@ impl FileCache for MainFileCache {
                 let (level, brotli_level) = if cfg!(debug_assertions) {
                     (Level::Fastest, Level::Fastest)
                 } else {
-                    (Level::Best, Level::Precise(3))
+                    (Level::Best, Level::Precise(4))
                 };
 
                 let mut brotli_buffer = Vec::new();
@@ -239,6 +245,18 @@ impl FileCache for MainFileCache {
 
                 res?;
 
+                let mut best = ContentCoding::BROTLI;
+                let mut best_len = brotli_buffer.len();
+
+                if deflate_buffer.len() < best_len {
+                    best = ContentCoding::DEFLATE;
+                    best_len = deflate_buffer.len();
+                }
+
+                if gzip_buffer.len() < best_len {
+                    best = ContentCoding::GZIP;
+                }
+
                 log::trace!(
                     "Brotli: {}, Deflate: {}, Gzip: {}",
                     brotli_buffer.len(),
@@ -246,7 +264,7 @@ impl FileCache for MainFileCache {
                     gzip_buffer.len()
                 );
 
-                (brotli_buffer, deflate_buffer, gzip_buffer)
+                (brotli_buffer, deflate_buffer, gzip_buffer, best)
             };
 
             log::trace!("Inserting into cache");
@@ -254,6 +272,7 @@ impl FileCache for MainFileCache {
             entry.insert(
                 path.to_path_buf(),
                 CacheEntry {
+                    best,
                     iden: Arc::from(content),
                     brotli: Arc::from(brotli),
                     deflate: Arc::from(deflate),

@@ -305,7 +305,6 @@ async fn file_reply<S>(route: &Route<S>, path: impl AsRef<Path>, cache: &impl Fi
                         http::header::CONTENT_ENCODING,
                         HeaderValue::from_static(coding.to_static()),
                     );
-                    headers.remove(http::header::CONTENT_LENGTH);
                 }
 
                 headers.insert(TRAILER, HeaderValue::from_static("Server-Timing"));
