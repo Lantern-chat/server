@@ -140,7 +140,7 @@ where
         }
     }
 
-    pub async fn contains<Q>(&self, key: &Q) -> bool
+    pub async fn contains<Q: ?Sized>(&self, key: &Q) -> bool
     where
         K: Borrow<Q>,
         Q: Hash + Eq,
@@ -157,7 +157,7 @@ where
     }
 
     #[inline]
-    fn hash_and_shard<Q>(&self, key: &Q) -> (u64, usize)
+    fn hash_and_shard<Q: ?Sized>(&self, key: &Q) -> (u64, usize)
     where
         Q: Hash + Eq,
     {
@@ -167,7 +167,7 @@ where
         (hash, hash as usize % self.shards.len())
     }
 
-    pub async fn get_cloned<Q>(&self, key: &Q) -> Option<T>
+    pub async fn get_cloned<Q: ?Sized>(&self, key: &Q) -> Option<T>
     where
         K: Borrow<Q>,
         Q: Hash + Eq,
@@ -181,7 +181,7 @@ where
             .map(|(_, value)| value.clone())
     }
 
-    pub async fn get<Q>(&self, key: &Q) -> Option<ReadValue<'_, K, T, S>>
+    pub async fn get<Q: ?Sized>(&self, key: &Q) -> Option<ReadValue<'_, K, T, S>>
     where
         K: Borrow<Q>,
         Q: Hash + Eq,
@@ -200,7 +200,7 @@ where
         }
     }
 
-    pub async fn get_mut<Q>(&self, key: &Q) -> Option<WriteValue<'_, K, T, S>>
+    pub async fn get_mut<Q: ?Sized>(&self, key: &Q) -> Option<WriteValue<'_, K, T, S>>
     where
         K: Borrow<Q>,
         Q: Hash + Eq,
