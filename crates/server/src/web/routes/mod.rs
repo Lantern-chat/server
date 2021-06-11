@@ -34,10 +34,24 @@ pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
             fs::dir(&route, "frontend/dist").boxed().await.into_response()
         }
 
-        (&Method::GET, _) | (&Method::HEAD, _) => fs::file(&route, "frontend/dist/index.html")
-            .boxed()
-            .await
-            .into_response(),
+        (&Method::GET, segment) | (&Method::HEAD, segment) => {
+            let allowed = match segment {
+                Segment::End => true,
+                Segment::Exact(part) => matches!(
+                    part,
+                    "channels" | "login" | "register" | "invite" // | "verify" | "profile" | "reset"
+                ),
+            };
+
+            if !allowed {
+                return StatusCode::NOT_FOUND.into_response();
+            }
+
+            fs::file(&route, "frontend/dist/index.html")
+                .boxed()
+                .await
+                .into_response()
+        }
 
         _ => StatusCode::METHOD_NOT_ALLOWED.into_response(),
     }
