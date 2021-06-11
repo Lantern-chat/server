@@ -1,19 +1,102 @@
 use std::path::{Path, PathBuf};
-use std::{fs::Metadata, time::Instant};
+use std::time::SystemTime;
+use std::{fs::Metadata, io, time::Instant};
 
 use bytes::{Bytes, BytesMut};
 use tokio::fs::File as TkFile;
-use tokio::io::{AsyncReadExt, AsyncSeekExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt};
 
 use headers::{
-    AcceptRanges, ContentLength, ContentRange, ContentType, HeaderMap, HeaderMapExt, HeaderValue,
-    IfModifiedSince, IfRange, IfUnmodifiedSince, LastModified, Range, TransferEncoding,
+    AcceptEncoding, AcceptRanges, ContentCoding, ContentEncoding, ContentLength, ContentRange, ContentType,
+    HeaderMap, HeaderMapExt, HeaderValue, IfModifiedSince, IfRange, IfUnmodifiedSince, LastModified, Range,
+    TransferEncoding,
 };
 use http::{header::TRAILER, Method, Response, StatusCode};
 use hyper::Body;
 use percent_encoding::percent_decode_str;
 
 use super::{Reply, Route};
+
+use async_trait::async_trait;
+
+pub trait GenericFile: Unpin + AsyncRead + AsyncSeek + Send + 'static {}
+impl<T> GenericFile for T where T: Unpin + AsyncRead + AsyncSeek + Send + 'static {}
+
+pub trait FileMetadata {
+    fn is_dir(&self) -> bool;
+    fn len(&self) -> u64;
+    fn modified(&self) -> io::Result<SystemTime>;
+    fn blksize(&self) -> u64;
+}
+
+impl FileMetadata for Metadata {
+    fn is_dir(&self) -> bool {
+        Metadata::is_dir(self)
+    }
+
+    fn modified(&self) -> io::Result<SystemTime> {
+        Metadata::modified(self)
+    }
+
+    fn len(&self) -> u64 {
+        Metadata::len(self)
+    }
+
+    #[cfg(unix)]
+    fn blksize(&self) -> u64 {
+        use std::os::unix::fs::MetadataExt;
+
+        MetadataExt::blksize(self)
+    }
+
+    #[cfg(not(unix))]
+    fn blksize(&self) -> u64 {
+        0
+    }
+}
+
+#[async_trait]
+pub trait FileCache {
+    type File: GenericFile;
+    type Meta: FileMetadata;
+
+    async fn open(
+        &self,
+        path: &Path,
+        accepts: Option<AcceptEncoding>,
+    ) -> io::Result<(Self::File, ContentCoding)>;
+    async fn metadata(&self, path: &Path) -> io::Result<Self::Meta>;
+    async fn file_metadata(&self, file: &Self::File) -> io::Result<Self::Meta>;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NoCache;
+
+#[async_trait]
+impl FileCache for NoCache {
+    type File = TkFile;
+    type Meta = Metadata;
+
+    #[inline]
+    async fn open(
+        &self,
+        path: &Path,
+        _accepts: Option<AcceptEncoding>,
+    ) -> io::Result<(Self::File, ContentCoding)> {
+        let file = TkFile::open(path).await?;
+
+        Ok((file, ContentCoding::IDENTITY))
+    }
+
+    #[inline]
+    async fn metadata(&self, path: &Path) -> io::Result<Self::Meta> {
+        tokio::fs::metadata(path).await
+    }
+
+    async fn file_metadata(&self, file: &Self::File) -> io::Result<Self::Meta> {
+        file.metadata().await
+    }
+}
 
 #[derive(Debug)]
 pub struct Conditionals {
@@ -29,17 +112,6 @@ enum Cond {
 }
 
 impl Conditionals {
-    pub fn parse<S>(route: &Route<S>) -> Conditionals {
-        let headers = route.req.headers();
-
-        Conditionals {
-            if_modified_since: headers.typed_get(),
-            if_unmodified_since: headers.typed_get(),
-            if_range: headers.typed_get(),
-            range: headers.typed_get(),
-        }
-    }
-
     fn check(self, last_modified: Option<LastModified>) -> Cond {
         if let Some(since) = self.if_unmodified_since {
             let precondition = last_modified
@@ -124,58 +196,40 @@ pub fn sanitize_path(base: impl AsRef<Path>, tail: &str) -> Result<PathBuf, Sani
     Ok(buf)
 }
 
-const DEFAULT_READ_BUF_SIZE: usize = 8_192;
+const DEFAULT_READ_BUF_SIZE: u64 = 8_192;
 
-fn optimal_buf_size(metadata: &Metadata) -> usize {
-    let block_size = get_block_size(metadata);
-
-    // If file length is smaller than block size, don't waste space
-    // reserving a bigger-than-needed buffer.
-    std::cmp::min(block_size as u64, metadata.len()) as usize
+pub async fn file<S>(route: &Route<S>, path: impl AsRef<Path>, cache: &impl FileCache) -> impl Reply {
+    file_reply(route, path, cache).await
 }
 
-#[cfg(unix)]
-fn get_block_size(metadata: &Metadata) -> usize {
-    use std::os::unix::fs::MetadataExt;
-    //TODO: blksize() returns u64, should handle bad cast...
-    //(really, a block size bigger than 4gb?)
-
-    // Use device blocksize unless it's really small.
-    std::cmp::max(metadata.blksize() as usize, DEFAULT_READ_BUF_SIZE)
-}
-
-#[cfg(not(unix))]
-fn get_block_size(_metadata: &Metadata) -> usize {
-    DEFAULT_READ_BUF_SIZE
-}
-
-pub async fn file<S>(route: &Route<S>, path: impl AsRef<Path>) -> impl Reply {
-    file_reply(route, path).await
-}
-
-pub async fn dir<S>(route: &Route<S>, base: impl AsRef<Path>) -> impl Reply {
+pub async fn dir<S>(route: &Route<S>, base: impl AsRef<Path>, cache: &impl FileCache) -> impl Reply {
     let mut buf = match sanitize_path(base, route.tail()) {
         Ok(buf) => buf,
         Err(e) => return e.to_string().with_status(StatusCode::BAD_REQUEST).into_response(),
     };
 
-    let is_dir = tokio::fs::metadata(&buf)
-        .await
-        .map(|m| m.is_dir())
-        .unwrap_or(false);
+    let is_dir = cache.metadata(&buf).await.map(|m| m.is_dir()).unwrap_or(false);
 
     if is_dir {
         log::debug!("dir: appending index.html to directory path");
         buf.push("index.html");
     }
 
-    file_reply(route, buf).await.into_response()
+    file_reply(route, buf, cache).await.into_response()
 }
 
-async fn file_reply<S>(route: &Route<S>, path: impl AsRef<Path>) -> impl Reply {
+async fn file_reply<S>(route: &Route<S>, path: impl AsRef<Path>, cache: &impl FileCache) -> impl Reply {
     let path = path.as_ref();
 
-    let file = match TkFile::open(path).await {
+    let range = route.header::<headers::Range>();
+
+    // if a range is given, do not use pre-compression
+    let accepts = match range {
+        None => route.header::<AcceptEncoding>(),
+        Some(_) => None,
+    };
+
+    let (file, coding) = match cache.open(path, accepts).await {
         Ok(f) => f,
         Err(e) => {
             return match e.kind() {
@@ -186,7 +240,7 @@ async fn file_reply<S>(route: &Route<S>, path: impl AsRef<Path>) -> impl Reply {
         }
     };
 
-    let metadata = match file.metadata().await {
+    let metadata = match cache.file_metadata(&file).await {
         Ok(m) => m,
         Err(e) => {
             log::error!("Error retreiving file metadata: {}", e);
@@ -195,7 +249,13 @@ async fn file_reply<S>(route: &Route<S>, path: impl AsRef<Path>) -> impl Reply {
     };
 
     // parse after opening the file handle to save time on open error
-    let conditionals = Conditionals::parse(route);
+    let headers = route.req.headers();
+    let conditionals = Conditionals {
+        range,
+        if_modified_since: headers.typed_get(),
+        if_unmodified_since: headers.typed_get(),
+        if_range: headers.typed_get(),
+    };
 
     let modified = match metadata.modified() {
         Err(_) => None,
@@ -213,7 +273,8 @@ async fn file_reply<S>(route: &Route<S>, path: impl AsRef<Path>) -> impl Reply {
 
             Ok((start, end)) => {
                 let sub_len = end - start;
-                let buf_size = optimal_buf_size(&metadata);
+
+                let buf_size = metadata.blksize().max(DEFAULT_READ_BUF_SIZE).min(len) as usize;
 
                 let mut resp = if route.method() == &Method::GET {
                     Response::new(file_body(route.start, file, buf_size, (start, end)))
@@ -222,6 +283,8 @@ async fn file_reply<S>(route: &Route<S>, path: impl AsRef<Path>) -> impl Reply {
                 };
 
                 if sub_len != len {
+                    assert_eq!(coding, ContentCoding::IDENTITY);
+
                     *resp.status_mut() = StatusCode::PARTIAL_CONTENT;
                     resp.headers_mut()
                         .typed_insert(ContentRange::bytes(start..end, len).expect("valid ContentRange"));
@@ -231,12 +294,21 @@ async fn file_reply<S>(route: &Route<S>, path: impl AsRef<Path>) -> impl Reply {
 
                 let mime = mime_guess::from_path(path).first_or_octet_stream();
 
+                let headers = resp.headers_mut();
+
                 if let Some(last_modified) = modified {
-                    resp.headers_mut().typed_insert(last_modified);
+                    headers.typed_insert(last_modified);
                 }
 
-                resp.headers_mut()
-                    .insert(TRAILER, HeaderValue::from_static("Server-Timing"));
+                if coding != ContentCoding::IDENTITY {
+                    headers.append(
+                        http::header::CONTENT_ENCODING,
+                        HeaderValue::from_static(coding.to_static()),
+                    );
+                    headers.remove(http::header::CONTENT_LENGTH);
+                }
+
+                headers.insert(TRAILER, HeaderValue::from_static("Server-Timing"));
 
                 resp.with_header(ContentLength(len))
                     .with_header(ContentType::from(mime))
@@ -279,7 +351,14 @@ fn bytes_range(range: Option<Range>, max_len: u64) -> Result<(u64, u64), BadRang
 use futures::Stream;
 use std::io::SeekFrom;
 
-fn file_body(route_start: Instant, mut file: TkFile, buf_size: usize, (start, end): (u64, u64)) -> Body {
+use std::pin::Pin;
+
+fn file_body(
+    route_start: Instant,
+    mut file: impl GenericFile,
+    buf_size: usize,
+    (start, end): (u64, u64),
+) -> Body {
     //return Body::wrap_stream(file_stream(file, buf_size, (start, end)));
 
     let (mut sender, body) = Body::channel();
@@ -337,9 +416,7 @@ fn file_body(route_start: Instant, mut file: TkFile, buf_size: usize, (start, en
             trailers.insert("Server-Timing", value);
 
             if let Err(e) = sender.send_trailers(trailers).await {
-                log::error!("Error sending trailers: {}", e);
-
-                return sender.abort();
+                log::warn!("Error sending trailers: {}", e);
             }
         } else {
             log::warn!("Unable to create trailer value");

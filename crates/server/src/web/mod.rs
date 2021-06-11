@@ -4,3 +4,4 @@ pub mod ip_bans;
 pub mod rate_limit;
 pub mod routes;
 pub mod service;
+pub mod file_cache;
