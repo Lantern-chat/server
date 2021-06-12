@@ -76,13 +76,13 @@ pub async fn ready(
                     Query::select()
                         .and_where(Users::Id.equals(Var::of(Users::Id)))
                         .cols(&[
-                            Users::Username,      // 0
-                            Users::Discriminator, // 1
-                            Users::Flags,         // 2
-                            Users::Email,         // 3
-                            Users::CustomStatus,  // 4
-                            Users::Biography,     // 5
-                            Users::Preferences,   // 6
+                            /* 0*/ Users::Username,
+                            /* 1*/ Users::Discriminator,
+                            /* 2*/ Users::Flags,
+                            /* 3*/ Users::Email,
+                            /* 4*/ Users::CustomStatus,
+                            /* 5*/ Users::Biography,
+                            /* 6*/ Users::Preferences,
                         ])
                         .col(UserAvatars::FileId) // 7
                         .from(
@@ -116,18 +116,18 @@ pub async fn ready(
 
     let parties_future = async {
         let rows = db
-            .query_stream_cached_typed(
+            .query_cached_typed(
                 || {
                     use db::schema::*;
                     use thorn::*;
 
                     Query::select()
                         .cols(&[
-                            Party::Id,
-                            Party::OwnerId,
-                            Party::Name,
-                            Party::AvatarId,
-                            Party::Description,
+                            /* 0*/ Party::Id,
+                            /* 1*/ Party::OwnerId,
+                            /* 2*/ Party::Name,
+                            /* 3*/ Party::AvatarId,
+                            /* 4*/ Party::Description,
                         ])
                         .from(
                             Party::left_join_table::<PartyMember>()
@@ -140,31 +140,28 @@ pub async fn ready(
             )
             .await?;
 
-        let parties_stream = rows.map(|row| match row {
-            Err(e) => Err(Error::from(e)),
-            Ok(row) => Ok(Party {
-                partial: PartialParty {
-                    id: row.try_get(0)?,
-                    name: row.try_get(2)?,
-                    description: row.try_get(4)?,
-                },
-                owner: row.try_get(1)?,
-                security: SecurityFlags::empty(),
-                roles: Vec::new(),
-                emotes: Vec::new(),
-                icon_id: row.try_get(3)?,
-            }),
-        });
-
         let mut parties = HashMap::new();
         let mut ids = Vec::new();
 
-        futures::pin_mut!(parties_stream);
-        while let Some(res) = parties_stream.next().await {
-            let party = res?;
+        for row in rows {
+            let id = row.try_get(0)?;
 
-            ids.push(party.id);
-            parties.insert(party.id, party);
+            ids.push(id);
+            parties.insert(
+                id,
+                Party {
+                    partial: PartialParty {
+                        id,
+                        name: row.try_get(2)?,
+                        description: row.try_get(4)?,
+                    },
+                    owner: row.try_get(1)?,
+                    security: SecurityFlags::empty(),
+                    roles: Vec::new(),
+                    emotes: Vec::new(),
+                    icon_id: row.try_get(3)?,
+                },
+            );
         }
 
         let (roles, emotes) = futures::future::join(
