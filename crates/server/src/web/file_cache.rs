@@ -145,7 +145,8 @@ impl FileCache for MainFileCache {
                     Err(_) => {
                         log::warn!("Duration calculation failed, time reversed?");
                     }
-                    Ok(dur) if dur > Duration::from_secs(15) => {
+                    // recheck every 15 seconds in debug, 2 minutes in release (TODO: Increase?)
+                    Ok(dur) if dur > Duration::from_secs(if cfg!(debug_assertions) { 15 } else { 120 }) => {
                         last_modified = Some(file.last_modified);
                     }
                     Ok(_) => {
@@ -193,7 +194,6 @@ impl FileCache for MainFileCache {
         // avoiding duplicate processing.
         let EntryValue { lock, mut entry } = self.map.entry(path).await;
 
-        log::trace!("Loading in file to cache: {}", path.display());
         let mut file = tokio::fs::File::open(path).await?;
 
         let meta = file.metadata().await?;
@@ -205,27 +205,26 @@ impl FileCache for MainFileCache {
         let mut do_read = true;
 
         if let Some(last_modified) = last_modified {
-            log::trace!("Checking for modifications of {}", path.display());
-
             if last_modified == meta.modified()? {
                 use hashbrown::hash_map::RawEntryMut;
 
-                match entry {
-                    RawEntryMut::Occupied(ref mut occupied) => {
-                        occupied.get_mut().last_checked = SystemTime::now();
-                        do_read = false;
-                    }
-                    _ => {}
+                if let RawEntryMut::Occupied(ref mut entry) = entry {
+                    entry.get_mut().last_checked = SystemTime::now();
+                    do_read = false;
                 }
             }
         }
 
         if do_read {
-            if meta.len() > (1024 * 1024 * 10) {
+            log::trace!("Loading in file to cache: {}", path.display());
+
+            let len = meta.len();
+
+            if len > (1024 * 1024 * 10) {
                 log::warn!("Caching file larger than 10MB! {}", path.display());
             }
 
-            let mut content = Vec::new();
+            let mut content = Vec::with_capacity(len as usize);
             file.read_to_end(&mut content).await?;
 
             let (brotli, deflate, gzip, best) = {
@@ -282,12 +281,17 @@ impl FileCache for MainFileCache {
                 (brotli_buffer, deflate_buffer, gzip_buffer, best)
             };
 
-            log::trace!("Inserting into cache");
+            log::trace!(
+                "Inserting {} bytes into file cache from {}",
+                (content.len() + brotli.len() + deflate.len() + gzip.len()),
+                path.display(),
+            );
 
             entry.insert(
                 path.to_path_buf(),
                 CacheEntry {
                     best,
+                    // NOTE: Arc::from(vec) does not overallocate, so shrink_to_fit() is not needed
                     iden: Arc::from(content),
                     brotli: Arc::from(brotli),
                     deflate: Arc::from(deflate),
@@ -323,6 +327,7 @@ impl FileCache for MainFileCache {
         }
     }
 
+    #[inline]
     async fn file_metadata(&self, file: &Self::File) -> io::Result<Self::Meta> {
         Ok(Metadata {
             len: file.buf.len() as u64,

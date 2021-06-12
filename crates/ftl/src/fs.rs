@@ -30,19 +30,23 @@ pub trait FileMetadata {
 }
 
 impl FileMetadata for Metadata {
+    #[inline]
     fn is_dir(&self) -> bool {
         Metadata::is_dir(self)
     }
 
+    #[inline]
     fn modified(&self) -> io::Result<SystemTime> {
         Metadata::modified(self)
     }
 
+    #[inline]
     fn len(&self) -> u64 {
         Metadata::len(self)
     }
 
     #[cfg(unix)]
+    #[inline]
     fn blksize(&self) -> u64 {
         use std::os::unix::fs::MetadataExt;
 
@@ -50,6 +54,7 @@ impl FileMetadata for Metadata {
     }
 
     #[cfg(not(unix))]
+    #[inline]
     fn blksize(&self) -> u64 {
         0
     }
@@ -93,6 +98,7 @@ impl FileCache for NoCache {
         tokio::fs::metadata(path).await
     }
 
+    #[inline]
     async fn file_metadata(&self, file: &Self::File) -> io::Result<Self::Meta> {
         file.metadata().await
     }
