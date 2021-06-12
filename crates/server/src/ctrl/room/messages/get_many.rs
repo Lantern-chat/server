@@ -57,6 +57,11 @@ pub async fn get_many(
 
     let limit = 100.min(form.limit as i16);
 
+    let limit = match form.query {
+        Some(MessageSearch::Around(_)) => (limit + limit % 2) / 2,
+        _ => limit,
+    };
+
     let stream = if had_perms {
         let params: &[&(dyn ToSql + Sync)] = &[&room_id, &msg_id, &limit];
 
@@ -182,7 +187,6 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
     let user_id_var = Var::at(Users::Id, 4);
 
     let mut query = Query::select()
-        .from_table::<AggMessages>()
         .cols(&[
             /* 0*/ AggMessages::MsgId,
             /* 1*/ AggMessages::UserId,
@@ -204,8 +208,14 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
             AggMessages::MessageFlags
                 .bit_and(Literal::Int2(MessageFlags::DELETED.bits()))
                 .equals(Literal::Int2(0)),
-        )
-        .limit(limit_var);
+        );
+
+    match mode {
+        MessageSearch::Before(_) | MessageSearch::After(_) => {
+            query = query.from_table::<AggMessages>().limit(limit_var.clone())
+        }
+        _ => {}
+    }
 
     query = match mode {
         MessageSearch::After(_) => query
@@ -215,7 +225,62 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
             .and_where(AggMessages::MsgId.less_than(msg_id_var))
             .order_by(AggMessages::MsgId.descending()),
 
-        MessageSearch::Around(_) => unimplemented!(),
+        MessageSearch::Around(_) => {
+            tables! {
+                struct NumberedMsgs {
+                    MsgId: Messages::Id,
+                    RowNumber: Type::INT8,
+                }
+
+                struct Offsets {
+                    Offset: Type::INT8,
+                }
+            }
+
+            let numbered = NumberedMsgs::as_query(
+                Query::select()
+                    .from_table::<AggMessages>()
+                    .expr(AggMessages::MsgId.alias_to(NumberedMsgs::MsgId))
+                    .expr(
+                        Builtin::row_number(())
+                            .over(AggMessages::MsgId.ascending())
+                            .alias_to(NumberedMsgs::RowNumber),
+                    ),
+            );
+
+            let offsets = Offsets::as_query(
+                Query::select()
+                    .expr(
+                        Builtin::generate_series((limit_var.clone().neg(), Literal::Int8(-1)))
+                            .alias_to(Offsets::Offset),
+                    )
+                    .union_all(
+                        Query::select().expr(
+                            Builtin::generate_series((Literal::Int8(1), limit_var.clone()))
+                                .alias_to(Offsets::Offset),
+                        ),
+                    ),
+            );
+
+            query = query
+                .with(numbered.exclude())
+                .with(offsets.exclude())
+                .from(
+                    AggMessages::inner_join_table::<NumberedMsgs>()
+                        .on(AggMessages::MsgId.equals(NumberedMsgs::MsgId)),
+                )
+                .and_where(
+                    NumberedMsgs::RowNumber.in_query(
+                        Query::select()
+                            .expr(NumberedMsgs::RowNumber.add(Offsets::Offset))
+                            .from(NumberedMsgs::cross_join_table::<Offsets>())
+                            .and_where(NumberedMsgs::MsgId.equals(msg_id_var)),
+                    ),
+                )
+                .order_by(AggMessages::MsgId.ascending());
+
+            query
+        }
     };
 
     if check_perms {
