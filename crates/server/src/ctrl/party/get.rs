@@ -10,9 +10,9 @@ use crate::{
 use models::*;
 
 pub async fn get_party(state: ServerState, auth: Authorization, party_id: Snowflake) -> Result<Party, Error> {
-    let row = state
-        .read_db()
-        .await
+    let db = state.db.read.get().await?;
+
+    let row = db
         .query_opt_cached_typed(
             || {
                 use db::schema::*;
@@ -46,14 +46,14 @@ pub async fn get_party(state: ServerState, auth: Authorization, party_id: Snowfl
     };
 
     let roles = async {
-        super::roles::get_roles_raw(&state, SearchMode::Single(party_id))
+        super::roles::get_roles_raw(&db, SearchMode::Single(party_id))
             .await?
             .try_collect::<Vec<_>>()
             .await
     };
 
     let emotes = async {
-        super::emotes::get_custom_emotes_raw(&state, SearchMode::Single(party_id))
+        super::emotes::get_custom_emotes_raw(&db, SearchMode::Single(party_id))
             .await?
             .map_ok(Emote::Custom)
             .try_collect::<Vec<_>>()

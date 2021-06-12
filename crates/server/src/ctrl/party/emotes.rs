@@ -1,6 +1,6 @@
 use futures::{Stream, StreamExt, TryStreamExt};
 
-use db::Snowflake;
+use db::{pool::Client, Snowflake};
 
 use crate::{
     ctrl::{auth::Authorization, Error, SearchMode},
@@ -24,13 +24,11 @@ fn base_query() -> thorn::query::SelectQuery {
 }
 
 pub async fn get_custom_emotes_raw<'a>(
-    state: &ServerState,
+    db: &Client,
     party_id: SearchMode<'a>,
 ) -> Result<impl Stream<Item = Result<CustomEmote, Error>> + 'static, Error> {
-    let client = state.read_db().await;
-
     let stream = match party_id {
-        SearchMode::Single(id) => client
+        SearchMode::Single(id) => db
             .query_stream_cached_typed(
                 || {
                     use db::schema::*;
@@ -42,7 +40,7 @@ pub async fn get_custom_emotes_raw<'a>(
             )
             .await?
             .boxed(),
-        SearchMode::Many(ids) => client
+        SearchMode::Many(ids) => db
             .query_stream_cached_typed(
                 || {
                     use db::schema::*;

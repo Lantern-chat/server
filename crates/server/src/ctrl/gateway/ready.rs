@@ -169,13 +169,13 @@ pub async fn ready(
 
         let (roles, emotes) = futures::future::join(
             async {
-                crate::ctrl::party::roles::get_roles_raw(&state, SearchMode::Many(&ids))
+                crate::ctrl::party::roles::get_roles_raw(&db, SearchMode::Many(&ids))
                     .await?
                     .try_collect::<Vec<_>>()
                     .await
             },
             async {
-                crate::ctrl::party::emotes::get_custom_emotes_raw(&state, SearchMode::Many(&ids))
+                crate::ctrl::party::emotes::get_custom_emotes_raw(&db, SearchMode::Many(&ids))
                     .await?
                     .try_collect::<Vec<_>>()
                     .await
