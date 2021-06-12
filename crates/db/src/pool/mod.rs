@@ -1,5 +1,6 @@
 use std::ops::{Deref, DerefMut};
 use std::pin::Pin;
+use std::sync::atomic::AtomicU64;
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, Weak,
@@ -64,6 +65,7 @@ use futures::stream::BoxStream;
 #[derive(Clone)]
 pub struct Connection {
     pub readonly: bool,
+    pub id: u64,
     pub stream: Arc<tokio::sync::Mutex<BoxStream<'static, Result<AsyncMessage, PgError>>>>,
     pub release: Arc<Notify>,
 }
@@ -138,6 +140,8 @@ pub trait Connector {
     ) -> Result<(PgClient, Connection, Receiver<Notification>), Error>;
 }
 
+static ID_COUNTER: AtomicU64 = AtomicU64::new(1);
+
 #[async_trait]
 impl<T> Connector for T
 where
@@ -191,6 +195,7 @@ where
 
         let conn = Connection {
             readonly: config.readonly,
+            id: ID_COUNTER.fetch_add(1, Ordering::Relaxed),
             stream: Arc::new(tokio::sync::Mutex::new(ConnectionStream(connection).boxed())),
             release: Arc::new(Notify::new()),
         };
@@ -252,7 +257,10 @@ impl Pool {
 
     async fn recycle(&self, client: &Client) -> Result<(), Error> {
         if client.client.is_closed() {
-            log::info!("Connection could not be recycled because it was closed");
+            log::info!(
+                "Connection {} could not be recycled because it was closed",
+                client.conn.id
+            );
             return Err(Error::RecyclingError);
         }
 
@@ -489,6 +497,7 @@ pub struct Client {
 
 pub struct Transaction<'a> {
     t: PgTransaction<'a>,
+    id: u64,
     stmt_cache: Arc<StatementCache>,
     readonly: bool,
 }
@@ -507,6 +516,7 @@ impl Client {
     pub async fn transaction<'a>(&'a mut self) -> Result<Transaction<'a>, Error> {
         Ok(Transaction {
             readonly: self.readonly,
+            id: self.conn.id,
             stmt_cache: self.stmt_cache.clone(),
             t: self.client.transaction().await?,
         })
@@ -702,7 +712,7 @@ impl Client {
         let (query, collector) = query().to_string();
         let types = collector.types();
 
-        log::debug!("Preparing query: \"{}\"", query);
+        log::debug!("Preparing {} query: \"{}\"", self.conn.id, query);
 
         let stmt = self
             .client
@@ -791,6 +801,7 @@ impl Transaction<'_> {
     pub async fn transaction<'a>(&'a mut self) -> Result<Transaction<'a>, Error> {
         Ok(Transaction {
             readonly: self.readonly,
+            id: self.id,
             stmt_cache: self.stmt_cache.clone(),
             t: self.t.transaction().await?,
         })
@@ -802,6 +813,7 @@ impl Transaction<'_> {
     {
         Ok(Transaction {
             readonly: self.readonly,
+            id: self.id,
             stmt_cache: self.stmt_cache.clone(),
             t: self.t.savepoint(name).await?,
         })

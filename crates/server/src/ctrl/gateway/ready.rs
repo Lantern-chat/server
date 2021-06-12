@@ -21,7 +21,7 @@ pub async fn ready(
 ) -> Result<models::ReadyEvent, Error> {
     use models::*;
 
-    let db = state.read_db().await;
+    let db = state.db.read.get().await?;
 
     let perms_future = async {
         if state.perm_cache.add_reference(auth.user_id).await {
