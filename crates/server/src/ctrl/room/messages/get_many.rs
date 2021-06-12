@@ -205,12 +205,16 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
                 .bit_and(Literal::Int2(MessageFlags::DELETED.bits()))
                 .equals(Literal::Int2(0)),
         )
-        .order_by(AggMessages::MsgId.descending())
         .limit(limit_var);
 
     query = match mode {
-        MessageSearch::After(_) => query.and_where(AggMessages::MsgId.greater_than(msg_id_var)),
-        MessageSearch::Before(_) => query.and_where(AggMessages::MsgId.less_than(msg_id_var)),
+        MessageSearch::After(_) => query
+            .and_where(AggMessages::MsgId.greater_than(msg_id_var))
+            .order_by(AggMessages::MsgId.ascending()),
+        MessageSearch::Before(_) => query
+            .and_where(AggMessages::MsgId.less_than(msg_id_var))
+            .order_by(AggMessages::MsgId.descending()),
+
         MessageSearch::Around(_) => unimplemented!(),
     };
 
