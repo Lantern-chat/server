@@ -15,7 +15,7 @@ pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
 
     match route.method_segment() {
         // ANY /api
-        (_, Exact("api")) => api::api(route).await,
+        (_, Exact("api")) => compression::wrap_route(true, route, api::api).await,
 
         (_, Exact("robots.txt")) => include_str!("robots.txt")
             .with_header(ContentType::text())

@@ -3,7 +3,10 @@ use std::error::Error as StdError;
 use bytes::Bytes;
 use futures::{Future, Stream};
 
-use async_compression::tokio::bufread::{BrotliEncoder, DeflateEncoder, GzipEncoder};
+use async_compression::{
+    tokio::bufread::{BrotliEncoder, DeflateEncoder, GzipEncoder},
+    Level,
+};
 use http::header::HeaderValue;
 use hyper::{
     header::{CONTENT_ENCODING, CONTENT_LENGTH},
@@ -68,10 +71,6 @@ where
     R: FnOnce(Route<S>) -> F,
     F: Future<Output = Response>,
 {
-    if !enable {
-        return r(route).await;
-    }
-
     use headers::{ContentCoding, ContentLength, HeaderMapExt};
 
     let encoding = route
@@ -81,8 +80,12 @@ where
     let resp = r(route).await;
 
     match encoding {
+        // skip compressing error responses, don't waste time on these
+        _ if !enable || !resp.status().is_success() => resp,
+
         // COMPRESS method is unsupported (and never used in practice anyway)
         None | Some(ContentCoding::IDENTITY) | Some(ContentCoding::COMPRESS) => resp,
+
         Some(encoding) => {
             let mut props = CompressionProps::from(resp);
 
@@ -98,18 +101,27 @@ where
 
             let reader = StreamReader::new(props.body);
 
+            const LEVEL: Level = if cfg!(debug_assertions) {
+                Level::Fastest
+            } else {
+                Level::Default
+            };
+
             match encoding {
                 ContentCoding::BROTLI => Response::from_parts(
                     props.head,
-                    Body::wrap_stream(ReaderStream::new(BrotliEncoder::new(reader))),
+                    Body::wrap_stream(ReaderStream::new(BrotliEncoder::with_quality(
+                        reader,
+                        Level::Fastest,
+                    ))),
                 ),
                 ContentCoding::GZIP => Response::from_parts(
                     props.head,
-                    Body::wrap_stream(ReaderStream::new(GzipEncoder::new(reader))),
+                    Body::wrap_stream(ReaderStream::new(GzipEncoder::with_quality(reader, LEVEL))),
                 ),
                 ContentCoding::DEFLATE => Response::from_parts(
                     props.head,
-                    Body::wrap_stream(ReaderStream::new(DeflateEncoder::new(reader))),
+                    Body::wrap_stream(ReaderStream::new(DeflateEncoder::with_quality(reader, LEVEL))),
                 ),
                 _ => unreachable!(),
             }
