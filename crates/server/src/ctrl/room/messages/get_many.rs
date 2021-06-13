@@ -237,6 +237,7 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
                 }
             }
 
+            // generate a sequence of message ids with their row number
             let numbered = NumberedMsgs::as_query(
                 Query::select()
                     .from_table::<AggMessages>()
@@ -248,6 +249,7 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
                     ),
             );
 
+            // generate a set of offsets around 0
             let offsets = Offsets::as_query(
                 Query::select()
                     .expr(
@@ -270,6 +272,7 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
                         .on(AggMessages::MsgId.equals(NumberedMsgs::MsgId)),
                 )
                 .and_where(
+                    // select only messages in the offset range
                     NumberedMsgs::RowNumber.in_query(
                         Query::select()
                             .expr(NumberedMsgs::RowNumber.add(Offsets::Offset))
