@@ -12,7 +12,7 @@ use tokio::io::AsyncSeek;
 use tokio::io::{AsyncRead, ReadBuf};
 use util::cmap::CHashMap;
 
-use ftl::fs::{FileCache, FileMetadata, GenericFile};
+use ftl::fs::{EncodedFile, FileCache, FileMetadata, GenericFile};
 use ftl::*;
 
 use headers::ContentCoding;
@@ -46,8 +46,14 @@ impl FileMetadata for Metadata {
 pub struct CachedFile {
     buf: Arc<[u8]>,
     pos: u64,
-    //encoding: ContentCoding,
+    encoding: ContentCoding,
     last_modified: SystemTime,
+}
+
+impl EncodedFile for CachedFile {
+    fn encoding(&self) -> ContentCoding {
+        self.encoding
+    }
 }
 
 impl AsyncRead for CachedFile {
@@ -111,12 +117,13 @@ pub struct MainFileCache {
 impl MainFileCache {
     pub async fn cleanup(&self) {
         let now = SystemTime::now();
+
         self.map
             .retain(|_, file| match now.duration_since(file.last_checked) {
                 // retain if duration since last checked is less than 1 hour (debug) or 24 hours (release)
                 Ok(dur) => dur < Duration::from_secs(60 * 60 * if cfg!(debug_assertions) { 1 } else { 24 }),
-                // if checked since `now`, then retain (or time travel, but whatever)
-                Err(_) => true,
+                // if checked since `now`, then don't retain (or time travel, but whatever)
+                Err(_) => false,
             })
             .await
     }
@@ -130,11 +137,7 @@ impl FileCache for MainFileCache {
     type File = CachedFile;
     type Meta = Metadata;
 
-    async fn open(
-        &self,
-        path: &Path,
-        accepts: Option<AcceptEncoding>,
-    ) -> io::Result<(Self::File, ContentCoding)> {
+    async fn open(&self, path: &Path, accepts: Option<AcceptEncoding>) -> io::Result<Self::File> {
         let mut last_modified = None;
 
         match self.map.get_cloned(path).await {
@@ -150,7 +153,7 @@ impl FileCache for MainFileCache {
                         last_modified = Some(file.last_modified);
                     }
                     Ok(_) => {
-                        let coding = match accepts.and_then(|a| {
+                        let encoding = match accepts.and_then(|a| {
                             // prefer best
                             let mut encodings = a.sorted_encodings();
                             let preferred = encodings.next();
@@ -159,13 +162,14 @@ impl FileCache for MainFileCache {
                             None | Some(ContentCoding::COMPRESS) | Some(ContentCoding::IDENTITY) => {
                                 ContentCoding::IDENTITY
                             }
-                            Some(coding) => coding,
+                            Some(encoding) => encoding,
                         };
 
                         let file = CachedFile {
                             pos: 0,
                             last_modified: file.last_modified,
-                            buf: match coding {
+                            encoding,
+                            buf: match encoding {
                                 ContentCoding::BROTLI => file.brotli.clone(),
                                 ContentCoding::DEFLATE => file.deflate.clone(),
                                 ContentCoding::GZIP => file.gzip.clone(),
@@ -176,12 +180,12 @@ impl FileCache for MainFileCache {
 
                         log::trace!(
                             "Serving cached {:?} ({}) encoded file: {}",
-                            coding,
+                            encoding,
                             file.buf.len(),
                             path.display()
                         );
 
-                        return Ok((file, coding));
+                        return Ok(file);
                     }
                 }
             }
@@ -195,6 +199,9 @@ impl FileCache for MainFileCache {
         let EntryValue { lock, mut entry } = self.map.entry(path).await;
 
         let mut file = tokio::fs::File::open(path).await?;
+
+        // get `now` time after opening as we last checked since opening it
+        let now = SystemTime::now();
 
         let meta = file.metadata().await?;
 
@@ -297,7 +304,7 @@ impl FileCache for MainFileCache {
                     deflate: Arc::from(deflate),
                     gzip: Arc::from(gzip),
                     last_modified: meta.modified()?,
-                    last_checked: SystemTime::now(),
+                    last_checked: now,
                 },
             );
         }

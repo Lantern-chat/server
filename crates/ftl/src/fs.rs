@@ -22,6 +22,17 @@ use async_trait::async_trait;
 pub trait GenericFile: Unpin + AsyncRead + AsyncSeek + Send + 'static {}
 impl<T> GenericFile for T where T: Unpin + AsyncRead + AsyncSeek + Send + 'static {}
 
+pub trait EncodedFile {
+    fn encoding(&self) -> ContentCoding;
+}
+
+impl EncodedFile for TkFile {
+    #[inline]
+    fn encoding(&self) -> ContentCoding {
+        ContentCoding::IDENTITY
+    }
+}
+
 pub trait FileMetadata {
     fn is_dir(&self) -> bool;
     fn len(&self) -> u64;
@@ -62,14 +73,10 @@ impl FileMetadata for Metadata {
 
 #[async_trait]
 pub trait FileCache {
-    type File: GenericFile;
+    type File: GenericFile + EncodedFile;
     type Meta: FileMetadata;
 
-    async fn open(
-        &self,
-        path: &Path,
-        accepts: Option<AcceptEncoding>,
-    ) -> io::Result<(Self::File, ContentCoding)>;
+    async fn open(&self, path: &Path, accepts: Option<AcceptEncoding>) -> io::Result<Self::File>;
     async fn metadata(&self, path: &Path) -> io::Result<Self::Meta>;
     async fn file_metadata(&self, file: &Self::File) -> io::Result<Self::Meta>;
 }
@@ -83,14 +90,8 @@ impl FileCache for NoCache {
     type Meta = Metadata;
 
     #[inline]
-    async fn open(
-        &self,
-        path: &Path,
-        _accepts: Option<AcceptEncoding>,
-    ) -> io::Result<(Self::File, ContentCoding)> {
-        let file = TkFile::open(path).await?;
-
-        Ok((file, ContentCoding::IDENTITY))
+    async fn open(&self, path: &Path, _accepts: Option<AcceptEncoding>) -> io::Result<Self::File> {
+        TkFile::open(path).await
     }
 
     #[inline]
@@ -235,7 +236,7 @@ async fn file_reply<S>(route: &Route<S>, path: impl AsRef<Path>, cache: &impl Fi
         Some(_) => None,
     };
 
-    let (file, coding) = match cache.open(path, accepts).await {
+    let file = match cache.open(path, accepts).await {
         Ok(f) => f,
         Err(e) => {
             return match e.kind() {
@@ -279,8 +280,8 @@ async fn file_reply<S>(route: &Route<S>, path: impl AsRef<Path>, cache: &impl Fi
 
             Ok((start, end)) => {
                 let sub_len = end - start;
-
                 let buf_size = metadata.blksize().max(DEFAULT_READ_BUF_SIZE).min(len) as usize;
+                let encoding = file.encoding();
 
                 let mut resp = if route.method() == &Method::GET {
                     Response::new(file_body(route.start, file, buf_size, (start, end)))
@@ -289,7 +290,7 @@ async fn file_reply<S>(route: &Route<S>, path: impl AsRef<Path>, cache: &impl Fi
                 };
 
                 if sub_len != len {
-                    assert_eq!(coding, ContentCoding::IDENTITY);
+                    assert_eq!(encoding, ContentCoding::IDENTITY);
 
                     *resp.status_mut() = StatusCode::PARTIAL_CONTENT;
                     resp.headers_mut()
@@ -306,10 +307,10 @@ async fn file_reply<S>(route: &Route<S>, path: impl AsRef<Path>, cache: &impl Fi
                     headers.typed_insert(last_modified);
                 }
 
-                if coding != ContentCoding::IDENTITY {
+                if encoding != ContentCoding::IDENTITY {
                     headers.append(
                         http::header::CONTENT_ENCODING,
-                        HeaderValue::from_static(coding.to_static()),
+                        HeaderValue::from_static(encoding.to_static()),
                     );
                 }
 
