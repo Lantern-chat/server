@@ -14,11 +14,13 @@ pub mod processors {
     use crate::{ctrl::Error, ServerState};
 
     pub mod message_create;
+    pub mod typing_start;
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct RawEventCode {
     pub id: Snowflake,
+    pub room_id: Option<Snowflake>,
     pub code: i16,
 }
 
@@ -43,7 +45,14 @@ pub async fn process(
 
     match code {
         EventCode::MessageCreate => {
-            processors::message_create::message_create(state, event.id, party_id).await?
+            processors::message_create::message_create(state, event.id, party_id).await?;
+        }
+        EventCode::TypingStarted => {
+            if let Some(room_id) = event.room_id {
+                processors::typing_start::trigger_typing(state, event.id, party_id, room_id).await?;
+            } else {
+                log::warn!("Typing started outside of room!");
+            }
         }
         _ => unimplemented!(),
     }

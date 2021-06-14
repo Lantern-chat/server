@@ -15,6 +15,8 @@ thorn::tables! {
         Id: SNOWFLAKE,
         /// If the event is for a party, have this to sort with
         PartyId: SNOWFLAKE,
+        /// Rarely, only the room_id will be given
+        RoomId: SNOWFLAKE,
     }
 
     pub struct EventLogLastNotification in Lantern {

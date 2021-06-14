@@ -21,3 +21,15 @@ pub struct ReadyEvent {
     pub parties: Vec<Party>,
     pub session: Snowflake,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TypingStartEvent {
+    pub room: Snowflake,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub party: Option<Snowflake>,
+    pub user: Snowflake,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub member: Option<PartyMember>,
+    // maybe timestamp?
+    //ts: u32,
+}

@@ -6,6 +6,7 @@ macro_rules! cols {
 }
 
 pub mod codes;
+pub use codes::*;
 
 pub mod tables;
 pub use tables::*;

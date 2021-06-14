@@ -181,7 +181,13 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
 
                         Query::select()
                             .from_table::<EventLog>()
-                            .cols(&[EventLog::Counter, EventLog::Code, EventLog::Id, EventLog::PartyId])
+                            .cols(&[
+                                EventLog::Counter,
+                                EventLog::Code,
+                                EventLog::Id,
+                                EventLog::PartyId,
+                                EventLog::RoomId,
+                            ])
                             .order_by(EventLog::Counter.ascending())
                             .and_where(EventLog::Counter.greater_than(Var::of(EventLog::Counter)))
                     },
@@ -202,6 +208,7 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
                     let event = RawEventCode {
                         code: row.try_get(1)?,
                         id: row.try_get(2)?,
+                        room_id: row.try_get(4)?,
                     };
 
                     match row.try_get(3)? {
@@ -228,10 +235,10 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
 
             // process events from each party in parallel,
             // but within each party process them sequentially
-            futures::stream::iter(party_events.iter())
+            futures::stream::iter(party_events.drain())
                 .for_each_concurrent(state.config.num_parallel_tasks, |(party_id, events)| async move {
                     for event in events {
-                        if let Err(e) = super::process(&state, *event, Some(*party_id)).await {
+                        if let Err(e) = super::process(&state, event, Some(party_id)).await {
                             log::error!("Error processing event: {:?} {}", event, e);
                             // TODO: Disconnect party
                         }
@@ -239,7 +246,6 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
                 })
                 .await;
 
-            party_events.clear();
             user_events.clear();
 
             *latest_event = next_latest_event;

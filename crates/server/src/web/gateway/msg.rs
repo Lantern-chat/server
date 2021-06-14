@@ -3,6 +3,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde::de::{self, Deserialize, Deserializer, MapAccess, Visitor};
 
 // Utility function where the
+#[inline]
 fn is_default<T>(value: &T) -> bool
 where
     T: Default + Eq,
@@ -142,13 +143,7 @@ pub mod server {
             party: Snowflake,
             status: u8,
         },
-        12 => TypingStart {
-            r: Snowflake,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            party: Option<Snowflake>,
-            user: Snowflake,
-            ts: u32,
-        },
+        12 => TypingStart { #[serde(flatten)] t: Box<models::TypingStartEvent> },
     }
 }
 

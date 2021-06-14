@@ -8,6 +8,8 @@ CREATE TABLE lantern.event_log (
 
     -- If it's a party event, place the ID here for better throughput on application layer
     party_id    bigint,
+    -- May be NULL even when the event
+    room_id     bigint,
 
     code        smallint    NOT NULL
 );
@@ -17,11 +19,13 @@ ALTER TABLE lantern.event_log ADD CONSTRAINT party_fk FOREIGN KEY (party_id)
     REFERENCES lantern.party (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
+ALTER TABLE lantern.event_log ADD CONSTRAINT room_fk FOREIGN KEY (room_id)
+    REFERENCES lantern.rooms (id) MATCH FULL
+    ON DELETE CASCADE ON UPDATE CASCADE;
+
 CREATE INDEX event_log_counter_idx ON lantern.event_log USING btree(counter);
 
-CREATE INDEX event_log_party_idx ON lantern.event_log USING btree(party_id) WHERE NOT NULL;
-
-
+-- CREATE INDEX event_log_party_idx ON lantern.event_log USING btree(party_id) WHERE NOT NULL;
 
 
 
