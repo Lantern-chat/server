@@ -104,6 +104,7 @@ thorn::tables! {
         AvatarId: SNOWFLAKE,
         JoinedAt: Type::TIMESTAMP,
         Flags: Type::INT2,
+        SortOrder: Type::INT2,
         Nickname: Type::VARCHAR,
         CustomStatus: Type::VARCHAR,
     }

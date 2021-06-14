@@ -129,6 +129,7 @@ pub async fn ready(
                             /* 3*/ Party::AvatarId,
                             /* 4*/ Party::Description,
                         ])
+                        .col(PartyMember::SortOrder)
                         .from(
                             Party::left_join_table::<PartyMember>()
                                 .on(PartyMember::PartyId.equals(Party::Id)),
@@ -160,6 +161,7 @@ pub async fn ready(
                     roles: Vec::new(),
                     emotes: Vec::new(),
                     icon_id: row.try_get(3)?,
+                    sort_order: row.try_get::<_, i16>(5)? as u16,
                 },
             );
         }

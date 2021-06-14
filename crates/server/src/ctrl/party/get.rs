@@ -20,6 +20,7 @@ pub async fn get_party(state: ServerState, auth: Authorization, party_id: Snowfl
 
                 Query::select()
                     .cols(&[Party::Name, Party::OwnerId, Party::AvatarId, Party::Description])
+                    .col(PartyMember::SortOrder)
                     .and_where(Party::Id.equals(Var::of(Party::Id)))
                     .from(Party::left_join_table::<PartyMember>().on(PartyMember::PartyId.equals(Party::Id)))
                     .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
@@ -42,6 +43,7 @@ pub async fn get_party(state: ServerState, auth: Authorization, party_id: Snowfl
             roles: Vec::new(),
             emotes: Vec::new(),
             icon_id: row.try_get(2)?,
+            sort_order: row.try_get::<_, i16>(4)? as u16,
         },
     };
 

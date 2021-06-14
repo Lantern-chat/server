@@ -54,6 +54,7 @@ pub async fn create_party(
         roles: Vec::new(),
         emotes: Vec::new(),
         icon_id: None,
+        sort_order: 0,
     };
 
     let mut db = state.db.write.get().await?;

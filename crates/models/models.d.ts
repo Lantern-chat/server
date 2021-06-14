@@ -78,6 +78,7 @@ export interface Party extends PartialParty {
     roles: Role[],
     emotes?: Emote[],
     icon_id?: Snowflake,
+    sort_order: number,
 }
 
 export interface PartyMember {
