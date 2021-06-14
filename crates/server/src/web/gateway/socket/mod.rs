@@ -59,7 +59,7 @@ pub enum Item {
 }
 
 lazy_static::lazy_static! {
-    pub static ref HELLO_EVENT: Event = Event::new(ServerMsg::new_hello(45000)).unwrap();
+    pub static ref HELLO_EVENT: Event = Event::new(ServerMsg::new_hello(models::HelloEvent::default())).unwrap();
     pub static ref HEARTBEAT_ACK: Event = Event::new(ServerMsg::new_heartbeatack()).unwrap();
     pub static ref INVALID_SESSION: Event = Event::new(ServerMsg::new_invalidsession()).unwrap();
 }

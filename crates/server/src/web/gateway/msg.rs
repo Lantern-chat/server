@@ -117,16 +117,13 @@ pub type ServerMsg = server::Message;
 pub mod server {
     use super::*;
 
-    use models::{Message as RoomMessage, ReadyEvent};
+    use models::{HelloEvent, Message as RoomMessage, ReadyEvent};
 
     type Room = (); // TODO
 
     // TODO: Check that this enum doesn't grow too large, allocate large payloads like Ready
     decl_msgs! {
-        0 => Hello {
-            /// Number of milliseconds between heartbeats
-            heartbeat_interval: u32,
-        },
+        0 => Hello { #[serde(flatten)] inner: HelloEvent },
 
         2 => HeartbeatACK: Default {},
         3 => Ready { #[serde(flatten)] inner: Box<ReadyEvent> },

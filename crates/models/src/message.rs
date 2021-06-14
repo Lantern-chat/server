@@ -74,7 +74,7 @@ pub struct Message {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Reaction {
     pub emote: Emote,
-    pub users: Vec<User>,
+    pub users: Vec<Snowflake>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

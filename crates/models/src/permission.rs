@@ -102,7 +102,10 @@ pub struct Overwrite {
     ///
     /// If it doesn't exist in the role list, then it's a user, simple as that
     pub id: Snowflake,
+
+    #[serde(default, skip_serializing_if = "Permission::is_empty")]
     pub allow: Permission,
+    #[serde(default, skip_serializing_if = "Permission::is_empty")]
     pub deny: Permission,
 }
 
@@ -166,6 +169,10 @@ impl Permission {
     #[inline]
     pub fn is_admin(&self) -> bool {
         self.party.contains(PartyPermissions::ADMINISTRATOR)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.party.is_empty() && self.room.is_empty() && self.stream.is_empty()
     }
 }
 
