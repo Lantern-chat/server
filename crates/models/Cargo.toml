@@ -15,7 +15,7 @@ serde_shims = { version = "0.2", features = ["std", "mime", "bitflags"] }
 bitflags = "1.2"
 time = {version = "0.2", features = ["serde"] }
 serde_repr = "0.1"
-typescript-definitions = { git = "https://github.com/storyscript/typescript-definitions" }
+# typescript-definitions = { git = "https://github.com/storyscript/typescript-definitions" }
 
 [features]
 tokio-pg = ["postgres-types", "bytes"]
