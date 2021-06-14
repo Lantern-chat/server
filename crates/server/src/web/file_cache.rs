@@ -240,17 +240,17 @@ impl FileCache for MainFileCache {
                     Level,
                 };
 
-                let (level, brotli_level) = if cfg!(debug_assertions) {
-                    (Level::Fastest, Level::Fastest)
+                let level = if cfg!(debug_assertions) {
+                    Level::Fastest
                 } else {
-                    (Level::Best, Level::Precise(4))
+                    Level::Best
                 };
 
                 let mut brotli_buffer = Vec::new();
                 let mut deflate_buffer = Vec::new();
                 let mut gzip_buffer = Vec::new();
 
-                let mut brotli = BrotliEncoder::with_quality(&content[..], brotli_level);
+                let mut brotli = BrotliEncoder::with_quality(&content[..], level);
                 let mut deflate = DeflateEncoder::with_quality(&content[..], level);
                 let mut gzip = GzipEncoder::with_quality(&content[..], level);
 
