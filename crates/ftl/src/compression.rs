@@ -7,7 +7,7 @@ use async_compression::{
     tokio::bufread::{BrotliEncoder, DeflateEncoder, GzipEncoder},
     Level,
 };
-use http::header::HeaderValue;
+use http::{header::HeaderValue, StatusCode};
 use hyper::{
     header::{CONTENT_ENCODING, CONTENT_LENGTH},
     Body,
@@ -81,7 +81,7 @@ where
 
     match encoding {
         // skip compressing error responses, don't waste time on these
-        _ if !enable || !resp.status().is_success() => resp,
+        _ if !enable || !resp.status().is_success() || resp.status() == StatusCode::NO_CONTENT => resp,
 
         // COMPRESS method is unsupported (and never used in practice anyway)
         None | Some(ContentCoding::IDENTITY) | Some(ContentCoding::COMPRESS) => resp,
