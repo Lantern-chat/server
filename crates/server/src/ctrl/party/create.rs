@@ -60,11 +60,14 @@ pub async fn create_party(
     let mut db = state.db.write.get().await?;
     let t = db.transaction().await?;
 
-    futures::future::try_join4(
-        t.execute_cached_typed(
-            || insert_party(),
-            &[&party.id, &party.name, &party.description, &party.owner],
-        ),
+    // insert party first to avoid foreign key issues
+    t.execute_cached_typed(
+        || insert_party(),
+        &[&party.id, &party.name, &party.description, &party.owner],
+    )
+    .await?;
+
+    futures::future::try_join3(
         t.execute_cached_typed(|| insert_member(), &[&party.id, &auth.user_id]),
         t.execute_cached_typed(
             || insert_role(),
@@ -74,7 +77,10 @@ pub async fn create_party(
                 &(default_role.permissions.pack() as i64),
             ],
         ),
-        t.execute_cached_typed(|| insert_room(), &[&room_id, &party.id, &"general", &0i16]),
+        t.execute_cached_typed(
+            || insert_room(),
+            &[&room_id, &party.id, &"general", &0i16, &RoomFlags::DEFAULT.bits()],
+        ),
     )
     .await?;
 
@@ -128,11 +134,18 @@ fn insert_room() -> impl AnyQuery {
 
     Query::insert()
         .into::<Rooms>()
-        .cols(&[Rooms::Id, Rooms::PartyId, Rooms::Name, Rooms::SortOrder])
+        .cols(&[
+            Rooms::Id,
+            Rooms::PartyId,
+            Rooms::Name,
+            Rooms::SortOrder,
+            Rooms::Flags,
+        ])
         .values(vec![
             Var::of(Rooms::Id),
             Var::of(Party::Id),
             Var::of(Rooms::Name),
             Var::of(Rooms::SortOrder),
+            Var::of(Rooms::Flags),
         ])
 }

@@ -9,6 +9,7 @@ bitflags::bitflags! {
         const VOICE   = 1 << 2;
         const GROUP   = 1 << 3;
         const NSFW    = 1 << 4;
+        const DEFAULT = 1 << 5;
     }
 }
 
