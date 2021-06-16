@@ -24,6 +24,7 @@ pub mod config;
 pub mod ctrl;
 pub mod filesystem;
 pub mod permission_cache;
+pub mod queues;
 pub mod session_cache;
 pub mod state;
 pub mod util;
