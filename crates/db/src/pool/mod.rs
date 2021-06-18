@@ -14,7 +14,7 @@ use arc_swap::{ArcSwap, ArcSwapOption};
 use hashbrown::HashMap;
 
 use tokio::sync::{
-    mpsc::{self, error::RecvError, Receiver, Sender},
+    mpsc::{self, Receiver, Sender},
     Notify, Semaphore, TryAcquireError,
 };
 
