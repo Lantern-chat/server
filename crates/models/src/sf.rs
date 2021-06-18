@@ -55,8 +55,9 @@ impl FromStr for Snowflake {
 }
 
 impl fmt::Display for Snowflake {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
+        itoa::fmt(f, self.0.get())
     }
 }
 
