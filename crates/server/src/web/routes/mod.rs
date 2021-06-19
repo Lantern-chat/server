@@ -21,7 +21,7 @@ pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
             .with_header(ContentType::text())
             .into_response(),
 
-        (&Method::GET, Exact("favicon.ico")) | (&Method::HEAD, Exact("favicon.ico")) => {
+        (&Method::GET | &Method::HEAD, Exact("favicon.ico")) => {
             fs::file(&route, "frontend/dist/favicon.ico", &route.state.file_cache)
                 .boxed()
                 .await
@@ -30,14 +30,14 @@ pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
 
         _ if BAD_PATTERNS.is_match(route.path()) => StatusCode::IM_A_TEAPOT.into_response(),
 
-        (&Method::GET, Exact("static")) | (&Method::HEAD, Exact("static")) => {
+        (&Method::GET | &Method::HEAD, Exact("static")) => {
             fs::dir(&route, "frontend/dist", &route.state.file_cache)
                 .boxed()
                 .await
                 .into_response()
         }
 
-        (&Method::GET, segment) | (&Method::HEAD, segment) => {
+        (&Method::GET | &Method::HEAD, segment) => {
             let allowed = match segment {
                 Segment::End => true,
                 Segment::Exact(part) => matches!(

@@ -159,7 +159,7 @@ impl FileCache for MainFileCache {
                             let preferred = encodings.next();
                             encodings.find(|e| *e == file.best).or(preferred)
                         }) {
-                            None | Some(ContentCoding::COMPRESS) | Some(ContentCoding::IDENTITY) => {
+                            None | Some(ContentCoding::COMPRESS | ContentCoding::IDENTITY) => {
                                 ContentCoding::IDENTITY
                             }
                             Some(encoding) => encoding,
