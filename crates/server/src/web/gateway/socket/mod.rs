@@ -22,7 +22,7 @@ use db::Snowflake;
 use ftl::ws::{Message as WsMessage, SinkError, WebSocket};
 use util::cancel::{Cancel, CancelableStream};
 
-use crate::{ctrl::auth::Authorization, permission_cache::PermMute, ServerState};
+use crate::{ctrl::auth::Authorization, permission_cache::PermMute, web::encoding::Encoding, ServerState};
 
 use super::{
     conn::GatewayConnection,
@@ -31,7 +31,7 @@ use super::{
 };
 
 pub mod params;
-pub use params::{GatewayMsgEncoding, GatewayQueryParams};
+pub use params::GatewayQueryParams;
 
 pub mod identify;
 
@@ -87,8 +87,8 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                                 let msg = decompress_if(query.compress, msg.as_bytes())?;
 
                                 Ok(match query.encoding {
-                                    GatewayMsgEncoding::Json => serde_json::from_slice(&msg)?,
-                                    GatewayMsgEncoding::MsgPack => rmp_serde::from_slice(&msg)?,
+                                    Encoding::Json => serde_json::from_slice(&msg)?,
+                                    Encoding::MsgPack => rmp_serde::from_slice(&msg)?,
                                 })
                             });
 

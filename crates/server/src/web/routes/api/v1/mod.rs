@@ -20,7 +20,7 @@ pub async fn api_v1(mut route: Route<crate::ServerState>) -> impl Reply {
         //(_, Exact("file")) => file::file(route).boxed().await.into_response(),
         (_, Exact("room")) => room::room(route).boxed().await.into_response(),
         (_, Exact("gateway")) => gateway::gateway(route).into_response(),
-        (&Method::GET, Exact("build")) => build::build().into_response(),
+        (&Method::GET, Exact("build")) => build::build(route).into_response(),
 
         _ => ApiError::not_found().into_response(),
     }

@@ -1,21 +1,4 @@
-/// Websocket message encoding
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum GatewayMsgEncoding {
-    /// Textual JSON, simple.
-    Json,
-
-    /// Binary MessagePack (smaller, slower to encode/decode in browser)
-    ///
-    /// This is recommended when you have access to natively compiled MsgPack libraries
-    MsgPack,
-}
-
-impl Default for GatewayMsgEncoding {
-    fn default() -> Self {
-        GatewayMsgEncoding::Json
-    }
-}
+use crate::web::encoding::Encoding;
 
 const fn default_compress() -> bool {
     true
@@ -25,7 +8,7 @@ const fn default_compress() -> bool {
 pub struct GatewayQueryParams {
     /// Encoding method for each individual websocket message
     #[serde(default)]
-    pub encoding: GatewayMsgEncoding,
+    pub encoding: Encoding,
 
     /// Whether to compress individual messages
     #[serde(default = "default_compress")]
@@ -35,7 +18,7 @@ pub struct GatewayQueryParams {
 impl Default for GatewayQueryParams {
     fn default() -> Self {
         GatewayQueryParams {
-            encoding: GatewayMsgEncoding::default(),
+            encoding: Encoding::default(),
             compress: default_compress(),
         }
     }

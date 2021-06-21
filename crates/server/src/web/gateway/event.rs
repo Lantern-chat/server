@@ -7,10 +7,9 @@ use db::Snowflake;
 
 use models::ReadyEvent;
 
-use super::{
-    msg::ServerMsg,
-    socket::{GatewayMsgEncoding, GatewayQueryParams},
-};
+use crate::web::encoding::Encoding;
+
+use super::{msg::ServerMsg, socket::GatewayQueryParams};
 
 #[derive(Debug)]
 pub struct CompressedEvent {
@@ -63,8 +62,8 @@ impl EncodedEvent {
 
     pub fn get(&self, params: GatewayQueryParams) -> &Vec<u8> {
         match params.encoding {
-            GatewayMsgEncoding::Json => self.json.get(params.compress),
-            GatewayMsgEncoding::MsgPack => self.msgpack.get(params.compress),
+            Encoding::Json => self.json.get(params.compress),
+            Encoding::MsgPack => self.msgpack.get(params.compress),
         }
     }
 }
