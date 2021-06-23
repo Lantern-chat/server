@@ -20,6 +20,8 @@ use super::{Reply, Route};
 use async_trait::async_trait;
 
 // TODO: https://github.com/magiclen/entity-tag/blob/master/src/lib.rs
+// https://github.com/pillarjs/send/blob/master/index.js
+// https://github.com/jshttp/etag/blob/master/index.js
 
 pub trait GenericFile: Unpin + AsyncRead + AsyncSeek + Send + 'static {}
 impl<T> GenericFile for T where T: Unpin + AsyncRead + AsyncSeek + Send + 'static {}
