@@ -7,11 +7,13 @@ CREATE TABLE lantern.messages (
     updated_at  timestamp               DEFAULT now(),
     edited_at   timestamp,
     flags       smallint    NOT NULL    DEFAULT 0,
-    content     text,
+    content     text, -- NOTE: THIS MUST BE THE ONLY VARIABLE FIELD IN TABLE, due to TOAST stuff
 
     CONSTRAINT messages_pk PRIMARY KEY (id)
 );
 ALTER TABLE lantern.messages OWNER TO postgres;
+
+ALTER TABLE lantern.messages SET (toast_tuple_target = 128);
 
 -- Since id is a snowflake, it's always sorted by time
 -- so index with btree for the times when we need to fetch by timestamps
