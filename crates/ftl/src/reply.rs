@@ -100,18 +100,12 @@ pub fn try_msgpack<T: serde::Serialize>(value: &T, named: bool) -> Result<MsgPac
 }
 
 pub fn msgpack<T: serde::Serialize>(value: &T, named: bool) -> MsgPack {
-    let res = match named {
-        true => rmp_serde::to_vec_named(value),
-        false => rmp_serde::to_vec(value),
-    };
-
-    MsgPack {
-        inner: match res {
-            Ok(v) => Ok(Bytes::from(v)),
-            Err(e) => Err({
-                log::error!("MsgPack Reply error: {}", e);
-            }),
-        },
+    match try_msgpack(value, named) {
+        Ok(resp) => resp,
+        Err(e) => {
+            log::error!("MsgPack Reply error: {}", e);
+            MsgPack { inner: Err(()) }
+        }
     }
 }
 
@@ -141,14 +135,12 @@ pub fn try_json<T: serde::Serialize>(value: &T) -> Result<Json, serde_json::Erro
 }
 
 pub fn json<T: serde::Serialize>(value: &T) -> Json {
-    Json {
-        inner: match serde_json::to_vec(value) {
-            Ok(v) => Ok(v.into()),
-            Err(err) => {
-                log::error!("JSON Reply error: {}", err);
-                Err(())
-            }
-        },
+    match try_json(value) {
+        Ok(resp) => resp,
+        Err(e) => {
+            log::error!("JSON Reply error: {}", e);
+            Json { inner: Err(()) }
+        }
     }
 }
 
