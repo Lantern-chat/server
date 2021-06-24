@@ -8,5 +8,5 @@ pub async fn logout(route: Route<ServerState>, auth: auth::Authorization) -> imp
         log::error!("Logout error: {}", e);
     }
 
-    StatusCode::OK.into_response()
+    StatusCode::NO_CONTENT.into_response()
 }

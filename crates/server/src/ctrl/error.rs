@@ -124,13 +124,49 @@ impl Error {
             Error::NoSession => StatusCode::UNAUTHORIZED,
             Error::NotFound => StatusCode::NOT_FOUND,
             Error::AlreadyExists => StatusCode::CONFLICT,
+            Error::InvalidCredentials => StatusCode::UNAUTHORIZED,
+            Error::NotFound => StatusCode::NOT_FOUND,
+            Error::BadRequest => StatusCode::BAD_REQUEST,
             _ => StatusCode::BAD_REQUEST,
         }
     }
 
+    #[rustfmt::skip]
     pub fn code(&self) -> u16 {
-        // TODO: Decide on actual error codes
-        self.http_status().as_u16()
+        match *self {
+            Error::DbError(_)               => 50001,
+            Error::JoinError(_)             => 50002,
+            Error::SemaphoreError(_)        => 50003,
+            Error::HashError(_)             => 50004,
+            Error::JsonError(_)             => 50005,
+            Error::EncodingError(_)         => 50006,
+            Error::InternalError(_)         => 50007,
+            Error::InternalErrorStatic(_)   => 50008,
+
+            Error::AlreadyExists            => 40001,
+            Error::UsernameUnavailable      => 40002,
+            Error::InvalidEmail             => 40003,
+            Error::InvalidUsername          => 40004,
+            Error::InvalidPassword          => 40005,
+            Error::InvalidCredentials       => 40006,
+            Error::InsufficientAge          => 40007,
+            Error::InvalidDate(_)           => 40008,
+            Error::InvalidContent           => 40009,
+            Error::InvalidName              => 40010,
+            Error::InvalidTopic             => 40011,
+            Error::MissingUploadMetadataHeader  => 40012,
+            Error::MissingAuthorizationHeader   => 40013,
+            Error::NoSession                => 40014,
+            Error::InvalidAuthFormat        => 40015,
+            Error::HeaderParseError         => 40016,
+            Error::MissingFilename          => 40017,
+            Error::MissingFiletype          => 40018,
+            Error::AuthTokenParseError(_)   => 40019,
+            Error::DecodeError(_)           => 40020,
+
+            // TODO: Decide on actual error codes
+            _ => self.http_status().as_u16(),
+        }
     }
 
     pub fn format(&self) -> Cow<'static, str> {

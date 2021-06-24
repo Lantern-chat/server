@@ -1,5 +1,7 @@
 export type Snowflake = string;
 
+export { ErrorCode } from "./codes";
+
 export interface User {
     id: Snowflake,
     username: string,
@@ -11,7 +13,6 @@ export interface User {
     email?: string,
     preferences?: UserPreferences
 }
-
 
 export interface AnonymousSession {
     expires: string,
