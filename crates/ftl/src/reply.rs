@@ -82,7 +82,21 @@ impl Reply for () {
 }
 
 pub struct MsgPack {
-    inner: Result<Vec<u8>, ()>,
+    inner: Result<Bytes, ()>,
+}
+
+pub fn try_msgpack<T: serde::Serialize>(value: &T, named: bool) -> Result<MsgPack, rmp_serde::encode::Error> {
+    let res = match named {
+        true => rmp_serde::to_vec_named(value),
+        false => rmp_serde::to_vec(value),
+    };
+
+    Ok(MsgPack {
+        inner: match res {
+            Ok(v) => Ok(Bytes::from(v)),
+            Err(e) => return Err(e),
+        },
+    })
 }
 
 pub fn msgpack<T: serde::Serialize>(value: &T, named: bool) -> MsgPack {
@@ -92,9 +106,12 @@ pub fn msgpack<T: serde::Serialize>(value: &T, named: bool) -> MsgPack {
     };
 
     MsgPack {
-        inner: res.map_err(|err| {
-            log::error!("MsgPack Reply error: {}", err);
-        }),
+        inner: match res {
+            Ok(v) => Ok(Bytes::from(v)),
+            Err(e) => Err({
+                log::error!("MsgPack Reply error: {}", e);
+            }),
+        },
     }
 }
 
@@ -112,6 +129,15 @@ impl Reply for MsgPack {
 #[derive(Clone)]
 pub struct Json {
     inner: Result<Bytes, ()>,
+}
+
+pub fn try_json<T: serde::Serialize>(value: &T) -> Result<Json, serde_json::Error> {
+    Ok(Json {
+        inner: match serde_json::to_vec(value) {
+            Ok(v) => Ok(Bytes::from(v)),
+            Err(e) => return Err(e),
+        },
+    })
 }
 
 pub fn json<T: serde::Serialize>(value: &T) -> Json {
