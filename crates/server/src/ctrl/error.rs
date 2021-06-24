@@ -121,12 +121,15 @@ impl Error {
         }
 
         match self {
-            Error::NoSession => StatusCode::UNAUTHORIZED,
-            Error::NotFound => StatusCode::NOT_FOUND,
-            Error::AlreadyExists => StatusCode::CONFLICT,
-            Error::InvalidCredentials => StatusCode::UNAUTHORIZED,
+            Error::NoSession | Error::InvalidCredentials => StatusCode::UNAUTHORIZED,
             Error::NotFound => StatusCode::NOT_FOUND,
             Error::BadRequest => StatusCode::BAD_REQUEST,
+            Error::AlreadyExists => StatusCode::CONFLICT,
+            Error::MissingAuthorizationHeader
+            | Error::MissingUploadMetadataHeader
+            | Error::HeaderParseError
+            | Error::AuthTokenParseError(_)
+            | Error::DecodeError(_) => StatusCode::UNPROCESSABLE_ENTITY,
             _ => StatusCode::BAD_REQUEST,
         }
     }
