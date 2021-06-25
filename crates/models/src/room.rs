@@ -25,15 +25,13 @@ pub struct Room {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon_id: Option<Snowflake>,
 
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
+    pub name: String,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub topic: Option<String>,
 
     /// Sort order
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sort_order: Option<i16>,
+    pub sort_order: i16,
 
     pub flags: RoomFlags,
 
