@@ -124,9 +124,7 @@ pub async fn create_message(
             preferences: None,
         },
         thread_id: None,
-        created_at: time::PrimitiveDateTime::from(msg_id.timestamp())
-            .assume_utc()
-            .format(time::Format::Rfc3339),
+        created_at: msg_id.format_timestamp(),
         edited_at: None,
         flags: MessageFlags::empty(),
         content: form.content,

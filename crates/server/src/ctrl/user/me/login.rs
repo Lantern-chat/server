@@ -108,6 +108,7 @@ pub async fn do_login(
 
     Ok(Session {
         auth: token.encode(),
-        expires: time::OffsetDateTime::from(expires).format(time::Format::Rfc3339),
+        expires: chrono::DateTime::<chrono::Utc>::from(expires)
+            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
     })
 }

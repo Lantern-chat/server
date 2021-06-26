@@ -99,7 +99,7 @@ pub struct Embed {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub ts: Option<time::PrimitiveDateTime>,
+    pub ts: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<u32>,
 }

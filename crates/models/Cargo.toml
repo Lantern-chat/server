@@ -9,11 +9,10 @@ edition = "2018"
 [dependencies]
 postgres-types = { version = "0.2.1", optional = true }
 bytes = { version = "1", optional = true }
-
+chrono = "0.4.19"
 serde = { version = "1", features = ["derive"] }
 serde_shims = { version = "0.2", features = ["std", "mime", "bitflags"] }
 bitflags = "1.2"
-time = {version = "0.2", features = ["serde"] }
 serde_repr = "0.1"
 itoa = "0.4.7"
 # typescript-definitions = { git = "https://github.com/storyscript/typescript-definitions" }

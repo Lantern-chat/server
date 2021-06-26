@@ -40,14 +40,12 @@ pub async fn get_one(
     let mut msg = Message {
         id: msg_id,
         party_id,
-        created_at: time::PrimitiveDateTime::from(msg_id.timestamp())
-            .assume_utc()
-            .format(time::Format::Rfc3339),
+        created_at: msg_id.format_timestamp(),
         room_id,
         flags: MessageFlags::from_bits_truncate(row.try_get(9)?),
         edited_at: row
-            .try_get::<_, Option<time::PrimitiveDateTime>>(8)?
-            .map(|t| t.assume_utc().format(time::Format::Rfc3339)),
+            .try_get::<_, Option<chrono::NaiveDateTime>>(8)?
+            .map(crate::util::time::format_naivedatetime),
         content: row.try_get(10)?,
         author: User {
             id: row.try_get(0)?,

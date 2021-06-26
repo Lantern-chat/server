@@ -31,10 +31,7 @@ pub async fn list_sessions(
 
     Ok(sessions.map(|row| {
         Ok(AnonymousSession {
-            expires: row?
-                .try_get::<_, time::PrimitiveDateTime>(0)?
-                .assume_utc()
-                .format(time::Format::Rfc3339),
+            expires: crate::util::time::format_naivedatetime(row?.try_get::<_, chrono::NaiveDateTime>(0)?),
         })
     }))
 }

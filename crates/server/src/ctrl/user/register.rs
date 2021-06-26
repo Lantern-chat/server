@@ -44,7 +44,11 @@ pub async fn register_user(
         return Err(Error::InvalidEmail);
     }
 
-    let dob = time::Date::try_from_ymd(form.year, form.month + 1, form.day + 1)?;
+    let dob = match chrono::NaiveDate::from_ymd_opt(form.year, form.month as u32 + 1, form.day as u32 + 1) {
+        Some(dob) => dob,
+        None => return Err(Error::InvalidDate),
+    };
+
     let now = SystemTime::now();
 
     if !crate::util::time::is_of_age(state.config.min_user_age_in_years as i64, now, dob) {

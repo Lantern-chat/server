@@ -49,7 +49,7 @@ pub enum Error {
     InsufficientAge,
 
     #[error("Invalid Date")]
-    InvalidDate(#[from] time::error::ComponentRange),
+    InvalidDate,
 
     #[error("Invalid Message Content")]
     InvalidContent,
@@ -159,7 +159,7 @@ impl Error {
             Error::InvalidPassword          => 40005,
             Error::InvalidCredentials       => 40006,
             Error::InsufficientAge          => 40007,
-            Error::InvalidDate(_)           => 40008,
+            Error::InvalidDate              => 40008,
             Error::InvalidContent           => 40009,
             Error::InvalidName              => 40010,
             Error::InvalidTopic             => 40011,
