@@ -19,6 +19,8 @@ impl ApiError {
     fn real_err(kind: Error) -> WithStatus<Json> {
         if kind.is_fatal() {
             log::error!("Error {}", kind);
+        } else if cfg!(debug_assertions) {
+            log::warn!("Non-fatal error: {}", kind);
         }
 
         reply::json(&ApiError {

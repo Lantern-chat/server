@@ -30,6 +30,8 @@ export enum ErrorCode {
     MissingFiletype = 40018,
     AuthTokenParseError = 40019,
     Base64DecodeError = 40020,
+    BodyDeserializationError = 40021,
+    QueryParseError = 40022,
 }
 
 export function errorKind(err: ApiError): ErrorKind {

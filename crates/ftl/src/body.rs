@@ -44,13 +44,13 @@ pub enum BodyDeserializeError {
     #[error("{0}")]
     BodyError(#[from] BodyError),
 
-    #[error("Parse Error: {0}")]
+    #[error("JSON Parse Error: {0}")]
     Json(#[from] serde_json::Error),
 
-    #[error("Parse Error: {0}")]
+    #[error("Form Parse Error: {0}")]
     Form(#[from] serde_urlencoded::de::Error),
 
-    #[error("Parse Error: {0}")]
+    #[error("MsgPack Parse Error: {0}")]
     MsgPack(#[from] rmp_serde::decode::Error),
 
     #[error("Content Type Error")]

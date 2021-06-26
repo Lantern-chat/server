@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use db::pool::Error as DbError;
-use ftl::StatusCode;
+use ftl::{body::BodyDeserializeError, StatusCode};
 
 use crate::web::gateway::event::EncodingError;
 
@@ -92,6 +92,12 @@ pub enum Error {
 
     #[error("Decode Error: {0}")]
     DecodeError(#[from] base64::DecodeError),
+
+    #[error("Body Deserialization Error: {0}")]
+    BodyDeserializeError(#[from] BodyDeserializeError),
+
+    #[error("Query Parse Error: {0}")]
+    QueryParseError(#[from] serde_urlencoded::de::Error),
 }
 
 impl From<db::pg::Error> for Error {
@@ -166,6 +172,8 @@ impl Error {
             Error::MissingFiletype          => 40018,
             Error::AuthTokenParseError(_)   => 40019,
             Error::DecodeError(_)           => 40020,
+            Error::BodyDeserializeError(_)  => 40021,
+            Error::QueryParseError(_)       => 40022,
 
             // TODO: Decide on actual error codes
             _ => self.http_status().as_u16(),
