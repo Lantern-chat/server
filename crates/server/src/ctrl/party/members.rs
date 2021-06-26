@@ -85,7 +85,10 @@ fn parse_row(row: db::Row, existing: &mut Option<PartyMember>) -> Result<Option<
     {
         if user.id == user_id {
             if let Some(role_id) = role_id {
-                roles.push(role_id);
+                match roles {
+                    Some(ref mut roles) => roles.push(role_id),
+                    None => *roles = Some(vec![role_id]),
+                };
             }
             return Ok(None);
         }
@@ -111,7 +114,12 @@ fn parse_row(row: db::Row, existing: &mut Option<PartyMember>) -> Result<Option<
             if let Some(role_id) = role_id {
                 roles.push(role_id);
             }
-            roles
+
+            if roles.is_empty() {
+                None
+            } else {
+                Some(roles)
+            }
         },
     });
 

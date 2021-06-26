@@ -101,7 +101,7 @@ pub async fn create_message(
 
     let party_id: Option<Snowflake> = row.try_get(0)?;
     let nickname: Option<String> = row.try_get(1)?;
-    let roles: Vec<Snowflake> = row.try_get(2)?;
+    let roles = row.try_get(2)?;
 
     Ok(Message {
         id: msg_id,

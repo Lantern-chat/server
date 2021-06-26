@@ -76,7 +76,7 @@ export interface PartialParty {
 export interface Party extends PartialParty {
     owner: Snowflake,
     security: number,
-    roles: Role[],
+    roles?: Role[],
     emotes?: Emote[],
     icon_id?: Snowflake,
     sort_order: number,

@@ -57,12 +57,22 @@ pub async fn trigger_typing(
                         avatar_id: None,
                     }),
                     nick: row.try_get(0)?,
-                    roles: vec![row.try_get(4)?],
+                    roles: None,
                 };
 
-                for row in rows {
-                    member.roles.push(row.try_get(4)?);
+                let mut roles = Vec::new();
+
+                if let Some(role) = row.try_get(4)? {
+                    roles.push(role);
                 }
+
+                for row in rows {
+                    if let Some(role) = row.try_get(4)? {
+                        roles.push(role);
+                    }
+                }
+
+                member.roles = if roles.is_empty() { None } else { Some(roles) };
 
                 maybe_member = Some(member);
             } else {
