@@ -30,6 +30,15 @@ pub struct GetManyMessagesForm {
 #[rustfmt::skip]
 const fn default_limit() -> u8 { 50 }
 
+impl Default for GetManyMessagesForm {
+    fn default() -> Self {
+        GetManyMessagesForm {
+            query: None,
+            limit: default_limit(),
+        }
+    }
+}
+
 pub async fn get_many(
     state: ServerState,
     auth: Authorization,

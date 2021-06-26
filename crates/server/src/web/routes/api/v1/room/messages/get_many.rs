@@ -7,13 +7,14 @@ use crate::{ctrl::auth::Authorization, web::routes::api::ApiError};
 use crate::ctrl::room::messages::get_many::{GetManyMessagesForm, MessageSearch};
 
 pub async fn get_many(
-    mut route: Route<crate::ServerState>,
+    route: Route<crate::ServerState>,
     auth: Authorization,
     room_id: Snowflake,
 ) -> impl Reply {
-    let form = match body::any::<GetManyMessagesForm, _>(&mut route).await {
-        Ok(form) => form,
-        Err(e) => return e.into_response(),
+    let form = match route.query::<GetManyMessagesForm>() {
+        None => GetManyMessagesForm::default(),
+        Some(Ok(form)) => form,
+        Some(Err(e)) => return ApiError::err(e.into()).into_response(),
     };
 
     match crate::ctrl::room::messages::get_many::get_many(route.state, auth, room_id, form).await {
