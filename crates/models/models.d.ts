@@ -134,7 +134,7 @@ export type Emote = StandardEmote | CustomEmote;
 
 // GATEWAY
 
-export type GatewayEvent = HelloEvent | ReadyEvent;
+export type GatewayEvent = HelloEvent | ReadyEvent | TypingStartEvent;
 
 export interface HelloEvent {
     heartbeat_interval: number,
@@ -145,4 +145,11 @@ export interface ReadyEvent {
     dms: Room[],
     parties: Party[],
     session: Snowflake,
+}
+
+export interface TypingStartEvent {
+    room: Snowflake,
+    party?: Snowflake,
+    user: Snowflake,
+    member?: PartyMember,
 }
