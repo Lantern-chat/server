@@ -22,7 +22,7 @@ pub async fn post_room(
     mut route: Route<ServerState>,
     auth: Authorization,
     party_id: Snowflake,
-) -> impl Reply {
+) -> Response {
     let form = match body::any::<RoomCreateForm, _>(&mut route).await {
         Ok(form) => form,
         Err(e) => return StatusCode::BAD_REQUEST.into_response(),

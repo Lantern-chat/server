@@ -4,7 +4,7 @@ use db::{Snowflake, SnowflakeExt};
 
 use crate::ServerState;
 
-pub async fn test(route: Route<ServerState>) -> impl Reply {
+pub async fn test(route: Route<ServerState>) -> Response {
     let state = route.state;
 
     use db::schema::*;
@@ -33,4 +33,6 @@ pub async fn test(route: Route<ServerState>) -> impl Reply {
     for row in res {
         println!("{}", row.get::<_, String>(0));
     }
+
+    ().into_response()
 }

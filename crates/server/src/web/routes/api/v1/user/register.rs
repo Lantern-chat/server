@@ -6,7 +6,7 @@ use crate::{
     ServerState,
 };
 
-pub async fn register(mut route: Route<ServerState>) -> impl Reply {
+pub async fn register(mut route: Route<ServerState>) -> Response {
     let form = match body::any::<RegisterForm, _>(&mut route).await {
         Ok(form) => form,
         Err(e) => return e.into_response(),

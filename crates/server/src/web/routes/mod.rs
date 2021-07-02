@@ -7,6 +7,10 @@ use headers::ContentType;
 pub mod api;
 
 pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
+    if route.path().len() > 255 || route.raw_query().map(|q| q.len() > 255) == Some(true) {
+        return ApiError::bad_request().into_response();
+    }
+
     if let Err(_) = route.apply_method_override() {
         return StatusCode::METHOD_NOT_ALLOWED.into_response();
     }
@@ -42,7 +46,7 @@ pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
                 Segment::End => true,
                 Segment::Exact(part) => matches!(
                     part,
-                    "channels" | "login" | "register" | "invite" // | "verify" | "profile" | "reset"
+                    "channels" | "login" | "register" | "invite" | "verify" | "profile" | "reset"
                 ),
             };
 
@@ -61,6 +65,8 @@ pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
 }
 
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
+
+use crate::web::routes::api::ApiError;
 
 lazy_static::lazy_static! {
     static ref BAD_PATTERNS: AhoCorasick = AhoCorasickBuilder::new().dfa(true).build(&[

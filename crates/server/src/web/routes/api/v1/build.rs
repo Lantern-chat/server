@@ -27,7 +27,7 @@ use crate::{
     ServerState,
 };
 
-pub fn build(route: Route<ServerState>) -> impl Reply {
+pub fn build(route: Route<ServerState>) -> Response {
     lazy_static::lazy_static! {
         static ref JSON_BUILD_INFO: String = serde_json::to_string(&BUILD_INFO).unwrap();
         static ref MSGPACK_BUILD_INFO: Bytes = rmp_serde::to_vec(&BUILD_INFO).unwrap().into();

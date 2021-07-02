@@ -6,7 +6,7 @@ use ftl::*;
 
 use db::{schema::file::File, Snowflake};
 
-pub async fn patch(mut route: Route<crate::ServerState>, mut file: File) -> impl Reply {
+pub async fn patch(mut route: Route<crate::ServerState>, mut file: File) -> Response {
     match route.raw_header("Content-Type") {
         Some(ct) if ct.as_bytes() == b"application/offset+octet-stream" => {}
         _ => return StatusCode::UNSUPPORTED_MEDIA_TYPE.into_response(),
@@ -100,7 +100,7 @@ pub async fn patch(mut route: Route<crate::ServerState>, mut file: File) -> impl
     }
 
     // just copy formatting from the HEAD response
-    let mut res = super::head::head(route, file).await.into_response();
+    let mut res = super::head::head(route, file).await;
     *res.status_mut() = StatusCode::NO_CONTENT;
 
     res

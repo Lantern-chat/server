@@ -10,7 +10,7 @@ pub async fn get_room(
     route: Route<crate::ServerState>,
     auth: Authorization,
     room_id: Snowflake,
-) -> impl Reply {
+) -> Response {
     match crate::ctrl::room::get::get_room(route.state, auth, room_id).await {
         Ok(ref room) => reply::json(room).into_response(),
         Err(e) => ApiError::err(e).into_response(),

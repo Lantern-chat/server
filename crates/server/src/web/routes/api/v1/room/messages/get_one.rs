@@ -9,7 +9,7 @@ pub async fn get_one(
     auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,
-) -> impl Reply {
+) -> Response {
     match crate::ctrl::room::messages::get_one::get_one(route.state, auth, room_id, msg_id).await {
         Ok(ref msg) => reply::json(msg).into_response(),
         Err(e) => ApiError::err(e).into_response(),

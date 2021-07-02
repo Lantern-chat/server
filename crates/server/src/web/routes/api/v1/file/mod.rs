@@ -32,13 +32,13 @@ lazy_static::lazy_static! {
     pub static ref REQUEST_ENTITY_TOO_LARGE: StatusCode = StatusCode::from_u16(413).unwrap();
 }
 
-pub async fn file(mut route: Route<crate::ServerState>) -> impl Reply {
+pub async fn file(mut route: Route<crate::ServerState>) -> Response {
     match route.next().method_segment() {
         // POST /api/v1/file
-        (&Method::POST, End) => post::post(route).await.into_response(),
+        (&Method::POST, End) => post::post(route).await(),
 
         // OPTIONS /api/v1/file
-        (&Method::OPTIONS, End) => options::options(route).await.into_response(),
+        (&Method::OPTIONS, End) => options::options(route).await(),
 
         // ANY /api/v1/file/1234
         (_, Exact(_)) => match route.param::<Snowflake>() {
@@ -60,13 +60,13 @@ pub async fn file(mut route: Route<crate::ServerState>) -> impl Reply {
 
                 match route.method() {
                     // HEAD /api/v1/file/1234
-                    &Method::HEAD => head::head(route, file).await.into_response(),
+                    &Method::HEAD => head::head(route, file).await(),
 
                     // PATCH /api/v1/file/1234
-                    &Method::PATCH => patch::patch(route, file).await.into_response(),
+                    &Method::PATCH => patch::patch(route, file).await(),
 
                     // DELETE /api/v1/file/1234
-                    &Method::DELETE => delete::delete(route, file).await.into_response(),
+                    &Method::DELETE => delete::delete(route, file).await(),
 
                     _ => StatusCode::METHOD_NOT_ALLOWED.into_response(),
                 }

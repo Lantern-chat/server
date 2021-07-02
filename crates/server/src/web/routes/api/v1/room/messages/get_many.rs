@@ -6,11 +6,7 @@ use crate::{ctrl::auth::Authorization, web::routes::api::ApiError};
 
 use crate::ctrl::room::messages::get_many::{GetManyMessagesForm, MessageSearch};
 
-pub async fn get_many(
-    route: Route<crate::ServerState>,
-    auth: Authorization,
-    room_id: Snowflake,
-) -> impl Reply {
+pub async fn get_many(route: Route<crate::ServerState>, auth: Authorization, room_id: Snowflake) -> Response {
     let form = match route.query::<GetManyMessagesForm>() {
         None => GetManyMessagesForm::default(),
         Some(Ok(form)) => form,

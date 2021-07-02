@@ -5,16 +5,16 @@ use ftl::{
 
 use crate::web::{gateway::socket::client_connected, routes::api::ApiError};
 
-pub fn gateway(route: Route<crate::ServerState>) -> Result<impl Reply, WsError> {
+pub fn gateway(route: Route<crate::ServerState>) -> Response {
     let addr = match real_ip::get_real_ip(&route) {
         Ok(addr) => addr,
-        Err(_) => return Ok(ApiError::bad_request().into_response()),
+        Err(_) => return ApiError::bad_request().into_response(),
     };
 
     let query = match route.query() {
         Some(Ok(query)) => query,
         None => Default::default(),
-        _ => return Ok(ApiError::bad_request().into_response()),
+        _ => return ApiError::bad_request().into_response(),
     };
 
     // TODO: Move this into FTL websocket part?
@@ -24,7 +24,10 @@ pub fn gateway(route: Route<crate::ServerState>) -> Result<impl Reply, WsError> 
     //config.max_message_size = Some(1024 * 512); // 512KIB
     config.max_send_queue = Some(1);
 
-    Ok(Ws::new(route, Some(config))?
-        .on_upgrade(move |ws| client_connected(ws, query, addr, state))
-        .into_response())
+    match Ws::new(route, Some(config)) {
+        Ok(ws) => ws
+            .on_upgrade(move |ws| client_connected(ws, query, addr, state))
+            .into_response(),
+        Err(e) => e.into_response(),
+    }
 }

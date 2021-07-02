@@ -2,7 +2,7 @@ use ftl::*;
 
 use db::Snowflake;
 
-use crate::ctrl::auth::Authorization;
+use crate::{ctrl::auth::Authorization, web::routes::api::ApiError};
 
 pub mod get;
 pub mod patch;
@@ -12,13 +12,13 @@ pub async fn party_rooms(
     mut route: Route<crate::ServerState>,
     auth: Authorization,
     party_id: Snowflake,
-) -> impl Reply {
+) -> Response {
     match route.next().method_segment() {
         // POST /api/v1/party/1234/rooms
-        //(&Method::POST, End) => post::post_room(route, auth, party_id).await.into_response(),
+        //(&Method::POST, End) => post::post_room(route, auth, party_id).await,
 
         // GET /api/v1/party/1234/rooms
-        (&Method::GET, End) => get::get(route, auth, party_id).await.into_response(),
+        (&Method::GET, End) => get::get(route, auth, party_id).await,
 
         // ANY /api/v1/party/1234/rooms/5678
         _ => match route.param::<Snowflake>() {
@@ -26,9 +26,9 @@ pub async fn party_rooms(
                 // PATCH /api/v1/party/1234/room/5678
                 (&Method::PATCH, End) => "Unimplemented".into_response(),
 
-                _ => StatusCode::NOT_FOUND.into_response(),
+                _ => ApiError::not_found().into_response(),
             },
-            _ => return StatusCode::BAD_REQUEST.into_response(),
+            _ => return ApiError::bad_request().into_response(),
         },
     }
 }

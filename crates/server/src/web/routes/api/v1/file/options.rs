@@ -2,7 +2,7 @@ use ftl::*;
 
 use db::Snowflake;
 
-pub async fn options(route: Route<crate::ServerState>) -> impl Reply {
+pub async fn options(route: Route<crate::ServerState>) -> Response {
     let mut res = Response::default();
 
     *res.status_mut() = StatusCode::NO_CONTENT;

@@ -14,6 +14,6 @@ pub async fn delete(
     route: Route<ServerState>,
     auth: Authorization,
     party_id: Snowflake,
-) -> impl Reply {
+) -> Response {
     "Unimplemented".into_response()
 }

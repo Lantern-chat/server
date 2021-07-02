@@ -7,13 +7,13 @@ pub mod register;
 
 pub mod me;
 
-pub async fn user(mut route: Route<crate::ServerState>) -> impl Reply {
+pub async fn user(mut route: Route<crate::ServerState>) -> Response {
     match route.next().method_segment() {
         // POST /api/v1/user
-        (&Method::POST, End) => register::register(route).await.into_response(),
+        (&Method::POST, End) => register::register(route).await,
 
         // ANY /api/v1/user/@me
-        (_, Exact("@me")) => me::me(route).await.into_response(),
+        (_, Exact("@me")) => me::me(route).await,
 
         // ANY /api/v1/user/1234
         (_, Exact(segment)) => match segment.parse::<db::Snowflake>() {
@@ -23,6 +23,6 @@ pub async fn user(mut route: Route<crate::ServerState>) -> impl Reply {
                 Ok(_auth) => "user stuff".into_response(),
             },
         },
-        _ => StatusCode::NOT_FOUND.into_response(),
+        _ => ApiError::not_found().into_response(),
     }
 }

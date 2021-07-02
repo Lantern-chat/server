@@ -19,7 +19,7 @@ pub async fn patch(
     mut route: Route<ServerState>,
     auth: Authorization,
     party_id: Snowflake,
-) -> impl Reply {
+) -> Response {
     let form = match body::any::<PatchPartyForm, _>(&mut route).await {
         Ok(form) => form,
         Err(e) => return e.into_response(),

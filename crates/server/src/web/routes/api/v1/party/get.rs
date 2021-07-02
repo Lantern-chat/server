@@ -9,9 +9,9 @@ use crate::{
     ServerState,
 };
 
-pub async fn get(route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> impl Reply {
+pub async fn get(route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> Response {
     match get_party(route.state, auth, party_id).await {
-        Ok(ref party) => Either::Left(reply::json(party)),
-        Err(e) => Either::Right(ApiError::err(e)),
+        Ok(ref party) => reply::json(party).into_response(),
+        Err(e) => ApiError::err(e).into_response(),
     }
 }

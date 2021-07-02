@@ -7,7 +7,7 @@ use crate::{ctrl::auth::Authorization, ServerState};
 
 use crate::ctrl::room::messages::create::{create_message, CreateMessageForm};
 
-pub async fn post(mut route: Route<ServerState>, auth: Authorization, room_id: Snowflake) -> impl Reply {
+pub async fn post(mut route: Route<ServerState>, auth: Authorization, room_id: Snowflake) -> Response {
     let form = match body::any::<CreateMessageForm, _>(&mut route).await {
         Ok(form) => form,
         Err(e) => return e.into_response(),

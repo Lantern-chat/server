@@ -6,7 +6,7 @@ use crate::{
     ServerState,
 };
 
-pub async fn login(mut route: Route<ServerState>) -> impl Reply {
+pub async fn login(mut route: Route<ServerState>) -> Response {
     let form = match body::any::<LoginForm, _>(&mut route).await {
         Ok(form) => form,
         Err(e) => return e.into_response(),

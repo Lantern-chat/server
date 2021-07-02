@@ -3,7 +3,7 @@ use crate::ServerState;
 
 use ftl::*;
 
-pub async fn logout(route: Route<ServerState>, auth: auth::Authorization) -> impl Reply {
+pub async fn logout(route: Route<ServerState>, auth: auth::Authorization) -> Response {
     if let Err(e) = logout_user(route.state, auth).await {
         log::error!("Logout error: {}", e);
     }

@@ -8,7 +8,7 @@ use crate::{
     ServerState,
 };
 
-pub async fn sessions(route: Route<ServerState>, auth: Authorization) -> impl Reply {
+pub async fn sessions(route: Route<ServerState>, auth: Authorization) -> Response {
     match list_sessions(route.state, auth).await {
         Ok(sessions) => reply::json_stream(sessions).into_response(),
         Err(e) => ApiError::err(e).into_response(),
