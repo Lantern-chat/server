@@ -88,11 +88,18 @@ impl<S> Route<S> {
         self.req.uri().query().map(serde_urlencoded::de::from_str)
     }
 
+    #[inline]
+    pub fn raw_query(&self) -> Option<&str> {
+        self.req.uri().query()
+    }
+
+    #[inline]
     pub fn path(&self) -> &str {
         self.req.uri().path()
     }
 
     /// Returns the remaining parts of the URI path **After** the current segment.
+    #[inline]
     pub fn tail(&self) -> &str {
         &self.path()[self.next_segment_index..]
     }
