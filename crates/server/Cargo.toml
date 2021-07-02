@@ -24,7 +24,6 @@ async-stream = "0.3"
 async-trait = "0.1.50"
 async-compression = { version = "0.3.8", features = ["brotli", "deflate", "gzip", "tokio"] }
 hashbrown = { version = "0.11", features = ["inline-more"] }
-# lettre = { version = "0.10.0-rc.1", features = ["tokio1"] }
 futures = "0.3"
 hyper = { version = "0.14.4", features = ["http1", "http2", "server", "stream", "runtime"] }
 mime = "0.3.16"
