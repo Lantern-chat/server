@@ -1,4 +1,4 @@
-use db::Snowflake;
+use schema::Snowflake;
 
 use crate::{ctrl::Error, ServerState};
 
@@ -8,8 +8,8 @@ pub mod task;
 pub mod processors {
     use thorn::*;
 
-    use db::Snowflake;
     use models::*;
+    use schema::Snowflake;
 
     use crate::{ctrl::Error, ServerState};
 
@@ -24,7 +24,7 @@ pub struct RawEventCode {
     pub code: i16,
 }
 
-use db::schema::codes::EventCode;
+use schema::codes::EventCode;
 
 pub async fn process(
     state: &ServerState,

@@ -1,6 +1,7 @@
 use futures::{Stream, StreamExt, TryStreamExt};
 
-use db::{pool::Client, Snowflake};
+use db::pool::Client;
+use schema::Snowflake;
 
 use crate::{
     ctrl::{auth::Authorization, Error, SearchMode},
@@ -10,7 +11,7 @@ use crate::{
 use models::*;
 
 fn base_query() -> thorn::query::SelectQuery {
-    use db::schema::*;
+    use schema::*;
     use thorn::*;
 
     Query::select().from_table::<Emotes>().cols(&[
@@ -31,7 +32,7 @@ pub async fn get_custom_emotes_raw<'a>(
         SearchMode::Single(id) => db
             .query_stream_cached_typed(
                 || {
-                    use db::schema::*;
+                    use schema::*;
                     use thorn::*;
 
                     base_query().and_where(Emotes::PartyId.equals(Var::of(Party::Id)))
@@ -43,7 +44,7 @@ pub async fn get_custom_emotes_raw<'a>(
         SearchMode::Many(ids) => db
             .query_stream_cached_typed(
                 || {
-                    use db::schema::*;
+                    use schema::*;
                     use thorn::*;
 
                     base_query().and_where(Emotes::PartyId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))

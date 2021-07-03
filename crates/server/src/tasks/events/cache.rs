@@ -1,6 +1,6 @@
 use std::{any::Any, time::Instant};
 
-use db::Snowflake;
+use schema::Snowflake;
 use util::cmap::CHashMap;
 
 pub struct EventItemCache {

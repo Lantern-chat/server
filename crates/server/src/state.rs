@@ -8,8 +8,8 @@ use std::{
     time::Instant,
 };
 
-use db::Snowflake;
 use futures::{future::BoxFuture, FutureExt};
+use schema::Snowflake;
 use tokio::sync::{oneshot, Mutex, Notify, Semaphore};
 use util::cmap::CHashMap;
 

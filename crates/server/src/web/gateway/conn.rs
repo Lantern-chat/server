@@ -7,7 +7,7 @@ use std::{
     time::Instant,
 };
 
-use db::{Snowflake, SnowflakeExt};
+use schema::{Snowflake, SnowflakeExt};
 
 use super::Event;
 

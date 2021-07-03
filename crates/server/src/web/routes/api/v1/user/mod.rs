@@ -16,7 +16,7 @@ pub async fn user(mut route: Route<crate::ServerState>) -> Response {
         (_, Exact("@me")) => me::me(route).await,
 
         // ANY /api/v1/user/1234
-        (_, Exact(segment)) => match segment.parse::<db::Snowflake>() {
+        (_, Exact(segment)) => match segment.parse::<schema::Snowflake>() {
             Err(_) => StatusCode::BAD_REQUEST.into_response(),
             Ok(_user_id) => match authorize(&route).await {
                 Err(e) => ApiError::err(e).into_response(),

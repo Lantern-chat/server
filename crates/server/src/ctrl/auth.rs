@@ -80,7 +80,7 @@ impl AuthToken {
     }
 }
 
-use db::Snowflake;
+use schema::Snowflake;
 
 use crate::ServerState;
 
@@ -104,7 +104,7 @@ pub async fn do_auth(state: &ServerState, raw_token: &[u8]) -> Result<Authorizat
             let row = db
                 .query_opt_cached_typed(
                     || {
-                        use db::schema::*;
+                        use schema::*;
                         use thorn::*;
 
                         Query::select()

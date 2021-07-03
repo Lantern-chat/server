@@ -12,7 +12,7 @@ pub async fn message_create(
     let row = db
         .query_one_cached_typed(
             || {
-                use db::schema::*;
+                use schema::*;
 
                 Query::select()
                     .from_table::<AggMessages>()

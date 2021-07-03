@@ -16,7 +16,7 @@ pub async fn list_sessions(
         .await
         .query_stream_cached_typed(
             || {
-                use db::schema::*;
+                use schema::*;
                 use thorn::*;
 
                 Query::select()

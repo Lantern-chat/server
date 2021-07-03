@@ -2,7 +2,7 @@ use futures::{Stream, StreamExt, TryStreamExt};
 
 use hashbrown::HashMap;
 
-use db::Snowflake;
+use schema::Snowflake;
 
 use models::*;
 
@@ -41,7 +41,7 @@ pub async fn get_rooms(
         let row = db
             .query_one_cached_typed(
                 || {
-                    use db::schema::*;
+                    use schema::*;
                     use thorn::*;
 
                     Query::select()
@@ -84,7 +84,7 @@ pub async fn get_rooms(
         let rows = db
             .query_cached_typed(
                 || {
-                    use db::schema::*;
+                    use schema::*;
                     use thorn::*;
 
                     Query::select()
@@ -135,7 +135,7 @@ pub async fn get_rooms(
         let rows = db
             .query_cached_typed(
                 || {
-                    use db::schema::*;
+                    use schema::*;
                     use thorn::*;
 
                     Query::select()

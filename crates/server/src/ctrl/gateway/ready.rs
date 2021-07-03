@@ -1,7 +1,7 @@
 use futures::{StreamExt, TryStreamExt};
 use hashbrown::{hash_map::Entry, HashMap};
 
-use db::Snowflake;
+use schema::Snowflake;
 
 use crate::{
     ctrl::{auth::Authorization, Error, SearchMode},
@@ -31,7 +31,7 @@ pub async fn ready(
         let stream = db
             .query_stream_cached_typed(
                 || {
-                    use db::schema::*;
+                    use schema::*;
                     use thorn::*;
 
                     Query::select()
@@ -70,7 +70,7 @@ pub async fn ready(
         let row = db
             .query_one_cached_typed(
                 || {
-                    use db::schema::*;
+                    use schema::*;
                     use thorn::*;
 
                     Query::select()
@@ -118,7 +118,7 @@ pub async fn ready(
         let rows = db
             .query_cached_typed(
                 || {
-                    use db::schema::*;
+                    use schema::*;
                     use thorn::*;
 
                     Query::select()
@@ -211,7 +211,7 @@ pub async fn ready(
 
 /*
 fn select_members() -> impl AnyQuery {
-    use db::schema::*;
+    use schema::*;
 
     Query::select()
         .and_where(PartyMember::PartyId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))
@@ -232,7 +232,7 @@ fn select_members() -> impl AnyQuery {
 }
 
 fn select_members_old() -> impl AnyQuery {
-    use db::schema::*;
+    use schema::*;
 
     Query::select()
         .and_where(PartyMember::PartyId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))
@@ -254,7 +254,7 @@ fn select_members_old() -> impl AnyQuery {
 }
 
 fn select_emotes() -> impl AnyQuery {
-    use db::schema::*;
+    use schema::*;
 
     Query::select()
 }

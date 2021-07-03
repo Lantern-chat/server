@@ -1,6 +1,6 @@
 use futures::{StreamExt, TryStreamExt};
 
-use db::Snowflake;
+use schema::Snowflake;
 
 use crate::{
     ctrl::{auth::Authorization, perm::get_cached_room_permissions_with_conn, Error, SearchMode},
@@ -38,7 +38,7 @@ pub async fn get_room(state: ServerState, auth: Authorization, room_id: Snowflak
 use thorn::*;
 
 fn query(perm: bool) -> impl AnyQuery {
-    use db::schema::*;
+    use schema::*;
 
     let query = Query::select().cols(&[
         Rooms::PartyId,

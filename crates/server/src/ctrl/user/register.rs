@@ -1,6 +1,6 @@
 use std::{net::SocketAddr, sync::Arc, time::SystemTime};
 
-use db::{Snowflake, SnowflakeExt};
+use schema::{Snowflake, SnowflakeExt};
 
 use crate::{ctrl::Error, ServerState};
 
@@ -60,7 +60,7 @@ pub async fn register_user(
         .await
         .query_opt_cached_typed(
             || {
-                use db::schema::*;
+                use schema::*;
                 use thorn::*;
 
                 Query::select()
@@ -104,7 +104,7 @@ pub async fn register_user(
         .await
         .execute_cached_typed(
             || {
-                use db::schema::*;
+                use schema::*;
                 use thorn::*;
 
                 Query::call(Call::custom("lantern.register_user").args((

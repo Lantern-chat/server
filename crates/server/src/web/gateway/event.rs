@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use miniz_oxide::deflate::core::TDEFLStatus;
 
-use db::Snowflake;
+use schema::Snowflake;
 
 use models::ReadyEvent;
 

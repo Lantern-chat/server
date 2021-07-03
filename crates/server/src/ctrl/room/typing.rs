@@ -1,4 +1,4 @@
-use db::{Snowflake, SnowflakeExt};
+use schema::{Snowflake, SnowflakeExt};
 
 use crate::{
     ctrl::{auth::Authorization, perm::get_cached_room_permissions, Error, SearchMode},
@@ -22,7 +22,7 @@ pub async fn trigger_typing(
 
     db.execute_cached_typed(
         || {
-            use db::schema::*;
+            use schema::*;
             use thorn::*;
 
             tables! {

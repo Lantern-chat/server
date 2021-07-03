@@ -16,7 +16,7 @@ pub async fn friends(
         .await?
         .query_stream_cached_typed(
             || {
-                use db::schema::*;
+                use schema::*;
                 use thorn::*;
 
                 Query::select()

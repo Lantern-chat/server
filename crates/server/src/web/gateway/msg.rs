@@ -110,7 +110,7 @@ macro_rules! decl_msgs {
     }}
 }
 
-use db::Snowflake;
+use schema::Snowflake;
 
 pub type ClientMsg = client::Message;
 pub type ServerMsg = server::Message;

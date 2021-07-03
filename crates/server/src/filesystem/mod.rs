@@ -3,7 +3,7 @@ pub mod disk;
 /*
 use futures::Future;
 
-use db::Snowflake;
+use schema::Snowflake;
 
 use std::io::SeekFrom;
 

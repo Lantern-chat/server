@@ -1,7 +1,7 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
-use db::Snowflake;
+use schema::Snowflake;
 
 use io::SeekFrom;
 use tokio::fs::{self, File};

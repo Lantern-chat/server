@@ -12,6 +12,7 @@ ftl = { path = "../ftl" }
 models = { path = "../models" }
 db = { path = "../db" }
 util = { path = "../util" }
+schema = { path = "../schema" }
 
 thorn = { git = "https://github.com/novacrazy/thorn" }
 

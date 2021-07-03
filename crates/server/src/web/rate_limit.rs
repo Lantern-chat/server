@@ -4,7 +4,7 @@ use std::{
 };
 
 use util::cmap::CHashMap;
-// use db::Snowflake;
+// use schema::Snowflake;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct RateLimitKey {

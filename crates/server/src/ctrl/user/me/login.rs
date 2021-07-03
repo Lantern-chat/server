@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use db::Snowflake;
+use schema::Snowflake;
 
 use crate::{
     ctrl::{auth::AuthToken, Error},
@@ -29,7 +29,7 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: LoginForm) -> Res
         .await
         .query_opt_cached_typed(
             || {
-                use db::schema::*;
+                use schema::*;
                 use thorn::*;
 
                 Query::select()
@@ -84,7 +84,7 @@ pub async fn do_login(
         .await
         .execute_cached_typed(
             || {
-                use db::schema::*;
+                use schema::*;
                 use thorn::*;
 
                 Query::insert()

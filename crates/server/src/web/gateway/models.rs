@@ -1,4 +1,4 @@
-use db::Snowflake;
+use schema::Snowflake;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {

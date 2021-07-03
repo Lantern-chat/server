@@ -1,4 +1,4 @@
-use db::{Snowflake, SnowflakeExt};
+use schema::{Snowflake, SnowflakeExt};
 
 use futures::{Stream, StreamExt};
 use models::*;
@@ -178,7 +178,7 @@ pub async fn get_many(
 }
 
 fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
-    use db::schema::*;
+    use schema::*;
     use thorn::*;
 
     tables! {

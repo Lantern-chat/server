@@ -1,6 +1,6 @@
 use ftl::*;
 
-use db::Snowflake;
+use schema::Snowflake;
 
 pub async fn options(route: Route<crate::ServerState>) -> Response {
     let mut res = Response::default();

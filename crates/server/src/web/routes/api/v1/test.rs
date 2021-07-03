@@ -1,13 +1,13 @@
 use ftl::*;
 
-use db::{Snowflake, SnowflakeExt};
+use schema::{Snowflake, SnowflakeExt};
 
 use crate::ServerState;
 
 pub async fn test(route: Route<ServerState>) -> Response {
     let state = route.state;
 
-    use db::schema::*;
+    use schema::*;
     use thorn::*;
 
     let ids = vec![

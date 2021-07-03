@@ -16,7 +16,7 @@ pub async fn trigger_typing(
             let rows = db
                 .query_cached_typed(
                     || {
-                        use db::schema::*;
+                        use schema::*;
                         use thorn::*;
 
                         Query::select()

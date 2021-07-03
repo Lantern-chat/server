@@ -11,9 +11,4 @@ pub mod migrate;
 pub mod pool;
 pub mod util;
 
-pub mod sf;
-pub use sf::{Snowflake, SnowflakeExt};
-
-pub mod schema;
-
 pub use pg::Row;

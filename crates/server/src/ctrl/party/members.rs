@@ -1,6 +1,6 @@
 use hashbrown::hash_map::{Entry, HashMap};
 
-use db::Snowflake;
+use schema::Snowflake;
 
 use crate::{
     ctrl::{auth::AuthToken, Error},
@@ -56,7 +56,7 @@ pub fn get_members(
 use thorn::*;
 
 fn select_members() -> impl AnyQuery {
-    use db::schema::*;
+    use schema::*;
 
     Query::select()
         .and_where(PartyMember::PartyId.equals(Var::of(Party::Id)))

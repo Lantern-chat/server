@@ -1,7 +1,7 @@
 use either::Either;
 use ftl::*;
 
-use db::Snowflake;
+use schema::Snowflake;
 
 use crate::{
     ctrl::{auth::Authorization, party::get::get_party},

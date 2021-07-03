@@ -1,6 +1,6 @@
 use std::time::SystemTime;
 
-use db::SnowflakeExt;
+use schema::SnowflakeExt;
 
 use models::*;
 
@@ -94,7 +94,7 @@ pub async fn create_party(
 use thorn::*;
 
 fn insert_party() -> impl AnyQuery {
-    use db::schema::*;
+    use schema::*;
 
     Query::insert()
         .into::<Party>()
@@ -108,7 +108,7 @@ fn insert_party() -> impl AnyQuery {
 }
 
 fn insert_member() -> impl AnyQuery {
-    use db::schema::*;
+    use schema::*;
 
     Query::insert()
         .into::<PartyMember>()
@@ -117,7 +117,7 @@ fn insert_member() -> impl AnyQuery {
 }
 
 fn insert_role() -> impl AnyQuery {
-    use db::schema::*;
+    use schema::*;
 
     Query::insert()
         .into::<Roles>()
@@ -130,7 +130,7 @@ fn insert_role() -> impl AnyQuery {
 }
 
 fn insert_room() -> impl AnyQuery {
-    use db::schema::*;
+    use schema::*;
 
     Query::insert()
         .into::<Rooms>()

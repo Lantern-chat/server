@@ -7,7 +7,7 @@ pub async fn logout_user(state: ServerState, auth: auth::Authorization) -> Resul
         .await
         .execute_cached_typed(
             || {
-                use db::schema::*;
+                use schema::*;
                 use thorn::*;
 
                 Query::delete()

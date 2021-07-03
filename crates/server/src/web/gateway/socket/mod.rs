@@ -18,8 +18,8 @@ use tokio_stream::wrappers::{errors::BroadcastStreamRecvError, BroadcastStream, 
 
 use hashbrown::HashMap;
 
-use db::Snowflake;
 use ftl::ws::{Message as WsMessage, SinkError, WebSocket};
+use schema::Snowflake;
 use util::cancel::{Cancel, CancelableStream};
 
 use crate::{ctrl::auth::Authorization, permission_cache::PermMute, web::encoding::Encoding, ServerState};

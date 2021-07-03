@@ -5,7 +5,7 @@ use crate::ServerState;
 
 use db::pg::AsyncMessage;
 use db::pool::Object;
-use db::Snowflake;
+use schema::Snowflake;
 
 use failsafe::futures::CircuitBreaker;
 use failsafe::{Config, Error as Reject};
@@ -60,7 +60,7 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
     let row = db
         .query_opt_cached_typed(
             || {
-                use db::schema::*;
+                use schema::*;
                 use thorn::*;
 
                 Query::select()
@@ -176,7 +176,7 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
             let stream = db
                 .query_stream_cached_typed(
                     || {
-                        use db::schema::*;
+                        use schema::*;
                         use thorn::*;
 
                         Query::select()

@@ -59,7 +59,7 @@ impl IpBans {
         let stream = conn
             .query_stream_cached_typed(
                 || {
-                    use db::schema::*;
+                    use schema::*;
                     use thorn::*;
 
                     Query::select().from_table::<IpBans>().cols(&[IpBans::Addr])

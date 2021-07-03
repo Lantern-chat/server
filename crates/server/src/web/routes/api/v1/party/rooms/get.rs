@@ -1,6 +1,6 @@
 use ftl::*;
 
-use db::Snowflake;
+use schema::Snowflake;
 
 use crate::{
     ctrl::{auth::Authorization, party::rooms::get::get_rooms},

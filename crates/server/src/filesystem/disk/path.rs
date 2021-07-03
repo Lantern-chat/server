@@ -1,6 +1,6 @@
 use std::{hash::Hasher, path::PathBuf};
 
-use db::Snowflake;
+use schema::Snowflake;
 
 #[inline]
 pub fn outer_perfect_shuffle(mut x: u64) -> u64 {

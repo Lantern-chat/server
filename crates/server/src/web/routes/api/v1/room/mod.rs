@@ -1,5 +1,5 @@
-use db::Snowflake;
 use ftl::*;
+use schema::Snowflake;
 
 use crate::web::{
     auth::{authorize, Authorization},

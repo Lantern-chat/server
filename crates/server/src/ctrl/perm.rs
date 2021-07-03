@@ -16,7 +16,7 @@ pub async fn get_party_permissions(
     let row = db
         .query_one_cached_typed(
             || {
-                use db::schema::*;
+                use schema::*;
                 use thorn::*;
 
                 Query::select()
@@ -88,7 +88,7 @@ pub async fn get_room_permissions(
     let row = db
         .query_opt_cached_typed(
             || {
-                use db::schema::*;
+                use schema::*;
                 use thorn::*;
 
                 Query::select()
@@ -130,7 +130,7 @@ pub async fn get_room_permissions(
     let row = db
         .query_one_cached_typed(
             || {
-                use db::schema::*;
+                use schema::*;
                 use thorn::*;
 
                 let room_id_var = Var::at(Rooms::Id, 1);

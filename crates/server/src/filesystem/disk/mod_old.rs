@@ -12,7 +12,7 @@ pub struct DiskStore {
 use io::SeekFrom;
 use tokio::{fs::File as TkFile, io::AsyncSeekExt, task::JoinHandle};
 
-use db::Snowflake;
+use schema::Snowflake;
 
 use super::{File, FileStore};
 

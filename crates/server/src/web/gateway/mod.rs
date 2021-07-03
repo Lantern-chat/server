@@ -12,7 +12,7 @@ use hashbrown::HashMap;
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-use db::Snowflake;
+use schema::Snowflake;
 use util::cmap::CHashMap;
 
 pub type PartyId = Snowflake;

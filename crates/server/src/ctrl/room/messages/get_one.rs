@@ -1,4 +1,4 @@
-use db::Snowflake;
+use schema::Snowflake;
 
 use models::*;
 
@@ -102,7 +102,7 @@ pub async fn get_one(
 use thorn::*;
 
 mod consts {
-    use db::schema::*;
+    use schema::*;
 
     pub const COLUMNS: &[AggMessages] = &[
         /* 0*/ AggMessages::UserId,
@@ -121,7 +121,7 @@ mod consts {
 }
 
 fn get_one_without_perms() -> impl AnyQuery {
-    use db::schema::*;
+    use schema::*;
 
     Query::select()
         .from_table::<AggMessages>()
@@ -137,7 +137,7 @@ fn get_one_without_perms() -> impl AnyQuery {
 }
 
 fn get_one_with_perms() -> impl AnyQuery {
-    use db::schema::*;
+    use schema::*;
 
     tables! {
         struct AggPerm {

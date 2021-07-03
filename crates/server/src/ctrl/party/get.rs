@@ -1,6 +1,6 @@
 use futures::{StreamExt, TryStreamExt};
 
-use db::Snowflake;
+use schema::Snowflake;
 
 use crate::{
     ctrl::{auth::Authorization, Error, SearchMode},
@@ -15,7 +15,7 @@ pub async fn get_party(state: ServerState, auth: Authorization, party_id: Snowfl
     let row = db
         .query_opt_cached_typed(
             || {
-                use db::schema::*;
+                use schema::*;
                 use thorn::*;
 
                 Query::select()

@@ -1,5 +1,5 @@
-use db::Snowflake;
 use ftl::*;
+use schema::Snowflake;
 
 use crate::{ctrl::auth::Authorization, ctrl::Error, web::routes::api::ApiError, ServerState};
 
@@ -10,7 +10,7 @@ pub async fn get_members(route: Route<ServerState>, auth: Authorization, party_i
         .await
         .query_opt_cached_typed(
             || {
-                use db::schema::*;
+                use schema::*;
                 use thorn::*;
 
                 Query::select()

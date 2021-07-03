@@ -21,7 +21,7 @@ impl<S: BuildHasher> BuildHasher for SharedBuildHasher<S> {
     }
 }
 
-use db::Snowflake;
+use schema::Snowflake;
 
 use models::Permission;
 

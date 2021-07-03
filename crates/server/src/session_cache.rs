@@ -2,7 +2,7 @@ use std::time::SystemTime;
 
 use util::cmap::CHashMap;
 
-use db::Snowflake;
+use schema::Snowflake;
 
 use crate::ctrl::auth::{AuthToken, Authorization};
 

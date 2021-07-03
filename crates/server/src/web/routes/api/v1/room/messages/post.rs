@@ -1,6 +1,6 @@
 use ftl::*;
 
-use db::Snowflake;
+use schema::Snowflake;
 
 use crate::web::routes::api::ApiError;
 use crate::{ctrl::auth::Authorization, ServerState};

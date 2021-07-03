@@ -8,8 +8,8 @@ pub use error::Error;
 
 #[derive(Debug, Clone, Copy)]
 pub enum SearchMode<'a> {
-    Single(db::Snowflake),
-    Many(&'a [db::Snowflake]),
+    Single(schema::Snowflake),
+    Many(&'a [schema::Snowflake]),
 }
 
 pub mod gateway {
