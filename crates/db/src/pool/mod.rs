@@ -5,6 +5,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc, Weak,
 };
+use std::task::{Context, Poll};
 use std::{any::TypeId, collections::VecDeque};
 use std::{borrow::Cow, time::Duration};
 
@@ -13,6 +14,7 @@ use async_trait::async_trait;
 use arc_swap::{ArcSwap, ArcSwapOption};
 use hashbrown::HashMap;
 
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::{
     mpsc::{self, Receiver, Sender},
     Notify, Semaphore, TryAcquireError,
@@ -23,8 +25,8 @@ use parking_lot::{Mutex, RwLock};
 use futures::{Future, FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt};
 use pg::{
     tls::MakeTlsConnect, tls::TlsConnect, types::Type, AsyncMessage, Client as PgClient, Config as PgConfig,
-    Error as PgError, IsolationLevel, NoTls, Notification, Socket, Statement, Transaction as PgTransaction,
-    TransactionBuilder as PgTransactionBuilder,
+    Connection as PgConnection, Error as PgError, IsolationLevel, NoTls, Notification, Socket, Statement,
+    Transaction as PgTransaction, TransactionBuilder as PgTransactionBuilder,
 };
 
 use failsafe::futures::CircuitBreaker;
@@ -50,7 +52,28 @@ pub use error::Error;
 
 pub use config::{PoolConfig, Timeouts};
 
-use crate::conn::ConnectionStream;
+/// Simple wrapper type for `pg::Connection` that returns the actual message in the future
+pub struct ConnectionStream<S, T>(pub PgConnection<S, T>);
+
+impl<S, T> Deref for ConnectionStream<S, T> {
+    type Target = PgConnection<S, T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<S, T> Stream for ConnectionStream<S, T>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+    T: AsyncRead + AsyncWrite + Unpin,
+{
+    type Item = Result<AsyncMessage, PgError>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        self.0.poll_message(cx)
+    }
+}
 
 fn ro(readonly: bool) -> &'static str {
     if readonly {

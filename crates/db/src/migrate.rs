@@ -10,9 +10,7 @@ use futures::{Stream, StreamExt};
 use pg::Connection;
 use tokio::sync::mpsc;
 
-use crate::pool::{Client, Error, Pool};
-
-use super::conn::ConnectionStream;
+use crate::pool::{Client, ConnectionStream, Error, Pool};
 
 #[derive(Debug, thiserror::Error)]
 pub enum MigrationError {
