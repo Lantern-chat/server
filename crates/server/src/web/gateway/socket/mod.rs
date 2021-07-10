@@ -216,6 +216,10 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                             ));
                             continue;
                         }
+                        ClientMsg::SetPresence { payload, .. } => {
+                            // TODO;
+                            continue;
+                        }
                         // no immediate response necessary, continue listening for events
                         _ => continue,
                     },

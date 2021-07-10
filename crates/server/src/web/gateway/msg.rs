@@ -159,5 +159,8 @@ pub mod client {
         2 => Resume {
             session: Snowflake,
         },
+        3 => SetPresence {
+            away: bool,
+        }
     }
 }
