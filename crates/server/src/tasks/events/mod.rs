@@ -18,32 +18,18 @@ pub mod processors {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct RawEventCode {
+pub struct RawEvent {
     pub id: Snowflake,
     pub room_id: Option<Snowflake>,
-    pub code: i16,
+    pub code: EventCode,
 }
 
 use schema::codes::EventCode;
 
-pub async fn process(
-    state: &ServerState,
-    event: RawEventCode,
-    party_id: Option<Snowflake>,
-) -> Result<(), Error> {
-    let code = match EventCode::from_i16(event.code) {
-        Some(code) => code,
-        None => {
-            return Err(Error::InternalError(format!(
-                "Unknown event code: {}",
-                event.code
-            )));
-        }
-    };
-
+pub async fn process(state: &ServerState, event: RawEvent, party_id: Option<Snowflake>) -> Result<(), Error> {
     let party_id_res = party_id.ok_or_else(|| Error::InternalErrorStatic("Missing PartyId"));
 
-    match code {
+    match event.code {
         EventCode::MessageCreate => {
             processors::message_create::message_create(state, event.id, party_id).await?;
         }

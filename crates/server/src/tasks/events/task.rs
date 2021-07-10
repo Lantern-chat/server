@@ -19,7 +19,7 @@ use tokio::{
     time::{Duration, Instant, Sleep},
 };
 
-use super::RawEventCode;
+use super::RawEvent;
 
 pub async fn start(state: ServerState) {
     let circuit_breaker = Config::new().build();
@@ -146,8 +146,8 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
         let _ = forwarding_subtask.await;
     };
 
-    let mut party_events: HashMap<Snowflake, Vec<RawEventCode>> = HashMap::new();
-    let mut user_events: Vec<RawEventCode> = Vec::new();
+    let mut party_events: HashMap<Snowflake, Vec<RawEvent>> = HashMap::new();
+    let mut user_events: Vec<RawEvent> = Vec::new();
 
     const DEBOUNCE_PERIOD: Duration = Duration::from_millis(100);
 
@@ -205,7 +205,7 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
                 loop {
                     let row = row_res?;
 
-                    let event = RawEventCode {
+                    let event = RawEvent {
                         code: row.try_get(1)?,
                         id: row.try_get(2)?,
                         room_id: row.try_get(4)?,

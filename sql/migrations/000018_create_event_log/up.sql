@@ -1,3 +1,28 @@
+CREATE TYPE lantern.event_code AS ENUM (
+    'message_create',
+    'message_update',
+    'message_delete',
+    'typing_started',
+    'user_updated',
+    'self_updated',
+    'presence_updated',
+    'party_create',
+    'party_update',
+    'party_delete',
+    'room_created',
+    'room_updated',
+    'room_deleted',
+    'member_updated',
+    'member_joined',
+    'member_left',
+    'role_created',
+    'role_updated',
+    'role_deleted',
+    'invite_create',
+    'message_react',
+    'message_unreact'
+);
+
 CREATE SEQUENCE lantern.event_id;
 
 CREATE TABLE lantern.event_log (
@@ -11,7 +36,7 @@ CREATE TABLE lantern.event_log (
     -- May be NULL even when the event
     room_id     bigint,
 
-    code        smallint    NOT NULL
+    code        event_code  NOT NULL
 );
 ALTER TABLE lantern.event_log OWNER TO postgres;
 

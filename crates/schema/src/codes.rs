@@ -1,17 +1,41 @@
-use enum_primitive::*;
+thorn::enums! {
+    pub enum EventCode in Lantern {
+        MessageCreate,
+        MessageUpdate,
+        MessageDelete,
 
-enum_from_primitive! {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub enum EventCode {
-        MessageCreate   = 1,
-        MessageUpdate   = 2,
-        MessageDelete   = 3,
-        TypingStarted   = 4,
-    }
-}
+        /// User started typing in channel
+        TypingStarted,
 
-impl EventCode {
-    pub fn from_i16(value: i16) -> Option<EventCode> {
-        FromPrimitive::from_i16(value)
+        /// If any user updated with public fields
+        UserUpdated,
+        /// If self updated with private fields
+        SelfUpdated,
+
+        PresenceUpdated,
+
+        PartyCreate,
+        PartyUpdate,
+        PartyDelete,
+
+        RoomCreated,
+        RoomUpdated,
+        RoomDeleted,
+
+        /// Per-party member information updated
+        MemberUpdated,
+        /// Member joined party
+        MemberJoined,
+        /// Member left party
+        MemberLeft,
+
+        RoleCreated,
+        RoleUpdated,
+        RoleDeleted,
+
+        InviteCreate,
+
+        MessageReact,
+        MessageUnreact,
     }
 }

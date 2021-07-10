@@ -47,7 +47,7 @@ pub async fn trigger_typing(
                 .query(
                     Query::select()
                         .from_table::<AggPartyId>()
-                        .expr(Literal::Int2(EventCode::TypingStarted as i16))
+                        .expr(EventCode::TypingStarted)
                         .expr(user_id_var)
                         .expr(AggPartyId::PartyId)
                         .expr(room_id_var)

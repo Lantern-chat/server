@@ -9,6 +9,7 @@ edition = "2018"
 models = { path = "../models", features = ["tokio-pg"] }
 
 thorn = { git = "https://github.com/novacrazy/thorn" }
+postgres-types = "0.2.1"
 enum_primitive = "0.1.1"
 
 [dev-dependencies]
