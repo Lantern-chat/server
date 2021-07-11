@@ -49,3 +49,25 @@ export function errorKind(err: ApiError): ErrorKind {
 export function parseApiError(err: ApiError): ErrorCode | undefined {
     return ErrorCode[ErrorCode[err.code]];
 }
+
+export enum Intent {
+    PARTIES = 1 << 0,
+    PARTY_MEMBERS = 1 << 1,
+    PARTY_BANS = 1 << 2,
+    PARTY_EMOTES = 1 << 3,
+    PARTY_INTEGRATIONS = 1 << 4,
+    PARTY_WEBHOOKS = 1 << 5,
+    PARTY_INVITES = 1 << 6,
+    VOICE_STATUS = 1 << 7,
+    PRESENCE = 1 << 8,
+    MESSAGES = 1 << 9,
+    MESSAGE_REACTIONS = 1 << 10,
+    MESSAGE_TYPING = 1 << 11,
+    DIRECT_MESSAGES = 1 << 12,
+    DIRECT_MESSAGE_REACTIONS = 1 << 13,
+    DIRECT_MESSAGE_TYPING = 1 << 14,
+
+    ALL_DESKTOP = (1 << 15) - 1, // all 1s
+
+    ALL_MOBILE = Intent.ALL_DESKTOP & ~Intent.PRESENCE, // TODO: Add more
+}
