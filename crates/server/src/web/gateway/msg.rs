@@ -198,7 +198,10 @@ pub mod server {
                 Message::PresenceUpdate { .. } => Intent::PRESENCE,
                 Message::TypingStart { .. } => Intent::MESSAGE_TYPING,
 
-                _ => return None,
+                Message::Hello { .. } |
+                Message::HeartbeatACK { .. } |
+                Message::Ready { .. } |
+                Message::InvalidSession { .. } => return None,
             })
         }
     }
