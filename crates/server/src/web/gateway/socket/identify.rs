@@ -26,7 +26,7 @@ async fn do_identify(
     let ready = ready(state, conn.id, auth).await?;
     let _ = conn
         .tx
-        .send(Event::new(ServerMsg::new_ready(Box::new(ready)))?)
+        .send(Event::new(ServerMsg::new_ready(Box::new(ready)), None)?)
         .await;
     Ok(())
 }

@@ -25,6 +25,7 @@ pub struct EncodedEvent {
 pub struct EventInner {
     pub msg: ServerMsg,
     pub encoded: EncodedEvent,
+    pub room_id: Option<Snowflake>,
 }
 
 #[derive(Debug, Clone)]
@@ -40,10 +41,14 @@ impl Deref for Event {
 }
 
 impl Event {
-    pub fn new(msg: ServerMsg) -> Result<Event, EncodingError> {
+    pub fn new(msg: ServerMsg, room_id: Option<Snowflake>) -> Result<Event, EncodingError> {
         let encoded = EncodedEvent::new(&msg)?;
 
-        Ok(Event(Arc::new(EventInner { msg, encoded })))
+        Ok(Event(Arc::new(EventInner {
+            msg,
+            encoded,
+            room_id,
+        })))
     }
 }
 

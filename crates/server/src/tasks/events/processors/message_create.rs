@@ -42,11 +42,13 @@ pub async fn message_create(
         log::warn!("Message PartyID from event-log and PartyID from Message differ!");
     }
 
+    let room_id = row.try_get(2)?;
+
     let mut msg = Message {
         id,
         party_id: ext_party_id,
         created_at: id.format_timestamp(),
-        room_id: row.try_get(2)?,
+        room_id,
         flags: MessageFlags::from_bits_truncate(row.try_get(9)?),
         edited_at: None, // new message, not edited
         content: row.try_get(10)?,
@@ -104,7 +106,7 @@ pub async fn message_create(
 
         state
             .gateway
-            .broadcast_event(Event::new(event)?, party_id, false)
+            .broadcast_event(Event::new(event, Some(room_id))?, party_id, false)
             .await;
     }
 

@@ -59,9 +59,9 @@ pub enum Item {
 }
 
 lazy_static::lazy_static! {
-    pub static ref HELLO_EVENT: Event = Event::new(ServerMsg::new_hello(models::events::Hello::default())).unwrap();
-    pub static ref HEARTBEAT_ACK: Event = Event::new(ServerMsg::new_heartbeatack()).unwrap();
-    pub static ref INVALID_SESSION: Event = Event::new(ServerMsg::new_invalidsession()).unwrap();
+    pub static ref HELLO_EVENT: Event = Event::new(ServerMsg::new_hello(models::events::Hello::default()), None).unwrap();
+    pub static ref HEARTBEAT_ACK: Event = Event::new(ServerMsg::new_heartbeatack(), None).unwrap();
+    pub static ref INVALID_SESSION: Event = Event::new(ServerMsg::new_invalidsession(), None).unwrap();
 }
 
 pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr, state: ServerState) {
@@ -175,31 +175,24 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                             }
                             _ => match user_id {
                                 None => break 'event_loop,
-                                Some(user_id) => match event.msg {
-                                    ServerMsg::MessageCreate {
-                                        payload: MessageCreatePayload { ref msg },
-                                        ..
-                                    }
-                                    | ServerMsg::MessageUpdate {
-                                        payload: MessageUpdatePayload { ref msg },
-                                        ..
-                                    }
-                                    | ServerMsg::MessageDelete {
-                                        payload: MessageDeletePayload { ref msg },
-                                        ..
-                                    } => match state.perm_cache.get(user_id, msg.room_id).await {
-                                        None => break,
-                                        Some(PermMute { perm, .. }) => {
-                                            if !perm.room.contains(RoomPermissions::READ_MESSAGES) {
-                                                continue 'event_loop;
+                                Some(user_id) => {
+                                    if let Some(room_id) = event.room_id {
+                                        match state.perm_cache.get(user_id, room_id).await {
+                                            None => break 'event_loop,
+                                            Some(PermMute { perm, .. }) => {
+                                                if !perm.room.contains(RoomPermissions::READ_MESSAGES) {
+                                                    continue 'event_loop;
+                                                }
                                             }
                                         }
-                                    },
+                                    }
 
-                                    // TODO: Party ADD subscribe
-                                    // TODO: Party REMOVE unsubscribe
-                                    _ => {}
-                                },
+                                    match event.msg {
+                                        // TODO: Party ADD subscribe
+                                        // TODO: Party REMOVE unsubscribe
+                                        _ => {}
+                                    }
+                                }
                             },
                         }
 

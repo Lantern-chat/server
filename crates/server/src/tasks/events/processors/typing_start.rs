@@ -88,7 +88,7 @@ pub async fn trigger_typing(
 
             state
                 .gateway
-                .broadcast_event(Event::new(event)?, party_id, false)
+                .broadcast_event(Event::new(event, Some(room_id))?, party_id, false)
                 .await;
         }
         None => {
