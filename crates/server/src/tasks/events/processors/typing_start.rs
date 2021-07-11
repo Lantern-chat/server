@@ -79,7 +79,7 @@ pub async fn trigger_typing(
                 log::warn!("Typing event from user not in the room? {} {}", id, room_id);
             }
 
-            let event = ServerMsg::new_typingstart(Box::new(TypingStartEvent {
+            let event = ServerMsg::new_typingstart(Box::new(events::TypingStart {
                 room: room_id,
                 user: id,
                 party: Some(party_id),

@@ -5,8 +5,6 @@ use miniz_oxide::deflate::core::TDEFLStatus;
 
 use schema::Snowflake;
 
-use models::ReadyEvent;
-
 use crate::web::encoding::Encoding;
 
 use super::{msg::ServerMsg, socket::GatewayQueryParams};

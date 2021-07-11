@@ -59,7 +59,7 @@ pub enum Item {
 }
 
 lazy_static::lazy_static! {
-    pub static ref HELLO_EVENT: Event = Event::new(ServerMsg::new_hello(models::HelloEvent::default())).unwrap();
+    pub static ref HELLO_EVENT: Event = Event::new(ServerMsg::new_hello(models::events::Hello::default())).unwrap();
     pub static ref HEARTBEAT_ACK: Event = Event::new(ServerMsg::new_heartbeatack()).unwrap();
     pub static ref INVALID_SESSION: Event = Event::new(ServerMsg::new_invalidsession()).unwrap();
 }
@@ -124,6 +124,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
         state.gateway.add_connection(conn.clone()).await;
 
         let mut user_id = None;
+        let mut intent = models::Intent::empty();
 
         'event_loop: while let Some(event) = events.next().await {
             let resp = match event {
@@ -131,6 +132,13 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                 Item::Event(event) => match event {
                     Ok(event) => {
                         use super::msg::server::payloads::*;
+
+                        // if this message corresponds to an intent, filter it
+                        if let Some(matching_intent) = event.msg.matching_intent() {
+                            if !intent.contains(matching_intent) {
+                                continue; // skip doing anything with this event
+                            }
+                        }
 
                         match event.msg {
                             ServerMsg::Hello { .. } => {}
@@ -211,9 +219,10 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                             tokio::spawn(identify::identify(
                                 state.clone(),
                                 conn.clone(),
-                                payload.auth,
-                                payload.intent,
+                                payload.inner.auth,
+                                payload.inner.intent,
                             ));
+                            intent = payload.inner.intent;
                             continue;
                         }
                         ClientMsg::SetPresence { payload, .. } => {

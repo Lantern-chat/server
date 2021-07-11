@@ -18,7 +18,7 @@ pub async fn ready(
     state: ServerState,
     conn_id: Snowflake,
     auth: Authorization,
-) -> Result<models::ReadyEvent, Error> {
+) -> Result<models::events::Ready, Error> {
     use models::*;
 
     let db = state.db.read.get().await?;
@@ -201,7 +201,7 @@ pub async fn ready(
 
     let (user, parties, _) = futures::future::try_join3(user_future, parties_future, perms_future).await?;
 
-    Ok(ReadyEvent {
+    Ok(events::Ready {
         user,
         dms: Vec::new(),
         parties,

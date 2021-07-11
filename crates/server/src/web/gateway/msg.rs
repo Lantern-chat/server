@@ -118,49 +118,106 @@ pub type ServerMsg = server::Message;
 pub mod server {
     use super::*;
 
-    use models::{HelloEvent, Message as RoomMessage, ReadyEvent};
+    use models::{
+        events::{Hello, Ready, TypingStart},
+        Intent, Message as RoomMessage,
+    };
 
     type Room = (); // TODO
 
     // TODO: Check that this enum doesn't grow too large, allocate large payloads like Ready
     decl_msgs! {
-        0 => Hello { #[serde(flatten)] inner: HelloEvent },
+        0 => Hello { #[serde(flatten)] inner: Hello },
 
-        2 => HeartbeatACK: Default {},
-        3 => Ready { #[serde(flatten)] inner: Box<ReadyEvent> },
-        4 => InvalidSession: Default {},
+        1 => HeartbeatACK: Default {},
+        2 => Ready { #[serde(flatten)] inner: Box<Ready> },
+        3 => InvalidSession: Default {},
 
-        5 => RoomCreate { #[serde(flatten)] room: Room },
-        6 => RoomUpdate { #[serde(flatten)] room: Room },
-        7 => RoomDelete { id: Snowflake },
+        4 => PartyCreate {},
+        5 => PartyUpdate {},
+        6 => PartyDelete {},
 
-        8 => MessageCreate { #[serde(flatten)] msg: RoomMessage },
-        9 => MessageUpdate { #[serde(flatten)] msg: RoomMessage },
-        10 => MessageDelete { #[serde(flatten)] msg: RoomMessage },
+        7 => RoleCreate {},
+        8 => RoleUpdate {},
+        9 => RoleDelete {},
 
-        11 => PresenceUpdate {
+        10 => MemberAdd {},
+        11 => MemberUpdate {},
+        12 => MemberRemove {},
+
+        13 => RoomCreate { #[serde(flatten)] room: Room },
+        14 => RoomUpdate { #[serde(flatten)] room: Room },
+        15 => RoomDelete { id: Snowflake },
+        16 => RoomPinsUpdate {},
+
+        17 => MessageCreate { #[serde(flatten)] msg: RoomMessage },
+        18 => MessageUpdate { #[serde(flatten)] msg: RoomMessage },
+        19 => MessageDelete { #[serde(flatten)] msg: RoomMessage },
+
+        20 => MessageReactionAdd {},
+        21 => MessageReactionRemove {},
+        22 => MessageReactionRemoveAll {},
+        23 => MessageReactionRemoveEmote {},
+
+        24 => PresenceUpdate {
             user: Snowflake,
             party: Snowflake,
             status: u8,
         },
-        12 => TypingStart { #[serde(flatten)] t: Box<models::TypingStartEvent> },
+        25 => TypingStart { #[serde(flatten)] t: Box<TypingStart> },
+    }
+
+    impl Message {
+        #[rustfmt::skip]
+        pub fn matching_intent(&self) -> Option<Intent> {
+            Some(match *self {
+                Message::PartyCreate { .. } |
+                Message::PartyDelete { .. } |
+                Message::PartyUpdate { .. } |
+                Message::RoleCreate { .. } |
+                Message::RoleDelete { .. } |
+                Message::RoleUpdate { .. } |
+                Message::RoomPinsUpdate { .. } |
+                Message::RoomCreate { .. } |
+                Message::RoomDelete { .. } |
+                Message::RoomUpdate { .. } => Intent::PARTIES,
+
+                Message::MemberAdd { .. } |
+                Message::MemberRemove { .. } |
+                Message::MemberUpdate { .. } => Intent::PARTY_MEMBERS,
+
+                Message::MessageCreate { .. } |
+                Message::MessageDelete { .. } |
+                Message::MessageUpdate { .. } => Intent::MESSAGES,
+
+                Message::MessageReactionAdd { .. } |
+                Message::MessageReactionRemove { .. } |
+                Message::MessageReactionRemoveAll { .. } |
+                Message::MessageReactionRemoveEmote { .. } => Intent::MESSAGE_REACTIONS,
+
+                Message::PresenceUpdate { .. } => Intent::PRESENCE,
+                Message::TypingStart { .. } => Intent::MESSAGE_TYPING,
+
+                _ => return None,
+            })
+        }
     }
 }
 
 pub mod client {
     use super::*;
 
+    use models::{
+        commands::{Identify, SetPresence},
+        Intent,
+    };
+
     decl_msgs! {
         0 => Heartbeat: Default {},
-        1 => Identify {
-            auth: String,
-            intent: u32,
-        },
+        1 => Identify { #[serde(flatten)] inner: Identify },
         2 => Resume {
             session: Snowflake,
         },
-        3 => SetPresence {
-            away: bool,
-        }
+        3 => SetPresence { #[serde(flatten)] inner: SetPresence }
     }
 }
