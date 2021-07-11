@@ -22,7 +22,15 @@ use ftl::ws::{Message as WsMessage, SinkError, WebSocket};
 use schema::Snowflake;
 use util::cancel::{Cancel, CancelableStream};
 
-use crate::{ctrl::auth::Authorization, permission_cache::PermMute, web::encoding::Encoding, ServerState};
+use crate::{
+    ctrl::{
+        auth::Authorization,
+        gateway::presence::{clear_presence, set_presence},
+    },
+    permission_cache::PermMute,
+    web::encoding::Encoding,
+    ServerState,
+};
 
 use super::{
     conn::GatewayConnection,
@@ -226,12 +234,28 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                             intent = payload.inner.intent;
                             continue;
                         }
+                        ClientMsg::Resume { .. } => {
+                            log::error!("Attempted to resume connection");
+                            break 'event_loop;
+                        }
                         ClientMsg::SetPresence { payload, .. } => {
-                            // TODO;
+                            match user_id {
+                                None => {
+                                    log::warn!("Attempted to set presence before identification");
+
+                                    break 'event_loop;
+                                }
+                                Some(user_id) => {
+                                    tokio::spawn(set_presence(
+                                        state.clone(),
+                                        user_id,
+                                        conn.id,
+                                        payload.inner.presence,
+                                    ));
+                                }
+                            }
                             continue;
                         }
-                        // no immediate response necessary, continue listening for events
-                        _ => continue,
                     },
                     Err(e) => match e {
                         _ if e.is_close() => {
@@ -264,6 +288,18 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                     todo!("Force kick socket?")
                 }
             }
+        } // END 'event_loop
+
+        if let Some(user_id) = user_id {
+            let conn_id = conn.id;
+            let state2 = state.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_secs(5)).await;
+
+                if let Err(e) = clear_presence(state2, user_id, conn_id).await {
+                    log::error!("Error clearing connection presence: {}", e);
+                }
+            });
         }
 
         // TODO: Cleanup connection

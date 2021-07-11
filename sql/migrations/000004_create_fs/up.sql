@@ -43,8 +43,8 @@ BEGIN
     INSERT INTO lantern.files (id, name, preview, mime, size, "offset", flags)
     VALUES (_id, _name, _preview, _mime, _size, _offset, _flags)
     ON CONFLICT ON CONSTRAINT file_pk DO
-        UPDATE SET preview = _preview,
+        UPDATE SET preview  = _preview,
                    "offset" = _offset,
-                   flags = _flags;
+                   flags    = _flags;
 END
 $$;

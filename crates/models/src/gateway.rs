@@ -89,7 +89,10 @@ pub mod commands {
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub struct SetPresence {}
+    pub struct SetPresence {
+        #[serde(flatten)]
+        pub presence: UserPresence,
+    }
 }
 
 pub mod events {

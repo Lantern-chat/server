@@ -1,4 +1,5 @@
 use schema::Snowflake;
+use db::pool::Client;
 
 use crate::{ctrl::Error, ServerState};
 
@@ -14,6 +15,7 @@ pub mod processors {
     use crate::{ctrl::Error, ServerState};
 
     pub mod message_create;
+    pub mod presence_update;
     pub mod typing_start;
 }
 
@@ -26,19 +28,22 @@ pub struct RawEvent {
 
 use schema::codes::EventCode;
 
-pub async fn process(state: &ServerState, event: RawEvent, party_id: Option<Snowflake>) -> Result<(), Error> {
-    let party_id_res = party_id.ok_or_else(|| Error::InternalErrorStatic("Missing PartyId"));
+pub async fn process(state: &ServerState, db: &Client, event: RawEvent, party_id: Option<Snowflake>) -> Result<(), Error> {
+    //let party_id_res = party_id.ok_or_else(|| Error::InternalErrorStatic("Missing PartyId"));
 
     match event.code {
         EventCode::MessageCreate => {
-            processors::message_create::message_create(state, event.id, party_id).await?;
+            processors::message_create::message_create(state, db, event.id, party_id).await?;
         }
         EventCode::TypingStarted => {
             if let Some(room_id) = event.room_id {
-                processors::typing_start::trigger_typing(state, event.id, party_id, room_id).await?;
+                processors::typing_start::trigger_typing(state, db, event.id, party_id, room_id).await?;
             } else {
                 log::warn!("Typing started outside of room!");
             }
+        }
+        EventCode::PresenceUpdated => {
+            processors::presence_update::presence_updated(state, db, event.id).await?;
         }
         _ => unimplemented!(),
     }

@@ -4,11 +4,10 @@ use super::*;
 
 pub async fn message_create(
     state: &ServerState,
+    db: &db::pool::Client,
     id: Snowflake,
     party_id: Option<Snowflake>,
 ) -> Result<(), Error> {
-    let db = state.db.read.get().await?;
-
     let row = db
         .query_one_cached_typed(
             || {

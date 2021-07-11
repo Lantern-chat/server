@@ -147,6 +147,7 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
     };
 
     let mut party_events: HashMap<Snowflake, Vec<RawEvent>> = HashMap::new();
+    let mut direct_events: HashMap<Snowflake, Vec<RawEvent>> = HashMap::new();
     let mut user_events: Vec<RawEvent> = Vec::new();
 
     const DEBOUNCE_PERIOD: Duration = Duration::from_millis(100);
@@ -213,7 +214,10 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
 
                     match row.try_get(3)? {
                         Some(party_id) => party_events.entry(party_id).or_default().push(event),
-                        None => user_events.push(event),
+                        None => match event.room_id {
+                            None => user_events.push(event),
+                            Some(room_id) => direct_events.entry(room_id).or_default().push(event),
+                        },
                     }
 
                     row_res = match stream.next().await {
@@ -228,25 +232,52 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
             }
 
             log::debug!(
-                "Received {} party_events and {} user_events",
+                "Received {} party_events, {} direct events, and {} user_events",
                 party_events.len(),
+                direct_events.len(),
                 user_events.len()
             );
 
-            // process events from each party in parallel,
-            // but within each party process them sequentially
-            futures::stream::iter(party_events.drain())
-                .for_each_concurrent(state.config.num_parallel_tasks, |(party_id, events)| async move {
-                    for event in events {
-                        if let Err(e) = super::process(&state, event, Some(party_id)).await {
-                            log::error!("Error processing event: {:?} {}", event, e);
-                            // TODO: Disconnect party
+            let db = &db;
+
+            tokio::join!(
+                // process events from each party in parallel,
+                // but within each party process them sequentially
+                futures::stream::iter(party_events.drain()).for_each_concurrent(
+                    state.config.num_parallel_tasks,
+                    |(party_id, events)| async move {
+                        for event in events {
+                            if let Err(e) = super::process(&state, db, event, Some(party_id)).await {
+                                log::error!("Error processing party event: {:?} {}", event, e);
+                                // TODO: Disconnect party
+                            }
+                        }
+                    },
+                ),
+                // process events from each direct-room in parallel,
+                // but within each room process them sequentially
+                futures::stream::iter(direct_events.drain()).for_each_concurrent(
+                    state.config.num_parallel_tasks,
+                    |(_room_id, events)| async move {
+                        for event in events {
+                            if let Err(e) = super::process(&state, db, event, None).await {
+                                log::error!("Error processing direct event: {:?} {}", event, e);
+                                // TODO: Disconnect users
+                            }
                         }
                     }
-                })
-                .await;
-
-            user_events.clear();
+                ),
+                // random user events are unstructured and processed in parallel
+                futures::stream::iter(user_events.drain(..)).for_each_concurrent(
+                    state.config.num_parallel_tasks,
+                    |event| async move {
+                        if let Err(e) = super::process(&state, db, event, None).await {
+                            log::error!("Error processing user event: {:?} {}", event, e);
+                            // TODO: Disconnect users
+                        }
+                    },
+                )
+            );
 
             *latest_event = next_latest_event;
 

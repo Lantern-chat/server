@@ -4,14 +4,13 @@ use super::*;
 
 pub async fn trigger_typing(
     state: &ServerState,
+    db: &db::pool::Client,
     id: Snowflake,
     party_id: Option<Snowflake>,
     room_id: Snowflake,
 ) -> Result<(), Error> {
     match party_id {
         Some(party_id) => {
-            let db = state.db.read.get().await?;
-
             // NOTE: Most users have zero or very few roles, so optimize for the common case
             let rows = db
                 .query_cached_typed(

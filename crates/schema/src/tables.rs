@@ -61,10 +61,12 @@ thorn::tables! {
         Token: Type::BYTEA,
     }
 
-    pub struct UserStatus in Lantern {
+    pub struct UserPresence in Lantern {
         UserId: Users::Id,
-        Updated: Type::TIMESTAMP,
-        Active: Type::INT2,
+        ConnId: SNOWFLAKE,
+        UpdatedAt: Type::TIMESTAMP,
+        Flags: Type::INT2,
+        Activity: Type::JSONB,
     }
 
     pub struct UserAvatars in Lantern {

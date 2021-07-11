@@ -4,7 +4,9 @@ CREATE TABLE lantern.user_presence (
     conn_id     bigint      NOT NULL,
     updated_at  timestamp   NOT NULL DEFAULT now(),
     flags       smallint    NOT NULL,
-    activity    jsonb
+    activity    jsonb,
+
+    CONSTRAINT presence_pk PRIMARY KEY (user_id, conn_id)
 );
 ALTER TABLE lantern.user_presence OWNER TO postgres;
 
@@ -31,3 +33,21 @@ $$;
 
 CREATE TRIGGER presence_update AFTER UPDATE OR INSERT ON lantern.user_presence
 FOR EACH ROW EXECUTE FUNCTION lantern.presence_trigger();
+
+CREATE OR REPLACE PROCEDURE lantern.set_presence(
+    _user_id bigint,
+    _conn_id bigint,
+    _flags   smallint,
+    _activity jsonb
+)
+LANGUAGE plpgsql AS
+$$
+BEGIN
+    INSERT INTO lantern.user_presence (user_id, conn_id, updated_at, flags, activity)
+    VALUES (_user_id, _conn_id, now(), _flags, _activity)
+    ON CONFLICT ON CONSTRAINT presence_pk DO
+        UPDATE SET updated_at   = now(),
+                   flags        = _flags,
+                   activity     = _activity;
+END
+$$;
