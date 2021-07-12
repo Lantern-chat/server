@@ -16,7 +16,7 @@ schema = { path = "../schema" }
 
 thorn = { git = "https://github.com/novacrazy/thorn" }
 
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive", "rc"] }
 serde_urlencoded = "0.7"
 tokio = { version = "1.4", features = ["full", "parking_lot"] }
 tokio-util = { version = "0.6", features = ["io"] }
@@ -36,7 +36,7 @@ hex = "0.4.2"
 bytes = "1.0.1"
 lazy_static = "1.4.0"
 rust-argon2 = "0.8.3"
-ctr = "0.7"
+ctr = "0.8.0"
 aes = "0.7"
 # sha3 = "0.9.1"
 flate2 = { version = "1.0.19", default-features = false, features = ["rust_backend"] }
@@ -49,7 +49,7 @@ rmp-serde = "0.15.4"
 rand = "0.8.3"
 chrono = "0.4.19"
 regex = "1.4.6"
-tokio-tungstenite = "0.14.0"
+tokio-tungstenite = "0.15.0"
 ahash = "0.7.2"
 either = "1.6.0"
 failsafe = "1.0.0"
