@@ -118,12 +118,20 @@ pub type ServerMsg = server::Message;
 pub mod server {
     use super::*;
 
+    use std::sync::Arc;
+
     use models::{
         events::{Hello, Ready, TypingStart},
-        Intent, Message as RoomMessage,
+        Intent, Message as RoomMessage, User, UserPresence,
     };
 
     type Room = (); // TODO
+
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct UserPresenceInner {
+        pub user: User,
+        pub presence: UserPresence,
+    }
 
     // TODO: Check that this enum doesn't grow too large, allocate large payloads like Ready
     decl_msgs! {
@@ -160,9 +168,8 @@ pub mod server {
         23 => MessageReactionRemoveEmote {},
 
         24 => PresenceUpdate {
-            user: Snowflake,
             party: Snowflake,
-            status: u8,
+            #[serde(flatten)] inner: Arc<UserPresenceInner>,
         },
         25 => TypingStart { #[serde(flatten)] t: Box<TypingStart> },
     }

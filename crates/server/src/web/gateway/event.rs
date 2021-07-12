@@ -1,8 +1,5 @@
+use std::ops::Deref;
 use std::sync::Arc;
-use std::{
-    ops::Deref,
-    sync::atomic::{AtomicU64, Ordering},
-};
 
 use miniz_oxide::deflate::core::TDEFLStatus;
 
@@ -29,9 +26,6 @@ pub struct EventInner {
     pub msg: ServerMsg,
     pub encoded: EncodedEvent,
     pub room_id: Option<Snowflake>,
-
-    /// Artificial sequence number produced on this process, use to deduplicate events
-    pub seq: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -46,8 +40,6 @@ impl Deref for Event {
     }
 }
 
-const SEQUENCE_COUNTER: AtomicU64 = AtomicU64::new(1);
-
 impl Event {
     pub fn new(msg: ServerMsg, room_id: Option<Snowflake>) -> Result<Event, EncodingError> {
         let encoded = EncodedEvent::new(&msg)?;
@@ -56,7 +48,6 @@ impl Event {
             msg,
             encoded,
             room_id,
-            seq: SEQUENCE_COUNTER.fetch_add(1, Ordering::SeqCst),
         })))
     }
 }

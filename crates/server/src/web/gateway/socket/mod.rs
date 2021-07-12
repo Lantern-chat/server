@@ -133,7 +133,6 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
 
         let mut user_id = None;
         let mut intent = models::Intent::empty();
-        let mut last_seq: u64 = 0;
 
         'event_loop: while let Some(event) = events.next().await {
             let resp = match event {
@@ -141,13 +140,6 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                 Item::Event(event) => match event {
                     Ok(event) => {
                         use super::msg::server::payloads::*;
-
-                        // avoid duplicate events
-                        if event.seq <= last_seq {
-                            continue 'event_loop; // skip event
-                        }
-
-                        last_seq = event.seq;
 
                         // if this message corresponds to an intent, filter it
                         if let Some(matching_intent) = event.msg.matching_intent() {

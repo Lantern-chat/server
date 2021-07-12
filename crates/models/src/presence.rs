@@ -13,6 +13,10 @@ serde_shims::impl_serde_for_bitflags!(UserPresenceFlags);
 pub struct UserPresence {
     pub flags: UserPresenceFlags,
 
+    /// Updated-At timestamp as ISO-8061
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub activity: Option<Activity>,
 }

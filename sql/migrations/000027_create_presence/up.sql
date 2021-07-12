@@ -24,14 +24,16 @@ $$
 BEGIN
     INSERT INTO lantern.event_log (code, id) VALUES (
         'presence_updated'::lantern.event_code,
-        NEW.user_id
+        CASE TG_OP WHEN 'DELETE' THEN OLD.user_id
+                                 ELSE NEW.user_id
+        END
     );
 
     RETURN NEW;
 END
 $$;
 
-CREATE TRIGGER presence_update AFTER UPDATE OR INSERT ON lantern.user_presence
+CREATE TRIGGER presence_update AFTER INSERT OR UPDATE OR DELETE ON lantern.user_presence
 FOR EACH ROW EXECUTE FUNCTION lantern.presence_trigger();
 
 CREATE OR REPLACE PROCEDURE lantern.set_presence(
