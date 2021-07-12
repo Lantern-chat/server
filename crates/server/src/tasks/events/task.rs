@@ -5,7 +5,7 @@ use crate::ServerState;
 
 use db::pg::AsyncMessage;
 use db::pool::Object;
-use schema::Snowflake;
+use schema::{EventCode, Snowflake};
 
 use failsafe::futures::CircuitBreaker;
 use failsafe::{Config, Error as Reject};
@@ -149,6 +149,7 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
     let mut party_events: HashMap<Snowflake, Vec<RawEvent>> = HashMap::new();
     let mut direct_events: HashMap<Snowflake, Vec<RawEvent>> = HashMap::new();
     let mut user_events: Vec<RawEvent> = Vec::new();
+    let mut presence_events: Vec<RawEvent> = Vec::new();
 
     const DEBOUNCE_PERIOD: Duration = Duration::from_millis(100);
 
@@ -215,7 +216,13 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
                     match row.try_get(3)? {
                         Some(party_id) => party_events.entry(party_id).or_default().push(event),
                         None => match event.room_id {
-                            None => user_events.push(event),
+                            None => {
+                                if event.code == EventCode::PresenceUpdated {
+                                    presence_events.push(event);
+                                } else {
+                                    user_events.push(event);
+                                }
+                            }
                             Some(room_id) => direct_events.entry(room_id).or_default().push(event),
                         },
                     }
@@ -232,51 +239,85 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
             }
 
             log::debug!(
-                "Received {} party_events, {} direct events, and {} user_events",
+                "Received {} party_events, {} direct events, {} user_events, and {} presence events",
                 party_events.len(),
                 direct_events.len(),
-                user_events.len()
+                user_events.len(),
+                presence_events.len(),
             );
 
-            let db = &db;
-
-            tokio::join!(
-                // process events from each party in parallel,
-                // but within each party process them sequentially
-                futures::stream::iter(party_events.drain()).for_each_concurrent(
-                    state.config.num_parallel_tasks,
-                    |(party_id, events)| async move {
+            // process events from each party in parallel,
+            // but within each party process them sequentially
+            async fn process_party_events(
+                events: &mut HashMap<Snowflake, Vec<RawEvent>>,
+                state: &ServerState,
+                db: &db::pool::Client,
+            ) {
+                futures::stream::iter(events.drain())
+                    .for_each_concurrent(state.config.num_parallel_tasks, |(party_id, events)| async move {
                         for event in events {
                             if let Err(e) = super::process(&state, db, event, Some(party_id)).await {
                                 log::error!("Error processing party event: {:?} {}", event, e);
                                 // TODO: Disconnect party
                             }
                         }
-                    },
-                ),
-                // process events from each direct-room in parallel,
-                // but within each room process them sequentially
-                futures::stream::iter(direct_events.drain()).for_each_concurrent(
-                    state.config.num_parallel_tasks,
-                    |(_room_id, events)| async move {
+                    })
+                    .await
+            }
+
+            // process events from each direct-room in parallel,
+            // but within each room process them sequentially
+            async fn process_direct_events(
+                events: &mut HashMap<Snowflake, Vec<RawEvent>>,
+                state: &ServerState,
+                db: &db::pool::Client,
+            ) {
+                futures::stream::iter(events.drain())
+                    .for_each_concurrent(state.config.num_parallel_tasks, |(_room_id, events)| async move {
                         for event in events {
                             if let Err(e) = super::process(&state, db, event, None).await {
                                 log::error!("Error processing direct event: {:?} {}", event, e);
                                 // TODO: Disconnect users
                             }
                         }
-                    }
-                ),
-                // random user events are unstructured and processed in parallel
-                futures::stream::iter(user_events.drain(..)).for_each_concurrent(
-                    state.config.num_parallel_tasks,
-                    |event| async move {
+                    })
+                    .await
+            }
+
+            // user events can be processed in any order
+            async fn process_user_events(
+                events: &mut Vec<RawEvent>,
+                state: &ServerState,
+                db: &db::pool::Client,
+            ) {
+                futures::stream::iter(events.drain(..))
+                    .for_each_concurrent(state.config.num_parallel_tasks, |event| async move {
                         if let Err(e) = super::process(&state, db, event, None).await {
                             log::error!("Error processing user event: {:?} {}", event, e);
                             // TODO: Disconnect users
                         }
-                    },
-                )
+                    })
+                    .await
+            }
+
+            // presence events are special. They can be processed in parallel, but must be emitted sequentially
+            async fn process_presence_events(
+                events: &mut Vec<RawEvent>,
+                state: &ServerState,
+                db: &db::pool::Client,
+            ) {
+                futures::stream::iter(events.drain(..))
+                    .map(|event| async move {})
+                    .buffer_unordered(state.config.num_parallel_tasks)
+                    .for_each(|event| async {})
+                    .await
+            }
+
+            tokio::join!(
+                process_party_events(&mut party_events, state, &db),
+                process_direct_events(&mut direct_events, state, &db),
+                process_user_events(&mut user_events, state, &db),
+                process_presence_events(&mut presence_events, state, &db),
             );
 
             *latest_event = next_latest_event;

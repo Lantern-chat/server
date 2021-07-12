@@ -1,5 +1,5 @@
-use schema::Snowflake;
 use db::pool::Client;
+use schema::Snowflake;
 
 use crate::{ctrl::Error, ServerState};
 
@@ -28,7 +28,12 @@ pub struct RawEvent {
 
 use schema::codes::EventCode;
 
-pub async fn process(state: &ServerState, db: &Client, event: RawEvent, party_id: Option<Snowflake>) -> Result<(), Error> {
+pub async fn process(
+    state: &ServerState,
+    db: &Client,
+    event: RawEvent,
+    party_id: Option<Snowflake>,
+) -> Result<(), Error> {
     //let party_id_res = party_id.ok_or_else(|| Error::InternalErrorStatic("Missing PartyId"));
 
     match event.code {
