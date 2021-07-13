@@ -140,6 +140,7 @@ pub async fn get_many(
                         user: None,
                         nick: row.try_get(3)?,
                         roles: row.try_get(12)?,
+                        presence: None,
                     }),
                 },
                 thread_id: None,

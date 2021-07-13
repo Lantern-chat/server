@@ -68,6 +68,7 @@ pub async fn message_create(
                 user: None,
                 nick: row.try_get(3)?,
                 roles: row.try_get(11)?,
+                presence: None,
             }),
         },
         thread_id: None,

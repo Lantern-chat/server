@@ -15,113 +15,112 @@ pub struct LoginForm {
 
 use futures::{Stream, StreamExt};
 
-use models::{PartyMember, User, UserFlags};
+use models::{AnyActivity, PartyMember, User, UserFlags, UserPresence, UserPresenceFlags};
 
-pub fn get_members(
+pub async fn get_members(
     state: ServerState,
     party_id: Snowflake,
-) -> impl Stream<Item = Result<PartyMember, Error>> {
-    async_stream::stream! {
-        let rows = state.read_db().await
-            .query_stream_cached_typed(|| select_members(), &[&party_id])
-            .await;
+) -> Result<impl Stream<Item = Result<PartyMember, Error>>, Error> {
+    let db = state.db.read.get().await?;
 
-        let rows = match rows {
-            Err(e) => return yield Err(e.into()),
-            Ok(rows) => rows,
-        };
+    let stream = db
+        .query_stream_cached_typed(|| select_members2(), &[&party_id])
+        .await?;
 
-        let mut member = None;
-
-        futures::pin_mut!(rows);
-        loop {
-            match rows.next().await {
-                None => break,
-                Some(Err(e)) => return yield Err(e.into()),
-                Some(Ok(row)) => match parse_row(row, &mut member) {
-                    Err(e) => return yield Err(e),
-                    Ok(Some(m)) => yield Ok(m),
-                    Ok(None) => {}
-                }
+    Ok(stream.map(|row| match row {
+        Err(e) => Err(e.into()),
+        Ok(row) => Ok({
+            let user_id = row.try_get(1)?;
+            PartyMember {
+                nick: row.try_get(0)?,
+                user: Some(User {
+                    id: user_id,
+                    username: row.try_get(2)?,
+                    discriminator: row.try_get(3)?,
+                    flags: UserFlags::from_bits_truncate(row.try_get(4)?).publicize(),
+                    status: None,
+                    bio: None,
+                    email: None,
+                    preferences: None,
+                    avatar_id: None,
+                }),
+                presence: match row.try_get::<_, Option<chrono::NaiveDateTime>>(5)? {
+                    None => None,
+                    Some(updated_at) => Some(UserPresence {
+                        updated_at: Some(crate::util::time::format_naivedatetime(updated_at)),
+                        flags: UserPresenceFlags::from_bits_truncate(row.try_get(6)?),
+                        activity: match row.try_get::<_, Option<serde_json::Value>>(7)? {
+                            None => None,
+                            Some(value) => Some(AnyActivity::Any(value)),
+                        },
+                    }),
+                },
+                roles: row.try_get(8)?,
             }
-        }
-
-        // cleanup last member
-        if let Some(member) = member {
-            yield Ok(member);
-        }
-    }
+        }),
+    }))
 }
 
 use thorn::*;
 
-fn select_members() -> impl AnyQuery {
+fn select_members2() -> impl AnyQuery {
     use schema::*;
 
-    Query::select()
-        .and_where(PartyMember::PartyId.equals(Var::of(Party::Id)))
-        .cols(&[PartyMember::Nickname])
-        .cols(&[Users::Id, Users::Username, Users::Discriminator, Users::Flags])
-        .col(RoleMembers::RoleId)
-        .from(
-            RoleMembers::right_join(
-                Users::left_join_table::<PartyMember>().on(Users::Id.equals(PartyMember::UserId)),
-            )
-            .on(RoleMembers::UserId.equals(Users::Id)),
-        )
-        .order_by(Users::Id.ascending())
-}
-
-fn parse_row(row: db::Row, existing: &mut Option<PartyMember>) -> Result<Option<PartyMember>, Error> {
-    let user_id = row.try_get(1)?;
-    let role_id = row.try_get(5)?;
-
-    // fast path, existing member with same id
-    if let Some(PartyMember {
-        user: Some(ref user),
-        ref mut roles,
-        ..
-    }) = existing
-    {
-        if user.id == user_id {
-            if let Some(role_id) = role_id {
-                match roles {
-                    Some(ref mut roles) => roles.push(role_id),
-                    None => *roles = Some(vec![role_id]),
-                };
-            }
-            return Ok(None);
+    tables! {
+        struct AggPresence {
+            UserId: UserPresence::UserId,
+            UpdatedAt: UserPresence::UpdatedAt,
+            Flags: UserPresence::Flags,
+            Activity: UserPresence::Activity,
         }
     }
 
-    let previous = existing.take();
-
-    *existing = Some(PartyMember {
-        user: Some(User {
-            id: user_id,
-            username: row.try_get(2)?,
-            discriminator: row.try_get(3)?,
-            flags: UserFlags::from_bits_truncate(row.try_get(4)?).publicize(),
-            email: None,
-            preferences: None,
-            status: None,
-            bio: None,
-            avatar_id: None,
-        }),
-        nick: row.try_get(0)?,
-        roles: {
-            let mut roles = Vec::new();
-            if let Some(role_id) = role_id {
-                roles.push(role_id);
-            }
-
-            if roles.is_empty() {
-                None
-            } else {
-                Some(roles)
-            }
-        },
-    });
-
-    Ok(previous)
+    Query::with()
+        .with(
+            AggPresence::as_query(
+                Query::select()
+                    .distinct()
+                    .on(UserPresence::UserId)
+                    .cols(&[
+                        UserPresence::UserId,
+                        UserPresence::UpdatedAt,
+                        UserPresence::Flags,
+                        UserPresence::Activity,
+                    ])
+                    .from_table::<UserPresence>()
+                    .order_by(UserPresence::UserId.ascending())
+                    .order_by(UserPresence::UpdatedAt.descending()),
+            )
+            .exclude(),
+        )
+        .select()
+        .cols(&[/* 0 */ PartyMember::Nickname])
+        .cols(&[
+            /* 1 */ Users::Id,
+            /* 2 */ Users::Username,
+            /* 3 */ Users::Discriminator,
+            /* 4 */ Users::Flags,
+        ])
+        .cols(&[
+            /* 5 */ AggPresence::UpdatedAt,
+            /* 6 */ AggPresence::Flags,
+            /* 7 */ AggPresence::Activity,
+        ])
+        .expr(
+            /* 8 */
+            Call::custom("ARRAY").args(
+                Query::select()
+                    .col(RoleMembers::RoleId)
+                    .from_table::<RoleMembers>()
+                    .and_where(RoleMembers::UserId.equals(Users::Id))
+                    .as_value(),
+            ),
+        )
+        .from(
+            AggPresence::right_join(
+                PartyMember::inner_join_table::<Users>().on(Users::Id.equals(PartyMember::UserId)),
+            )
+            .on(AggPresence::UserId.equals(PartyMember::UserId)),
+        )
+        .and_where(PartyMember::PartyId.equals(Var::of(Party::Id)))
 }

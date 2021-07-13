@@ -64,6 +64,7 @@ pub async fn get_one(
                 user: None,
                 nick: row.try_get(2)?,
                 roles: row.try_get(11)?,
+                presence: None,
             }),
         },
         thread_id: None,

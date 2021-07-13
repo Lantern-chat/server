@@ -168,7 +168,7 @@ pub mod server {
         23 => MessageReactionRemoveEmote {},
 
         24 => PresenceUpdate {
-            party: Snowflake,
+            party: Option<Snowflake>,
             #[serde(flatten)] inner: Arc<UserPresenceInner>,
         },
         25 => TypingStart { #[serde(flatten)] t: Box<TypingStart> },

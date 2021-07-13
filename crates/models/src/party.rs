@@ -95,6 +95,9 @@ pub struct PartyMember {
     // pub avatar_id: Option<Snowflake>,
 
     /// List of Role id snowflakes
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "is_none_or_empty")]
     pub roles: Option<Vec<Snowflake>>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub presence: Option<UserPresence>,
 }

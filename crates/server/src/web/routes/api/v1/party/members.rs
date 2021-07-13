@@ -25,7 +25,9 @@ pub async fn get_members(route: Route<ServerState>, auth: Authorization, party_i
     match is_member {
         Err(e) => ApiError::err(e.into()).into_response(),
         Ok(None) => ApiError::err(Error::NoSession).into_response(),
-        Ok(Some(_)) => reply::json_stream(crate::ctrl::party::members::get_members(route.state, party_id))
-            .into_response(),
+        Ok(Some(_)) => match crate::ctrl::party::members::get_members(route.state, party_id).await {
+            Ok(stream) => reply::json_stream(stream).into_response(),
+            Err(e) => ApiError::err(e).into_response(),
+        },
     }
 }

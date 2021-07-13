@@ -1,4 +1,4 @@
-use models::{events::PresenceUpdate, Snowflake, UserPresence};
+use models::{Snowflake, UserPresence};
 
 use crate::{ctrl::Error, ServerState};
 
@@ -31,7 +31,7 @@ pub async fn set_presence(
     Ok(())
 }
 
-pub async fn clear_presence(state: ServerState, user_id: Snowflake, conn_id: Snowflake) -> Result<(), Error> {
+pub async fn clear_presence(state: ServerState, conn_id: Snowflake) -> Result<(), Error> {
     let db = state.db.write.get().await?;
 
     db.execute_cached_typed(
@@ -41,10 +41,9 @@ pub async fn clear_presence(state: ServerState, user_id: Snowflake, conn_id: Sno
 
             Query::delete()
                 .from::<UserPresence>()
-                .and_where(UserPresence::UserId.equals(Var::of(UserPresence::UserId)))
                 .and_where(UserPresence::ConnId.equals(Var::of(UserPresence::ConnId)))
         },
-        &[&user_id, &conn_id],
+        &[&conn_id],
     )
     .await?;
 

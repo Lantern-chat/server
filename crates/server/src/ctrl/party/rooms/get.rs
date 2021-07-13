@@ -35,7 +35,7 @@ pub async fn get_rooms(
     auth: Authorization,
     party_id: Snowflake,
 ) -> Result<Vec<Room>, Error> {
-    let db = state.read_db().await;
+    let db = state.db.read.get().await?;
 
     let base_perm_future = async {
         let row = db

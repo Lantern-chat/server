@@ -18,7 +18,16 @@ pub struct UserPresence {
     pub updated_at: Option<String>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub activity: Option<Activity>,
+    pub activity: Option<AnyActivity>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum AnyActivity {
+    Typed(Activity),
+
+    /// WARNING: Never construct this manually
+    Any(serde_json::Value),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

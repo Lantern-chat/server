@@ -24,3 +24,11 @@ pub use self::{
 pub const fn is_false(value: &bool) -> bool {
     !*value
 }
+
+#[inline]
+pub fn is_none_or_empty<T>(value: &Option<Vec<T>>) -> bool {
+    match value {
+        None => true,
+        Some(v) => v.is_empty(),
+    }
+}

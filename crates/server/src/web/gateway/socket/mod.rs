@@ -282,13 +282,13 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
             }
         } // END 'event_loop
 
-        if let Some(user_id) = user_id {
+        if user_id.is_some() {
             let conn_id = conn.id;
             let state2 = state.clone();
             tokio::spawn(async move {
                 tokio::time::sleep(Duration::from_secs(5)).await;
 
-                if let Err(e) = clear_presence(state2, user_id, conn_id).await {
+                if let Err(e) = clear_presence(state2, conn_id).await {
                     log::error!("Error clearing connection presence: {}", e);
                 }
             });

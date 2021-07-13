@@ -111,6 +111,7 @@ pub async fn create_message(
             user: None,
             nick: Some(nick),
             roles,
+            presence: None,
         }),
         author: User {
             id: auth.user_id,

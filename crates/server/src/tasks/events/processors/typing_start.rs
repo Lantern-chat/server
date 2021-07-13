@@ -57,6 +57,7 @@ pub async fn trigger_typing(
                     }),
                     nick: row.try_get(0)?,
                     roles: None,
+                    presence: None,
                 };
 
                 let mut roles = Vec::new();
