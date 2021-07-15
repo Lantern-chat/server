@@ -3,7 +3,7 @@ use std::{hash::Hasher, path::PathBuf};
 use schema::Snowflake;
 
 #[inline]
-pub fn outer_perfect_shuffle(mut x: u64) -> u64 {
+fn outer_perfect_shuffle(mut x: u64) -> u64 {
     let t = (x ^ (x >> 16)) & 0x00000000FFFF0000u64;
     x = x ^ t ^ (t << 16);
 

@@ -11,7 +11,7 @@ publish = false
 db = { path = "../db" }
 server = { path = "../server" }
 
-tokio = { version = "1.4", features = ["full", "parking_lot"] }
+tokio = { version = "1", features = ["full", "parking_lot"] }
 futures = "0.3"
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
 tracing-futures = { version = "0.2.4", default-features = false, features = ["std-future"] }
