@@ -37,9 +37,10 @@ struct MimeEntry {
 }
 
 fn main() -> io::Result<()> {
-    let mime_db = File::open("./mime-db/db.json")?;
+    let mut db: HashMap<String, MimeEntry> = serde_json::from_reader(File::open("./extra.json")?).unwrap();
+    let db2: HashMap<String, MimeEntry> = serde_json::from_reader(File::open("./mime-db/db.json")?).unwrap();
 
-    let db: HashMap<String, MimeEntry> = serde_json::from_reader(mime_db).unwrap();
+    db.extend(db2); // apply mime-db second to overwrite any old extras
 
     let path = Path::new(&env::var("OUT_DIR").unwrap()).join("mime_db.rs");
     let mut file = BufWriter::new(File::create(&path)?);

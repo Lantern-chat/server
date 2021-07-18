@@ -1,0 +1,12 @@
+{
+    "image/flif": {
+        "extensions": [
+            "flif"
+        ]
+    },
+    "image/jxl": {
+        "extensions": [
+            "jxl"
+        ]
+    }
+}
