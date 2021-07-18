@@ -1,0 +1,17 @@
+[package]
+name = "mime_db"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+phf = "0.9.0"
+unicase = "2.6.0"
+
+[build-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+phf_shared = { version = "0.9", features = ["unicase"] }
+phf_codegen = "0.9"
+unicase = "2.6.0"
