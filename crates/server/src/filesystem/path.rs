@@ -22,8 +22,7 @@ fn outer_perfect_shuffle(mut x: u64) -> u64 {
     x
 }
 
-// TODO: Optimize this to return a fixed-size string since all the file paths are the same size.
-pub fn id_to_path(buf: &mut PathBuf, id: Snowflake) {
+pub fn id_to_path(id: Snowflake, buf: &mut PathBuf) {
     let id = id.to_u64();
 
     let mut hasher = ahash::AHasher::new_with_keys(
@@ -34,24 +33,25 @@ pub fn id_to_path(buf: &mut PathBuf, id: Snowflake) {
     let hash = hasher.finish().to_le_bytes();
 
     // take upper bits and use them for directories
+    // using only 32 bits for this allows for up to 2^32 directories as 256 / 256 / 256 / 256
+    // and on EXT4 the number of files is like 2^31, so this is way, way more than sufficient.
     let mut encoded = [0; 4 * 2];
     hex::encode_to_slice(&hash[..4], &mut encoded).unwrap();
 
+    buf.reserve(8 + 3); // 8 bytes for path chunks + 3 slashes
     for chunk in encoded.chunks_exact(2) {
         buf.push(unsafe { std::str::from_utf8_unchecked(chunk) });
     }
 }
 
 pub fn id_to_name(id: Snowflake, buf: &mut PathBuf) {
-    // shuffle bytes for file name
-
-    let ordered_bytes = outer_perfect_shuffle(id.to_u64()).swap_bytes().to_le_bytes();
+    let bytes = outer_perfect_shuffle(id.to_u64()).to_le_bytes();
 
     const SHUFFLE: [usize; 8] = [7, 4, 2, 0, 1, 6, 3, 5]; // randomly generated
 
     let mut shuffled = [0; 8];
     for i in 0..8 {
-        shuffled[i] = ordered_bytes[SHUFFLE[i]];
+        shuffled[i] = bytes[SHUFFLE[i]];
     }
 
     let mut name_encoded = [0; 8 * 4 / 3 + 4];
