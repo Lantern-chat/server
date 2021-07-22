@@ -18,7 +18,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 impl<F> EncryptedFile<F> {
-    pub fn new_read(inner: F, cipher: Aes256Ctr) -> Self {
+    pub fn new(inner: F, cipher: Aes256Ctr) -> Self {
         EncryptedFile { inner, cipher }
     }
 
