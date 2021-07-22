@@ -58,6 +58,7 @@ aho-corasick = "0.7"
 xorf = "0.7.0"
 arc-swap = "1.2.0"
 bitflags = "1.2"
+pin-project = "1.0.8"
 
 [build-dependencies]
 built = { version = "0.5", features = ["git2", "chrono"] }
