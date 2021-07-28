@@ -1,3 +1,4 @@
+use std::fs::Metadata;
 use std::io::{self, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
@@ -78,5 +79,13 @@ impl FileStore {
         };
 
         options.open(path).await
+    }
+
+    pub async fn metadata(&self, id: Snowflake) -> io::Result<Metadata> {
+        let mut path = self.root.clone();
+        id_to_path(id, &mut path);
+        id_to_name(id, &mut path);
+
+        tokio::fs::metadata(path).await
     }
 }

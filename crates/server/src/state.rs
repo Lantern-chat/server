@@ -10,12 +10,12 @@ use std::{
 
 use futures::{future::BoxFuture, FutureExt};
 use schema::Snowflake;
-use tokio::sync::{oneshot, Mutex, Notify, Semaphore};
+use tokio::sync::{oneshot, Mutex, Notify, OwnedMutexGuard, Semaphore};
 use util::cmap::CHashMap;
 
 use crate::{
-    config::LanternConfig, permission_cache::PermissionCache, session_cache::SessionCache,
-    web::file_cache::MainFileCache, DatabasePools,
+    config::LanternConfig, filesystem::store::FileStore, permission_cache::PermissionCache,
+    session_cache::SessionCache, web::file_cache::MainFileCache, DatabasePools,
 };
 use crate::{
     tasks::events::cache::EventItemCache,
@@ -30,7 +30,7 @@ pub struct InnerServerState {
     pub db: DatabasePools,
     pub config: LanternConfig,
     pub id_lock: IdLockMap,
-    //pub fs: FileStore,
+    pub fs: FileStore,
     pub gateway: Gateway,
     pub hashing_semaphore: Semaphore,
     pub fs_semaphore: Semaphore,
@@ -64,7 +64,7 @@ impl ServerState {
             db,
             config: Default::default(), // TODO: Load from file
             id_lock: IdLockMap::default(),
-            //fs: FileStore::new("./data"), // TODO: Set from config
+            fs: FileStore::new("./data"), // TODO: Set from config
             gateway: Gateway::default(),
             hashing_semaphore: Semaphore::new(16), // TODO: Set from available memory?
             fs_semaphore: Semaphore::new(512),
@@ -137,8 +137,9 @@ pub struct IdLockMap {
 }
 
 impl IdLockMap {
-    pub async fn get(&self, id: Snowflake) -> Arc<Mutex<()>> {
-        self.map.get_or_default(&id).await.clone()
+    pub async fn lock(&self, id: Snowflake) -> OwnedMutexGuard<()> {
+        let lock = self.map.get_or_default(&id).await.clone();
+        Mutex::lock_owned(lock).await
     }
 
     pub async fn cleanup(&self) {
