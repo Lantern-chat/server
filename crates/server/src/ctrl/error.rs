@@ -1,9 +1,17 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, string::FromUtf8Error};
 
 use db::pool::Error as DbError;
 use ftl::{body::BodyDeserializeError, StatusCode};
 
 use crate::web::gateway::event::EncodingError;
+
+lazy_static::lazy_static! {
+    // 460 Checksum Mismatch
+    pub static ref CHECKSUM_MISMATCH: StatusCode = StatusCode::from_u16(460).unwrap();
+
+    // 413 Request Entity Too Large
+    pub static ref REQUEST_ENTITY_TOO_LARGE: StatusCode = StatusCode::from_u16(413).unwrap();
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -21,10 +29,15 @@ pub enum Error {
     JsonError(#[from] serde_json::Error),
     #[error("Encoding Error {0}")]
     EncodingError(#[from] EncodingError),
+    #[error("IO Error: {0}")]
+    IOError(#[from] std::io::Error),
     #[error("Internal Error: {0}")]
     InternalError(String),
     #[error("Internal Error: {0}")]
     InternalErrorStatic(&'static str),
+
+    #[error("UTF8 Parse Error: {0}")]
+    Utf8ParseError(#[from] FromUtf8Error),
 
     // NON-FATAL ERRORS
     #[error("Already Exists")]
@@ -60,6 +73,9 @@ pub enum Error {
     #[error("Invalid Room Topic")]
     InvalidTopic,
 
+    #[error("Invalid file preview")]
+    InvalidPreview,
+
     #[error("Missing Upload-Metadata Header")]
     MissingUploadMetadataHeader,
 
@@ -73,13 +89,13 @@ pub enum Error {
     InvalidAuthFormat,
 
     #[error("Header Parse Error")]
-    HeaderParseError,
+    HeaderParseError(#[from] http::header::ToStrError),
 
     #[error("Missing filename")]
     MissingFilename,
 
-    #[error("Missing filetype")]
-    MissingFiletype,
+    #[error("Missing mime")]
+    MissingMime,
 
     #[error("Not Found")]
     NotFound,
@@ -98,6 +114,12 @@ pub enum Error {
 
     #[error("Query Parse Error: {0}")]
     QueryParseError(#[from] serde_urlencoded::de::Error),
+
+    #[error("Checksum Mismatch")]
+    ChecksumMismatch,
+
+    #[error("Request Entity Too Large")]
+    RequestEntityTooLarge,
 }
 
 impl From<db::pg::Error> for Error {
@@ -116,6 +138,7 @@ impl Error {
                 | Error::HashError(_)
                 | Error::JsonError(_)
                 | Error::EncodingError(_)
+                | Error::IOError(_)
                 | Error::InternalError(_)
                 | Error::InternalErrorStatic(_)
         )
@@ -133,9 +156,11 @@ impl Error {
             Error::AlreadyExists => StatusCode::CONFLICT,
             Error::MissingAuthorizationHeader
             | Error::MissingUploadMetadataHeader
-            | Error::HeaderParseError
+            | Error::HeaderParseError(_)
             | Error::AuthTokenParseError(_)
             | Error::DecodeError(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            Error::ChecksumMismatch => *CHECKSUM_MISMATCH,
+            Error::RequestEntityTooLarge => *REQUEST_ENTITY_TOO_LARGE,
             _ => StatusCode::BAD_REQUEST,
         }
     }
@@ -167,9 +192,9 @@ impl Error {
             Error::MissingAuthorizationHeader   => 40013,
             Error::NoSession                => 40014,
             Error::InvalidAuthFormat        => 40015,
-            Error::HeaderParseError         => 40016,
+            Error::HeaderParseError(_)      => 40016,
             Error::MissingFilename          => 40017,
-            Error::MissingFiletype          => 40018,
+            Error::MissingMime          => 40018,
             Error::AuthTokenParseError(_)   => 40019,
             Error::DecodeError(_)           => 40020,
             Error::BodyDeserializeError(_)  => 40021,
@@ -186,6 +211,7 @@ impl Error {
             Error::DbError(_) => "Database Error",
             Error::AuthTokenParseError(_) => "Auth Token Parse Error",
             Error::DecodeError(_) => "Base64 Decode Error",
+            Error::IOError(_) => "IO Error",
 
             _ if self.is_fatal() => "Internal Server Error",
             _ => return self.to_string().into(),

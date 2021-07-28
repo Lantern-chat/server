@@ -13,7 +13,7 @@ pub struct LanternConfig {
     pub roomname_len: Range<usize>,
     pub message_len: Range<usize>,
     pub max_message_newlines: usize,
-    pub max_upload_size: u32,
+    pub max_upload_size: i32,
 }
 
 impl Default for LanternConfig {

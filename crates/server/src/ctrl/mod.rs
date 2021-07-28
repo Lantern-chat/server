@@ -50,3 +50,7 @@ pub mod room {
         pub mod get_one;
     }
 }
+
+pub mod file {
+    pub mod post;
+}

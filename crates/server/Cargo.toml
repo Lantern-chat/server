@@ -14,6 +14,8 @@ db = { path = "../db" }
 util = { path = "../util" }
 schema = { path = "../schema" }
 
+blurhash = { path = "../../../deps/blurhash" }
+
 thorn = { git = "https://github.com/novacrazy/thorn" }
 
 serde = { version = "1", features = ["derive", "rc"] }

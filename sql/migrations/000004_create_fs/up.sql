@@ -3,6 +3,9 @@ CREATE TABLE lantern.files (
     -- Snowflake ID
     id      bigint      NOT NULL,
 
+    -- Encryption Nonce
+    nonce   bigint,
+
     -- Size of file in bytes
     size    int         NOT NULL,
 
@@ -21,7 +24,6 @@ CREATE TABLE lantern.files (
     -- blurhash preview (first frame of video if video)
     -- this shouldn't be too large, less than 128 bytes
     preview bytea,
-
 
     CONSTRAINT file_pk PRIMARY KEY (id)
 );
