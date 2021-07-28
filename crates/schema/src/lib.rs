@@ -21,3 +21,5 @@ pub const SNOWFLAKE_ARRAY: Type = Type::INT8_ARRAY;
 
 pub mod sf;
 pub use sf::{Snowflake, SnowflakeExt};
+
+pub mod flags;

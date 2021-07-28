@@ -71,6 +71,8 @@ pub async fn head(state: ServerState, auth: Authorization, file_id: Snowflake) -
 
     if let Some(meta) = metadata {
         head.offset = meta.len() as i32;
+    } else {
+        log::trace!("File HEAD on file that doesn't exist yet");
     }
 
     Ok(head)

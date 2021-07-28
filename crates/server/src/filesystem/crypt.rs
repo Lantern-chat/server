@@ -28,6 +28,10 @@ impl<F> EncryptedFile<F> {
     {
         EncryptedFile::new(BufWriter::new(inner), cipher)
     }
+
+    pub fn get_ref(&self) -> &F {
+        &self.inner
+    }
 }
 
 impl<F: AsyncRead + Unpin> AsyncRead for EncryptedFile<F> {

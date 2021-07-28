@@ -1,8 +1,10 @@
-use std::time::Duration;
+use std::{env, time::Duration};
 
 use std::ops::Range;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+use aes::{cipher::BlockCipherKey, Aes256};
+
+#[derive(Debug, Clone)]
 pub struct LanternConfig {
     pub num_parallel_tasks: usize,
     pub login_session_duration: Duration,
@@ -14,6 +16,7 @@ pub struct LanternConfig {
     pub message_len: Range<usize>,
     pub max_message_newlines: usize,
     pub max_upload_size: i32,
+    pub file_key: BlockCipherKey<Aes256>,
 }
 
 impl Default for LanternConfig {
@@ -29,6 +32,14 @@ impl Default for LanternConfig {
             message_len: 1..5000,
             max_message_newlines: 120,
             max_upload_size: 1024 * 1024 * 8,
+            file_key: {
+                let mut key: BlockCipherKey<Aes256> = BlockCipherKey::<Aes256>::default();
+
+                hex::decode_to_slice(env::var("FS_KEY").unwrap(), key.as_mut_slice())
+                    .expect("Invalid hexidecimal AES256 Key");
+
+                key
+            },
         }
     }
 }

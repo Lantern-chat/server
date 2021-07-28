@@ -26,6 +26,7 @@ use crate::{
 
 pub mod head;
 pub mod options;
+pub mod patch;
 pub mod post;
 
 pub async fn file(mut route: Route<ServerState>) -> Response {

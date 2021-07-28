@@ -7,7 +7,7 @@ use aes::cipher::{BlockCipherKey, NewCipher, Nonce};
 use aes::{Aes256, Aes256Ctr, BlockCipher, NewBlockCipher};
 
 use tokio::fs::{self, File as TkFile, OpenOptions};
-use tokio::io::{AsyncRead, AsyncSeek, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncSeek, AsyncWrite, BufWriter};
 
 use schema::Snowflake;
 
@@ -36,8 +36,34 @@ impl CipherOptions {
 
 use super::crypt::EncryptedFile;
 
-pub trait RWSeekStream: AsyncWrite + AsyncRead + AsyncSeek + Send {}
-impl<T> RWSeekStream for T where T: AsyncWrite + AsyncRead + AsyncSeek + Send {}
+#[async_trait::async_trait]
+pub trait SetFileLength {
+    async fn set_len(&self, size: u64) -> Result<(), io::Error>;
+}
+
+#[async_trait::async_trait]
+impl SetFileLength for TkFile {
+    async fn set_len(&self, size: u64) -> Result<(), io::Error> {
+        TkFile::set_len(self, size).await
+    }
+}
+
+#[async_trait::async_trait]
+impl SetFileLength for BufWriter<TkFile> {
+    async fn set_len(&self, size: u64) -> Result<(), io::Error> {
+        self.get_ref().set_len(size).await
+    }
+}
+
+#[async_trait::async_trait]
+impl<F: SetFileLength + Sync> SetFileLength for EncryptedFile<F> {
+    async fn set_len(&self, size: u64) -> Result<(), io::Error> {
+        self.get_ref().set_len(size).await
+    }
+}
+
+pub trait RWSeekStream: AsyncWrite + AsyncRead + AsyncSeek + SetFileLength + Send {}
+impl<T> RWSeekStream for T where T: AsyncWrite + AsyncRead + AsyncSeek + SetFileLength + Send {}
 
 impl FileStore {
     pub fn new<P: AsRef<Path>>(root: P) -> FileStore {
@@ -78,6 +104,8 @@ impl FileStore {
             OpenMode::Write => options.write(true).create(true),
         };
 
+        log::trace!("Opening file: {} in mode: {:?}", path.display(), mode);
+
         options.open(path).await
     }
 
@@ -85,6 +113,8 @@ impl FileStore {
         let mut path = self.root.clone();
         id_to_path(id, &mut path);
         id_to_name(id, &mut path);
+
+        log::trace!("Loading metadata: {}", path.display());
 
         tokio::fs::metadata(path).await
     }
