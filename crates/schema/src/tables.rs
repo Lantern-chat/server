@@ -222,12 +222,13 @@ thorn::tables! {
 
     pub struct Files in Lantern {
         Id: SNOWFLAKE,
+        UserId: Users::Id,
         Nonce: Type::INT8,
         Size: Type::INT4,
-        Offset: Type::INT4,
         Flags: Type::INT2,
         Name: Type::TEXT,
         Mime: Type::TEXT,
+        Sha1: Type::BYTEA,
         Preview: Type::BYTEA,
     }
 }

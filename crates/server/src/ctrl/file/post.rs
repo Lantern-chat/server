@@ -1,4 +1,8 @@
-use crate::{ctrl::Error, web::routes::api::v1::file::post::Metadata, ServerState};
+use crate::{
+    ctrl::Error,
+    web::{auth::Authorization, routes::api::v1::file::post::Metadata},
+    ServerState,
+};
 
 use schema::{Snowflake, SnowflakeExt};
 
@@ -6,6 +10,7 @@ use rand::Rng;
 
 pub async fn post_file(
     state: ServerState,
+    auth: Authorization,
     upload_size: i32,
     metadata: Metadata<'_>,
 ) -> Result<Snowflake, Error> {
@@ -44,6 +49,7 @@ pub async fn post_file(
                 .into::<Files>()
                 .cols(&[
                     Files::Id,
+                    Files::UserId,
                     Files::Nonce,
                     Files::Size,
                     Files::Flags,
@@ -53,6 +59,7 @@ pub async fn post_file(
                 ])
                 .values(vec![
                     Var::of(Files::Id),
+                    Var::of(Files::UserId),
                     Var::of(Files::Nonce),
                     Var::of(Files::Size),
                     Var::of(Files::Flags),
@@ -61,7 +68,16 @@ pub async fn post_file(
                     Var::of(Files::Preview),
                 ])
         },
-        &[&file_id, &nonce, &upload_size, &0i16, &filename, &mime, &preview],
+        &[
+            &file_id,
+            &auth.user_id,
+            &nonce,
+            &upload_size,
+            &0i16,
+            &filename,
+            &mime,
+            &preview,
+        ],
     )
     .await?;
 

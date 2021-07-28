@@ -13,8 +13,8 @@ pub enum SearchMode<'a> {
 }
 
 pub mod gateway {
-    pub mod ready;
     pub mod presence;
+    pub mod ready;
 }
 
 pub mod user {
@@ -52,5 +52,8 @@ pub mod room {
 }
 
 pub mod file {
+    pub mod delete;
+    pub mod head;
+    pub mod patch;
     pub mod post;
 }

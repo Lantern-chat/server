@@ -29,6 +29,7 @@ pub struct InnerServerState {
     pub rate_limit: RateLimitTable,
     pub db: DatabasePools,
     pub config: LanternConfig,
+    pub id_lock: IdLockMap,
     //pub fs: FileStore,
     pub gateway: Gateway,
     pub hashing_semaphore: Semaphore,
@@ -62,6 +63,7 @@ impl ServerState {
             rate_limit: RateLimitTable::new(),
             db,
             config: Default::default(), // TODO: Load from file
+            id_lock: IdLockMap::default(),
             //fs: FileStore::new("./data"), // TODO: Set from config
             gateway: Gateway::default(),
             hashing_semaphore: Semaphore::new(16), // TODO: Set from available memory?
@@ -125,5 +127,21 @@ impl ServerState {
             .get()
             .await
             .expect("Could not acquire writable database connection")
+    }
+}
+
+/// Simple concurrent map structure containing locks for any particular snowflake ID
+#[derive(Default, Debug)]
+pub struct IdLockMap {
+    pub map: CHashMap<Snowflake, Arc<Mutex<()>>>,
+}
+
+impl IdLockMap {
+    pub async fn get(&self, id: Snowflake) -> Arc<Mutex<()>> {
+        self.map.get_or_default(&id).await.clone()
+    }
+
+    pub async fn cleanup(&self) {
+        self.map.retain(|_, lock| Arc::strong_count(lock) > 1).await
     }
 }

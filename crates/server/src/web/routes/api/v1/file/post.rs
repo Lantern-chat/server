@@ -2,9 +2,13 @@ use ftl::*;
 
 use schema::Snowflake;
 
-use crate::{ctrl::Error, web::routes::api::ApiError, ServerState};
+use crate::{
+    ctrl::Error,
+    web::{auth::Authorization, routes::api::ApiError},
+    ServerState,
+};
 
-pub async fn post(route: Route<ServerState>) -> Response {
+pub async fn post(route: Route<ServerState>, auth: Authorization) -> Response {
     let upload_length = match route.parse_raw_header::<i32>("upload-length") {
         Some(Ok(Ok(upload_length))) => upload_length,
         _ => return ApiError::bad_request().into_response(),
@@ -19,7 +23,7 @@ pub async fn post(route: Route<ServerState>) -> Response {
         Err(e) => return ApiError::err(e).into_response(),
     };
 
-    match crate::ctrl::file::post::post_file(route.state.clone(), upload_length, metadata).await {
+    match crate::ctrl::file::post::post_file(route.state.clone(), auth, upload_length, metadata).await {
         Err(e) => ApiError::err(e).into_response(),
         Ok(file_id) => {
             let mut res = Response::default();

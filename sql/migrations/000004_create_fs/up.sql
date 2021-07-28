@@ -3,14 +3,13 @@ CREATE TABLE lantern.files (
     -- Snowflake ID
     id      bigint      NOT NULL,
 
+    user_id bigint      NOT NULL,
+
     -- Encryption Nonce
     nonce   bigint,
 
     -- Size of file in bytes
     size    int         NOT NULL,
-
-    -- Offset of file write
-    "offset"  int       NOT NULL DEFAULT 0,
 
     -- Bitflags for state
     flags   smallint    NOT NULL,
@@ -21,6 +20,9 @@ CREATE TABLE lantern.files (
     -- MIME type
     mime    text,
 
+    -- SHA-1 hash of completed file
+    sha1    bytea,
+
     -- blurhash preview (first frame of video if video)
     -- this shouldn't be too large, less than 128 bytes
     preview bytea,
@@ -30,23 +32,6 @@ CREATE TABLE lantern.files (
 
 CREATE INDEX file_idx ON lantern.files USING hash(id);
 
-CREATE OR REPLACE PROCEDURE lantern.upsert_file(
-    _id bigint,
-    _name text,
-    _preview bytea,
-    _mime text,
-    _size int,
-    _offset int,
-    _flags smallint
-)
-LANGUAGE plpgsql AS
-$$
-BEGIN
-    INSERT INTO lantern.files (id, name, preview, mime, size, "offset", flags)
-    VALUES (_id, _name, _preview, _mime, _size, _offset, _flags)
-    ON CONFLICT ON CONSTRAINT file_pk DO
-        UPDATE SET preview  = _preview,
-                   "offset" = _offset,
-                   flags    = _flags;
-END
-$$;
+ALTER TABLE lantern.files ADD CONSTRAINT user_fk FOREIGN KEY (user_id)
+    REFERENCES lantern.users (id) MATCH FULL
+    ON DELETE RESTRICT ON UPDATE CASCADE;
