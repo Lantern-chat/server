@@ -5,6 +5,7 @@ use ftl::*;
 use headers::ContentType;
 
 pub mod api;
+pub mod cdn;
 
 pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
     if route.path().len() > 255 || route.raw_query().map(|q| q.len() > 255) == Some(true) {
@@ -40,6 +41,8 @@ pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
                 .await
                 .into_response()
         }
+
+        (&Method::GET | &Method::HEAD, Exact("cdn")) => cdn::cdn(route).boxed().await,
 
         (&Method::GET | &Method::HEAD, segment) => {
             let allowed = match segment {
