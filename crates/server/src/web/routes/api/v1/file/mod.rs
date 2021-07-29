@@ -51,8 +51,9 @@ pub async fn file(mut route: Route<ServerState>) -> Response {
                                 return ApiError::not_found().into_response();
                             }
 
-                            match route.method() {
-                                &Method::HEAD => head::head(route, auth, file_id).await,
+                            match *route.method() {
+                                Method::HEAD => head::head(route, auth, file_id).await,
+                                Method::PATCH => patch::patch(route, auth, file_id).await,
 
                                 _ => StatusCode::METHOD_NOT_ALLOWED.into_response(),
                             }

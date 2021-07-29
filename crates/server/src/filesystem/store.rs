@@ -37,33 +37,33 @@ impl CipherOptions {
 use super::crypt::EncryptedFile;
 
 #[async_trait::async_trait]
-pub trait SetFileLength {
+pub trait FileExt {
     async fn set_len(&self, size: u64) -> Result<(), io::Error>;
 }
 
 #[async_trait::async_trait]
-impl SetFileLength for TkFile {
+impl FileExt for TkFile {
     async fn set_len(&self, size: u64) -> Result<(), io::Error> {
         TkFile::set_len(self, size).await
     }
 }
 
 #[async_trait::async_trait]
-impl SetFileLength for BufWriter<TkFile> {
+impl FileExt for BufWriter<TkFile> {
     async fn set_len(&self, size: u64) -> Result<(), io::Error> {
         self.get_ref().set_len(size).await
     }
 }
 
 #[async_trait::async_trait]
-impl<F: SetFileLength + Sync> SetFileLength for EncryptedFile<F> {
+impl<F: FileExt + Sync> FileExt for EncryptedFile<F> {
     async fn set_len(&self, size: u64) -> Result<(), io::Error> {
         self.get_ref().set_len(size).await
     }
 }
 
-pub trait RWSeekStream: AsyncWrite + AsyncRead + AsyncSeek + SetFileLength + Send {}
-impl<T> RWSeekStream for T where T: AsyncWrite + AsyncRead + AsyncSeek + SetFileLength + Send {}
+pub trait RWSeekStream: AsyncWrite + AsyncRead + AsyncSeek + FileExt + Send + Sync {}
+impl<T> RWSeekStream for T where T: AsyncWrite + AsyncRead + AsyncSeek + FileExt + Send + Sync {}
 
 impl FileStore {
     pub fn new<P: AsRef<Path>>(root: P) -> FileStore {

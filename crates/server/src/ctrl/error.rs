@@ -103,6 +103,12 @@ pub enum Error {
     #[error("Bad Request")]
     BadRequest,
 
+    #[error("Upload Error")]
+    UploadError,
+
+    #[error("Upload Conflict")]
+    Conflict,
+
     #[error("Auth Token Parse Error: {0}")]
     AuthTokenParseError(#[from] super::auth::AuthTokenFromStrError),
 
@@ -161,6 +167,7 @@ impl Error {
             | Error::DecodeError(_) => StatusCode::UNPROCESSABLE_ENTITY,
             Error::ChecksumMismatch => *CHECKSUM_MISMATCH,
             Error::RequestEntityTooLarge => *REQUEST_ENTITY_TOO_LARGE,
+            Error::Conflict => StatusCode::CONFLICT,
             _ => StatusCode::BAD_REQUEST,
         }
     }
@@ -176,6 +183,8 @@ impl Error {
             Error::EncodingError(_)         => 50006,
             Error::InternalError(_)         => 50007,
             Error::InternalErrorStatic(_)   => 50008,
+            Error::Utf8ParseError(_)        => 50009,
+            Error::IOError(_)               => 50010,
 
             Error::AlreadyExists            => 40001,
             Error::UsernameUnavailable      => 40002,
@@ -194,14 +203,23 @@ impl Error {
             Error::InvalidAuthFormat        => 40015,
             Error::HeaderParseError(_)      => 40016,
             Error::MissingFilename          => 40017,
-            Error::MissingMime          => 40018,
+            Error::MissingMime              => 40018,
             Error::AuthTokenParseError(_)   => 40019,
             Error::DecodeError(_)           => 40020,
             Error::BodyDeserializeError(_)  => 40021,
             Error::QueryParseError(_)       => 40022,
+            Error::UploadError              => 40023,
+            Error::InvalidPreview           => 40024,
+
+            // HTTP-like error codes
+            Error::BadRequest               => 40400,
+            Error::NotFound                 => 40404,
+            Error::Conflict                 => 40409,
+            Error::RequestEntityTooLarge    => 40413,
+            Error::ChecksumMismatch         => 40460,
 
             // TODO: Decide on actual error codes
-            _ => self.http_status().as_u16(),
+            //_ => self.http_status().as_u16(),
         }
     }
 

@@ -2,7 +2,7 @@ use std::io::SeekFrom;
 
 use crate::{
     ctrl::Error,
-    filesystem::store::{CipherOptions, OpenMode, RWSeekStream, SetFileLength},
+    filesystem::store::{CipherOptions, FileExt, OpenMode, RWSeekStream},
     web::{auth::Authorization, routes::api::v1::file::post::Metadata},
     ServerState,
 };
@@ -20,6 +20,8 @@ pub struct FilePatch {
 }
 
 pub struct FilePatchParams {
+    pub crc32: u32,
+    pub upload_offset: u32,
     pub content_length: u64,
 }
 
@@ -59,7 +61,10 @@ pub async fn patch_file(
 
     drop(db); // free connection
 
-    let mut crc32 = crc32fast::Hasher::new();
+    // a completed file cannot be modified
+    if flags.contains(FileFlags::COMPLETE) {
+        return Err(Error::Conflict);
+    }
 
     let cipher_options = CipherOptions {
         key: state.config.file_key,
@@ -74,6 +79,11 @@ pub async fn patch_file(
         .await?;
 
     let append_pos = file.seek(SeekFrom::End(0)).await?;
+
+    if params.upload_offset as u64 != append_pos {
+        return Err(Error::Conflict);
+    }
+
     let end_pos = append_pos + params.content_length;
 
     // Don't allow excess writing
@@ -81,30 +91,31 @@ pub async fn patch_file(
         return Err(Error::RequestEntityTooLarge);
     }
 
+    let mut crc32 = crc32fast::Hasher::new();
     let mut bytes_written = 0;
 
-    let res = loop {
+    let mut res = loop {
         match body.next().await {
             None => break None,
             Some(Err(e)) => {
                 let is_fatal = e.is_parse() || e.is_parse_status() || e.is_parse_too_large() || e.is_user();
 
-                if is_fatal {
-                    break Some(Error::InternalError(e.to_string()));
+                break Some(if is_fatal {
+                    Error::InternalError(e.to_string())
                 } else {
-                    // TODO: Better error
-                    break Some(Error::InvalidContent);
-                }
+                    Error::UploadError
+                });
             }
             Some(Ok(mut bytes)) => {
                 let num_bytes = bytes.len() as u64;
                 let new_bytes_written = bytes_written + num_bytes;
 
                 // check if request is too large before writing
-                if bytes_written > params.content_length {
+                if new_bytes_written > params.content_length {
                     break Some(Error::RequestEntityTooLarge);
                 }
 
+                // update crc before bytes are moved out
                 crc32.update(&bytes);
 
                 if let Err(e) = file.write_all_buf(&mut bytes).await {
@@ -115,6 +126,21 @@ pub async fn patch_file(
             }
         }
     };
+
+    if let Err(e) = file.flush().await {
+        match res {
+            Some(Error::IOError(_)) => {
+                log::error!("Error flushing file: {}, probably due to previous IO error", e)
+            }
+            Some(_) => log::error!("Error flushing file after non-io error: {}", e),
+            None => res = Some(e.into()),
+        }
+    }
+
+    // check checksum
+    if params.crc32 != crc32.finalize() {
+        res = res.or(Some(Error::ChecksumMismatch));
+    }
 
     if let Some(err) = res {
         // only rewind if there was anything written
