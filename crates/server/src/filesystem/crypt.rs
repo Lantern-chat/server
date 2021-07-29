@@ -68,7 +68,15 @@ impl<F: AsyncWrite + Unpin> AsyncWrite for EncryptedFile<F> {
                 this.cipher.seek(pos);
                 Poll::Pending
             }
-            Poll::Ready(res) => Poll::Ready(res),
+            Poll::Ready(Ok(bytes)) => {
+                if bytes < buf.len() {
+                    // partial rewind...
+                    this.cipher.seek(pos + bytes as u64);
+                }
+
+                Poll::Ready(Ok(bytes))
+            }
+            Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
         }
     }
 
