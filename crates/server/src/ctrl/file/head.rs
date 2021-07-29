@@ -58,6 +58,7 @@ pub async fn head(state: ServerState, auth: Authorization, file_id: Snowflake) -
     };
 
     let fetch_metadata = async {
+        // TODO: Determine if this is necessary, as HEAD can be called on a completed file
         let _file_lock = state.id_lock.lock(file_id).await;
 
         match state.fs.metadata(file_id).await {

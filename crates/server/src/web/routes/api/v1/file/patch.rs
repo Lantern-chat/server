@@ -8,28 +8,29 @@ use crate::{
     ServerState,
 };
 
-pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: Snowflake) -> Response {
+pub async fn patch(
+    mut route: Route<ServerState>,
+    auth: Authorization,
+    file_id: Snowflake,
+) -> Result<Response, Error> {
     match route.raw_header("Content-Type") {
         Some(ct) if ct.as_bytes() == b"application/offset+octet-stream" => {}
-        _ => return StatusCode::UNSUPPORTED_MEDIA_TYPE.into_response(),
+        _ => return Ok(StatusCode::UNSUPPORTED_MEDIA_TYPE.into_response()),
     }
 
     let upload_offset: u32 = match route.parse_raw_header("Upload-Offset") {
         Some(Ok(Ok(upload_offset))) => upload_offset,
-        _ => return StatusCode::BAD_REQUEST.into_response(),
+        _ => return Ok(StatusCode::BAD_REQUEST.into_response()),
     };
 
     let checksum = match route.raw_header("Upload-Checksum") {
-        Some(checksum_header) => match parse_checksum_header(checksum_header) {
-            Err(e) => return ApiError::err(e).into_response(),
-            Ok(s) => s,
-        },
-        _ => return StatusCode::BAD_REQUEST.into_response(),
+        Some(checksum_header) => parse_checksum_header(checksum_header)?,
+        _ => return Ok(StatusCode::BAD_REQUEST.into_response()),
     };
 
     let content_length = match route.header::<headers::ContentLength>() {
         Some(cl) => cl.0,
-        _ => return StatusCode::BAD_REQUEST.into_response(),
+        _ => return Ok(StatusCode::BAD_REQUEST.into_response()),
     };
 
     let params = FilePatchParams {
@@ -40,24 +41,21 @@ pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: 
 
     let body = route.take_body().unwrap();
 
-    match crate::ctrl::file::patch::patch_file(route.state, auth, file_id, params, body).await {
-        Err(e) => ApiError::err(e).into_response(),
-        Ok(patch) => {
-            let mut res = Response::default();
-            *res.status_mut() = StatusCode::NO_CONTENT;
+    let patch = crate::ctrl::file::patch::patch_file(route.state, auth, file_id, params, body).await?;
 
-            let headers = res.headers_mut();
+    let mut res = Response::default();
+    *res.status_mut() = StatusCode::NO_CONTENT;
 
-            headers.extend(super::TUS_HEADERS.iter().map(|(k, v)| (k.clone(), v.clone())));
+    let headers = res.headers_mut();
 
-            headers.insert(
-                "Upload-Offset",
-                HeaderValue::from_str(&patch.upload_offset.to_string()).unwrap(),
-            );
+    headers.extend(super::TUS_HEADERS.iter().map(|(k, v)| (k.clone(), v.clone())));
 
-            res
-        }
-    }
+    headers.insert(
+        "Upload-Offset",
+        HeaderValue::from_str(&patch.upload_offset.to_string())?,
+    );
+
+    Ok(res)
 }
 
 fn parse_checksum_header(header: &HeaderValue) -> Result<u32, Error> {
@@ -79,5 +77,5 @@ fn parse_checksum_header(header: &HeaderValue) -> Result<u32, Error> {
         return Err(Error::ChecksumMismatch);
     }
 
-    Ok(u32::from_le_bytes(out))
+    Ok(u32::from_be_bytes(out))
 }

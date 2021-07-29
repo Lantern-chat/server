@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use ftl::{
     reply::{self, Reply},
-    StatusCode,
+    ReplyError, StatusCode,
 };
 
 use crate::ctrl::error::Error;
@@ -14,6 +14,22 @@ pub struct ApiError {
 }
 
 use reply::{Json, WithStatus};
+
+impl Reply for Error {
+    fn into_response(self) -> ftl::Response {
+        ApiError::err(self).into_response()
+    }
+}
+
+impl ReplyError for Error {
+    fn status(&self) -> StatusCode {
+        self.http_status()
+    }
+
+    fn into_error_response(self) -> ftl::Response {
+        ApiError::err(self).into_response()
+    }
+}
 
 impl ApiError {
     fn real_err(kind: Error) -> WithStatus<Json> {

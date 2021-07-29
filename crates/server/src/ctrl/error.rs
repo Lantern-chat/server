@@ -2,6 +2,7 @@ use std::{borrow::Cow, string::FromUtf8Error};
 
 use db::pool::Error as DbError;
 use ftl::{body::BodyDeserializeError, StatusCode};
+use http::header::InvalidHeaderValue;
 
 use crate::web::gateway::event::EncodingError;
 
@@ -31,6 +32,8 @@ pub enum Error {
     EncodingError(#[from] EncodingError),
     #[error("IO Error: {0}")]
     IOError(#[from] std::io::Error),
+    #[error("Invalid Header Value: {0}")]
+    InvalidHeaderValue(#[from] InvalidHeaderValue),
     #[error("Internal Error: {0}")]
     InternalError(String),
     #[error("Internal Error: {0}")]
@@ -126,6 +129,9 @@ pub enum Error {
 
     #[error("Request Entity Too Large")]
     RequestEntityTooLarge,
+
+    #[error("Mime Parse Error: {0}")]
+    MimeParseError(#[from] mime::FromStrError),
 }
 
 impl From<db::pg::Error> for Error {
@@ -147,6 +153,7 @@ impl Error {
                 | Error::IOError(_)
                 | Error::InternalError(_)
                 | Error::InternalErrorStatic(_)
+                | Error::InvalidHeaderValue(_)
         )
     }
 
@@ -185,6 +192,7 @@ impl Error {
             Error::InternalErrorStatic(_)   => 50008,
             Error::Utf8ParseError(_)        => 50009,
             Error::IOError(_)               => 50010,
+            Error::InvalidHeaderValue(_)    => 50011,
 
             Error::AlreadyExists            => 40001,
             Error::UsernameUnavailable      => 40002,
@@ -210,6 +218,7 @@ impl Error {
             Error::QueryParseError(_)       => 40022,
             Error::UploadError              => 40023,
             Error::InvalidPreview           => 40024,
+            Error::MimeParseError(_)        => 40025,
 
             // HTTP-like error codes
             Error::BadRequest               => 40400,
@@ -230,6 +239,7 @@ impl Error {
             Error::AuthTokenParseError(_) => "Auth Token Parse Error",
             Error::DecodeError(_) => "Base64 Decode Error",
             Error::IOError(_) => "IO Error",
+            Error::InvalidHeaderValue(_) => "Invalid Header Value",
 
             _ if self.is_fatal() => "Internal Server Error",
             _ => return self.to_string().into(),

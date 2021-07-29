@@ -24,6 +24,7 @@ use crate::{
     ServerState,
 };
 
+pub mod get;
 pub mod head;
 pub mod options;
 pub mod patch;
@@ -43,7 +44,7 @@ pub async fn file(mut route: Route<ServerState>) -> Response {
             match route.method_segment() {
                 (&Method::POST, End) => post::post(route, auth).await,
 
-                (&Method::HEAD | &Method::PATCH | &Method::DELETE, Exact(_)) => {
+                (&Method::HEAD | &Method::PATCH | &Method::DELETE | &Method::GET, Exact(_)) => {
                     match route.param::<Snowflake>() {
                         Some(Ok(file_id)) => {
                             // nothing should be after the file_id
@@ -51,9 +52,10 @@ pub async fn file(mut route: Route<ServerState>) -> Response {
                                 return ApiError::not_found().into_response();
                             }
 
-                            match *route.method() {
-                                Method::HEAD => head::head(route, auth, file_id).await,
-                                Method::PATCH => patch::patch(route, auth, file_id).await,
+                            match route.method() {
+                                &Method::HEAD => head::head(route, auth, file_id).await.into_response(),
+                                &Method::PATCH => patch::patch(route, auth, file_id).await.into_response(),
+                                &Method::GET => get::get(route, auth, file_id).await,
 
                                 _ => StatusCode::METHOD_NOT_ALLOWED.into_response(),
                             }

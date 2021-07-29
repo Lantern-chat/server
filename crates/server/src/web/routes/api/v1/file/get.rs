@@ -1,0 +1,148 @@
+use std::{str::FromStr, time::Instant};
+
+use bytes::{Bytes, BytesMut};
+use ftl::*;
+
+use headers::{ContentLength, ContentType, HeaderMap, HeaderMapExt, HeaderValue};
+use hyper::Body;
+use tokio::io::AsyncReadExt;
+
+use models::Snowflake;
+use schema::flags::FileFlags;
+
+use crate::{
+    ctrl::Error,
+    filesystem::store::{CipherOptions, OpenMode},
+    web::{auth::Authorization, routes::api::ApiError},
+    ServerState,
+};
+
+use futures::Stream;
+
+pub async fn get(route: Route<ServerState>, auth: Authorization, file_id: Snowflake) -> Response {
+    match get_file(route.state, route.start, auth, file_id).await {
+        Err(e) => ApiError::err(e).into_response(),
+        Ok(res) => res,
+    }
+}
+
+pub async fn get_file(
+    state: ServerState,
+    route_start: Instant,
+    auth: Authorization,
+    file_id: Snowflake,
+) -> Result<Response, Error> {
+    let db = state.db.read.get().await?;
+
+    let row = db
+        .query_one_cached_typed(
+            || {
+                use schema::*;
+                use thorn::*;
+
+                Query::select()
+                    .from_table::<Files>()
+                    .cols(&[Files::Size, Files::Flags, Files::Nonce, Files::Name, Files::Mime])
+                    .and_where(Files::Id.equals(Var::of(Files::Id)))
+                    .and_where(Files::UserId.equals(Var::of(Files::UserId)))
+            },
+            &[&file_id, &auth.user_id],
+        )
+        .await?;
+
+    let size: i32 = row.try_get(0)?;
+    let flags = FileFlags::from_bits_truncate(row.try_get(1)?);
+    let nonce: i64 = row.try_get(2)?;
+    let name: String = row.try_get(3)?;
+    let mime: Option<String> = row.try_get(4)?;
+
+    if flags.contains(FileFlags::PARTIAL) {
+        return Err(Error::NotFound);
+    }
+
+    let options = CipherOptions {
+        key: state.config.file_key,
+        nonce: unsafe { std::mem::transmute([nonce, nonce]) },
+    };
+
+    let mut file = state.fs.open_crypt(file_id, OpenMode::Read, &options).await?;
+
+    let (mut sender, body) = Body::channel();
+
+    let mut res = Response::new(body);
+
+    let headers = res.headers_mut();
+
+    headers.typed_insert(ContentLength(size as u64));
+
+    headers.insert(
+        "Content-Disposition",
+        HeaderValue::from_str(&format!("inline; filename=\"{}\"", name))?,
+    );
+
+    if let Some(mime) = mime {
+        headers.insert("Content-Type", HeaderValue::from_str(&mime)?);
+    } else {
+        headers.typed_insert(ContentType::octet_stream());
+    }
+
+    tokio::spawn(async move {
+        let mut buf = BytesMut::new();
+
+        let mut len = size as u64;
+
+        let buf_size = 1024 * 16;
+
+        while len != 0 {
+            if buf.capacity() - buf.len() < buf_size {
+                buf.reserve(buf_size);
+            }
+
+            let n = match file.read_buf(&mut buf).await {
+                Ok(n) => n as u64,
+                Err(err) => {
+                    log::debug!("File read error: {}", err);
+                    return sender.abort();
+                }
+            };
+
+            if n == 0 {
+                log::warn!("File read found EOF before expected length: {}", len);
+                break;
+            }
+
+            let mut chunk = buf.split().freeze();
+
+            if n > len {
+                chunk = chunk.split_to(len as usize);
+                len = 0;
+            } else {
+                len -= n;
+            }
+
+            if let Err(e) = sender.send_data(chunk).await {
+                log::error!("Error sending file chunk: {}", e);
+                return sender.abort();
+            }
+        }
+
+        let elapsed = route_start.elapsed().as_secs_f64() * 1000.0;
+
+        log::debug!("File transfer finished in {:.4}ms", elapsed);
+
+        let mut trailers = HeaderMap::new();
+        if let Ok(value) = HeaderValue::from_str(&format!("end;dur={:.4}", elapsed)) {
+            trailers.insert("Server-Timing", value);
+
+            if let Err(e) = sender.send_trailers(trailers).await {
+                log::warn!("Error sending trailers: {}", e);
+            }
+        } else {
+            log::warn!("Unable to create trailer value");
+        }
+
+        drop(sender);
+    });
+
+    Ok(res)
+}

@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::{
     ctrl::Error,
     web::{auth::Authorization, routes::api::v1::file::post::Metadata},
@@ -18,7 +20,14 @@ pub async fn post_file(
 
     let mime = match metadata.mime {
         None => None,
-        Some(mime) => Some(String::from_utf8(base64::decode(mime)?)?),
+        Some(mime) => {
+            let mime = String::from_utf8(base64::decode(mime)?)?;
+
+            // try parsing the mime type
+            let _ = mime::Mime::from_str(&mime)?;
+
+            Some(mime)
+        }
     };
 
     let preview = match metadata.preview {

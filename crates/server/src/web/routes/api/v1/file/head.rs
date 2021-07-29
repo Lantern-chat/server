@@ -3,40 +3,35 @@ use headers::{CacheControl, HeaderMapExt, HeaderValue};
 use models::Snowflake;
 
 use crate::{
-    ctrl::file::head::UploadHead,
+    ctrl::{file::head::UploadHead, Error},
     web::{auth::Authorization, routes::api::ApiError},
     ServerState,
 };
 
-pub async fn head(route: Route<ServerState>, auth: Authorization, file_id: Snowflake) -> Response {
-    match crate::ctrl::file::head::head(route.state, auth, file_id).await {
-        Err(e) => return ApiError::err(e).into_response(),
-        Ok(head) => {
-            let mut res = Response::default();
+pub async fn head(
+    route: Route<ServerState>,
+    auth: Authorization,
+    file_id: Snowflake,
+) -> Result<Response, Error> {
+    let head = crate::ctrl::file::head::head(route.state, auth, file_id).await?;
 
-            let headers = res.headers_mut();
+    let mut res = Response::default();
 
-            headers.extend(super::TUS_HEADERS.iter().map(|(k, v)| (k.clone(), v.clone())));
+    let headers = res.headers_mut();
 
-            headers.insert("Upload-Metadata", encode_metadata(&head));
+    headers.extend(super::TUS_HEADERS.iter().map(|(k, v)| (k.clone(), v.clone())));
 
-            headers.insert(
-                "Upload-Length",
-                HeaderValue::from_str(&head.size.to_string()).unwrap(),
-            );
+    headers.insert("Upload-Metadata", encode_metadata(&head));
 
-            if head.size != head.offset {
-                headers.insert(
-                    "Upload-Offset",
-                    HeaderValue::from_str(&head.offset.to_string()).unwrap(),
-                );
-            }
+    headers.insert("Upload-Length", HeaderValue::from_str(&head.size.to_string())?);
 
-            headers.typed_insert(CacheControl::new().with_no_store());
-
-            res
-        }
+    if head.size != head.offset {
+        headers.insert("Upload-Offset", HeaderValue::from_str(&head.offset.to_string())?);
     }
+
+    headers.typed_insert(CacheControl::new().with_no_store());
+
+    Ok(res)
 }
 
 fn encode_metadata(head: &UploadHead) -> HeaderValue {

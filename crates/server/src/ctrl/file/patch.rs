@@ -138,7 +138,10 @@ pub async fn patch_file(
     }
 
     // check checksum
-    if params.crc32 != crc32.finalize() {
+    let final_crc32 = crc32.finalize();
+    if params.crc32 != final_crc32 {
+        log::debug!("{:X} != {:X}", params.crc32, final_crc32);
+
         res = res.or(Some(Error::ChecksumMismatch));
     }
 
