@@ -13,6 +13,7 @@ models = { path = "../models" }
 db = { path = "../db" }
 util = { path = "../util" }
 schema = { path = "../schema" }
+mime_db = { path = "../mime_db" }
 
 blurhash = { path = "../../../deps/blurhash" }
 

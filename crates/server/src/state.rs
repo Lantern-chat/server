@@ -67,7 +67,7 @@ impl ServerState {
             fs: FileStore::new("./data"), // TODO: Set from config
             gateway: Gateway::default(),
             hashing_semaphore: Semaphore::new(16), // TODO: Set from available memory?
-            fs_semaphore: Semaphore::new(512),
+            fs_semaphore: Semaphore::new(1024),
             all_tasks: Mutex::new(None),
             item_cache: EventItemCache::default(),
             ip_bans: IpBans::new(),
