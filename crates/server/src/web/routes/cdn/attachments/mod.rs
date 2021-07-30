@@ -1,11 +1,13 @@
-use std::{str::FromStr, time::Instant};
+use std::{io::SeekFrom, str::FromStr, time::Instant};
 
 use bytes::{Bytes, BytesMut};
-use ftl::*;
+use ftl::{fs::bytes_range, *};
 
-use headers::{ContentLength, ContentType, HeaderMap, HeaderMapExt, HeaderValue};
+use headers::{
+    AcceptRanges, ContentLength, ContentRange, ContentType, HeaderMap, HeaderMapExt, HeaderValue, Range,
+};
 use hyper::Body;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
 use models::Snowflake;
 use schema::flags::FileFlags;
@@ -31,24 +33,31 @@ pub async fn attachments(mut route: Route<ServerState>) -> Response {
     let filename = match route.next().segment() {
         Exact(filename) => match urlencoding::decode(filename) {
             Ok(filename) => filename.into_owned(),
-            Err(e) => return StatusCode::BAD_REQUEST.into_response(),
+            Err(_) => return StatusCode::BAD_REQUEST.into_response(),
         },
         _ => return StatusCode::BAD_REQUEST.into_response(),
     };
 
-    match get_attachment(route.state, route.start, room_id, attachment_id, filename).await {
+    let is_head = route.method() == Method::HEAD;
+
+    match get_attachment(route, room_id, attachment_id, filename, is_head).await {
         Err(e) => ApiError::err(e).into_response(),
         Ok(res) => res,
     }
 }
 
 async fn get_attachment(
-    state: ServerState,
-    route_start: Instant,
+    route: Route<ServerState>,
     room_id: Snowflake,
     attachment_id: Snowflake,
     filename: String,
+    is_head: bool,
 ) -> Result<Response, Error> {
+    let range: Option<Range> = route.header();
+
+    let route_start = route.start;
+    let state = route.state;
+
     let db = state.db.read.get().await?;
 
     let row = db
@@ -100,13 +109,106 @@ async fn get_attachment(
         .open_crypt(attachment_id, OpenMode::Read, &options)
         .await?;
 
-    let (mut sender, body) = Body::channel();
+    let mut len = size as u64;
 
-    let mut res = Response::new(body);
+    let mut res = if is_head {
+        Response::default()
+    } else {
+        let (start, end) = match bytes_range(range, len) {
+            Err(_) => {
+                return Ok(StatusCode::RANGE_NOT_SATISFIABLE
+                    .with_header(ContentRange::unsatisfied_bytes(len))
+                    .into_response())
+            }
+            Ok(range) => range,
+        };
+
+        let sub_len = end - start;
+
+        let (mut sender, body) = Body::channel();
+
+        let mut res = Response::new(body);
+
+        if len != sub_len {
+            *res.status_mut() = StatusCode::PARTIAL_CONTENT;
+
+            res.headers_mut()
+                .typed_insert(ContentRange::bytes(start..end, len).expect("valid ContentRange"));
+
+            len = sub_len;
+        }
+
+        tokio::spawn(async move {
+            if start != 0 {
+                if let Err(e) = file.seek(SeekFrom::Start(start)).await {
+                    log::error!("Error seeking file: {}", e);
+                    return sender.abort();
+                }
+            }
+
+            let mut buf = BytesMut::new();
+            let mut len = sub_len;
+
+            let buf_size = 1024 * 512; // 64Kb
+
+            while len != 0 {
+                if buf.capacity() - buf.len() < buf_size {
+                    buf.reserve(buf_size);
+                }
+
+                let n = match file.read_buf(&mut buf).await {
+                    Ok(n) => n as u64,
+                    Err(err) => {
+                        log::debug!("File read error: {}", err);
+                        return sender.abort();
+                    }
+                };
+
+                if n == 0 {
+                    log::warn!("File read found EOF before expected length: {}", len);
+                    break;
+                }
+
+                let mut chunk = buf.split().freeze();
+
+                if n > len {
+                    chunk = chunk.split_to(len as usize);
+                    len = 0;
+                } else {
+                    len -= n;
+                }
+
+                if let Err(e) = sender.send_data(chunk).await {
+                    log::error!("Error sending file chunk: {}", e);
+                    return sender.abort();
+                }
+            }
+
+            let elapsed = route_start.elapsed().as_secs_f64() * 1000.0;
+
+            log::debug!("File transfer finished in {:.4}ms", elapsed);
+
+            let mut trailers = HeaderMap::new();
+            if let Ok(value) = HeaderValue::from_str(&format!("end;dur={:.4}", elapsed)) {
+                trailers.insert("Server-Timing", value);
+
+                if let Err(e) = sender.send_trailers(trailers).await {
+                    log::warn!("Error sending trailers: {}", e);
+                }
+            } else {
+                log::warn!("Unable to create trailer value");
+            }
+
+            drop(sender);
+        });
+
+        res
+    };
 
     let headers = res.headers_mut();
 
-    headers.typed_insert(ContentLength(size as u64));
+    headers.typed_insert(ContentLength(len));
+    headers.typed_insert(AcceptRanges::bytes());
 
     headers.insert(
         "Content-Disposition",
@@ -118,64 +220,6 @@ async fn get_attachment(
     } else {
         headers.typed_insert(ContentType::octet_stream());
     }
-
-    tokio::spawn(async move {
-        let mut buf = BytesMut::new();
-
-        let mut len = size as u64;
-
-        let buf_size = 1024 * 16;
-
-        while len != 0 {
-            if buf.capacity() - buf.len() < buf_size {
-                buf.reserve(buf_size);
-            }
-
-            let n = match file.read_buf(&mut buf).await {
-                Ok(n) => n as u64,
-                Err(err) => {
-                    log::debug!("File read error: {}", err);
-                    return sender.abort();
-                }
-            };
-
-            if n == 0 {
-                log::warn!("File read found EOF before expected length: {}", len);
-                break;
-            }
-
-            let mut chunk = buf.split().freeze();
-
-            if n > len {
-                chunk = chunk.split_to(len as usize);
-                len = 0;
-            } else {
-                len -= n;
-            }
-
-            if let Err(e) = sender.send_data(chunk).await {
-                log::error!("Error sending file chunk: {}", e);
-                return sender.abort();
-            }
-        }
-
-        let elapsed = route_start.elapsed().as_secs_f64() * 1000.0;
-
-        log::debug!("File transfer finished in {:.4}ms", elapsed);
-
-        let mut trailers = HeaderMap::new();
-        if let Ok(value) = HeaderValue::from_str(&format!("end;dur={:.4}", elapsed)) {
-            trailers.insert("Server-Timing", value);
-
-            if let Err(e) = sender.send_trailers(trailers).await {
-                log::warn!("Error sending trailers: {}", e);
-            }
-        } else {
-            log::warn!("Unable to create trailer value");
-        }
-
-        drop(sender);
-    });
 
     Ok(res)
 }
