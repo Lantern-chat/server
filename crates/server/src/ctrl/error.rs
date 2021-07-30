@@ -226,9 +226,6 @@ impl Error {
             Error::Conflict                 => 40409,
             Error::RequestEntityTooLarge    => 40413,
             Error::ChecksumMismatch         => 40460,
-
-            // TODO: Decide on actual error codes
-            //_ => self.http_status().as_u16(),
         }
     }
 
