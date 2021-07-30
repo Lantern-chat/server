@@ -33,6 +33,10 @@ pub async fn patch(
         _ => return Ok(StatusCode::BAD_REQUEST.into_response()),
     };
 
+    if content_length > (route.state.config.max_upload_chunk_size as u64) {
+        return Err(Error::RequestEntityTooLarge);
+    }
+
     let params = FilePatchParams {
         crc32: checksum,
         upload_offset,

@@ -9,12 +9,12 @@ use crate::{
 };
 
 pub async fn post(route: Route<ServerState>, auth: Authorization) -> Response {
-    let upload_length = match route.parse_raw_header::<i32>("upload-length") {
+    let upload_length = match route.parse_raw_header::<u64>("upload-length") {
         Some(Ok(Ok(upload_length))) => upload_length,
         _ => return ApiError::bad_request().into_response(),
     };
 
-    if upload_length > route.state.config.max_upload_size {
+    if upload_length > (i32::MAX as u64) {
         return ApiError::err(Error::RequestEntityTooLarge).into_response();
     }
 
@@ -23,7 +23,8 @@ pub async fn post(route: Route<ServerState>, auth: Authorization) -> Response {
         Err(e) => return ApiError::err(e).into_response(),
     };
 
-    match crate::ctrl::file::post::post_file(route.state.clone(), auth, upload_length, metadata).await {
+    match crate::ctrl::file::post::post_file(route.state.clone(), auth, upload_length as i32, metadata).await
+    {
         Err(e) => ApiError::err(e).into_response(),
         Ok(file_id) => {
             let mut res = Response::default();

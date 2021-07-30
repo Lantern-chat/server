@@ -15,7 +15,8 @@ pub struct LanternConfig {
     pub roomname_len: Range<usize>,
     pub message_len: Range<usize>,
     pub max_message_newlines: usize,
-    pub max_upload_size: i32,
+    pub max_upload_size: u64,
+    pub max_upload_chunk_size: i32,
     pub file_key: BlockCipherKey<Aes256>,
 }
 
@@ -31,7 +32,8 @@ impl Default for LanternConfig {
             roomname_len: 3..64,
             message_len: 1..5000,
             max_message_newlines: 120,
-            max_upload_size: 1024 * 1024 * 8,
+            max_upload_size: i32::MAX as u64,
+            max_upload_chunk_size: 1024 * 1024 * 8, // 8MiB
             file_key: {
                 let mut key: BlockCipherKey<Aes256> = BlockCipherKey::<Aes256>::default();
 
