@@ -104,6 +104,8 @@ async fn get_attachment(
         nonce: unsafe { std::mem::transmute([nonce, nonce]) },
     };
 
+    let _fs_lock = state.fs_semaphore.acquire().await?;
+
     let mut file = state
         .fs
         .open_crypt(attachment_id, OpenMode::Read, &options)
@@ -111,9 +113,17 @@ async fn get_attachment(
 
     let mut len = size as u64;
 
+    // in debug mode, double-check length
+    if cfg!(debug_assertions) {
+        let real_len = file.get_len().await?;
+
+        assert_eq!(len, real_len);
+    }
+
     let mut res = if is_head {
         Response::default()
     } else {
+        // parse byte range using ftl method
         let (start, end) = match bytes_range(range, len) {
             Err(_) => {
                 return Ok(StatusCode::RANGE_NOT_SATISFIABLE
@@ -123,12 +133,14 @@ async fn get_attachment(
             Ok(range) => range,
         };
 
+        // determine content length from range (if applicable)
         let sub_len = end - start;
 
+        // setup body, sender and response
         let (mut sender, body) = Body::channel();
-
         let mut res = Response::new(body);
 
+        // if the selected range is not the entire length, set applicable headers
         if len != sub_len {
             *res.status_mut() = StatusCode::PARTIAL_CONTENT;
 
@@ -149,7 +161,7 @@ async fn get_attachment(
             let mut buf = BytesMut::new();
             let mut len = sub_len;
 
-            let buf_size = 1024 * 512; // 64Kb
+            let buf_size = 1024 * 64; // 64Kb
 
             while len != 0 {
                 if buf.capacity() - buf.len() < buf_size {
@@ -159,7 +171,7 @@ async fn get_attachment(
                 let n = match file.read_buf(&mut buf).await {
                     Ok(n) => n as u64,
                     Err(err) => {
-                        log::debug!("File read error: {}", err);
+                        log::error!("File read error: {}", err);
                         return sender.abort();
                     }
                 };
@@ -179,7 +191,7 @@ async fn get_attachment(
                 }
 
                 if let Err(e) = sender.send_data(chunk).await {
-                    log::error!("Error sending file chunk: {}", e);
+                    log::warn!("Error sending file chunk: {}", e);
                     return sender.abort();
                 }
             }
@@ -210,6 +222,7 @@ async fn get_attachment(
     headers.typed_insert(ContentLength(len));
     headers.typed_insert(AcceptRanges::bytes());
 
+    // always try to display the file inline
     headers.insert(
         "Content-Disposition",
         HeaderValue::from_str(&format!("inline; filename=\"{}\"", name))?,

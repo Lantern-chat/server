@@ -39,12 +39,20 @@ use super::crypt::EncryptedFile;
 #[async_trait::async_trait]
 pub trait FileExt {
     async fn set_len(&self, size: u64) -> Result<(), io::Error>;
+
+    async fn get_len(&self) -> Result<u64, io::Error>;
 }
 
 #[async_trait::async_trait]
 impl FileExt for TkFile {
     async fn set_len(&self, size: u64) -> Result<(), io::Error> {
         TkFile::set_len(self, size).await
+    }
+
+    async fn get_len(&self) -> Result<u64, io::Error> {
+        let meta = self.metadata().await?;
+
+        Ok(meta.len())
     }
 }
 
@@ -53,12 +61,20 @@ impl FileExt for BufWriter<TkFile> {
     async fn set_len(&self, size: u64) -> Result<(), io::Error> {
         self.get_ref().set_len(size).await
     }
+
+    async fn get_len(&self) -> Result<u64, io::Error> {
+        self.get_ref().get_len().await
+    }
 }
 
 #[async_trait::async_trait]
 impl<F: FileExt + Sync> FileExt for EncryptedFile<F> {
     async fn set_len(&self, size: u64) -> Result<(), io::Error> {
         self.get_ref().set_len(size).await
+    }
+
+    async fn get_len(&self) -> Result<u64, io::Error> {
+        self.get_ref().get_len().await
     }
 }
 
