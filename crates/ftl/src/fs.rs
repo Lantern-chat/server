@@ -207,7 +207,7 @@ pub fn sanitize_path(base: impl AsRef<Path>, tail: &str) -> Result<PathBuf, Sani
     Ok(buf)
 }
 
-const DEFAULT_READ_BUF_SIZE: u64 = 8_192;
+const DEFAULT_READ_BUF_SIZE: u64 = 1024 * 32;
 
 pub async fn file<S>(route: &Route<S>, path: impl AsRef<Path>, cache: &impl FileCache) -> impl Reply {
     file_reply(route, path, cache).await
@@ -329,8 +329,8 @@ async fn file_reply<S>(route: &Route<S>, path: impl AsRef<Path>, cache: &impl Fi
     }
 }
 
-struct BadRange;
-fn bytes_range(range: Option<Range>, max_len: u64) -> Result<(u64, u64), BadRange> {
+pub struct BadRange;
+pub fn bytes_range(range: Option<Range>, max_len: u64) -> Result<(u64, u64), BadRange> {
     use std::ops::Bound;
 
     match range.and_then(|r| r.iter().next()) {
