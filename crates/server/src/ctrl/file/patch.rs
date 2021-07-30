@@ -71,7 +71,11 @@ pub async fn patch_file(
         nonce: unsafe { std::mem::transmute([nonce, nonce]) },
     };
 
-    let _file_lock = state.id_lock.lock(file_id).await;
+    // acquire these at the same time
+    let (_file_lock, _fs_lock) = tokio::try_join! {
+        async { Ok(state.id_lock.lock(file_id).await) },
+        async { state.fs_semaphore.acquire().await },
+    }?;
 
     let mut file = state
         .fs

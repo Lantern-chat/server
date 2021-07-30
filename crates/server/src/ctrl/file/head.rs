@@ -58,8 +58,13 @@ pub async fn head(state: ServerState, auth: Authorization, file_id: Snowflake) -
     };
 
     let fetch_metadata = async {
-        // TODO: Determine if this is necessary, as HEAD can be called on a completed file
-        let _file_lock = state.id_lock.lock(file_id).await;
+        // TODO: Determine if _file_lock is necessary, as HEAD can be called on a completed file
+
+        // acquire these at the same time
+        let (_file_lock, _fs_lock) = tokio::try_join! {
+            async { Ok(state.id_lock.lock(file_id).await) },
+            async { state.fs_semaphore.acquire().await },
+        }?;
 
         match state.fs.metadata(file_id).await {
             Ok(meta) => Ok(Some(meta)),
