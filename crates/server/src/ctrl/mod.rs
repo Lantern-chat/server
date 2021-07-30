@@ -57,3 +57,5 @@ pub mod file {
     pub mod patch;
     pub mod post;
 }
+
+pub mod cdn;
