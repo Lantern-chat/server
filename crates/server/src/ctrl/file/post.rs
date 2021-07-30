@@ -6,7 +6,7 @@ use crate::{
     ServerState,
 };
 
-use schema::{Snowflake, SnowflakeExt};
+use schema::{flags::FileFlags, Snowflake, SnowflakeExt};
 
 use rand::Rng;
 
@@ -23,7 +23,7 @@ pub async fn post_file(
         Some(mime) => {
             let mime = String::from_utf8(base64::decode(mime)?)?;
 
-            // try parsing the mime type
+            // try parsing the mime given type
             let _ = mime::Mime::from_str(&mime)?;
 
             Some(mime)
@@ -82,7 +82,7 @@ pub async fn post_file(
             &auth.user_id,
             &nonce,
             &upload_size,
-            &0i16,
+            &FileFlags::PARTIAL.bits(),
             &filename,
             &mime,
             &preview,
