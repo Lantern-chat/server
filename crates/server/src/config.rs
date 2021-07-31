@@ -19,6 +19,7 @@ pub struct LanternConfig {
     pub max_upload_chunk_size: i32,
     pub max_avatar_size: i32,
     pub max_avatar_pixels: u32,
+    pub max_avatar_width: u32,
     pub file_key: BlockCipherKey<Aes256>,
 }
 
@@ -38,6 +39,7 @@ impl Default for LanternConfig {
             max_upload_chunk_size: 1024 * 1024 * 8, // 8 MiB
             max_avatar_size: 1024 * 1024 * 2,       // 2 MiB
             max_avatar_pixels: 1024 * 1024,         // 32-bit color * 1024^2 = 2.56 MiB RAM usage
+            max_avatar_width: 256,
             file_key: {
                 let mut key: BlockCipherKey<Aes256> = BlockCipherKey::<Aes256>::default();
 

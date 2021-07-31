@@ -24,7 +24,13 @@ pub async fn process_avatar(state: ServerState, user_id: Snowflake, file_id: Sno
 
                 Query::select()
                     .from_table::<Files>()
-                    .cols(&[Files::Size, Files::Nonce, Files::Flags, Files::Mime])
+                    .cols(&[
+                        Files::Size,
+                        Files::Nonce,
+                        Files::Flags,
+                        Files::Mime,
+                        Files::Preview,
+                    ])
                     .and_where(Files::UserId.equals(Var::of(Files::UserId)))
                     .and_where(Files::Id.equals(Var::of(Files::Id)))
                     .limit_n(1)
@@ -39,18 +45,22 @@ pub async fn process_avatar(state: ServerState, user_id: Snowflake, file_id: Sno
     };
 
     let size: i32 = row.try_get(0)?;
-    let nonce: i64 = row.try_get(1)?;
-    let flags = FileFlags::from_bits_truncate(row.try_get(2)?);
-    let mime: Option<String> = row.try_get(3)?;
 
     if size > state.config.max_avatar_size {
         return Err(Error::RequestEntityTooLarge);
     }
 
-    let mime = match mime {
+    let nonce: i64 = row.try_get(1)?;
+    let flags = FileFlags::from_bits_truncate(row.try_get(2)?);
+    let mime: Option<String> = row.try_get(3)?;
+
+    // TODO: Use mime type somehow?
+    let _mime = match mime {
         Some(mime) => mime,
         None => return Err(Error::MissingMime),
     };
+
+    let preview: Option<Vec<u8>> = row.try_get(4)?;
 
     let cipher_options = CipherOptions {
         key: state.config.file_key,
@@ -80,7 +90,7 @@ pub async fn process_avatar(state: ServerState, user_id: Snowflake, file_id: Sno
             Err(_) => return Err(Error::InvalidImageFormat),
         };
 
-        let (mut width, mut height) = {
+        let (mut width, height) = {
             let mut reader = Reader::new(Cursor::new(&buffer));
             reader.set_format(format);
 
@@ -94,10 +104,9 @@ pub async fn process_avatar(state: ServerState, user_id: Snowflake, file_id: Sno
             return Err(Error::RequestEntityTooLarge);
         }
 
-        // fast path if the file is already acceptable
-        if format == ImageFormat::Png && width == height && width <= MAX_WIDTH {
-            return Ok((false, buffer));
-        }
+        let max_width = encode_state.config.max_avatar_width;
+
+        let try_use_existing = format == ImageFormat::Png && width == height && width <= max_width;
 
         let mut reader = Reader::new(Cursor::new(&buffer));
         reader.set_format(format);
@@ -135,24 +144,40 @@ pub async fn process_avatar(state: ServerState, user_id: Snowflake, file_id: Sno
             width = new_width;
         }
 
-        const MAX_WIDTH: u32 = 256;
-
         // shrink if necessary
-        if width > MAX_WIDTH {
-            log::trace!("Resizing avatar image from {}^2 to {}^2", width, MAX_WIDTH);
+        if width > max_width {
+            log::trace!("Resizing avatar image from {}^2 to {}^2", width, max_width);
 
-            image = image.resize(MAX_WIDTH, MAX_WIDTH, FilterType::Lanczos3);
+            image = image.resize(max_width, max_width, FilterType::Lanczos3);
         }
 
-        match encode_png_best(image) {
-            Ok(output) => Ok((true, output)),
+        // encode the image and generate a blurhash preview if needed
+        match encode_png_best(image, preview) {
+            Ok(mut output) => {
+                let mut reused = false;
+
+                // if the existing PNG buffer is somehow smaller, use that
+                // could happen with a very-optimized PNG from photoshop or something
+                if try_use_existing && buffer.len() < output.buffer.len() {
+                    log::trace!(
+                        "PNG Encoder got worse compression than original, {} vs {}",
+                        buffer.len(),
+                        output.buffer.len()
+                    );
+
+                    reused = true;
+                    output.buffer = buffer;
+                }
+
+                Ok((!reused, output))
+            }
             Err(e) => Err(Error::InternalError(e.to_string())),
         }
     });
 
-    drop(_processing_permit);
+    let (new_file, encoded_image) = encode_task.await??;
 
-    let (new_file, buffer) = encode_task.await??;
+    drop(_processing_permit);
 
     let mut avatar_file_id = file_id;
 
@@ -160,7 +185,7 @@ pub async fn process_avatar(state: ServerState, user_id: Snowflake, file_id: Sno
         let (new_file_id, nonce) = crate::ctrl::file::post::do_post_file(
             state.clone(),
             user_id,
-            buffer.len() as i32,
+            encoded_image.buffer.len() as i32,
             format!("{}_avatar.png", user_id),
             Some("image/png".to_owned()),
             None,
@@ -181,7 +206,7 @@ pub async fn process_avatar(state: ServerState, user_id: Snowflake, file_id: Sno
             .open_crypt(avatar_file_id, OpenMode::Write, &cipher_options)
             .await?;
 
-        file.write_all(&buffer).await?;
+        file.write_all(&encoded_image.buffer).await?;
         file.flush().await?;
     }
 
@@ -196,9 +221,14 @@ pub async fn process_avatar(state: ServerState, user_id: Snowflake, file_id: Sno
                 Query::update()
                     .table::<Files>()
                     .set(Files::Flags, Var::of(Files::Flags))
+                    .set(Files::Preview, Var::of(Files::Preview))
                     .and_where(Files::Id.equals(Var::of(Files::Id)))
             },
-            &[&FileFlags::COMPLETE.bits(), &avatar_file_id],
+            &[
+                &FileFlags::COMPLETE.bits(),
+                &encoded_image.preview,
+                &avatar_file_id,
+            ],
         )
         .await?;
     }
@@ -221,34 +251,74 @@ pub async fn process_avatar(state: ServerState, user_id: Snowflake, file_id: Sno
     Ok(())
 }
 
-fn encode_png_best(image: image::DynamicImage) -> Result<Vec<u8>, image::ImageError> {
+struct EncodedImage {
+    buffer: Vec<u8>,
+    preview: Option<Vec<u8>>,
+}
+
+fn encode_png_best(
+    mut image: image::DynamicImage,
+    mut preview: Option<Vec<u8>>,
+) -> Result<EncodedImage, image::ImageError> {
     use image::{codecs::png, ColorType, DynamicImage, GenericImageView};
-
-    let mut bytes = image.as_bytes();
-    let (width, height) = image.dimensions();
-    let mut color = image.color();
-
-    let mut out = Vec::new();
-
     use png::{CompressionType, FilterType, PngEncoder};
 
-    let p = PngEncoder::new_with_quality(&mut out, CompressionType::Best, FilterType::Paeth);
-    let converted;
-    match image {
-        DynamicImage::ImageBgra8(_) => {
-            converted = image.to_rgba8().into_raw();
-            bytes = &converted;
-            color = ColorType::Rgba8;
+    image = match image {
+        DynamicImage::ImageBgra8(_) => DynamicImage::ImageRgba8(image.to_rgba8()),
+        DynamicImage::ImageBgr8(_) => DynamicImage::ImageRgb8(image.to_rgb8()),
+        _ => image,
+    };
+
+    let bytes = image.as_bytes();
+    let (width, height) = image.dimensions();
+    let color = image.color();
+
+    // 1.5 bytes per pixel
+    const BYTES_PER_PIXEL_D: usize = 3;
+    const BYTES_PER_PIXEL_N: usize = 2;
+
+    let expected_bytes = ((width * height) as usize * BYTES_PER_PIXEL_D) / BYTES_PER_PIXEL_N;
+
+    let mut out = Vec::with_capacity(expected_bytes);
+
+    PngEncoder::new_with_quality(&mut out, CompressionType::Best, FilterType::Paeth)
+        .encode(&bytes, width, height, color)?;
+
+    if preview.is_none() {
+        let has_alpha = image.color().has_alpha();
+
+        let mut bytes = match has_alpha {
+            true => image.to_rgba8().into_raw(),
+            false => image.to_rgb8().into_raw(),
+        };
+
+        let (xc, yc) = blurhash::encode::num_components(width, height);
+
+        // encode routine automatically premultiplies alpha
+        let hash = blurhash::encode::encode(
+            xc,
+            yc,
+            width as usize,
+            height as usize,
+            &mut bytes,
+            if has_alpha { 4 } else { 3 },
+        );
+
+        match hash {
+            Err(e) => {
+                log::error!("Error computing blurhash for avatar: {}", e)
+            }
+            Ok(hash) => {
+                preview = Some(hash);
+            }
         }
-        DynamicImage::ImageBgr8(_) => {
-            converted = image.to_rgb8().into_raw();
-            bytes = &converted;
-            color = ColorType::Rgb8;
-        }
-        _ => {}
     }
 
-    p.encode(&bytes, width, height, color)?;
+    log::trace!(
+        "PNG Encoder expected {} bytes, got {} bytes",
+        expected_bytes,
+        out.len()
+    );
 
-    Ok(out)
+    Ok(EncodedImage { buffer: out, preview })
 }
