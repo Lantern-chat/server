@@ -33,6 +33,7 @@ pub struct InnerServerState {
     pub fs: FileStore,
     pub gateway: Gateway,
     pub hashing_semaphore: Semaphore,
+    pub processing_semaphore: Semaphore,
     pub fs_semaphore: Semaphore,
     pub all_tasks:
         Mutex<Option<BoxFuture<'static, Result<Result<(), tokio::task::JoinError>, tokio::task::JoinError>>>>,
@@ -68,6 +69,7 @@ impl ServerState {
             gateway: Gateway::default(),
             hashing_semaphore: Semaphore::new(16), // TODO: Set from available memory?
             fs_semaphore: Semaphore::new(1024),
+            processing_semaphore: Semaphore::new(num_cpus::get() * 2),
             all_tasks: Mutex::new(None),
             item_cache: EventItemCache::default(),
             ip_bans: IpBans::new(),

@@ -70,10 +70,9 @@ thorn::tables! {
     }
 
     pub struct UserAvatars in Lantern {
-        Id: SNOWFLAKE,
         UserId: Users::Id,
         FileId: Files::Id,
-        IsMain: Type::BOOL,
+        PartyId: Party::Id,
     }
 
     pub struct Sessions in Lantern {
@@ -105,7 +104,6 @@ thorn::tables! {
         PartyId: Party::Id,
         UserId: Users::Id,
         InviteId: Invite::Id,
-        AvatarId: SNOWFLAKE,
         JoinedAt: Type::TIMESTAMP,
         Flags: Type::INT2,
         SortOrder: Type::INT2,

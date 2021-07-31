@@ -79,6 +79,9 @@ pub enum Error {
     #[error("Invalid file preview")]
     InvalidPreview,
 
+    #[error("Invalid Image Format")]
+    InvalidImageFormat,
+
     #[error("Missing Upload-Metadata Header")]
     MissingUploadMetadataHeader,
 
@@ -219,6 +222,7 @@ impl Error {
             Error::UploadError              => 40023,
             Error::InvalidPreview           => 40024,
             Error::MimeParseError(_)        => 40025,
+            Error::InvalidImageFormat       => 40026,
 
             // HTTP-like error codes
             Error::BadRequest               => 40400,

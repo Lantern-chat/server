@@ -21,6 +21,7 @@ pub mod user {
     pub mod register;
 
     pub mod me {
+        pub mod avatar;
         pub mod friends;
         pub mod login;
         pub mod logout;

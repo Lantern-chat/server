@@ -23,7 +23,13 @@ pub async fn post(route: Route<ServerState>, auth: Authorization) -> Response {
         Err(e) => return ApiError::err(e).into_response(),
     };
 
-    match crate::ctrl::file::post::post_file(route.state.clone(), auth, upload_length as i32, metadata).await
+    match crate::ctrl::file::post::post_file(
+        route.state.clone(),
+        auth.user_id,
+        upload_length as i32,
+        metadata,
+    )
+    .await
     {
         Err(e) => ApiError::err(e).into_response(),
         Ok(file_id) => {

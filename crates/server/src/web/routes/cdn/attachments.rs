@@ -29,6 +29,7 @@ pub async fn attachments(mut route: Route<ServerState>) -> Response {
         route,
         room_id,
         attachment_id,
+        None,
         crate::ctrl::cdn::FileKind::Attachment,
         Some(filename),
         is_head,

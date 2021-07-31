@@ -6,6 +6,7 @@ pub mod friends;
 pub mod login;
 pub mod logout;
 pub mod sessions;
+pub mod avatar;
 
 pub async fn me(mut route: Route<crate::ServerState>) -> Response {
     match route.next().method_segment() {
@@ -19,6 +20,7 @@ pub async fn me(mut route: Route<crate::ServerState>) -> Response {
                 (&Method::DELETE, End) => logout::logout(route, auth).await,
                 (&Method::GET, Exact("sessions")) => sessions::sessions(route, auth).await,
                 (&Method::GET, Exact("friends")) => friends::friends(route, auth).await,
+                (&Method::POST, Exact("avatar")) => avatar::post_avatar(route, auth).await,
                 _ => ApiError::not_found().into_response(),
             },
         },

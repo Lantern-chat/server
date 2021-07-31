@@ -21,13 +21,14 @@ use crate::{
 
 pub enum FileKind {
     Attachment,
-    Avatar,
+    UserAvatar,
 }
 
 pub async fn get_file(
     route: Route<ServerState>,
     kind_id: Snowflake,
     file_id: Snowflake,
+    party_id: Option<Snowflake>,
     kind: FileKind,
     filename: Option<String>,
     is_head: bool,
@@ -44,7 +45,16 @@ pub async fn get_file(
             db.query_opt_cached_typed(|| select_attachment(), &[&file_id, &kind_id])
                 .await?
         }
-        _ => unimplemented!(),
+        FileKind::UserAvatar => match party_id {
+            Some(party_id) => {
+                db.query_opt_cached_typed(|| select_user_avatar(true), &[&kind_id, &party_id])
+                    .await?
+            }
+            None => {
+                db.query_opt_cached_typed(|| select_user_avatar(false), &[&kind_id])
+                    .await?
+            }
+        },
     };
 
     let row = match row {
@@ -52,7 +62,7 @@ pub async fn get_file(
         Some(row) => row,
     };
 
-    let name: String = row.try_get(3)?;
+    let name: String = row.try_get(4)?;
 
     if let Some(filename) = filename {
         if name != filename {
@@ -63,17 +73,18 @@ pub async fn get_file(
 
     // TODO: Determine what to do with flags?
 
-    let size: i32 = row.try_get(0)?;
-    let flags = FileFlags::from_bits_truncate(row.try_get(1)?);
-    let nonce: i64 = row.try_get(2)?;
-    let mime: Option<String> = row.try_get(4)?;
+    let file_id: Snowflake = row.try_get(0)?;
+    let size: i32 = row.try_get(1)?;
+    let flags = FileFlags::from_bits_truncate(row.try_get(2)?);
+    let nonce: i64 = row.try_get(3)?;
+    let mime: Option<String> = row.try_get(5)?;
 
     let options = CipherOptions {
         key: state.config.file_key,
         nonce: unsafe { std::mem::transmute([nonce, nonce]) },
     };
 
-    let _fs_lock = state.fs_semaphore.acquire().await?;
+    let _fs_permit = state.fs_semaphore.acquire().await?;
 
     let mut file = state.fs.open_crypt(file_id, OpenMode::Read, &options).await?;
 
@@ -212,7 +223,14 @@ fn select_attachment() -> impl AnyQuery {
     use schema::*;
 
     Query::select()
-        .cols(&[Files::Size, Files::Flags, Files::Nonce, Files::Name, Files::Mime])
+        .cols(&[
+            /* 0 */ Files::Id,
+            /* 1 */ Files::Size,
+            /* 2 */ Files::Flags,
+            /* 3 */ Files::Nonce,
+            /* 4 */ Files::Name,
+            /* 5 */ Files::Mime,
+        ])
         .from(
             Files::inner_join(
                 Attachments::inner_join_table::<Messages>().on(Attachments::MessageId.equals(Messages::Id)),
@@ -221,4 +239,30 @@ fn select_attachment() -> impl AnyQuery {
         )
         .and_where(Files::Id.equals(Var::of(Files::Id)))
         .and_where(Messages::RoomId.equals(Var::of(Rooms::Id)))
+        .limit_n(1)
+}
+
+fn select_user_avatar(with_party: bool) -> impl AnyQuery {
+    use schema::*;
+
+    let mut query = Query::select()
+        .cols(&[
+            Files::Id,
+            Files::Size,
+            Files::Flags,
+            Files::Nonce,
+            Files::Name,
+            Files::Mime,
+        ])
+        .from(Files::inner_join_table::<UserAvatars>().on(Files::Id.equals(UserAvatars::FileId)))
+        .and_where(UserAvatars::UserId.equals(Var::of(Users::Id)))
+        .limit_n(1);
+
+    if with_party {
+        query = query.and_where(UserAvatars::PartyId.equals(Var::of(Party::Id)));
+    } else {
+        query = query.and_where(UserAvatars::PartyId.is_null());
+    }
+
+    query
 }

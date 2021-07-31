@@ -88,7 +88,8 @@ pub async fn ready(
                         .from(
                             Users::left_join_table::<UserAvatars>().on(UserAvatars::UserId.equals(Users::Id)),
                         )
-                        .and_where(UserAvatars::IsMain.is_not_false())
+                        .and_where(UserAvatars::PartyId.is_null())
+                        .limit_n(1)
                 },
                 &[&auth.user_id],
             )

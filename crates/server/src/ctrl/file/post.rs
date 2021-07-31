@@ -1,18 +1,15 @@
 use std::str::FromStr;
 
-use crate::{
-    ctrl::Error,
-    web::{auth::Authorization, routes::api::v1::file::post::Metadata},
-    ServerState,
-};
+use crate::{ctrl::Error, web::routes::api::v1::file::post::Metadata, ServerState};
 
+use db::pool::Object;
 use schema::{flags::FileFlags, Snowflake, SnowflakeExt};
 
 use rand::Rng;
 
 pub async fn post_file(
     state: ServerState,
-    auth: Authorization,
+    user_id: Snowflake,
     upload_size: i32,
     metadata: Metadata<'_>,
 ) -> Result<Snowflake, Error> {
@@ -43,6 +40,20 @@ pub async fn post_file(
         }),
     };
 
+    match do_post_file(state, user_id, upload_size, filename, mime, preview).await {
+        Ok((file_id, _nonce)) => Ok(file_id),
+        Err(e) => Err(e),
+    }
+}
+
+pub async fn do_post_file(
+    state: ServerState,
+    user_id: Snowflake,
+    upload_size: i32,
+    filename: String,
+    mime: Option<String>,
+    preview: Option<Vec<u8>>,
+) -> Result<(Snowflake, i64), Error> {
     let file_id = Snowflake::now();
     let nonce: i64 = util::rng::crypto_thread_rng().gen();
 
@@ -79,7 +90,7 @@ pub async fn post_file(
         },
         &[
             &file_id,
-            &auth.user_id,
+            &user_id,
             &nonce,
             &upload_size,
             &FileFlags::PARTIAL.bits(),
@@ -90,5 +101,5 @@ pub async fn post_file(
     )
     .await?;
 
-    Ok(file_id)
+    Ok((file_id, nonce))
 }
