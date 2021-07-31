@@ -124,6 +124,9 @@ pub async fn get_file(
                 }
             }
 
+            // TODO: Adjust the buffer size dynamically based on how long it took to transmite the previous buffer
+            // so if the connection is fast use a larger buffer, and smaller buffers for slow connections.
+
             let mut buf = BytesMut::new();
             let mut len = sub_len;
 
