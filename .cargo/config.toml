@@ -1,2 +1,2 @@
 [build]
-rustflags = ["-C", "target-feature=+avx2,+aes,+ssse3,+fma"]
+rustflags = ["-C", "target-feature=+avx2,+aes,+ssse3,+fma", "-C", "linker-plugin-lto"]
