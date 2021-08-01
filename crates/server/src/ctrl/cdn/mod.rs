@@ -171,7 +171,7 @@ pub async fn get_file(
                 }
 
                 if let Err(e) = sender.send_data(chunk).await {
-                    log::warn!("Error sending file chunk: {}", e);
+                    log::trace!("Error sending file chunk: {}", e);
                     return sender.abort();
                 }
             }
@@ -185,10 +185,10 @@ pub async fn get_file(
                 trailers.insert("Server-Timing", value);
 
                 if let Err(e) = sender.send_trailers(trailers).await {
-                    log::warn!("Error sending trailers: {}", e);
+                    log::trace!("Error sending trailers: {}", e);
                 }
             } else {
-                log::warn!("Unable to create trailer value");
+                log::trace!("Unable to create trailer value");
             }
 
             drop(sender);
