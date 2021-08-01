@@ -13,7 +13,8 @@ CREATE TABLE lantern.rooms (
 );
 ALTER TABLE lantern.rooms OWNER TO postgres;
 
-CREATE INDEX CONCURRENTLY room_name_idx ON lantern.rooms USING hash (name);
+CREATE INDEX room_name_idx ON lantern.rooms USING hash (name);
+CREATE INDEX room_avatar_idx ON lantern.rooms USING hash(avatar_id);
 
 ALTER TABLE lantern.rooms ADD CONSTRAINT party_fk FOREIGN KEY (party_id)
     REFERENCES lantern.party (id) MATCH FULL

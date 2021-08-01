@@ -9,6 +9,8 @@ ALTER TABLE lantern.user_avatars OWNER TO postgres;
 CREATE UNIQUE INDEX user_avatars_user_party_idx ON lantern.user_avatars
     USING btree(user_id, COALESCE(party_id, 1));
 
+CREATE INDEX user_avatar_file_idx ON lantern.user_avatars USING hash(file_id);
+
 ALTER TABLE lantern.user_avatars ADD CONSTRAINT user_fk FOREIGN KEY(user_id)
     REFERENCES lantern.users (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;

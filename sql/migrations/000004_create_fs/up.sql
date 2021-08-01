@@ -30,7 +30,7 @@ CREATE TABLE lantern.files (
     CONSTRAINT file_pk PRIMARY KEY (id)
 );
 
-CREATE INDEX file_idx ON lantern.files USING hash(id);
+CREATE INDEX file_idx ON lantern.files USING btree(user_id, id) INCLUDE (size);
 
 ALTER TABLE lantern.files ADD CONSTRAINT user_fk FOREIGN KEY (user_id)
     REFERENCES lantern.users (id) MATCH FULL
