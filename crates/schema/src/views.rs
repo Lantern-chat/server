@@ -23,6 +23,16 @@ thorn::tables! {
         Roles: SNOWFLAKE_ARRAY,
     }
 
+    pub struct AggAttachments in Lantern {
+        MsgId: Messages::Id,
+
+        /// Vec<{id: Snowflake, size: i32, name: String, mime: Option<String>}>
+        Meta: Type::JSONB_ARRAY,
+
+        /// Vec<Option<Vec<u8>>>
+        Preview: Type::BYTEA_ARRAY,
+    }
+
     pub struct AggFriends in Lantern {
         UserId: Users::Id,
         FriendId: Users::Id,
@@ -35,4 +45,12 @@ thorn::tables! {
         UserId: Overwrites::UserId,
         Perms: Type::INT8,
     }
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct AggAttachmentsMeta {
+    pub id: Snowflake,
+    pub size: i32,
+    pub name: String,
+    pub mime: Option<String>,
 }

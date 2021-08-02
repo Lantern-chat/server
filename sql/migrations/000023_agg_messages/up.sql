@@ -1,4 +1,19 @@
-CREATE OR REPLACE VIEW lantern.agg_messages AS
+CREATE OR REPLACE VIEW lantern.agg_messages(
+    msg_id,
+    user_id,
+    party_id,
+    room_id,
+    nickname,
+    username,
+    discriminator,
+    user_flags,
+    mention_kinds,
+    mention_ids,
+    edited_at,
+    message_flags,
+    content,
+    roles
+) AS
 SELECT
     messages.id AS msg_id,
     messages.user_id,
@@ -24,4 +39,5 @@ lantern.agg_mentions RIGHT JOIN
             lantern.users INNER JOIN lantern.messages ON users.id = messages.user_id
         ON rooms.id = messages.room_id
     ON (party_member.user_id = messages.user_id AND party_member.party_id = rooms.party_id)
-ON agg_mentions.msg_id = messages.id;
+ON agg_mentions.msg_id = messages.id
+;

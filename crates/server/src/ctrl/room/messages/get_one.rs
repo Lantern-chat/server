@@ -71,7 +71,39 @@ pub async fn get_one(
         user_mentions: Vec::new(),
         role_mentions: Vec::new(),
         room_mentions: Vec::new(),
-        attachments: Vec::new(),
+        attachments: {
+            let mut attachments = Vec::new();
+
+            let meta: Option<serde_json::Value> = row.try_get(12)?;
+
+            if let Some(meta) = meta {
+                let meta: Vec<schema::AggAttachmentsMeta> = serde_json::from_value(meta)?;
+                let previews: Vec<Option<Vec<u8>>> = row.try_get(13)?;
+
+                if meta.len() != previews.len() {
+                    return Err(Error::InternalErrorStatic("Meta != Previews length"));
+                }
+
+                attachments.reserve(meta.len());
+
+                for (meta, preview) in meta.into_iter().zip(previews) {
+                    use blurhash::base85::ToZ85;
+
+                    attachments.push(Attachment {
+                        id: meta.id,
+                        filename: meta.name,
+                        size: meta.size as usize,
+                        mime: meta.mime,
+                        embed: EmbedMediaAttributes {
+                            preview: preview.map(|p| p.to_z85().unwrap()),
+                            ..EmbedMediaAttributes::default()
+                        },
+                    })
+                }
+            }
+
+            attachments
+        },
         embeds: Vec::new(),
         reactions: Vec::new(),
     };
@@ -119,14 +151,23 @@ mod consts {
         /*10*/ AggMessages::Content,
         /*11*/ AggMessages::Roles,
     ];
+
+    pub const COLUMNS_ATTACHMENTS: &[AggAttachments] = &[
+        /*12*/ AggAttachments::Meta,
+        /*13*/ AggAttachments::Preview,
+    ];
 }
 
 fn get_one_without_perms() -> impl AnyQuery {
     use schema::*;
 
     Query::select()
-        .from_table::<AggMessages>()
+        .from(
+            AggMessages::left_join_table::<AggAttachments>()
+                .on(AggAttachments::MsgId.equals(AggMessages::MsgId)),
+        )
         .cols(consts::COLUMNS)
+        .cols(consts::COLUMNS_ATTACHMENTS)
         .and_where(AggMessages::RoomId.equals(Var::of(Rooms::Id)))
         .and_where(AggMessages::MsgId.equals(Var::of(Messages::Id)))
         .and_where(
@@ -173,8 +214,12 @@ fn get_one_with_perms() -> impl AnyQuery {
                 .bit_and(Literal::Int8(READ_MESSAGE))
                 .equals(Literal::Int8(READ_MESSAGE)),
         )
-        .from_table::<AggMessages>()
+        .from(
+            AggMessages::left_join_table::<AggAttachments>()
+                .on(AggAttachments::MsgId.equals(AggMessages::MsgId)),
+        )
         .cols(consts::COLUMNS)
+        .cols(consts::COLUMNS_ATTACHMENTS)
         .and_where(AggMessages::RoomId.equals(room_id_var))
         .and_where(AggMessages::MsgId.equals(msg_id_var))
         .and_where(

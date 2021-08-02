@@ -147,7 +147,39 @@ pub async fn get_many(
                 user_mentions: Vec::new(),
                 role_mentions: Vec::new(),
                 room_mentions: Vec::new(),
-                attachments: Vec::new(),
+                attachments: {
+                    let mut attachments = Vec::new();
+
+                    let meta: Option<serde_json::Value> = row.try_get(13)?;
+
+                    if let Some(meta) = meta {
+                        let meta: Vec<schema::AggAttachmentsMeta> = serde_json::from_value(meta)?;
+                        let previews: Vec<Option<Vec<u8>>> = row.try_get(14)?;
+
+                        if meta.len() != previews.len() {
+                            return Err(Error::InternalErrorStatic("Meta != Previews length"));
+                        }
+
+                        attachments.reserve(meta.len());
+
+                        for (meta, preview) in meta.into_iter().zip(previews) {
+                            use blurhash::base85::ToZ85;
+
+                            attachments.push(Attachment {
+                                id: meta.id,
+                                filename: meta.name,
+                                size: meta.size as usize,
+                                mime: meta.mime,
+                                embed: EmbedMediaAttributes {
+                                    preview: preview.map(|p| p.to_z85().unwrap()),
+                                    ..EmbedMediaAttributes::default()
+                                },
+                            })
+                        }
+                    }
+
+                    attachments
+                },
                 embeds: Vec::new(),
                 reactions: Vec::new(),
             };
@@ -210,6 +242,10 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
             /*11*/ AggMessages::Content,
             /*12*/ AggMessages::Roles,
         ])
+        .cols(&[
+            /*13*/ AggAttachments::Meta,
+            /*14*/ AggAttachments::Preview,
+        ])
         .and_where(AggMessages::RoomId.equals(room_id_var.clone()))
         .and_where(
             // test if message is deleted
@@ -220,7 +256,12 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
 
     match mode {
         MessageSearch::Before(_) | MessageSearch::After(_) => {
-            query = query.from_table::<AggMessages>().limit(limit_var.clone())
+            query = query
+                .from(
+                    AggMessages::left_join_table::<AggAttachments>()
+                        .on(AggAttachments::MsgId.equals(AggMessages::MsgId)),
+                )
+                .limit(limit_var.clone())
         }
         _ => {}
     }
@@ -276,8 +317,11 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
                 .with(numbered.exclude())
                 .with(offsets.exclude())
                 .from(
-                    AggMessages::inner_join_table::<NumberedMsgs>()
-                        .on(AggMessages::MsgId.equals(NumberedMsgs::MsgId)),
+                    AggAttachments::right_join(
+                        AggMessages::inner_join_table::<NumberedMsgs>()
+                            .on(AggMessages::MsgId.equals(NumberedMsgs::MsgId)),
+                    )
+                    .on(AggAttachments::MsgId.equals(AggMessages::MsgId)),
                 )
                 .and_where(
                     // select only messages in the offset range

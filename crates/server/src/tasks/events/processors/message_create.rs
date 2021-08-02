@@ -14,7 +14,10 @@ pub async fn message_create(
                 use schema::*;
 
                 Query::select()
-                    .from_table::<AggMessages>()
+                    .from(
+                        AggMessages::left_join_table::<AggAttachments>()
+                            .on(AggAttachments::MsgId.equals(AggMessages::MsgId)),
+                    )
                     .and_where(AggMessages::MsgId.equals(Var::of(AggMessages::MsgId)))
                     .cols(&[
                         /* 0*/ AggMessages::UserId,
@@ -29,6 +32,10 @@ pub async fn message_create(
                         /* 9*/ AggMessages::MessageFlags,
                         /*10*/ AggMessages::Content,
                         /*11*/ AggMessages::Roles,
+                    ])
+                    .cols(&[
+                        /*12*/ AggAttachments::Meta,
+                        /*13*/ AggAttachments::Preview,
                     ])
             },
             &[&id],
@@ -75,7 +82,39 @@ pub async fn message_create(
         user_mentions: Vec::new(),
         role_mentions: Vec::new(),
         room_mentions: Vec::new(),
-        attachments: Vec::new(),
+        attachments: {
+            let mut attachments = Vec::new();
+
+            let meta: Option<serde_json::Value> = row.try_get(12)?;
+
+            if let Some(meta) = meta {
+                let meta: Vec<schema::AggAttachmentsMeta> = serde_json::from_value(meta)?;
+                let previews: Vec<Option<Vec<u8>>> = row.try_get(13)?;
+
+                if meta.len() != previews.len() {
+                    return Err(Error::InternalErrorStatic("Meta != Previews length"));
+                }
+
+                attachments.reserve(meta.len());
+
+                for (meta, preview) in meta.into_iter().zip(previews) {
+                    use blurhash::base85::ToZ85;
+
+                    attachments.push(Attachment {
+                        id: meta.id,
+                        filename: meta.name,
+                        size: meta.size as usize,
+                        mime: meta.mime,
+                        embed: EmbedMediaAttributes {
+                            preview: preview.map(|p| p.to_z85().unwrap()),
+                            ..EmbedMediaAttributes::default()
+                        },
+                    })
+                }
+            }
+
+            attachments
+        },
         embeds: Vec::new(),
         reactions: Vec::new(),
     };

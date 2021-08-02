@@ -122,14 +122,21 @@ pub enum EmbedMediaKind {
     Thumbnail,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct EmbedMediaAttributes {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub proxy_url: Option<String>,
+
+    /// Base-85 encoded blurhash
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview: Option<String>,
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub height: Option<u32>,
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub width: Option<u32>,
 }
