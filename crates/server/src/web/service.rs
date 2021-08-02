@@ -25,10 +25,16 @@ pub async fn service(
 
     let route = Route::new(addr, req, state);
 
+    let host = route.host();
+
     let info = format!(
-        "{:?}: {} {}",
+        "{:?}: {} http://{}{}",
         real_ip::get_real_ip(&route),
         route.req.method(),
+        match host {
+            Some(ref h) => h.as_str(),
+            None => "unknown",
+        },
         route.req.uri()
     );
 
