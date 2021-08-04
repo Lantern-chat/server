@@ -1,4 +1,4 @@
-use std::fmt::{self, Display, Formatter, LowerHex};
+use std::fmt::{self, Debug, Display, Formatter, LowerHex};
 use std::str::FromStr;
 
 /// Integer wrapper that can `FromStr` and `Display` hexidecimal values.
@@ -6,10 +6,9 @@ use std::str::FromStr;
 #[repr(transparent)]
 pub struct HexidecimalInt<T>(pub T);
 
-pub unsafe trait SafeInt: Sized + LowerHex {
-    type BYTES: Default + AsRef<[u8]> + AsMut<[u8]>;
-    fn from_bytes(bytes: Self::BYTES) -> Self;
-    fn into_bytes(self) -> Self::BYTES;
+pub unsafe trait SafeInt: Sized + LowerHex + Copy {
+    type BYTES: Default + AsRef<[u8]> + AsMut<[u8]> + Debug;
+    fn from_be_bytes(bytes: Self::BYTES) -> Self;
 }
 
 macro_rules! impl_safe_int {
@@ -18,13 +17,8 @@ macro_rules! impl_safe_int {
             type BYTES = [u8; $bytes];
 
             #[inline(always)]
-            fn from_bytes(bytes: Self::BYTES) -> Self {
-                unsafe { std::mem::transmute(bytes) }
-            }
-
-            #[inline(always)]
-            fn into_bytes(self) -> Self::BYTES {
-                unsafe { std::mem::transmute(self) }
+            fn from_be_bytes(bytes: Self::BYTES) -> Self {
+                unsafe { std::mem::transmute::<_, Self>(bytes).swap_bytes() }
             }
         }
     )*}
@@ -37,12 +31,13 @@ impl<T: SafeInt> FromStr for HexidecimalInt<T> {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut bytes = T::BYTES::default();
+        // NOTE: This decodes as Big Endian
         hex::decode_to_slice(s, bytes.as_mut())?;
-        Ok(HexidecimalInt(T::from_bytes(bytes)))
+        Ok(HexidecimalInt(T::from_be_bytes(bytes)))
     }
 }
 
-impl<T: LowerHex> Display for HexidecimalInt<T> {
+impl<T: SafeInt> Display for HexidecimalInt<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{:01$x}", self.0, std::mem::size_of::<Self>() * 2)
     }
