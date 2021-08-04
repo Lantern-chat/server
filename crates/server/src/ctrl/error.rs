@@ -31,7 +31,7 @@ pub enum Error {
     #[error("Encoding Error {0}")]
     EncodingError(#[from] EncodingError),
     #[error("IO Error: {0}")]
-    IOError(#[from] std::io::Error),
+    IOError(std::io::Error),
     #[error("Invalid Header Value: {0}")]
     InvalidHeaderValue(#[from] InvalidHeaderValue),
     #[error("Internal Error: {0}")]
@@ -140,6 +140,16 @@ pub enum Error {
 impl From<db::pg::Error> for Error {
     fn from(err: db::pg::Error) -> Error {
         Error::DbError(err.into())
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Error {
+        if err.kind() == std::io::ErrorKind::NotFound {
+            Error::NotFound
+        } else {
+            Error::IOError(err)
+        }
     }
 }
 

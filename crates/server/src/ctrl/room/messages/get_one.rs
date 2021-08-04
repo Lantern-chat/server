@@ -2,7 +2,11 @@ use schema::Snowflake;
 
 use models::*;
 
-use crate::{ctrl::Error, web::auth::Authorization, ServerState};
+use crate::{
+    ctrl::{util::encrypted_asset::encrypt_snowflake, Error},
+    web::auth::Authorization,
+    ServerState,
+};
 
 pub async fn get_one(
     state: ServerState,
@@ -56,7 +60,10 @@ pub async fn get_one(
             bio: None,
             email: None,
             preferences: None,
-            avatar: None,
+            avatar: match row.try_get(12)? {
+                Some(avatar_id) => Some(encrypt_snowflake(&state, avatar_id)),
+                None => None,
+            },
         },
         member: match party_id {
             None => None,
@@ -74,11 +81,11 @@ pub async fn get_one(
         attachments: {
             let mut attachments = Vec::new();
 
-            let meta: Option<serde_json::Value> = row.try_get(12)?;
+            let meta: Option<serde_json::Value> = row.try_get(13)?;
 
             if let Some(meta) = meta {
                 let meta: Vec<schema::AggAttachmentsMeta> = serde_json::from_value(meta)?;
-                let previews: Vec<Option<Vec<u8>>> = row.try_get(13)?;
+                let previews: Vec<Option<Vec<u8>>> = row.try_get(14)?;
 
                 if meta.len() != previews.len() {
                     return Err(Error::InternalErrorStatic("Meta != Previews length"));
@@ -149,12 +156,10 @@ mod consts {
         /* 8*/ AggMessages::EditedAt,
         /* 9*/ AggMessages::MessageFlags,
         /*10*/ AggMessages::Content,
-        /*11*/ AggMessages::Roles,
-    ];
-
-    pub const COLUMNS_ATTACHMENTS: &[AggAttachments] = &[
-        /*12*/ AggAttachments::Meta,
-        /*13*/ AggAttachments::Preview,
+        /*11*/ AggMessages::RoleIds,
+        /*12*/ AggMessages::AvatarId,
+        /*13*/ AggMessages::AttachmentMeta,
+        /*14*/ AggMessages::AttachmentPreview,
     ];
 }
 
@@ -162,12 +167,8 @@ fn get_one_without_perms() -> impl AnyQuery {
     use schema::*;
 
     Query::select()
-        .from(
-            AggMessages::left_join_table::<AggAttachments>()
-                .on(AggAttachments::MsgId.equals(AggMessages::MsgId)),
-        )
+        .from_table::<AggMessages>()
         .cols(consts::COLUMNS)
-        .cols(consts::COLUMNS_ATTACHMENTS)
         .and_where(AggMessages::RoomId.equals(Var::of(Rooms::Id)))
         .and_where(AggMessages::MsgId.equals(Var::of(Messages::Id)))
         .and_where(
@@ -214,12 +215,8 @@ fn get_one_with_perms() -> impl AnyQuery {
                 .bit_and(Literal::Int8(READ_MESSAGE))
                 .equals(Literal::Int8(READ_MESSAGE)),
         )
-        .from(
-            AggMessages::left_join_table::<AggAttachments>()
-                .on(AggAttachments::MsgId.equals(AggMessages::MsgId)),
-        )
+        .from_table::<AggMessages>()
         .cols(consts::COLUMNS)
-        .cols(consts::COLUMNS_ATTACHMENTS)
         .and_where(AggMessages::RoomId.equals(room_id_var))
         .and_where(AggMessages::MsgId.equals(msg_id_var))
         .and_where(

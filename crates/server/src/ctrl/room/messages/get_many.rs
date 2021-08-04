@@ -5,7 +5,7 @@ use models::*;
 use thorn::pg::ToSql;
 
 use crate::{
-    ctrl::{perm::get_cached_room_permissions_with_conn, Error},
+    ctrl::{perm::get_cached_room_permissions_with_conn, util::encrypted_asset::encrypt_snowflake, Error},
     web::auth::Authorization,
     ServerState,
 };
@@ -132,7 +132,10 @@ pub async fn get_many(
                     bio: None,
                     email: None,
                     preferences: None,
-                    avatar: None,
+                    avatar: match row.try_get(13)? {
+                        Some(avatar_id) => Some(encrypt_snowflake(&state, avatar_id)),
+                        None => None,
+                    },
                 },
                 member: match party_id {
                     None => None,
@@ -150,11 +153,11 @@ pub async fn get_many(
                 attachments: {
                     let mut attachments = Vec::new();
 
-                    let meta: Option<serde_json::Value> = row.try_get(13)?;
+                    let meta: Option<serde_json::Value> = row.try_get(14)?;
 
                     if let Some(meta) = meta {
                         let meta: Vec<schema::AggAttachmentsMeta> = serde_json::from_value(meta)?;
-                        let previews: Vec<Option<Vec<u8>>> = row.try_get(14)?;
+                        let previews: Vec<Option<Vec<u8>>> = row.try_get(15)?;
 
                         if meta.len() != previews.len() {
                             return Err(Error::InternalErrorStatic("Meta != Previews length"));
@@ -240,11 +243,10 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
             /* 9*/ AggMessages::EditedAt,
             /*10*/ AggMessages::MessageFlags,
             /*11*/ AggMessages::Content,
-            /*12*/ AggMessages::Roles,
-        ])
-        .cols(&[
-            /*13*/ AggAttachments::Meta,
-            /*14*/ AggAttachments::Preview,
+            /*12*/ AggMessages::RoleIds,
+            /*13*/ AggMessages::AvatarId,
+            /*14*/ AggMessages::AttachmentMeta,
+            /*15*/ AggMessages::AttachmentPreview,
         ])
         .and_where(AggMessages::RoomId.equals(room_id_var.clone()))
         .and_where(
@@ -256,12 +258,7 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
 
     match mode {
         MessageSearch::Before(_) | MessageSearch::After(_) => {
-            query = query
-                .from(
-                    AggMessages::left_join_table::<AggAttachments>()
-                        .on(AggAttachments::MsgId.equals(AggMessages::MsgId)),
-                )
-                .limit(limit_var.clone())
+            query = query.from_table::<AggMessages>().limit(limit_var.clone())
         }
         _ => {}
     }
@@ -317,11 +314,8 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
                 .with(numbered.exclude())
                 .with(offsets.exclude())
                 .from(
-                    AggAttachments::right_join(
-                        AggMessages::inner_join_table::<NumberedMsgs>()
-                            .on(AggMessages::MsgId.equals(NumberedMsgs::MsgId)),
-                    )
-                    .on(AggAttachments::MsgId.equals(AggMessages::MsgId)),
+                    AggMessages::inner_join_table::<NumberedMsgs>()
+                        .on(AggMessages::MsgId.equals(NumberedMsgs::MsgId)),
                 )
                 .and_where(
                     // select only messages in the offset range

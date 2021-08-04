@@ -1,4 +1,7 @@
-use crate::web::gateway::{msg::ServerMsg, Event};
+use crate::{
+    ctrl::util::encrypted_asset::encrypt_snowflake,
+    web::gateway::{msg::ServerMsg, Event},
+};
 
 use super::*;
 
@@ -14,10 +17,7 @@ pub async fn message_create(
                 use schema::*;
 
                 Query::select()
-                    .from(
-                        AggMessages::left_join_table::<AggAttachments>()
-                            .on(AggAttachments::MsgId.equals(AggMessages::MsgId)),
-                    )
+                    .from_table::<AggMessages>()
                     .and_where(AggMessages::MsgId.equals(Var::of(AggMessages::MsgId)))
                     .cols(&[
                         /* 0*/ AggMessages::UserId,
@@ -31,11 +31,10 @@ pub async fn message_create(
                         /* 8*/ AggMessages::MentionKinds,
                         /* 9*/ AggMessages::MessageFlags,
                         /*10*/ AggMessages::Content,
-                        /*11*/ AggMessages::Roles,
-                    ])
-                    .cols(&[
-                        /*12*/ AggAttachments::Meta,
-                        /*13*/ AggAttachments::Preview,
+                        /*11*/ AggMessages::RoleIds,
+                        /*12*/ AggMessages::AttachmentMeta,
+                        /*13*/ AggMessages::AttachmentPreview,
+                        /*14*/ AggMessages::AvatarId,
                     ])
             },
             &[&id],
@@ -67,7 +66,10 @@ pub async fn message_create(
             bio: None,
             email: None,
             preferences: None,
-            avatar: None,
+            avatar: match row.try_get(14)? {
+                Some(avatar_id) => Some(encrypt_snowflake(&state, avatar_id)),
+                None => None,
+            },
         },
         member: match party_id {
             None => None,

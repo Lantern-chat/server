@@ -4,7 +4,7 @@ use hashbrown::{hash_map::Entry, HashMap};
 use schema::Snowflake;
 
 use crate::{
-    ctrl::{auth::Authorization, Error, SearchMode},
+    ctrl::{auth::Authorization, util::encrypted_asset::encrypt_snowflake, Error, SearchMode},
     permission_cache::PermMute,
     ServerState,
 };
@@ -74,21 +74,18 @@ pub async fn ready(
                     use thorn::*;
 
                     Query::select()
-                        .and_where(Users::Id.equals(Var::of(Users::Id)))
+                        .and_where(AggUsers::Id.equals(Var::of(Users::Id)))
                         .cols(&[
-                            /* 0*/ Users::Username,
-                            /* 1*/ Users::Discriminator,
-                            /* 2*/ Users::Flags,
-                            /* 3*/ Users::Email,
-                            /* 4*/ Users::CustomStatus,
-                            /* 5*/ Users::Biography,
-                            /* 6*/ Users::Preferences,
+                            /* 0*/ AggUsers::Username,
+                            /* 1*/ AggUsers::Discriminator,
+                            /* 2*/ AggUsers::Flags,
+                            /* 3*/ AggUsers::Email,
+                            /* 4*/ AggUsers::CustomStatus,
+                            /* 5*/ AggUsers::Biography,
+                            /* 6*/ AggUsers::Preferences,
+                            /* 7*/ AggUsers::AvatarId,
                         ])
-                        .col(UserAvatars::FileId) // 7
-                        .from(
-                            Users::left_join_table::<UserAvatars>().on(UserAvatars::UserId.equals(Users::Id)),
-                        )
-                        .and_where(UserAvatars::PartyId.is_null())
+                        .from_table::<AggUsers>()
                         .limit_n(1)
                 },
                 &[&auth.user_id],
@@ -101,7 +98,10 @@ pub async fn ready(
             discriminator: row.try_get(1)?,
             flags: UserFlags::from_bits_truncate(row.try_get(2)?),
             email: Some(row.try_get(3)?),
-            avatar: None, //row.try_get(7)?, // TODO
+            avatar: match row.try_get(7)? {
+                Some(avatar_id) => Some(encrypt_snowflake(&state, avatar_id)),
+                None => None,
+            },
             status: row.try_get(4)?,
             bio: row.try_get(5)?,
             preferences: {

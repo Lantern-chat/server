@@ -60,3 +60,7 @@ pub mod file {
 }
 
 pub mod cdn;
+
+pub mod util {
+    pub mod encrypted_asset;
+}

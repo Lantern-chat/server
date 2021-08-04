@@ -3,7 +3,7 @@ use hashbrown::hash_map::{Entry, HashMap};
 use schema::{Snowflake, SnowflakeExt};
 
 use crate::{
-    ctrl::{auth::AuthToken, Error},
+    ctrl::{auth::AuthToken, util::encrypted_asset::encrypt_snowflake, Error},
     util::hex::HexidecimalInt,
     ServerState,
 };
@@ -43,17 +43,9 @@ pub async fn get_members(
                     bio: row.try_get(4)?,
                     email: None,
                     preferences: None,
-                    avatar: {
-                        let avatar_id: Option<Snowflake> = row.try_get(9)?;
-
-                        match avatar_id {
-                            None => None,
-                            Some(id) => {
-                                let encrypted_id = HexidecimalInt(id.encrypt(state.config.sf_key));
-
-                                Some(encrypted_id.to_string())
-                            }
-                        }
+                    avatar: match row.try_get(9)? {
+                        Some(avatar_id) => Some(encrypt_snowflake(&state, avatar_id)),
+                        None => None,
                     },
                 }),
                 presence: match row.try_get::<_, Option<chrono::NaiveDateTime>>(7)? {
@@ -84,7 +76,7 @@ fn select_members2() -> impl AnyQuery {
             /* 0*/ AggUsers::Id,
             /* 1*/ AggUsers::Discriminator,
             /* 2*/ AggUsers::Username,
-            /* 3*/ AggUsers::UserFlags,
+            /* 3*/ AggUsers::Flags,
             /* 4*/ AggUsers::Biography,
             /* 5*/ AggUsers::CustomStatus,
             /* 6*/ AggUsers::PresenceFlags,
