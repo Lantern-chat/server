@@ -21,6 +21,9 @@ pub struct LanternConfig {
     pub max_avatar_pixels: u32,
     pub max_avatar_width: u32,
     pub file_key: BlockCipherKey<Aes256>,
+
+    /// AES-128 key for encrypting snowflakes
+    pub sf_key: u128,
 }
 
 impl Default for LanternConfig {
@@ -44,9 +47,17 @@ impl Default for LanternConfig {
                 let mut key: BlockCipherKey<Aes256> = BlockCipherKey::<Aes256>::default();
 
                 hex::decode_to_slice(env::var("FS_KEY").unwrap(), key.as_mut_slice())
-                    .expect("Invalid hexidecimal AES256 Key");
+                    .expect("Invalid hexidecimal AES256 Key: FS_KEY");
 
                 key
+            },
+            sf_key: {
+                let mut key = [0u8; 16];
+
+                hex::decode_to_slice(env::var("SF_KEY").unwrap(), &mut key)
+                    .expect("Invalid hexidecimal AES128 Key: SF_KEY");
+
+                u128::from_le_bytes(key)
             },
         }
     }

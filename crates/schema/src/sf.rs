@@ -20,6 +20,7 @@ pub trait SnowflakeExt {
         NonZeroU64::new(id as u64).map(Snowflake)
     }
 
+    #[inline]
     fn max_value() -> Snowflake {
         Snowflake(unsafe { NonZeroU64::new_unchecked(9223372036854775807) })
     }
@@ -66,10 +67,42 @@ pub trait SnowflakeExt {
         Self::at_ms(ts.duration_since(UNIX_EPOCH).unwrap().as_millis() as u64)
     }
 
+    fn encrypt(self, key: u128) -> u128;
+
+    #[inline]
+    fn decrypt(block: u128, key: u128) -> Option<Snowflake> {
+        use aes::{BlockDecrypt, NewBlockCipher};
+
+        let key = unsafe { std::mem::transmute(key) };
+        let mut block = unsafe { std::mem::transmute(block) };
+
+        let cipher = aes::Aes128::new(&key);
+
+        cipher.decrypt_block(&mut block);
+
+        let [l, _]: [u64; 2] = unsafe { std::mem::transmute(block) };
+
+        NonZeroU64::new(l).map(Snowflake)
+    }
+
     fn low_complexity(self) -> u64;
 }
 
 impl SnowflakeExt for Snowflake {
+    #[inline]
+    fn encrypt(self, key: u128) -> u128 {
+        use aes::{BlockEncrypt, NewBlockCipher};
+
+        let key = unsafe { std::mem::transmute(key) };
+        let mut block = unsafe { std::mem::transmute([self, self]) };
+
+        let cipher = aes::Aes128::new(&key);
+
+        cipher.encrypt_block(&mut block);
+
+        unsafe { std::mem::transmute(block) }
+    }
+
     fn low_complexity(self) -> u64 {
         const ID_MASK: u64 = 0b11111_11111;
         let raw = self.to_u64();
