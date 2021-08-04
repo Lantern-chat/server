@@ -1,9 +1,10 @@
 use hashbrown::hash_map::{Entry, HashMap};
 
-use schema::Snowflake;
+use schema::{Snowflake, SnowflakeExt};
 
 use crate::{
     ctrl::{auth::AuthToken, Error},
+    util::hex::HexidecimalInt,
     ServerState,
 };
 
@@ -27,35 +28,46 @@ pub async fn get_members(
         .query_stream_cached_typed(|| select_members2(), &[&party_id])
         .await?;
 
-    Ok(stream.map(|row| match row {
+    Ok(stream.map(move |row| match row {
         Err(e) => Err(e.into()),
         Ok(row) => Ok({
-            let user_id = row.try_get(1)?;
+            let user_id = row.try_get(0)?;
             PartyMember {
-                nick: row.try_get(0)?,
+                nick: row.try_get(10)?,
                 user: Some(User {
                     id: user_id,
                     username: row.try_get(2)?,
-                    discriminator: row.try_get(3)?,
-                    flags: UserFlags::from_bits_truncate(row.try_get(4)?).publicize(),
-                    status: None,
-                    bio: None,
+                    discriminator: row.try_get(1)?,
+                    flags: UserFlags::from_bits_truncate(row.try_get(3)?).publicize(),
+                    status: row.try_get(5)?,
+                    bio: row.try_get(4)?,
                     email: None,
                     preferences: None,
-                    avatar_id: None,
+                    avatar: {
+                        let avatar_id: Option<Snowflake> = row.try_get(9)?;
+
+                        match avatar_id {
+                            None => None,
+                            Some(id) => {
+                                let encrypted_id = HexidecimalInt(id.encrypt(state.config.sf_key));
+
+                                Some(encrypted_id.to_string())
+                            }
+                        }
+                    },
                 }),
-                presence: match row.try_get::<_, Option<chrono::NaiveDateTime>>(5)? {
+                presence: match row.try_get::<_, Option<chrono::NaiveDateTime>>(7)? {
                     None => None,
                     Some(updated_at) => Some(UserPresence {
                         updated_at: Some(crate::util::time::format_naivedatetime(updated_at)),
                         flags: UserPresenceFlags::from_bits_truncate(row.try_get(6)?),
-                        activity: match row.try_get::<_, Option<serde_json::Value>>(7)? {
+                        activity: match row.try_get::<_, Option<serde_json::Value>>(8)? {
                             None => None,
                             Some(value) => Some(AnyActivity::Any(value)),
                         },
                     }),
                 },
-                roles: row.try_get(8)?,
+                roles: row.try_get(12)?,
             }
         }),
     }))
@@ -65,6 +77,31 @@ use thorn::*;
 
 fn select_members2() -> impl AnyQuery {
     use schema::*;
+
+    Query::select()
+        .from(AggUsers::inner_join_table::<AggMembers>().on(AggMembers::UserId.equals(AggUsers::Id)))
+        .cols(&[
+            /* 0*/ AggUsers::Id,
+            /* 1*/ AggUsers::Discriminator,
+            /* 2*/ AggUsers::Username,
+            /* 3*/ AggUsers::UserFlags,
+            /* 4*/ AggUsers::Biography,
+            /* 5*/ AggUsers::CustomStatus,
+            /* 6*/ AggUsers::PresenceFlags,
+            /* 7*/ AggUsers::PresenceUpdatedAt,
+            /* 8*/ AggUsers::PresenceActivity,
+        ])
+        .expr(
+            /* 9*/ Builtin::coalesce((AggMembers::AvatarId, AggUsers::AvatarId)),
+        )
+        .cols(&[
+            /*10*/ AggMembers::Nickname,
+            /*11*/ AggMembers::JoinedAt,
+            /*12*/ AggMembers::RoleIds,
+        ])
+        .and_where(AggMembers::PartyId.equals(Var::of(Party::Id)))
+
+    /*
 
     tables! {
         struct AggPresence {
@@ -123,4 +160,6 @@ fn select_members2() -> impl AnyQuery {
             .on(AggPresence::UserId.equals(PartyMember::UserId)),
         )
         .and_where(PartyMember::PartyId.equals(Var::of(Party::Id)))
+
+        */
 }

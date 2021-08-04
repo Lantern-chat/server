@@ -23,6 +23,28 @@ thorn::tables! {
         Roles: SNOWFLAKE_ARRAY,
     }
 
+    pub struct AggUsers in Lantern {
+        Id: Users::Id,
+        Discriminator: Users::Discriminator,
+        UserFlags: Users::Flags,
+        Username: Users::Username,
+        Biography: Users::Biography,
+        CustomStatus: Users::CustomStatus,
+        AvatarId: UserAvatars::FileId,
+        PresenceFlags: UserPresence::Flags,
+        PresenceUpdatedAt: UserPresence::UpdatedAt,
+        PresenceActivity: UserPresence::Activity,
+    }
+
+    pub struct AggMembers in Lantern {
+        UserId: Users::Id,
+        PartyId: Party::Id,
+        Nickname: PartyMember::Nickname,
+        AvatarId: UserAvatars::FileId,
+        JoinedAt: PartyMember::JoinedAt,
+        RoleIds: SNOWFLAKE_ARRAY,
+    }
+
     pub struct AggAttachments in Lantern {
         MsgId: Messages::Id,
 
