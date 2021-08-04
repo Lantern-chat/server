@@ -132,7 +132,7 @@ pub async fn get_many(
                     bio: None,
                     email: None,
                     preferences: None,
-                    avatar_id: None,
+                    avatar: None,
                 },
                 member: match party_id {
                     None => None,

@@ -101,7 +101,7 @@ pub async fn ready(
             discriminator: row.try_get(1)?,
             flags: UserFlags::from_bits_truncate(row.try_get(2)?),
             email: Some(row.try_get(3)?),
-            avatar_id: row.try_get(7)?,
+            avatar: None, //row.try_get(7)?, // TODO
             status: row.try_get(4)?,
             bio: row.try_get(5)?,
             preferences: {

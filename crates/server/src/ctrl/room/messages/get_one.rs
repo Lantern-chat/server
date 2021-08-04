@@ -56,7 +56,7 @@ pub async fn get_one(
             bio: None,
             email: None,
             preferences: None,
-            avatar_id: None,
+            avatar: None,
         },
         member: match party_id {
             None => None,

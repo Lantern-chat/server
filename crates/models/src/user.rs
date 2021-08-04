@@ -32,7 +32,7 @@ pub struct User {
     pub username: String,
     pub discriminator: i16,
     pub flags: UserFlags,
-    pub avatar_id: Option<Snowflake>,
+    pub avatar: Option<String>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,

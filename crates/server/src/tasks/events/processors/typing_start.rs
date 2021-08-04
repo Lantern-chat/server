@@ -53,7 +53,7 @@ pub async fn trigger_typing(
                         preferences: None,
                         status: None,
                         bio: None,
-                        avatar_id: None,
+                        avatar: None,
                     }),
                     nick: row.try_get(0)?,
                     roles: None,

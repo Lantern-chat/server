@@ -94,7 +94,7 @@ pub async fn presence_updated(
         bio: None,
         email: None,
         preferences: None,
-        avatar_id: None,
+        avatar: None,
     };
 
     let inner = Arc::new(UserPresenceInner { user, presence });

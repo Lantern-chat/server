@@ -118,7 +118,7 @@ pub async fn create_message(
             username: row.try_get(3)?,
             discriminator: row.try_get(4)?,
             flags: UserFlags::from_bits_truncate(row.try_get(5)?).publicize(),
-            avatar_id: None,
+            avatar: None,
             status: row.try_get(6)?,
             bio: row.try_get(7)?,
             email: None,

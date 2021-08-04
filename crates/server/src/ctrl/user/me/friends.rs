@@ -42,7 +42,7 @@ pub async fn friends(
             flags: FriendFlags::from_bits_truncate(row.try_get(2)?),
             user: User {
                 id: row.try_get(0)?,
-                avatar_id: None,
+                avatar: None,
                 username: row.try_get(3)?,
                 flags: UserFlags::from_bits_truncate(row.try_get(4)?).publicize(),
                 discriminator: row.try_get(5)?,
