@@ -18,6 +18,7 @@ mime_db = { path = "../mime_db" }
 blurhash = { path = "../../../deps/blurhash" }
 
 thorn = { git = "https://github.com/novacrazy/thorn" }
+async-chashmap = { git = "https://github.com/novacrazy/async-chashmap" }
 
 serde = { version = "1", features = ["derive", "rc"] }
 serde_urlencoded = "0.7"
