@@ -172,6 +172,7 @@ pub mod server {
             #[serde(flatten)] inner: Arc<UserPresenceInner>,
         },
         25 => TypingStart { #[serde(flatten)] t: Box<TypingStart> },
+        26 => UserUpdate { user: Arc<User> }
     }
 
     impl Message {
@@ -208,7 +209,8 @@ pub mod server {
                 Message::Hello { .. } |
                 Message::HeartbeatACK { .. } |
                 Message::Ready { .. } |
-                Message::InvalidSession { .. } => return None,
+                Message::InvalidSession { .. } |
+                Message::UserUpdate { .. } => return None,
             })
         }
     }
