@@ -1,3 +1,4 @@
+pub mod base62;
 pub mod hex;
 pub mod serde;
 pub mod time;

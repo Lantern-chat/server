@@ -1,10 +1,10 @@
 CREATE TABLE lantern.invite (
     id          bigint      NOT NULL,
+    code        bigint      NOT NULL,
     party_id    bigint      NOT NULL,
     user_id     bigint      NOT NULL,
     expires     timestamp   NOT NULL,
     uses        smallint    NOT NULL    DEFAULT 1,
-    code        varchar(16) NOT NULL,
     description text        NOT NULL,
 
     CONSTRAINT invite_pk PRIMARY KEY (id)
@@ -19,6 +19,7 @@ ALTER TABLE lantern.invite ADD CONSTRAINT user_fk FOREIGN KEY (user_id)
     REFERENCES lantern.users (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
+CREATE UNIQUE INDEX invite_code_idx ON lantern.invite USING btree(code);
 
 
 -- Track what invite was used to invite a member

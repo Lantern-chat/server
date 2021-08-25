@@ -151,11 +151,11 @@ thorn::tables! {
 
     pub struct Invite in Lantern {
         Id: SNOWFLAKE,
+        Code: Type::INT8,
         PartyId: Party::Id,
         UserId: Users::Id,
         Expires: Type::TIMESTAMP,
         Uses: Type::INT2,
-        Code: Type::VARCHAR,
         Description: Type::TEXT,
     }
 
