@@ -73,7 +73,7 @@ use crate::web::routes::api::ApiError;
 
 lazy_static::lazy_static! {
     static ref BAD_PATTERNS: AhoCorasick = AhoCorasickBuilder::new().dfa(true).build(&[
-        "wp-includes", "wp-login", "wp-content", "wordpress", "xmlrpc.php",
+        "wp-includes", "wp-admin", "wp-login", "wp-content", "wordpress", "xmlrpc.php",
         "wlwmanifest", ".git", "drupal", "ajax", "claro", "wp-json"
     ]);
 }
