@@ -49,7 +49,7 @@ pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
                 Segment::End => true,
                 Segment::Exact(part) => matches!(
                     part,
-                    "channels" | "login" | "register" | "invite" | "verify" | "profile" | "reset"
+                    "channels" | "login" | "register" | "invite" | "verify" | "settings" | "reset"
                 ),
             };
 
