@@ -42,6 +42,7 @@ pub struct InnerServerState {
     pub perm_cache: PermissionCache,
     pub session_cache: SessionCache,
     pub file_cache: MainFileCache,
+    pub totp_tokens: TokenStorage,
 }
 
 #[derive(Clone)]
@@ -76,6 +77,7 @@ impl ServerState {
             perm_cache: PermissionCache::new(),
             session_cache: SessionCache::default(),
             file_cache: MainFileCache::default(),
+            totp_tokens: TokenStorage::default(),
         }))
     }
 
@@ -146,5 +148,26 @@ impl IdLockMap {
 
     pub async fn cleanup(&self) {
         self.map.retain(|_, lock| Arc::strong_count(lock) > 1).await
+    }
+}
+
+#[derive(Default)]
+pub struct TokenStorage {
+    pub map: CHashMap<Snowflake, (Instant, Arc<[u8]>)>,
+}
+
+impl TokenStorage {
+    pub async fn add(&self, id: Snowflake, token: impl AsRef<[u8]>) {
+        self.map
+            .insert(id, (Instant::now(), Arc::from(token.as_ref())))
+            .await;
+    }
+
+    pub async fn get(&self, id: Snowflake) -> Option<Arc<[u8]>> {
+        self.map.get_cloned(&id).await.map(|(_, token)| token)
+    }
+
+    pub async fn remove(&self, id: Snowflake) {
+        self.map.remove(&id).await;
     }
 }
