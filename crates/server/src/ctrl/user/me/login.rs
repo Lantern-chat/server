@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{alloc::System, net::SocketAddr, time::SystemTime};
 
 use schema::Snowflake;
 
@@ -11,6 +11,9 @@ use crate::{
 pub struct LoginForm {
     pub email: String,
     pub password: String,
+
+    #[serde(default)]
+    pub totp: Option<String>,
 }
 
 use models::Session;
@@ -34,7 +37,7 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: LoginForm) -> Res
 
                 Query::select()
                     .from_table::<Users>()
-                    .cols(&[Users::Id, Users::Passhash])
+                    .cols(&[Users::Id, Users::Passhash, Users::Secret])
                     .and_where(Users::Email.equals(Var::of(Users::Email)))
                     .and_where(Users::DeletedAt.is_null())
             },
@@ -49,12 +52,28 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: LoginForm) -> Res
 
     let id: Snowflake = user.try_get(0)?;
     let passhash: String = user.try_get(1)?;
+    let secret: Option<Vec<u8>> = user.try_get(2)?;
+
+    // while we own these, compute is totp is required and an error is returned later
+    let totp_required = secret.is_some() && form.totp.is_none();
 
     // NOTE: Given how expensive it can be to compute an argon2 hash,
     // this only allows a given number to process at once.
     let permit = state.hashing_semaphore.acquire().await?;
 
     let verified = tokio::task::spawn_blocking(move || {
+        if let (Some(secret), Some(token)) = (secret, form.totp) {
+            let now = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+
+            // TODO: Account for time skew in the check method
+            if Ok(true) != totp::TOTP6::new(&secret).check_str(&token, now) {
+                return Ok(false);
+            }
+        }
+
         let config = hash_config();
         argon2::verify_encoded_ext(&passhash, form.password.as_bytes(), config.secret, config.ad)
     })
@@ -64,6 +83,10 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: LoginForm) -> Res
 
     if !verified {
         return Err(Error::InvalidCredentials);
+    }
+
+    if totp_required {
+        return Err(Error::TOTPRequired);
     }
 
     do_login(state, addr, id, std::time::SystemTime::now()).await

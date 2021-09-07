@@ -46,6 +46,7 @@ thorn::tables! {
         CustomStatus: Type::VARCHAR,
         Biography: Type::VARCHAR,
         Preferences: Type::JSONB,
+        Secret: Type::BYTEA,
     }
 
     pub struct UsersFreelist in Lantern {

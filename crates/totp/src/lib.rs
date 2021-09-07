@@ -5,13 +5,24 @@ use sha2::Sha256;
 
 type HmacSha256 = Hmac<Sha256>;
 
+pub type TOTP6<'a> = TOTP<'a, 6>;
+pub type TOTP8<'a> = TOTP<'a, 8>;
+
 pub struct TOTP<'a, const DIGITS: usize> {
     pub key: &'a [u8],
     pub skew: u64,
     pub step: u64,
 }
 
-impl<const DIGITS: usize> TOTP<'_, DIGITS> {
+impl<'a, const DIGITS: usize> TOTP<'a, DIGITS> {
+    pub fn new(key: &'a impl AsRef<[u8]>) -> Self {
+        TOTP {
+            key: key.as_ref(),
+            skew: 10,
+            step: 30,
+        }
+    }
+
     /// https://datatracker.ietf.org/doc/html/rfc6238#appendix-A
     pub fn generate_raw(&self, time: u64) -> u32 {
         let ctr = (time / self.step).to_be_bytes();
@@ -39,13 +50,16 @@ impl<const DIGITS: usize> TOTP<'_, DIGITS> {
     }
 
     pub fn check(&self, token: u32, time: u64) -> bool {
+        // TODO: Figure out this math
         // skew is measured in seconds
-        let n = if self.skew > 0 {
-            // convert the seconds into number of steps around current step
-            (self.skew * 2) / self.step + 1
-        } else {
-            0
-        };
+        //let n = if self.skew > 0 {
+        //    // convert the seconds into number of steps around current step
+        //    (self.skew * 2) / self.step + 1
+        //} else {
+        //    0
+        //};
+
+        let n = 0;
 
         let basestep = time / self.step - n;
         for i in 0..n * 2 + 1 {
@@ -89,15 +103,12 @@ mod tests {
 
     use super::*;
 
-    type TOPT8<'a> = TOTP<'a, 8>;
-    type TOPT6<'a> = TOTP<'a, 6>;
-
     #[test]
     fn print_totps() {
         const TEST_TIMES: &[u64] = &[59, 1111111109, 1111111111, 1234567890, 2000000000, 20000000000];
         let key = hex::decode("3132333435363738393031323334353637383930313233343536373839303132").unwrap();
 
-        let totp = TOPT8 {
+        let totp = TOTP8 {
             key: &key,
             skew: 0,
             step: 30,
@@ -119,7 +130,7 @@ mod tests {
 
         println!("Keylen: {}", key.len());
 
-        let totp = TOPT6 {
+        let totp = TOTP6 {
             key: &key,
             skew: 0,
             step: 30,

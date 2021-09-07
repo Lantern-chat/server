@@ -16,6 +16,9 @@ CREATE TABLE lantern.users (
     -- this is for client-side user preferences, which can be stored as JSON easily enough
     preferences     jsonb,
 
+    -- 2FA Secret key
+    "secret"        bytea,
+
     CONSTRAINT users_pk PRIMARY KEY (id)
 );
 ALTER TABLE lantern.users OWNER TO postgres;

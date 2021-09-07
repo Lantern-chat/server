@@ -61,6 +61,9 @@ pub enum Error {
     #[error("Invalid Credentials")]
     InvalidCredentials,
 
+    #[error("TOTP Required")]
+    TOTPRequired,
+
     #[error("Insufficient Age")]
     InsufficientAge,
 
@@ -176,7 +179,7 @@ impl Error {
         }
 
         match self {
-            Error::NoSession | Error::InvalidCredentials => StatusCode::UNAUTHORIZED,
+            Error::NoSession | Error::InvalidCredentials | Error::TOTPRequired => StatusCode::UNAUTHORIZED,
             Error::NotFound => StatusCode::NOT_FOUND,
             Error::BadRequest => StatusCode::BAD_REQUEST,
             Error::AlreadyExists => StatusCode::CONFLICT,
@@ -233,6 +236,7 @@ impl Error {
             Error::InvalidPreview           => 40024,
             Error::MimeParseError(_)        => 40025,
             Error::InvalidImageFormat       => 40026,
+            Error::TOTPRequired             => 40027,
 
             // HTTP-like error codes
             Error::BadRequest               => 40400,
