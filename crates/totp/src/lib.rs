@@ -23,12 +23,30 @@ impl<'a, const DIGITS: usize> TOTP<'a, DIGITS> {
         }
     }
 
+    pub fn generate_backup_raw(&self, time: u64) -> [u8; 7] {
+        let hash = {
+            let mut mac = HmacSha256::new_from_slice(&self.key).expect("Invalid key");
+            mac.update(&time.to_be_bytes());
+            mac.finalize().into_bytes()
+        };
+
+        let offset = (hash[hash.len() - 1] & 0xF) as usize;
+
+        let mut buf = [0u8; 8];
+        buf.copy_from_slice(&hash[offset..offset + 8]);
+        let be = u64::from_be_bytes(buf).to_ne_bytes();
+
+        let mut buf = [0u8; 7];
+        buf.copy_from_slice(&be[0..7]);
+        buf
+    }
+
     /// https://datatracker.ietf.org/doc/html/rfc6238#appendix-A
     pub fn generate_raw(&self, time: u64) -> u32 {
         let ctr = (time / self.step).to_be_bytes();
 
         let hash = {
-            let mut mac = HmacSha256::new_from_slice(&self.key).expect("invalid key");
+            let mut mac = HmacSha256::new_from_slice(&self.key).expect("Invalid key");
             mac.update(&ctr);
             mac.finalize().into_bytes()
         };
@@ -39,14 +57,20 @@ impl<'a, const DIGITS: usize> TOTP<'a, DIGITS> {
             let mut buf = [0u8; 4];
             buf.copy_from_slice(&hash[offset..offset + 4]);
 
-            0x7fff_ffff & u32::from_ne_bytes(buf).swap_bytes()
+            0x7fff_ffff & u32::from_be_bytes(buf)
         };
 
-        binary % (10u32).pow(DIGITS as u32)
+        binary % 10u32.pow(DIGITS as u32)
     }
 
     pub fn generate(&self, time: u64) -> String {
         format!("{1:00$}", DIGITS, self.generate_raw(time))
+    }
+
+    pub fn generate_backup(&self, time: u64) -> String {
+        let code = self.generate_backup_raw(time);
+        base32::encode(base32::Alphabet::Crockford, &code)
+        //format!("{1:00$}", DIGITS * 4, self.generate_backup_raw(time))
     }
 
     pub fn check(&self, token: u32, time: u64) -> bool {
@@ -138,5 +162,10 @@ mod tests {
 
         println!("{}", totp.url("test", "testing"));
         println!("{}", totp.generate(now));
+        println!("{}", totp.generate_backup(now));
+
+        //for t in 0..100000000 {
+        //    assert_eq!(totp.generate_backup(t).len(), 13);
+        //}
     }
 }

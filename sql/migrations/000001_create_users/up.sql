@@ -13,11 +13,13 @@ CREATE TABLE lantern.users (
     custom_status   varchar(128),
     -- biography is an extended user description on their profile
     biography       varchar(4096),
-    -- this is for client-side user preferences, which can be stored as JSON easily enough
-    preferences     jsonb,
 
     -- 2FA Secret key
-    "secret"        bytea,
+    mfa_secret      bytea,
+    mfa_backup      bytea,
+
+    -- this is for client-side user preferences, which can be stored as JSON easily enough
+    preferences     jsonb,
 
     CONSTRAINT users_pk PRIMARY KEY (id)
 );

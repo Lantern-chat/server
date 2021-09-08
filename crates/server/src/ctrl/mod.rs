@@ -21,10 +21,12 @@ pub mod user {
     pub mod register;
 
     pub mod me {
+        pub mod account;
         pub mod avatar;
         pub mod friends;
         pub mod login;
         pub mod logout;
+        pub mod prefs;
         pub mod sessions;
     }
 }

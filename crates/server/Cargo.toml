@@ -42,6 +42,7 @@ bytes = "1.0.1"
 lazy_static = "1.4.0"
 rust-argon2 = "0.8.3"
 aes = { version = "0.7", features = ["ctr"] }
+aes-gcm-siv = "0.10.3"
 # sha3 = "0.9.1"
 flate2 = { version = "1.0.19", default-features = false, features = ["rust_backend"] }
 miniz_oxide = "0.4.4"

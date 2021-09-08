@@ -4,6 +4,7 @@ use schema::Snowflake;
 
 use crate::{
     ctrl::{auth::AuthToken, Error},
+    util::encrypt::decrypt_user_message,
     ServerState,
 };
 
@@ -37,7 +38,7 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: LoginForm) -> Res
 
                 Query::select()
                     .from_table::<Users>()
-                    .cols(&[Users::Id, Users::Passhash, Users::Secret])
+                    .cols(&[Users::Id, Users::Passhash, Users::MfaSecret, Users::MfaBackup])
                     .and_where(Users::Email.equals(Var::of(Users::Email)))
                     .and_where(Users::DeletedAt.is_null())
             },
@@ -50,52 +51,54 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: LoginForm) -> Res
         None => return Err(Error::InvalidCredentials),
     };
 
-    let id: Snowflake = user.try_get(0)?;
+    let user_id: Snowflake = user.try_get(0)?;
     let passhash: String = user.try_get(1)?;
     let secret: Option<Vec<u8>> = user.try_get(2)?;
+    let backup: Option<Vec<u8>> = user.try_get(3)?;
 
-    // while we own these, compute is totp is required and an error is returned later
-    let totp_required = secret.is_some() && form.totp.is_none();
+    if secret.is_some() != backup.is_some() {
+        return Err(Error::InternalErrorStatic("Secret/Backup Mismatch!"));
+    }
 
-    // NOTE: Given how expensive it can be to compute an argon2 hash,
-    // this only allows a given number to process at once.
-    let permit = state.hashing_semaphore.acquire().await?;
+    let verified = {
+        // NOTE: Given how expensive it can be to compute an argon2 hash,
+        // this only allows a given number to process at once.
+        let permit = state.hashing_semaphore.acquire().await?;
 
-    let verified = tokio::task::spawn_blocking(move || {
-        if let (Some(secret), Some(token)) = (secret, form.totp) {
-            let now = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+        let password = form.password;
+        let verified = tokio::task::spawn_blocking(move || {
+            let config = hash_config();
+            argon2::verify_encoded_ext(&passhash, password.as_bytes(), config.secret, config.ad)
+        })
+        .await??;
 
-            // TODO: Account for time skew in the check method
-            if Ok(true) != totp::TOTP6::new(&secret).check_str(&token, now) {
-                return Ok(false);
-            }
-        }
+        drop(permit);
 
-        let config = hash_config();
-        argon2::verify_encoded_ext(&passhash, form.password.as_bytes(), config.secret, config.ad)
-    })
-    .await??;
-
-    drop(permit);
+        verified
+    };
 
     if !verified {
         return Err(Error::InvalidCredentials);
     }
 
-    if totp_required {
-        return Err(Error::TOTPRequired);
+    if let (Some(secret), Some(backup)) = (secret, backup) {
+        match form.totp {
+            None => return Err(Error::TOTPRequired),
+            Some(token) => {
+                if !process_2fa(&state, user_id, secret, backup, token).await? {
+                    return Err(Error::InvalidCredentials);
+                }
+            }
+        }
     }
 
-    do_login(state, addr, id, std::time::SystemTime::now()).await
+    do_login(state, addr, user_id, std::time::SystemTime::now()).await
 }
 
 pub async fn do_login(
     state: ServerState,
     addr: SocketAddr,
-    id: Snowflake,
+    user_id: Snowflake,
     now: std::time::SystemTime,
 ) -> Result<Session, Error> {
     let token = AuthToken::new();
@@ -125,7 +128,7 @@ pub async fn do_login(
                         Var::of(Sessions::Addr),
                     ])
             },
-            &[&&token.0[..], &id, &expires, &addr.ip()],
+            &[&&token.0[..], &user_id, &expires, &addr.ip()],
         )
         .await?;
 
@@ -134,4 +137,43 @@ pub async fn do_login(
         expires: chrono::DateTime::<chrono::Utc>::from(expires)
             .to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
     })
+}
+
+pub async fn process_2fa(
+    state: &ServerState,
+    user_id: Snowflake,
+    secret: Vec<u8>,
+    backup: Vec<u8>,
+    token: String,
+) -> Result<bool, Error> {
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let secret = match decrypt_user_message(&state.config.mfa_key, user_id, &secret) {
+        Ok(secret) => secret,
+        Err(_) => return Err(Error::InternalErrorStatic("Decrypt Error!")),
+    };
+
+    match token.len() {
+        6 => {
+            // TODO: Account for time skew in the check method
+            if Ok(true) != totp::TOTP6::new(&secret).check_str(&token, now) {
+                return Ok(false);
+            }
+        }
+        13 => {
+            let backup = match decrypt_user_message(&state.config.mfa_key, user_id, &backup) {
+                Ok(backup) => backup,
+                Err(_) => return Err(Error::InternalErrorStatic("Decrypt Error!")),
+            };
+
+            return Ok(false);
+            // TODO: Backup codes
+        }
+        _ => return Err(Error::InvalidCredentials),
+    }
+
+    Ok(true)
 }
