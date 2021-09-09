@@ -1,0 +1,12 @@
+[package]
+name = "processing"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+blurhash = { path = "../../../deps/blurhash" }
+
+image = "0.23.14"
+tracing = "0.1.26"
