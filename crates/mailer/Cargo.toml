@@ -8,4 +8,4 @@ edition = "2018"
 [dependencies]
 tokio = { version = "1.4", features = ["full", "parking_lot"] }
 lettre = { version = "0.10.0-rc.3", features = ["tokio1", "builder", "smtp-transport", "tokio1-native-tls"] }
-ramhorns = "0.11.0"
+ramhorns = "0.12.0"
