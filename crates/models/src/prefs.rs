@@ -71,6 +71,9 @@ pub enum UserPreference {
     UIFontSize,
     /// Time format
     TimeFormat,
+
+    #[serde(other)]
+    InvalidField,
 }
 
 impl fmt::Display for UserPreference {
@@ -118,6 +121,14 @@ impl UserPreferences {
         self.0.retain(|field, value| field.validate(value).is_ok())
     }
 
+    pub fn nullify_defaults(&mut self) {
+        for (field, value) in self.0.iter_mut() {
+            if field.is_default(value) {
+                *value = Value::Null;
+            }
+        }
+    }
+
     pub fn merge(&mut self, new: &mut Self) {
         for (field, value) in new.0.drain() {
             self.0.insert(field, value);
@@ -132,6 +143,8 @@ impl UserPreference {
         let valid_type = match self {
             // NULL values are not allowed
             _ if value.is_null() => false,
+
+            Self::InvalidField => false,
 
             // The locale just has to be in the list of enums, and since
             // they are numbered it's easy to check
@@ -190,6 +203,21 @@ impl UserPreference {
             Err(UserPreferenceError { field: self, kind })
         } else {
             Ok(())
+        }
+    }
+
+    fn is_default(self, value: &Value) -> bool {
+        match self {
+            Self::IsLight | Self::ReduceAnim | Self::UnfocusPause | Self::Compact => {
+                *value == Value::Bool(false)
+            }
+            Self::AllowDms => *value == Value::Bool(true),
+            Self::ChatFontSize | Self::UIFontSize => value.as_f64() == Some(1.0),
+            Self::Temp => value.as_u64() == Some(6500),
+            Self::FriendAdd => value.as_u64() == Some(3),
+            Self::Locale => value.as_u64() == Some(Locale::enUS as u64),
+            Self::ChatFont | Self::UiFont => value.as_str() == Some("sans_serif"),
+            _ => false,
         }
     }
 }
