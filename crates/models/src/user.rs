@@ -49,18 +49,6 @@ pub struct User {
     pub preferences: Option<UserPreferences>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UserPreferences {
-    pub locale: Locale,
-}
-
-#[derive(Debug, Clone, Copy, Hash, serde_repr::Serialize_repr, serde_repr::Deserialize_repr)]
-#[allow(non_camel_case_types)]
-#[repr(u16)]
-pub enum Locale {
-    enUS = 0,
-}
-
 bitflags::bitflags! {
     pub struct FriendFlags: i16 {
         /// Pins the user to the top of their friendlist
