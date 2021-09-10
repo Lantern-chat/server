@@ -3,6 +3,7 @@ use std::{borrow::Cow, string::FromUtf8Error};
 use db::pool::Error as DbError;
 use ftl::{body::BodyDeserializeError, StatusCode};
 use http::header::InvalidHeaderValue;
+use models::UserPreferenceError;
 
 use crate::web::gateway::event::EncodingError;
 
@@ -84,6 +85,9 @@ pub enum Error {
 
     #[error("Invalid Image Format")]
     InvalidImageFormat,
+
+    #[error("{0}")]
+    InvalidPreferences(UserPreferenceError),
 
     #[error("Missing Upload-Metadata Header")]
     MissingUploadMetadataHeader,
@@ -237,6 +241,7 @@ impl Error {
             Error::MimeParseError(_)        => 40025,
             Error::InvalidImageFormat       => 40026,
             Error::TOTPRequired             => 40027,
+            Error::InvalidPreferences(_)    => 40028,
 
             // HTTP-like error codes
             Error::BadRequest               => 40400,

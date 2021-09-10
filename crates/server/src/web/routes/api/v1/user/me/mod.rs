@@ -2,11 +2,12 @@ use ftl::*;
 
 use crate::web::{auth::authorize, routes::api::ApiError};
 
+pub mod avatar;
 pub mod friends;
 pub mod login;
 pub mod logout;
+pub mod prefs;
 pub mod sessions;
-pub mod avatar;
 
 pub async fn me(mut route: Route<crate::ServerState>) -> Response {
     match route.next().method_segment() {
@@ -21,6 +22,7 @@ pub async fn me(mut route: Route<crate::ServerState>) -> Response {
                 (&Method::GET, Exact("sessions")) => sessions::sessions(route, auth).await,
                 (&Method::GET, Exact("friends")) => friends::friends(route, auth).await,
                 (&Method::POST, Exact("avatar")) => avatar::post_avatar(route, auth).await,
+                (&Method::PATCH, Exact("prefs")) => prefs::prefs(route, auth).await,
                 _ => ApiError::not_found().into_response(),
             },
         },

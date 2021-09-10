@@ -28,9 +28,9 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: LoginForm) -> Res
         return Err(Error::InvalidCredentials);
     }
 
-    let user = state
-        .read_db()
-        .await
+    let db = state.db.read.get().await?;
+
+    let user = db
         .query_opt_cached_typed(
             || {
                 use schema::*;
@@ -164,7 +164,7 @@ pub async fn process_2fa(
             }
         }
         13 => {
-            let backup = match decrypt_user_message(&state.config.mfa_key, user_id, &backup) {
+            let _backup = match decrypt_user_message(&state.config.mfa_key, user_id, &backup) {
                 Ok(backup) => backup,
                 Err(_) => return Err(Error::InternalErrorStatic("Decrypt Error!")),
             };
