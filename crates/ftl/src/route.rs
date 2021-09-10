@@ -14,9 +14,9 @@ use hyper::{
     Body, Request, Response,
 };
 
-// TODO: Make state generic
 pub struct Route<S> {
     pub addr: SocketAddr,
+    pub real_addr: SocketAddr,
     pub req: Request<Body>,
     pub state: S,
     pub segment_index: usize,
@@ -34,15 +34,22 @@ pub enum Segment<'a> {
 impl<S> Route<S> {
     #[inline]
     pub fn new(addr: SocketAddr, req: Request<Body>, state: S) -> Route<S> {
-        Route {
+        let mut route = Route {
             start: Instant::now(),
             addr,
+            real_addr: addr,
             req,
             state,
             segment_index: 0,
             next_segment_index: 0,
             has_body: true,
+        };
+
+        if let Ok(addr) = crate::real_ip::get_real_ip(&route) {
+            route.real_addr.set_ip(addr);
         }
+
+        route
     }
 
     #[inline]

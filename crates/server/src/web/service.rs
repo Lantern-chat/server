@@ -29,7 +29,7 @@ pub async fn service(
 
     let info = format!(
         "{:?}: {} http://{}{}",
-        real_ip::get_real_ip(&route),
+        route.real_addr.ip(),
         route.req.method(),
         match host {
             Some(ref h) => h.as_str(),
