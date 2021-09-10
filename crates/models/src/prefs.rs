@@ -56,7 +56,7 @@ pub enum UserPreference {
         APPEARANCE
     */
     /// Light-theme toggle
-    IsLight,
+    Light,
     /// Color temperature
     Temp,
     /// Compact chat view
@@ -164,7 +164,7 @@ impl UserPreference {
                 _ => false,
             },
             // These are all just booleans
-            Self::AllowDms | Self::ReduceAnim | Self::UnfocusPause | Self::IsLight | Self::Compact => {
+            Self::AllowDms | Self::ReduceAnim | Self::UnfocusPause | Self::Light | Self::Compact => {
                 value.is_boolean()
             }
             // Color temperature in whole-number kelvin degrees
@@ -208,7 +208,7 @@ impl UserPreference {
 
     fn is_default(self, value: &Value) -> bool {
         match self {
-            Self::IsLight | Self::ReduceAnim | Self::UnfocusPause | Self::Compact => {
+            Self::Light | Self::ReduceAnim | Self::UnfocusPause | Self::Compact => {
                 *value == Value::Bool(false)
             }
             Self::AllowDms => *value == Value::Bool(true),
