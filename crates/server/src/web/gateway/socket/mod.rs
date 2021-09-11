@@ -150,6 +150,10 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
 
                         match event.msg {
                             ServerMsg::Hello { .. } => {}
+                            ServerMsg::InvalidSession { .. } => {
+                                // this will ensure the stream ends after this event
+                                events.clear();
+                            }
                             // TODO: Make this non-blocking for the event-loop?
                             ServerMsg::Ready {
                                 payload: ReadyPayload { inner: ref ready },
@@ -281,6 +285,8 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                 }
             }
         } // END 'event_loop
+
+        log::trace!("Gateway event loop ended");
 
         if user_id.is_some() {
             let conn_id = conn.id;
