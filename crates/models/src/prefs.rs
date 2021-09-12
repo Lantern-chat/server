@@ -171,7 +171,7 @@ impl UserPreference {
             Self::Temp => match value.as_u64() {
                 Some(temp) => {
                     kind = UserPreferenceErrorKind::InvalidValue;
-                    4000 <= temp && temp <= 14000 // TODO: Check range
+                    965 <= temp && temp <= 12000 // TODO: Check range
                 }
                 _ => false,
             },
@@ -213,7 +213,7 @@ impl UserPreference {
             }
             Self::AllowDms => *value == Value::Bool(true),
             Self::ChatFontSize | Self::UIFontSize => value.as_f64() == Some(1.0),
-            Self::Temp => value.as_u64() == Some(6500),
+            Self::Temp => value.as_u64() == Some(7500),
             Self::FriendAdd => value.as_u64() == Some(3),
             Self::Locale => value.as_u64() == Some(Locale::enUS as u64),
             Self::ChatFont | Self::UiFont => value.as_str() == Some("sans_serif"),
