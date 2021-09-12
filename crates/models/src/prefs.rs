@@ -20,14 +20,20 @@ impl Default for Locale {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, serde_repr::Serialize_repr, serde_repr::Deserialize_repr,
+)]
+#[repr(u16)]
+#[allow(non_camel_case_types)]
 pub enum Font {
-    SansSerif,
+    SansSerif = 0,
     Serif,
-    OpenDyslexic,
     Monospace,
     Cursive,
+
+    OpenDyslexic,
+
+    __MAX_FONT,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq)]
@@ -182,10 +188,10 @@ impl UserPreference {
                 _ => false,
             },
             // Fonts must be in the list, which is easily checked by parsing the enum
-            Self::ChatFont | Self::UiFont => match value {
-                Value::String(value) => {
+            Self::ChatFont | Self::UiFont => match value.as_u64() {
+                Some(value) => {
                     kind = UserPreferenceErrorKind::InvalidValue;
-                    serde_json::from_str::<Font>(value).is_ok()
+                    value < Font::__MAX_FONT as u64
                 }
                 _ => false,
             },
@@ -216,7 +222,7 @@ impl UserPreference {
             Self::Temp => value.as_u64() == Some(7500),
             Self::FriendAdd => value.as_u64() == Some(3),
             Self::Locale => value.as_u64() == Some(Locale::enUS as u64),
-            Self::ChatFont | Self::UiFont => value.as_str() == Some("sans_serif"),
+            Self::ChatFont | Self::UiFont => value.as_u64() == Some(0),
             _ => false,
         }
     }
