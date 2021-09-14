@@ -173,11 +173,11 @@ impl UserPreference {
             Self::AllowDms | Self::ReduceAnim | Self::UnfocusPause | Self::Light | Self::Compact => {
                 value.is_boolean()
             }
-            // Color temperature in whole-number kelvin degrees
-            Self::Temp => match value.as_u64() {
+            // Color temperature in kelvin degrees
+            Self::Temp => match value.as_f64() {
                 Some(temp) => {
                     kind = UserPreferenceErrorKind::InvalidValue;
-                    965 <= temp && temp <= 12000 // TODO: Check range
+                    965.0 <= temp && temp <= 12000.0
                 }
                 _ => false,
             },
@@ -219,7 +219,7 @@ impl UserPreference {
             }
             Self::AllowDms => *value == Value::Bool(true),
             Self::ChatFontSize | Self::UIFontSize => value.as_f64() == Some(1.0),
-            Self::Temp => value.as_u64() == Some(7500),
+            Self::Temp => value.as_f64() == Some(7500.0),
             Self::FriendAdd => value.as_u64() == Some(3),
             Self::Locale => value.as_u64() == Some(Locale::enUS as u64),
             Self::ChatFont | Self::UiFont => value.as_u64() == Some(0),
