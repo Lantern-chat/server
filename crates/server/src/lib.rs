@@ -23,6 +23,7 @@ pub mod built {
 pub mod config;
 pub mod ctrl;
 pub mod filesystem;
+pub mod net;
 pub mod permission_cache;
 pub mod queues;
 pub mod session_cache;
