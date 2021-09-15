@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::{
     cmp::Ordering,
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
@@ -155,5 +157,133 @@ impl IpList {
         {
             self.sorted.insert(idx, self.values.insert(ip));
         }
+    }
+}
+
+use hashbrown::{hash_map::DefaultHashBuilder, raw::RawTable};
+
+#[derive(Default)]
+pub struct IpSet {
+    ipv4: Vec<Ipv4Addr>,
+    ipv6: Vec<Ipv6Addr>,
+    set: RawTable<u32>,
+    hash_builder: DefaultHashBuilder,
+}
+
+const MAX_LEN: usize = 1 << 31;
+const INDEX_MASK: usize = 0x7FFFFFFF;
+
+impl IpSet {
+    pub fn new(ips: Vec<IpAddr>) -> Self {
+        use std::hash::{BuildHasher, Hash, Hasher};
+
+        let mut this = IpSet {
+            ipv4: Vec::new(),
+            ipv6: Vec::new(),
+            set: RawTable::with_capacity(ips.len()),
+            hash_builder: DefaultHashBuilder::new(),
+        };
+
+        for ip in ips {
+            let mut hasher = this.hash_builder.build_hasher();
+
+            let idx = match ip {
+                IpAddr::V4(ip) => {
+                    ip.hash(&mut hasher);
+                    let idx = this.ipv4.len();
+                    assert!(idx < MAX_LEN);
+                    this.ipv4.push(ip);
+                    idx as u32
+                }
+                IpAddr::V6(ip) => {
+                    ip.hash(&mut hasher);
+                    let idx = this.ipv6.len();
+                    assert!(idx < MAX_LEN);
+                    this.ipv6.push(ip);
+                    idx as u32 | (1 << 31)
+                }
+            };
+
+            this.set.insert_no_grow(hasher.finish(), idx);
+        }
+
+        this
+    }
+
+    fn hash(&self, ip: &IpAddr) -> u64 {
+        use std::hash::{BuildHasher, Hash, Hasher};
+
+        let mut hasher = self.hash_builder.build_hasher();
+
+        // avoid hashing the discriminant
+        match ip {
+            IpAddr::V4(ip) => ip.hash(&mut hasher),
+            IpAddr::V6(ip) => ip.hash(&mut hasher),
+        }
+
+        hasher.finish()
+    }
+
+    #[inline]
+    unsafe fn cmp_eq(&self, idx: u32, ip: &IpAddr) -> bool {
+        match (idx >> 31 == 0, ip) {
+            (true, IpAddr::V4(ip)) => ip.eq(self.ipv4.get_unchecked(idx as usize)),
+            (false, IpAddr::V6(ip)) => ip.eq(self.ipv6.get_unchecked(idx as usize & INDEX_MASK)),
+            _ => false,
+        }
+    }
+
+    //unsafe fn get(&self, idx: u32) -> IpAddr {
+    //    if idx >> 31 == 0 {
+    //        IpAddr::V4(*self.ipv4.get_unchecked(idx as usize))
+    //    } else {
+    //        IpAddr::V6(*self.ipv6.get_unchecked(idx as usize & INDEX_MASK))
+    //    }
+    //}
+
+    pub fn contains(&self, ip: &IpAddr) -> bool {
+        self.set
+            .find(self.hash(ip), |idx| unsafe { self.cmp_eq(*idx, ip) })
+            .is_some()
+    }
+
+    pub fn add(&mut self, ip: IpAddr) {
+        let hash = self.hash(&ip);
+
+        let idx = match ip {
+            IpAddr::V4(ip) => {
+                let idx = self.ipv4.len();
+                assert!(idx < MAX_LEN);
+                self.ipv4.push(ip);
+                idx as u32
+            }
+            IpAddr::V6(ip) => {
+                let idx = self.ipv6.len();
+                assert!(idx < MAX_LEN);
+                self.ipv6.push(ip);
+                idx as u32 | (1 << 31)
+            }
+        };
+
+        let IpSet {
+            ref hash_builder,
+            ref mut set,
+            ref ipv4,
+            ref ipv6,
+        } = self;
+
+        set.insert(hash, idx, |&idx| unsafe {
+            use std::hash::{BuildHasher, Hash, Hasher};
+
+            let mut hasher = hash_builder.build_hasher();
+
+            if idx >> 31 == 0 {
+                ipv4.get_unchecked(idx as usize).hash(&mut hasher);
+            } else {
+                ipv6.get_unchecked(idx as usize & INDEX_MASK).hash(&mut hasher);
+            }
+
+            hasher.finish()
+        });
     }
 }
