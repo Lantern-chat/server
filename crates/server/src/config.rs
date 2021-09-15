@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::{env, time::Duration};
 
 use std::ops::Range;
@@ -25,6 +26,8 @@ pub struct LanternConfig {
 
     /// AES-128 key for encrypting snowflakes
     pub sf_key: u128,
+
+    pub data_path: PathBuf,
 }
 
 impl Default for LanternConfig {
@@ -68,6 +71,7 @@ impl Default for LanternConfig {
 
                 u128::from_le_bytes(key)
             },
+            data_path: { PathBuf::from(env::var("DATA_DIR").unwrap()) },
         }
     }
 }

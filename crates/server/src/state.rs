@@ -58,15 +58,16 @@ impl Deref for ServerState {
 
 impl ServerState {
     pub fn new(shutdown: oneshot::Sender<()>, db: DatabasePools) -> Self {
+        let config = LanternConfig::default();
         ServerState(Arc::new(InnerServerState {
             is_alive: AtomicBool::new(true),
             notify_shutdown: Arc::new(Notify::new()),
             shutdown: Mutex::new(Some(shutdown)),
             rate_limit: RateLimitTable::new(),
             db,
-            config: Default::default(), // TODO: Load from file
+            fs: FileStore::new(config.data_path.clone()),
+            config,
             id_lock: IdLockMap::default(),
-            fs: FileStore::new("./data"), // TODO: Set from config
             gateway: Gateway::default(),
             hashing_semaphore: Semaphore::new(16), // TODO: Set from available memory?
             fs_semaphore: Semaphore::new(1024),
