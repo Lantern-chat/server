@@ -54,11 +54,14 @@ impl FromStr for AuthToken {
     type Err = AuthTokenFromStrError;
 
     fn from_str(mut s: &str) -> Result<Self, Self::Err> {
-        // trim and limit for performance
-        s = &s.trim()[..Self::CHAR_LEN];
+        // trim and check length
+        s = s.trim();
+        if s.len() < Self::CHAR_LEN {
+            return Err(AuthTokenFromStrError::LengthError);
+        }
 
         // decode
-        let decoded = base64::decode(s)?;
+        let decoded = base64::decode(&s[..Self::CHAR_LEN])?;
 
         // copy into fixed array
         match decoded.try_into() {
