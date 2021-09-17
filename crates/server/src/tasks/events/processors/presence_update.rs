@@ -13,7 +13,7 @@ pub async fn presence_updated(
     id: Snowflake,
 ) -> Result<(), Error> {
     let row = db
-        .query_one_cached_typed(
+        .query_opt_cached_typed(
             || {
                 use schema::*;
 
@@ -63,6 +63,11 @@ pub async fn presence_updated(
             &[&id],
         )
         .await?;
+
+    let row = match row {
+        Some(row) => row,
+        None => return Ok(()),
+    };
 
     let party_ids: Vec<Snowflake> = row.try_get(6)?;
 
