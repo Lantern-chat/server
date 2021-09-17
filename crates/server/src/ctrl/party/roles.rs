@@ -15,12 +15,13 @@ fn base_query() -> thorn::query::SelectQuery {
     use thorn::*;
 
     Query::select().from_table::<Roles>().cols(&[
-        Roles::Id,
-        Roles::PartyId,
-        Roles::Name,
-        Roles::Permissions,
-        Roles::Color,
-        Roles::Flags,
+        /*0*/ Roles::Id,
+        /*1*/ Roles::PartyId,
+        /*2*/ Roles::Name,
+        /*3*/ Roles::Permissions,
+        /*4*/ Roles::Color,
+        /*5*/ Roles::Flags,
+        /*6*/ Roles::IconId,
     ])
 }
 
@@ -64,6 +65,7 @@ pub async fn get_roles_raw<'a>(
             permissions: Permission::unpack(row.try_get::<_, i64>(3)? as u64),
             color: row.try_get::<_, Option<i32>>(4)?.map(|c| c as u32),
             flags: RoleFlags::from_bits_truncate(row.try_get(5)?),
+            icon_id: row.try_get(6)?,
         }),
     }))
 }

@@ -1,6 +1,7 @@
 CREATE TABLE lantern.roles (
     id              bigint      NOT NULL,
     party_id        bigint      NOT NULL,
+    icon_id         bigint,
     -- Actually contains 3 16-bit fields
     permissions     bigint      NOT NULL    DEFAULT 0,
     color           integer,
@@ -18,7 +19,9 @@ ALTER TABLE lantern.roles ADD CONSTRAINT party_fk FOREIGN KEY (party_id)
     REFERENCES lantern.party (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
-
+ALTER TABLE lantern.roles ADD CONSTRAINT icon_fk FOREIGN KEY (icon_id)
+    REFERENCES lantern.files (id) MATCH FULL
+    ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- Role/User association map
 -- The party id can be found by joining with the role itself

@@ -37,6 +37,7 @@ pub async fn create_party(
     let default_role = Role {
         id: party_id,
         party_id,
+        icon_id: None,
         name: None,
         permissions: Permission::default(),
         color: None,

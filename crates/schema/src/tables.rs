@@ -123,6 +123,7 @@ thorn::tables! {
     pub struct Roles in Lantern {
         Id: SNOWFLAKE,
         PartyId: Party::Id,
+        IconId: Files::Id,
         Permissions: Type::INT8,
         /// Color encoded as a 32-bit integer
         Color: Type::INT4,
