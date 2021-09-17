@@ -9,6 +9,7 @@ use crate::{
 
 use models::*;
 
+// TODO: This
 pub async fn get_room(state: ServerState, auth: Authorization, room_id: Snowflake) -> Result<Room, Error> {
     let had_perms = if let Some(perms) = state.perm_cache.get(auth.user_id, room_id).await {
         if !perms.perm.room.contains(RoomPermissions::VIEW_ROOM) {
