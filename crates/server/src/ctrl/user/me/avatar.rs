@@ -51,7 +51,7 @@ pub async fn process_avatar(state: ServerState, user_id: Snowflake, file_id: Sno
 
     let nonce: i64 = row.try_get(1)?;
     //let flags = FileFlags::from_bits_truncate(row.try_get(2)?);
-    let mime: Option<String> = row.try_get(3)?;
+    let mime: Option<&str> = row.try_get(3)?;
 
     // TODO: Use mime type somehow?
     let _mime = match mime {

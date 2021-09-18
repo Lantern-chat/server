@@ -54,8 +54,8 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: LoginForm) -> Res
 
     let user_id: Snowflake = user.try_get(0)?;
     let passhash: String = user.try_get(1)?;
-    let secret: Option<Vec<u8>> = user.try_get(2)?;
-    let backup: Option<Vec<u8>> = user.try_get(3)?;
+    let secret: Option<&[u8]> = user.try_get(2)?;
+    let backup: Option<&[u8]> = user.try_get(3)?;
 
     if secret.is_some() != backup.is_some() {
         return Err(Error::InternalErrorStatic("Secret/Backup Mismatch!"));
@@ -143,8 +143,8 @@ pub async fn do_login(
 pub async fn process_2fa(
     state: &ServerState,
     user_id: Snowflake,
-    secret: Vec<u8>,
-    backup: Vec<u8>,
+    secret: &[u8],
+    backup: &[u8],
     token: String,
 ) -> Result<bool, Error> {
     let now = SystemTime::now()

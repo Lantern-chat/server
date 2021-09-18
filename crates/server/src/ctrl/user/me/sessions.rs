@@ -31,7 +31,7 @@ pub async fn list_sessions(
 
     Ok(sessions.map(|row| {
         Ok(AnonymousSession {
-            expires: crate::util::time::format_naivedatetime(row?.try_get::<_, chrono::NaiveDateTime>(0)?),
+            expires: crate::util::time::format_naivedatetime(row?.try_get(0)?),
         })
     }))
 }
