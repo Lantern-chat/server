@@ -1,5 +1,6 @@
 use std::{alloc::System, net::SocketAddr, time::SystemTime};
 
+use rand::RngCore;
 use schema::Snowflake;
 
 use crate::{
@@ -186,9 +187,14 @@ pub async fn process_2fa(
             if let Some(idx) = found_idx {
                 let db = state.db.write.get().await?;
 
-                // splice backup array
                 let start = idx * 8;
-                backup.drain(start..start + 8);
+                if true {
+                    // fill old backup code with randomness to prevent reuse
+                    util::rng::crypto_thread_rng().fill_bytes(&mut backup[start..start + 8]);
+                } else {
+                    // splice backup array to remove used code
+                    backup.drain(start..start + 8);
+                }
 
                 let backup = encrypt_user_message(&state.config.mfa_key, user_id, &backup);
 
