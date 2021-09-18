@@ -3,7 +3,7 @@ use hashbrown::hash_map::{Entry, HashMap};
 use schema::{Snowflake, SnowflakeExt};
 
 use crate::{
-    ctrl::{auth::AuthToken, util::encrypted_asset::encrypt_snowflake, Error},
+    ctrl::{auth::AuthToken, util::encrypted_asset::encrypt_snowflake_opt, Error},
     util::hex::HexidecimalInt,
     ServerState,
 };
@@ -43,10 +43,7 @@ pub async fn get_members(
                     bio: row.try_get(4)?,
                     email: None,
                     preferences: None,
-                    avatar: match row.try_get(9)? {
-                        Some(avatar_id) => Some(encrypt_snowflake(&state, avatar_id)),
-                        None => None,
-                    },
+                    avatar: encrypt_snowflake_opt(&state, row.try_get(9)?),
                 }),
                 presence: match row.try_get::<_, Option<chrono::NaiveDateTime>>(7)? {
                     None => None,

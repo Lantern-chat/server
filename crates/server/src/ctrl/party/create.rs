@@ -37,7 +37,7 @@ pub async fn create_party(
     let default_role = Role {
         id: party_id,
         party_id,
-        icon_id: None,
+        avatar: None,
         name: None,
         permissions: Permission::default(),
         color: None,
@@ -54,7 +54,7 @@ pub async fn create_party(
         security: form.security,
         roles: Vec::new(),
         emotes: Vec::new(),
-        icon_id: None,
+        avatar: None,
         sort_order: 0,
     };
 

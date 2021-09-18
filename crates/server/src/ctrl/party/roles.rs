@@ -4,7 +4,7 @@ use db::pool::Client;
 use schema::Snowflake;
 
 use crate::{
-    ctrl::{auth::Authorization, Error, SearchMode},
+    ctrl::{auth::Authorization, util::encrypted_asset::encrypt_snowflake_opt, Error, SearchMode},
     ServerState,
 };
 
@@ -21,12 +21,13 @@ fn base_query() -> thorn::query::SelectQuery {
         /*3*/ Roles::Permissions,
         /*4*/ Roles::Color,
         /*5*/ Roles::Flags,
-        /*6*/ Roles::IconId,
+        /*6*/ Roles::AvatarId,
     ])
 }
 
 pub async fn get_roles_raw<'a>(
     db: &Client,
+    state: ServerState,
     party_id: SearchMode<'a>,
 ) -> Result<impl Stream<Item = Result<Role, Error>> + 'static, Error> {
     let stream = match party_id {
@@ -56,7 +57,7 @@ pub async fn get_roles_raw<'a>(
             .boxed(),
     };
 
-    Ok(stream.map(|row| match row {
+    Ok(stream.map(move |row| match row {
         Err(e) => Err(Error::from(e)),
         Ok(row) => Ok(Role {
             id: row.try_get(0)?,
@@ -65,7 +66,7 @@ pub async fn get_roles_raw<'a>(
             permissions: Permission::unpack(row.try_get::<_, i64>(3)? as u64),
             color: row.try_get::<_, Option<i32>>(4)?.map(|c| c as u32),
             flags: RoleFlags::from_bits_truncate(row.try_get(5)?),
-            icon_id: row.try_get(6)?,
+            avatar: encrypt_snowflake_opt(&state, row.try_get(6)?),
         }),
     }))
 }

@@ -23,7 +23,7 @@ pub struct Room {
     pub party_id: Option<Snowflake>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub icon_id: Option<Snowflake>,
+    pub avatar: Option<String>,
 
     pub name: String,
 

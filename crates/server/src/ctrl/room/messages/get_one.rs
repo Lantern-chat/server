@@ -3,7 +3,7 @@ use schema::Snowflake;
 use models::*;
 
 use crate::{
-    ctrl::{util::encrypted_asset::encrypt_snowflake, Error},
+    ctrl::{util::encrypted_asset::encrypt_snowflake_opt, Error},
     web::auth::Authorization,
     ServerState,
 };
@@ -60,10 +60,7 @@ pub async fn get_one(
             bio: None,
             email: None,
             preferences: None,
-            avatar: match row.try_get(12)? {
-                Some(avatar_id) => Some(encrypt_snowflake(&state, avatar_id)),
-                None => None,
-            },
+            avatar: encrypt_snowflake_opt(&state, row.try_get(12)?),
         },
         member: match party_id {
             None => None,

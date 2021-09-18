@@ -4,7 +4,7 @@ use hashbrown::{hash_map::Entry, HashMap};
 use schema::Snowflake;
 
 use crate::{
-    ctrl::{auth::Authorization, util::encrypted_asset::encrypt_snowflake, Error, SearchMode},
+    ctrl::{auth::Authorization, util::encrypted_asset::encrypt_snowflake_opt, Error, SearchMode},
     permission_cache::PermMute,
     ServerState,
 };
@@ -98,10 +98,7 @@ pub async fn ready(
             discriminator: row.try_get(1)?,
             flags: UserFlags::from_bits_truncate(row.try_get(2)?),
             email: Some(row.try_get(3)?),
-            avatar: match row.try_get(7)? {
-                Some(avatar_id) => Some(encrypt_snowflake(&state, avatar_id)),
-                None => None,
-            },
+            avatar: encrypt_snowflake_opt(&state, row.try_get(7)?),
             status: row.try_get(4)?,
             bio: row.try_get(5)?,
             preferences: {
@@ -161,7 +158,7 @@ pub async fn ready(
                     security: SecurityFlags::empty(),
                     roles: Vec::new(),
                     emotes: Vec::new(),
-                    icon_id: row.try_get(3)?,
+                    avatar: encrypt_snowflake_opt(&state, row.try_get(3)?),
                     sort_order: row.try_get::<_, i16>(5)? as u16,
                 },
             );
@@ -169,7 +166,7 @@ pub async fn ready(
 
         let (roles, emotes) = futures::future::join(
             async {
-                crate::ctrl::party::roles::get_roles_raw(&db, SearchMode::Many(&ids))
+                crate::ctrl::party::roles::get_roles_raw(&db, state.clone(), SearchMode::Many(&ids))
                     .await?
                     .try_collect::<Vec<_>>()
                     .await

@@ -5,8 +5,17 @@ use schema::SnowflakeExt;
 
 use crate::{util::hex::HexidecimalInt, web::routes::api::ApiError, ServerState};
 
-pub async fn user_avatar(mut route: Route<ServerState>) -> Response {
-    let user_id = match route.next().param::<Snowflake>() {
+use crate::ctrl::cdn::FileKind;
+
+pub enum AvatarKind {
+    User,
+    Room,
+    Party,
+    Role,
+}
+
+pub async fn avatar(mut route: Route<ServerState>, kind: AvatarKind) -> Response {
+    let kind_id = match route.next().param::<Snowflake>() {
         Some(Ok(room_id)) => room_id,
         _ => return StatusCode::BAD_REQUEST.into_response(),
     };
@@ -22,15 +31,18 @@ pub async fn user_avatar(mut route: Route<ServerState>) -> Response {
         None => return StatusCode::BAD_REQUEST.into_response(),
     };
 
-    //log::trace!("User avatar file id: {}", file_id);
-
     let is_head = route.method() == Method::HEAD;
 
     match crate::ctrl::cdn::get_file(
         route,
-        user_id,
+        kind_id,
         file_id,
-        crate::ctrl::cdn::FileKind::UserAvatar,
+        match kind {
+            AvatarKind::Party => FileKind::PartyAvatar,
+            AvatarKind::Room => FileKind::RoomAvatar,
+            AvatarKind::Role => FileKind::RoleAvatar,
+            AvatarKind::User => FileKind::UserAvatar,
+        },
         None,
         is_head,
     )

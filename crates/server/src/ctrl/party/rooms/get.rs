@@ -7,7 +7,9 @@ use schema::Snowflake;
 use models::*;
 
 use crate::{
-    ctrl::{auth::Authorization, perm::get_party_permissions, Error},
+    ctrl::{
+        auth::Authorization, perm::get_party_permissions, util::encrypted_asset::encrypt_snowflake_opt, Error,
+    },
     ServerState,
 };
 
@@ -122,7 +124,7 @@ pub async fn get_rooms(
                 name: row.try_get(1)?,
                 topic: row.try_get(2)?,
                 flags: RoomFlags::from_bits_truncate(row.try_get(3)?),
-                icon_id: row.try_get(4)?,
+                avatar: encrypt_snowflake_opt(&state, row.try_get(4)?),
                 sort_order: row.try_get(5)?,
                 rate_limit_per_user: None,
                 parent_id: row.try_get(6)?,

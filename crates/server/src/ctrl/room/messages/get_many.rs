@@ -5,7 +5,9 @@ use models::*;
 use thorn::pg::ToSql;
 
 use crate::{
-    ctrl::{perm::get_cached_room_permissions_with_conn, util::encrypted_asset::encrypt_snowflake, Error},
+    ctrl::{
+        perm::get_cached_room_permissions_with_conn, util::encrypted_asset::encrypt_snowflake_opt, Error,
+    },
     web::auth::Authorization,
     ServerState,
 };
@@ -132,10 +134,7 @@ pub async fn get_many(
                     bio: None,
                     email: None,
                     preferences: None,
-                    avatar: match row.try_get(13)? {
-                        Some(avatar_id) => Some(encrypt_snowflake(&state, avatar_id)),
-                        None => None,
-                    },
+                    avatar: encrypt_snowflake_opt(&state, row.try_get(13)?),
                 },
                 member: match party_id {
                     None => None,

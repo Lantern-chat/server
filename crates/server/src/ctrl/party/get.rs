@@ -3,7 +3,7 @@ use futures::{StreamExt, TryStreamExt};
 use schema::Snowflake;
 
 use crate::{
-    ctrl::{auth::Authorization, Error, SearchMode},
+    ctrl::{auth::Authorization, util::encrypted_asset::encrypt_snowflake_opt, Error, SearchMode},
     ServerState,
 };
 
@@ -42,13 +42,13 @@ pub async fn get_party(state: ServerState, auth: Authorization, party_id: Snowfl
             security: SecurityFlags::empty(),
             roles: Vec::new(),
             emotes: Vec::new(),
-            icon_id: row.try_get(2)?,
+            avatar: encrypt_snowflake_opt(&state, row.try_get(2)?),
             sort_order: row.try_get::<_, i16>(4)? as u16,
         },
     };
 
     let roles = async {
-        super::roles::get_roles_raw(&db, SearchMode::Single(party_id))
+        super::roles::get_roles_raw(&db, state.clone(), SearchMode::Single(party_id))
             .await?
             .try_collect::<Vec<_>>()
             .await

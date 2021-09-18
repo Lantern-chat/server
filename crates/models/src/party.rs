@@ -48,7 +48,7 @@ pub struct Party {
     pub emotes: Vec<Emote>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub icon_id: Option<Snowflake>,
+    pub avatar: Option<String>,
 
     pub sort_order: u16,
 }

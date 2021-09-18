@@ -3,10 +3,12 @@ use std::{io::SeekFrom, str::FromStr, time::Instant};
 use bytes::{Bytes, BytesMut};
 use ftl::{fs::bytes_range, *};
 
+use futures::FutureExt;
 use headers::{
     AcceptRanges, ContentLength, ContentRange, ContentType, HeaderMap, HeaderMapExt, HeaderValue, Range,
 };
 use hyper::Body;
+use thorn::pg::ToSql;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
 use models::Snowflake;
@@ -22,6 +24,9 @@ use crate::{
 pub enum FileKind {
     Attachment,
     UserAvatar,
+    RoleAvatar,
+    PartyAvatar,
+    RoomAvatar,
 }
 
 pub async fn get_file(
@@ -39,20 +44,22 @@ pub async fn get_file(
 
     let db = state.db.read.get().await?;
 
-    let row = match kind {
-        FileKind::Attachment => {
-            db.query_opt_cached_typed(|| select_attachment(), &[&file_id, &kind_id])
-                .await?
-        }
-        FileKind::UserAvatar => {
-            db.query_opt_cached_typed(|| select_user_avatar(), &[&file_id, &kind_id])
-                .await?
-        }
+    let params: &[&(dyn ToSql + Sync)] = &[&file_id, &kind_id];
+
+    // boxing these is probably cheaper than the compiled state machines of all of them combined
+    #[rustfmt::skip]
+    let row_future = match kind {
+        FileKind::Attachment  => db.query_opt_cached_typed(|| queries::select_attachment(), params).boxed(),
+        FileKind::UserAvatar  => db.query_opt_cached_typed(|| queries::select_user_avatar(), params).boxed(),
+        FileKind::RoleAvatar  => db.query_opt_cached_typed(|| queries::select_role_avatar(), params).boxed(),
+        FileKind::PartyAvatar => db.query_opt_cached_typed(|| queries::select_party_avatar(), params).boxed(),
+        FileKind::RoomAvatar  => db.query_opt_cached_typed(|| queries::select_room_avatar(), params).boxed(),
     };
 
-    let row = match row {
-        None => return Err(Error::NotFound),
-        Some(row) => row,
+    let row = match row_future.await {
+        Ok(None) => return Err(Error::NotFound),
+        Ok(Some(row)) => row,
+        Err(e) => return Err(e.into()),
     };
 
     let name: String = row.try_get(4)?;
@@ -60,7 +67,7 @@ pub async fn get_file(
     if let Some(filename) = filename {
         if name != filename {
             log::debug!("{:?} != {:?}", name, filename);
-            return Err(Error::BadRequest);
+            return Err(Error::NotFound);
         }
     }
 
@@ -210,45 +217,68 @@ pub async fn get_file(
     Ok(res)
 }
 
-use thorn::*;
+mod queries {
 
-fn select_attachment() -> impl AnyQuery {
     use schema::*;
+    use thorn::*;
 
-    Query::select()
-        .cols(&[
-            /*0*/ Files::Id,
-            /*1*/ Files::Size,
-            /*2*/ Files::Flags,
-            /*3*/ Files::Nonce,
-            /*4*/ Files::Name,
-            /*5*/ Files::Mime,
-        ])
-        .from(
-            Files::inner_join(
-                Attachments::inner_join_table::<Messages>().on(Attachments::MessageId.equals(Messages::Id)),
+    const FILE_COLUMNS: &[Files] = &[
+        /*0*/ Files::Id,
+        /*1*/ Files::Size,
+        /*2*/ Files::Flags,
+        /*3*/ Files::Nonce,
+        /*4*/ Files::Name,
+        /*5*/ Files::Mime,
+    ];
+
+    pub fn select_attachment() -> impl AnyQuery {
+        Query::select()
+            .cols(FILE_COLUMNS)
+            .from(
+                Files::inner_join(
+                    Attachments::inner_join_table::<Messages>()
+                        .on(Attachments::MessageId.equals(Messages::Id)),
+                )
+                .on(Files::Id.equals(Attachments::FileId)),
             )
-            .on(Files::Id.equals(Attachments::FileId)),
-        )
-        .and_where(Files::Id.equals(Var::of(Files::Id)))
-        .and_where(Messages::RoomId.equals(Var::of(Rooms::Id)))
-        .limit_n(1)
-}
+            .and_where(Files::Id.equals(Var::of(Files::Id)))
+            .and_where(Messages::RoomId.equals(Var::of(Rooms::Id)))
+            .limit_n(1)
+    }
 
-fn select_user_avatar() -> impl AnyQuery {
-    use schema::*;
+    pub fn select_user_avatar() -> impl AnyQuery {
+        Query::select()
+            .cols(FILE_COLUMNS)
+            .from(Files::inner_join_table::<UserAvatars>().on(Files::Id.equals(UserAvatars::FileId)))
+            .and_where(Files::Id.equals(Var::of(Files::Id)))
+            .and_where(UserAvatars::UserId.equals(Var::of(Users::Id)))
+            .limit_n(1)
+    }
 
-    Query::select()
-        .cols(&[
-            /*0*/ Files::Id,
-            /*1*/ Files::Size,
-            /*2*/ Files::Flags,
-            /*3*/ Files::Nonce,
-            /*4*/ Files::Name,
-            /*5*/ Files::Mime,
-        ])
-        .from(Files::inner_join_table::<UserAvatars>().on(Files::Id.equals(UserAvatars::FileId)))
-        .and_where(Files::Id.equals(Var::of(Files::Id)))
-        .and_where(UserAvatars::UserId.equals(Var::of(Users::Id)))
-        .limit_n(1)
+    pub fn select_role_avatar() -> impl AnyQuery {
+        Query::select()
+            .cols(FILE_COLUMNS)
+            .from(Files::inner_join_table::<Roles>().on(Files::Id.equals(Roles::AvatarId)))
+            .and_where(Files::Id.equals(Var::of(Files::Id)))
+            .and_where(Roles::Id.equals(Var::of(Roles::Id)))
+            .limit_n(1)
+    }
+
+    pub fn select_party_avatar() -> impl AnyQuery {
+        Query::select()
+            .cols(FILE_COLUMNS)
+            .from(Files::inner_join_table::<Party>().on(Files::Id.equals(Party::AvatarId)))
+            .and_where(Files::Id.equals(Var::of(Files::Id)))
+            .and_where(Party::Id.equals(Var::of(Party::Id)))
+            .limit_n(1)
+    }
+
+    pub fn select_room_avatar() -> impl AnyQuery {
+        Query::select()
+            .cols(FILE_COLUMNS)
+            .from(Files::inner_join_table::<Rooms>().on(Files::Id.equals(Rooms::AvatarId)))
+            .and_where(Files::Id.equals(Var::of(Files::Id)))
+            .and_where(Rooms::Id.equals(Var::of(Rooms::Id)))
+            .limit_n(1)
+    }
 }
