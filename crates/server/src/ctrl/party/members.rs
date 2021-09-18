@@ -8,12 +8,6 @@ use crate::{
     ServerState,
 };
 
-#[derive(Deserialize)]
-pub struct LoginForm {
-    pub email: String,
-    pub password: String,
-}
-
 use futures::{Stream, StreamExt};
 
 use models::{AnyActivity, PartyMember, User, UserFlags, UserPresence, UserPresenceFlags};

@@ -1,14 +1,15 @@
 use std::{net::SocketAddr, sync::Arc, time::SystemTime};
 
 use schema::{Snowflake, SnowflakeExt};
+use smol_str::SmolStr;
 
 use crate::{ctrl::Error, ServerState};
 
 #[derive(Clone, Deserialize)]
 pub struct RegisterForm {
-    pub email: String,
-    pub username: String,
-    pub password: String,
+    pub email: SmolStr,
+    pub username: SmolStr,
+    pub password: SmolStr,
     pub year: i32,
     pub month: u8,
     pub day: u8,
@@ -75,7 +76,7 @@ pub async fn register_user(
         return Err(Error::AlreadyExists);
     }
 
-    let password = std::mem::replace(&mut form.password, String::new());
+    let password = std::mem::replace(&mut form.password, SmolStr::default());
 
     // NOTE: Given how expensive it can be to compute an argon2 hash,
     // this only allows a given number to process at once.

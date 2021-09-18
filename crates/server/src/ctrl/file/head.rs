@@ -7,12 +7,13 @@ use crate::{
 };
 
 use schema::Snowflake;
+use smol_str::SmolStr;
 
 pub struct UploadHead {
     pub size: i32,
     pub flags: i16,
-    pub name: String,
-    pub mime: Option<String>,
+    pub name: SmolStr,
+    pub mime: Option<SmolStr>,
     pub preview: Option<Vec<u8>>,
     pub offset: i32,
 }

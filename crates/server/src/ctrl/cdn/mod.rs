@@ -63,7 +63,7 @@ pub async fn get_file(
         Err(e) => return Err(e.into()),
     };
 
-    let name: String = row.try_get(4)?;
+    let name: &str = row.try_get(4)?;
 
     if let Some(filename) = filename {
         if name != filename {
@@ -78,7 +78,7 @@ pub async fn get_file(
     let size: i32 = row.try_get(1)?;
     let flags = FileFlags::from_bits_truncate(row.try_get(2)?);
     let nonce: i64 = row.try_get(3)?;
-    let mime: Option<SmolStr> = row.try_get(5)?;
+    let mime: Option<&str> = row.try_get(5)?;
 
     let options = CipherOptions {
         key: state.config.file_key,

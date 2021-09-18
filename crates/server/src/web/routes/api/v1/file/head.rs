@@ -36,11 +36,11 @@ pub async fn head(
 
 fn encode_metadata(head: &UploadHead) -> HeaderValue {
     let mut value = "filename ".to_owned();
-    value += &base64::encode(&head.name);
+    value += &base64::encode(head.name.as_bytes());
 
     if let Some(ref mime) = head.mime {
         value += ",mime ";
-        value += &base64::encode(mime);
+        value += &base64::encode(mime.as_bytes());
     }
 
     if let Some(ref preview) = head.preview {

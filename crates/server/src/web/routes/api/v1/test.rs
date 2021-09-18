@@ -1,6 +1,7 @@
 use ftl::*;
 
 use schema::{Snowflake, SnowflakeExt};
+use smol_str::SmolStr;
 
 use crate::ServerState;
 
@@ -31,7 +32,7 @@ pub async fn test(route: Route<ServerState>) -> Response {
         .unwrap();
 
     for row in res {
-        println!("{}", row.get::<_, String>(0));
+        println!("{}", row.get::<_, SmolStr>(0));
     }
 
     ().into_response()

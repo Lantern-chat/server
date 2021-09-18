@@ -9,7 +9,7 @@ use crate::{
 
 #[derive(Deserialize)]
 struct PatchPartyForm {
-    name: String,
+    name: SmolStr,
 
     #[serde(default)]
     owner_id: Option<Snowflake>,

@@ -1,18 +1,22 @@
-pub fn encode(mut x: u64) -> String {
+use smol_str::SmolStr;
+
+pub fn encode(mut x: u64) -> SmolStr {
     if x == 0 {
-        return "0".to_owned();
+        return SmolStr::new_inline("0");
     }
 
-    let mut s = String::with_capacity(11);
+    let mut buf = [0u8; 11];
+    let mut i = 0;
 
     const CHARSET: &'static [u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
     while x != 0 {
-        s.push(CHARSET[(x % 62) as usize] as char);
+        buf[i] = CHARSET[(x % 62) as usize];
         x /= 62;
+        i += 1;
     }
 
-    s
+    SmolStr::new_inline(unsafe { std::str::from_utf8_unchecked(&buf[..i]) })
 }
 
 pub fn decode(s: &str) -> u64 {

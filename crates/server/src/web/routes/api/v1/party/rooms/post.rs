@@ -9,10 +9,10 @@ use crate::{routes::api::auth::Authorization, ServerState};
 
 #[derive(Deserialize)]
 pub struct RoomCreateForm {
-    name: String,
+    name: SmolStr,
 
     #[serde(default)]
-    topic: Option<String>,
+    topic: Option<SmolStr>,
 
     #[serde(default)]
     parent_id: Option<Snowflake>,

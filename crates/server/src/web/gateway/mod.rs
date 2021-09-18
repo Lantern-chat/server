@@ -1,6 +1,5 @@
 pub mod conn;
 pub mod event;
-pub mod models;
 pub mod msg;
 pub mod socket;
 

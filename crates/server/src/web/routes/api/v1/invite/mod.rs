@@ -4,6 +4,7 @@ pub mod redeem;
 pub mod revoke;
 
 use ftl::*;
+use smol_str::SmolStr;
 
 use crate::{
     ctrl::Error,
@@ -19,7 +20,7 @@ pub async fn invite(mut route: Route<ServerState>) -> Response {
 
     match route.next().method_segment() {
         (&Method::POST, End) => post::post(route, auth).await,
-        (_, Exact(_)) => match route.param::<String>() {
+        (_, Exact(_)) => match route.param::<SmolStr>() {
             Some(Ok(code)) => match route.next().method_segment() {
                 (&Method::GET, End) => get::get_invite(route, auth, code).await,
                 (&Method::POST, Exact("redeem")) => redeem::redeem(route, auth, code).await,
