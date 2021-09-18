@@ -22,8 +22,8 @@ pub struct Role {
     // TODO: Revist removing this
     pub party_id: Snowflake,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub avatar: Option<String>,
-    pub name: Option<String>,
+    pub avatar: Option<SmolStr>,
+    pub name: Option<SmolStr>,
     pub permissions: Permission,
     pub color: Option<u32>,
     pub flags: RoleFlags,

@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessageCreateForm {
-    pub content: String,
+    pub content: SmolStr,
 
     #[serde(default, skip_serializing_if = "crate::is_false")]
     pub tts: bool,
@@ -50,7 +50,7 @@ pub struct Message {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub edited_at: Option<String>,
 
-    pub content: String,
+    pub content: SmolStr,
 
     pub flags: MessageFlags,
 
@@ -80,24 +80,24 @@ pub struct Reaction {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Attachment {
     pub id: Snowflake,
-    pub filename: String,
+    pub filename: SmolStr,
     pub size: usize,
 
     #[serde(flatten)]
     pub embed: EmbedMediaAttributes,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub mime: Option<String>,
+    pub mime: Option<SmolStr>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Embed {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
+    pub title: Option<SmolStr>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
+    pub description: Option<SmolStr>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub url: Option<String>,
+    pub url: Option<SmolStr>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ts: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -125,12 +125,12 @@ pub enum EmbedMediaKind {
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct EmbedMediaAttributes {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub url: Option<String>,
+    pub url: Option<SmolStr>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub proxy_url: Option<String>,
+    pub proxy_url: Option<SmolStr>,
 
-    /// Base-85 encoded blurhash
+    /// Base-85 encoded blurhash, basically guaranteed to be larger than 22 bytes so just use a regular String
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preview: Option<String>,
 

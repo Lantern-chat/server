@@ -1,3 +1,5 @@
+use super::*;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
     /// Auth token encoded as base-64

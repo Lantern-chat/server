@@ -48,7 +48,7 @@ pub struct Party {
     pub emotes: Vec<Emote>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub avatar: Option<String>,
+    pub avatar: Option<SmolStr>,
 
     pub sort_order: u16,
 }
@@ -58,11 +58,11 @@ pub struct PartialParty {
     pub id: Snowflake,
 
     /// Party name
-    pub name: String,
+    pub name: SmolStr,
 
     /// Discription of the party, if publicly listed
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
+    pub description: Option<SmolStr>,
 }
 
 impl Deref for Party {
@@ -81,14 +81,14 @@ pub struct PartyMember {
 
     /// Per-party nickname
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub nick: Option<String>,
+    pub nick: Option<SmolStr>,
 
     // /// Per-party status
     // #[serde(default, skip_serializing_if = "Option::is_none")]
-    // pub status: Option<String>,
+    // pub status: Option<SmolStr>,
     /// Per-party biography
     // #[serde(default, skip_serializing_if = "Option::is_none")]
-    // pub bio: Option<String>,
+    // pub bio: Option<SmolStr>,
 
     /// Per-party avatar?
     // #[serde(default, skip_serializing_if = "Option::is_none")]

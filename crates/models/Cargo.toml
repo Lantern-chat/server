@@ -16,6 +16,7 @@ serde_shims = { version = "0.2", features = ["std", "mime", "bitflags"] }
 bitflags = "1.2"
 serde_repr = "0.1"
 itoa = "0.4.7"
+smol_str = { path = "../../deps/smol_str", features = ["serde"] }
 # typescript-definitions = { git = "https://github.com/storyscript/typescript-definitions" }
 
 [features]

@@ -74,10 +74,12 @@ thorn::tables! {
     }
 }
 
+use smol_str::SmolStr;
+
 #[derive(Debug, serde::Deserialize)]
 pub struct AggAttachmentsMeta {
     pub id: Snowflake,
     pub size: i32,
-    pub name: String,
-    pub mime: Option<String>,
+    pub name: SmolStr,
+    pub mime: Option<SmolStr>,
 }

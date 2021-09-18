@@ -2,8 +2,9 @@ use ftl::*;
 
 use models::Snowflake;
 use schema::SnowflakeExt;
+use util::hex::HexidecimalInt;
 
-use crate::{util::hex::HexidecimalInt, web::routes::api::ApiError, ServerState};
+use crate::{web::routes::api::ApiError, ServerState};
 
 use crate::ctrl::cdn::FileKind;
 

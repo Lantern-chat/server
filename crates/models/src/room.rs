@@ -23,12 +23,12 @@ pub struct Room {
     pub party_id: Option<Snowflake>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub avatar: Option<String>,
+    pub avatar: Option<SmolStr>,
 
-    pub name: String,
+    pub name: SmolStr,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub topic: Option<String>,
+    pub topic: Option<SmolStr>,
 
     /// Sort order
     pub sort_order: i16,

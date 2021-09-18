@@ -29,20 +29,20 @@ impl UserFlags {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: Snowflake,
-    pub username: String,
+    pub username: SmolStr,
     pub discriminator: i16,
     pub flags: UserFlags,
-    pub avatar: Option<String>,
+    pub avatar: Option<SmolStr>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
+    pub status: Option<SmolStr>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub bio: Option<String>,
+    pub bio: Option<SmolStr>,
 
     /// Not present when user isn't self
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub email: Option<String>,
+    pub email: Option<SmolStr>,
 
     /// Not present when user isn't self
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -61,7 +61,7 @@ serde_shims::impl_serde_for_bitflags!(FriendFlags);
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Friend {
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub note: Option<String>,
+    pub note: Option<SmolStr>,
     pub flags: FriendFlags,
     pub user: User,
 }

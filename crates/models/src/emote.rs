@@ -16,7 +16,7 @@ pub struct CustomEmote {
     pub id: Snowflake,
     pub party_id: Snowflake,
     pub file: Snowflake,
-    pub name: String,
+    pub name: SmolStr,
     pub flags: EmoteFlags,
     pub aspect_ratio: f32,
 }

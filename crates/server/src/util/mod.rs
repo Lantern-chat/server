@@ -1,8 +1,7 @@
 pub mod base62;
-pub mod hex;
+pub mod encrypt;
 pub mod serde;
 pub mod time;
-pub mod encrypt;
 
 pub fn passthrough<F, T, U>(f: F) -> F
 where

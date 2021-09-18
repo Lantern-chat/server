@@ -8,6 +8,8 @@ edition = "2018"
 [dependencies]
 models = { path = "../models", features = ["tokio-pg"] }
 
+smol_str = { path = "../../deps/smol_str" }
+
 thorn = { git = "https://github.com/novacrazy/thorn" }
 
 serde = { version = "1", features = ["derive"] }

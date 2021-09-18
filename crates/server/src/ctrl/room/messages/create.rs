@@ -1,4 +1,5 @@
 use schema::{Snowflake, SnowflakeExt};
+use smol_str::SmolStr;
 
 use crate::{
     ctrl::{auth::Authorization, perm::get_cached_room_permissions, Error, SearchMode},
@@ -9,7 +10,7 @@ use models::*;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateMessageForm {
-    content: String,
+    content: SmolStr,
 }
 
 pub async fn create_message(
@@ -100,7 +101,7 @@ pub async fn create_message(
     };
 
     let party_id: Option<Snowflake> = row.try_get(0)?;
-    let nickname: Option<String> = row.try_get(1)?;
+    let nickname: Option<SmolStr> = row.try_get(1)?;
     let roles = row.try_get(2)?;
 
     Ok(Message {

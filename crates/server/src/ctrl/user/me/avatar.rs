@@ -2,6 +2,7 @@ use std::io::Cursor;
 
 use models::Snowflake;
 use schema::{flags::FileFlags, SnowflakeExt};
+use smol_str::SmolStr;
 
 use crate::{
     ctrl::Error,

@@ -1,6 +1,8 @@
 #[macro_use]
 extern crate serde;
 
+use smol_str::SmolStr;
+
 pub mod emote;
 pub mod file;
 pub mod gateway;

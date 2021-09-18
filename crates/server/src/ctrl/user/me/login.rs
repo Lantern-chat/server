@@ -2,6 +2,7 @@ use std::{alloc::System, net::SocketAddr, time::SystemTime};
 
 use rand::RngCore;
 use schema::Snowflake;
+use smol_str::SmolStr;
 
 use crate::{
     ctrl::{auth::AuthToken, Error},
@@ -11,11 +12,11 @@ use crate::{
 
 #[derive(Deserialize)]
 pub struct LoginForm {
-    pub email: String,
-    pub password: String,
+    pub email: SmolStr,
+    pub password: SmolStr,
 
     #[serde(default)]
-    pub totp: Option<String>,
+    pub totp: Option<SmolStr>,
 }
 
 use models::Session;
@@ -86,7 +87,7 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: LoginForm) -> Res
         match form.totp {
             None => return Err(Error::TOTPRequired),
             Some(token) => {
-                if !process_2fa(&state, user_id, secret, backup, token).await? {
+                if !process_2fa(&state, user_id, secret, backup, &token).await? {
                     return Err(Error::InvalidCredentials);
                 }
             }
@@ -145,7 +146,7 @@ pub async fn process_2fa(
     user_id: Snowflake,
     secret: &[u8],
     backup: &[u8],
-    token: String,
+    token: &str,
 ) -> Result<bool, Error> {
     let now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)

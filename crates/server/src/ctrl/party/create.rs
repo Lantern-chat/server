@@ -3,6 +3,7 @@ use std::time::SystemTime;
 use schema::SnowflakeExt;
 
 use models::*;
+use smol_str::SmolStr;
 
 use crate::{
     ctrl::{auth::Authorization, Error},
@@ -11,10 +12,10 @@ use crate::{
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct PartyCreateForm {
-    name: String,
+    name: SmolStr,
 
     #[serde(default)]
-    description: Option<String>,
+    description: Option<SmolStr>,
 
     #[serde(default)]
     security: SecurityFlags,

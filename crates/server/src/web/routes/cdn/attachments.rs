@@ -17,7 +17,7 @@ pub async fn attachments(mut route: Route<ServerState>) -> Response {
 
     let filename = match route.next().segment() {
         Exact(filename) => match urlencoding::decode(filename) {
-            Ok(filename) => filename.into_owned(),
+            Ok(filename) => filename.into(),
             Err(_) => return StatusCode::BAD_REQUEST.into_response(),
         },
         _ => return StatusCode::BAD_REQUEST.into_response(),

@@ -8,6 +8,7 @@ use headers::{
     AcceptRanges, ContentLength, ContentRange, ContentType, HeaderMap, HeaderMapExt, HeaderValue, Range,
 };
 use hyper::Body;
+use smol_str::SmolStr;
 use thorn::pg::ToSql;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
@@ -34,7 +35,7 @@ pub async fn get_file(
     kind_id: Snowflake,
     file_id: Snowflake,
     kind: FileKind,
-    filename: Option<String>,
+    filename: Option<SmolStr>,
     is_head: bool,
 ) -> Result<Response, Error> {
     let range: Option<Range> = route.header();
@@ -77,7 +78,7 @@ pub async fn get_file(
     let size: i32 = row.try_get(1)?;
     let flags = FileFlags::from_bits_truncate(row.try_get(2)?);
     let nonce: i64 = row.try_get(3)?;
-    let mime: Option<String> = row.try_get(5)?;
+    let mime: Option<SmolStr> = row.try_get(5)?;
 
     let options = CipherOptions {
         key: state.config.file_key,

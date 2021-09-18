@@ -108,7 +108,7 @@ pub async fn message_create(
                         size: meta.size as usize,
                         mime: meta.mime,
                         embed: EmbedMediaAttributes {
-                            preview: preview.map(|p| p.to_z85().unwrap()),
+                            preview: preview.map(|p| p.to_z85().unwrap().into()),
                             ..EmbedMediaAttributes::default()
                         },
                     })

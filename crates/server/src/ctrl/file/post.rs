@@ -6,6 +6,7 @@ use db::pool::Object;
 use schema::{flags::FileFlags, Snowflake, SnowflakeExt};
 
 use rand::Rng;
+use smol_str::SmolStr;
 
 pub async fn post_file(
     state: ServerState,

@@ -1,3 +1,5 @@
+use super::*;
+
 bitflags::bitflags! {
     pub struct UserPresenceFlags: i16 {
         const ONLINE    = 1 << 0;
