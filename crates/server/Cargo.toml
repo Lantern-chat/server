@@ -68,6 +68,7 @@ bitflags = "1.2"
 pin-project = "1.0.8"
 crc32fast = "1.2.1"
 urlencoding = "2.1.0"
+base32 = "0.4.0"
 
 [build-dependencies]
 built = { version = "0.5", features = ["git2", "chrono"] }

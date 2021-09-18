@@ -4,7 +4,7 @@ use schema::Snowflake;
 
 use crate::{
     ctrl::{auth::AuthToken, Error},
-    util::encrypt::decrypt_user_message,
+    util::encrypt::{decrypt_user_message, encrypt_user_message},
     ServerState,
 };
 
@@ -164,13 +164,54 @@ pub async fn process_2fa(
             }
         }
         13 => {
-            let _backup = match decrypt_user_message(&state.config.mfa_key, user_id, &backup) {
-                Ok(backup) => backup,
-                Err(_) => return Err(Error::InternalErrorStatic("Decrypt Error!")),
+            let mut backup = match decrypt_user_message(&state.config.mfa_key, user_id, &backup) {
+                Ok(backup) if backup.len() % 8 == 0 => backup,
+                _ => return Err(Error::InternalErrorStatic("Decrypt Error!")),
             };
 
-            return Ok(false);
-            // TODO: Backup codes
+            let token = match base32::decode(base32::Alphabet::Crockford, &token) {
+                Some(token) if token.len() == 8 => token,
+                _ => return Err(Error::InvalidCredentials),
+            };
+
+            let mut found_idx = None;
+
+            for (idx, backup_code) in backup.chunks_exact(8).enumerate() {
+                if token == backup_code {
+                    found_idx = Some(idx);
+                    break;
+                }
+            }
+
+            if let Some(idx) = found_idx {
+                let db = state.db.write.get().await?;
+
+                // splice backup array
+                let start = idx * 8;
+                backup.drain(start..start + 8);
+
+                let backup = encrypt_user_message(&state.config.mfa_key, user_id, &backup);
+
+                log::debug!("MFA Backup token used, saving new backup array to database");
+                db.execute_cached_typed(
+                    || {
+                        use schema::*;
+                        use thorn::*;
+
+                        let user_id = Var::at(Users::Id, 1);
+                        let backup = Var::at(Users::MfaBackup, 2);
+
+                        Query::update()
+                            .table::<Users>()
+                            .set(Users::MfaBackup, backup)
+                            .and_where(Users::Id.equals(user_id))
+                    },
+                    &[&user_id, &backup],
+                )
+                .await?;
+            } else {
+                return Err(Error::InvalidCredentials);
+            }
         }
         _ => return Err(Error::InvalidCredentials),
     }
