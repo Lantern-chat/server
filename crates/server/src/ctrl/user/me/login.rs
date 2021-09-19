@@ -54,7 +54,7 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: LoginForm) -> Res
     };
 
     let user_id: Snowflake = user.try_get(0)?;
-    let passhash: String = user.try_get(1)?;
+    let passhash: &str = user.try_get(1)?;
     let secret: Option<&[u8]> = user.try_get(2)?;
     let backup: Option<&[u8]> = user.try_get(3)?;
 
@@ -67,10 +67,14 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: LoginForm) -> Res
         // this only allows a given number to process at once.
         let permit = state.hashing_semaphore.acquire().await?;
 
+        // SAFETY: This is only used within the following spawn_blocking block,
+        // but will remain alive until `drop(user)` below.
+        let passhash: &'static str = unsafe { std::mem::transmute(passhash) };
+
         let password = form.password;
         let verified = tokio::task::spawn_blocking(move || {
             let config = hash_config();
-            argon2::verify_encoded_ext(&passhash, password.as_bytes(), config.secret, config.ad)
+            argon2::verify_encoded_ext(passhash, password.as_bytes(), config.secret, config.ad)
         })
         .await??;
 
@@ -93,6 +97,8 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: LoginForm) -> Res
             }
         }
     }
+
+    drop(user);
 
     do_login(state, addr, user_id, std::time::SystemTime::now()).await
 }
