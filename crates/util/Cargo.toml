@@ -20,3 +20,16 @@ futures = "0.3.14"
 thiserror = "1.0.24"
 pin-project = "1.0.7"
 hex = "0.4"
+base64 = "0.13.0"
+serde = "1"
+# strength_reduce = "0.2.3"
+
+# static_init = "1.0.1"
+# specialized-div-rem = { version = "1.0.1", default_features = false, features = ["implement", "std"] }
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "utils"
+harness = false
