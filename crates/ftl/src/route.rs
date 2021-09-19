@@ -119,6 +119,14 @@ impl<S> Route<S> {
         }
     }
 
+    /// Parses a URI as an arbitrary parameter using `FromStr`, but with a length limit
+    pub fn param_n<P: FromStr>(&self, limit: usize) -> Option<Result<P, P::Err>> {
+        match self.segment() {
+            Segment::Exact(segment) if segment.len() <= limit => Some(segment.parse()),
+            _ => None,
+        }
+    }
+
     /// Returns both the `Method` and URI `Segment` a the same time for convenient `match` statements.
     pub fn method_segment(&self) -> (&Method, Segment) {
         let path = self.req.uri().path();
