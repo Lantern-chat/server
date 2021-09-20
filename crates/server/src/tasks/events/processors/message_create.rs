@@ -1,3 +1,5 @@
+use thorn::pg::Json;
+
 use crate::{
     ctrl::util::encrypted_asset::encrypt_snowflake,
     web::gateway::{msg::ServerMsg, Event},
@@ -87,11 +89,10 @@ pub async fn message_create(
         attachments: {
             let mut attachments = Vec::new();
 
-            let meta: Option<serde_json::Value> = row.try_get(12)?;
+            let meta: Option<Json<Vec<schema::AggAttachmentsMeta>>> = row.try_get(12)?;
 
-            if let Some(meta) = meta {
-                let meta: Vec<schema::AggAttachmentsMeta> = serde_json::from_value(meta)?;
-                let previews: Vec<Option<Vec<u8>>> = row.try_get(13)?;
+            if let Some(Json(meta)) = meta {
+                let previews: Vec<Option<&[u8]>> = row.try_get(13)?;
 
                 if meta.len() != previews.len() {
                     return Err(Error::InternalErrorStatic("Meta != Previews length"));
@@ -108,7 +109,7 @@ pub async fn message_create(
                         size: meta.size as usize,
                         mime: meta.mime,
                         embed: EmbedMediaAttributes {
-                            preview: preview.map(|p| p.to_z85().unwrap().into()),
+                            preview: preview.and_then(|p| p.to_z85().ok()),
                             ..EmbedMediaAttributes::default()
                         },
                     })

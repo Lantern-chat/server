@@ -2,6 +2,7 @@ use futures::{StreamExt, TryStreamExt};
 use hashbrown::{hash_map::Entry, HashMap};
 
 use schema::Snowflake;
+use thorn::pg::Json;
 
 use crate::{
     ctrl::{auth::Authorization, util::encrypted_asset::encrypt_snowflake_opt, Error, SearchMode},
@@ -102,12 +103,8 @@ pub async fn ready(
             status: row.try_get(4)?,
             bio: row.try_get(5)?,
             preferences: {
-                let value: Option<serde_json::Value> = row.try_get(6)?;
-
-                match value {
-                    None => None,
-                    Some(v) => Some(serde_json::from_value(v)?),
-                }
+                let value: Option<Json<_>> = row.try_get(6)?;
+                value.map(|v| v.0)
             },
         })
     };

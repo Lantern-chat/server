@@ -2,7 +2,7 @@ use schema::{Snowflake, SnowflakeExt};
 
 use futures::{Stream, StreamExt};
 use models::*;
-use thorn::pg::ToSql;
+use thorn::pg::{Json, ToSql};
 
 use crate::{
     ctrl::{
@@ -168,11 +168,10 @@ pub async fn get_many(
                 attachments: {
                     let mut attachments = Vec::new();
 
-                    let meta: Option<serde_json::Value> = row.try_get(14)?;
+                    let meta: Option<Json<Vec<schema::AggAttachmentsMeta>>> = row.try_get(14)?;
 
-                    if let Some(meta) = meta {
-                        let meta: Vec<schema::AggAttachmentsMeta> = serde_json::from_value(meta)?;
-                        let previews: Vec<Option<Vec<u8>>> = row.try_get(15)?;
+                    if let Some(Json(meta)) = meta {
+                        let previews: Vec<Option<&[u8]>> = row.try_get(15)?;
 
                         if meta.len() != previews.len() {
                             return Err(Error::InternalErrorStatic("Meta != Previews length"));
@@ -189,7 +188,7 @@ pub async fn get_many(
                                 size: meta.size as usize,
                                 mime: meta.mime,
                                 embed: EmbedMediaAttributes {
-                                    preview: preview.map(|p| p.to_z85().unwrap()),
+                                    preview: preview.and_then(|p| p.to_z85().ok()),
                                     ..EmbedMediaAttributes::default()
                                 },
                             })

@@ -81,5 +81,7 @@ pub struct AggAttachmentsMeta {
     pub id: Snowflake,
     pub size: i32,
     pub name: SmolStr,
+
+    #[serde(default)]
     pub mime: Option<SmolStr>,
 }
