@@ -9,10 +9,6 @@ fn charset(x: usize) -> u8 {
 }
 
 pub fn encode64(mut x: u64) -> SmolStr {
-    if x == 0 {
-        return SmolStr::new_inline("0");
-    }
-
     let mut buf = [b'0'; 11];
     let mut i = 0;
 
@@ -32,10 +28,6 @@ use strength_reduce::StrengthReducedU128;
 //static SIXTY_TWO: StrengthReducedU128 = StrengthReducedU128::new(62);
 
 pub fn encode128(mut x: u128) -> SmolStr {
-    if x == 0 {
-        return SmolStr::new_inline("0");
-    }
-
     const SIXTY_TWO: StrengthReducedU128 = StrengthReducedU128 {
         multiplier_hi: 5488425272918362313925396894060777604,
         multiplier_lo: 43907402183346898511403175152486220834,
@@ -47,7 +39,6 @@ pub fn encode128(mut x: u128) -> SmolStr {
 
     while x != 0 {
         let (xd, xm) = StrengthReducedU128::div_rem(x, SIXTY_TWO);
-        //let (xd, xm) = specialized_div_rem::u128_div_rem_delegate(x, 62);
 
         unsafe {
             *buf.get_unchecked_mut(i) = *CHARSET.get_unchecked(xm as usize);
