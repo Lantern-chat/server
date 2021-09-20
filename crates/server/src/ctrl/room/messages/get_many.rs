@@ -109,6 +109,9 @@ pub async fn get_many(
         }
     };
 
+    // for many messages from the same user in a row, avoid duplicating work of encoding user things at the cost of cloning it
+    let mut last_user: Option<User> = None;
+
     Ok(stream.map(move |row| match row {
         Err(e) => Err(Error::from(e)),
         Ok(row) => {
@@ -125,16 +128,29 @@ pub async fn get_many(
                     .try_get::<_, Option<chrono::NaiveDateTime>>(9)?
                     .map(crate::util::time::format_naivedatetime),
                 content: row.try_get(11)?,
-                author: User {
-                    id: row.try_get(1)?,
-                    username: row.try_get(4)?,
-                    discriminator: row.try_get(5)?,
-                    flags: UserFlags::from_bits_truncate(row.try_get(6)?).publicize(),
-                    status: None,
-                    bio: None,
-                    email: None,
-                    preferences: None,
-                    avatar: encrypt_snowflake_opt(&state, row.try_get(13)?),
+                author: {
+                    let id = row.try_get(1)?;
+
+                    match last_user {
+                        Some(ref last_user) if last_user.id == id => last_user.clone(),
+                        _ => {
+                            let user = User {
+                                id,
+                                username: row.try_get(4)?,
+                                discriminator: row.try_get(5)?,
+                                flags: UserFlags::from_bits_truncate(row.try_get(6)?).publicize(),
+                                status: None,
+                                bio: None,
+                                email: None,
+                                preferences: None,
+                                avatar: encrypt_snowflake_opt(&state, row.try_get(13)?),
+                            };
+
+                            last_user = Some(user.clone());
+
+                            user
+                        }
+                    }
                 },
                 member: match party_id {
                     None => None,
