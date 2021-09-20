@@ -1,9 +1,12 @@
 use ftl::*;
 
+use smol_str::SmolStr;
+
 use models::Snowflake;
 use schema::SnowflakeExt;
-use util::hex::HexidecimalInt;
 
+use crate::ctrl::util::encrypted_asset::decrypt_snowflake;
+use crate::ctrl::Error;
 use crate::{web::routes::api::ApiError, ServerState};
 
 use crate::ctrl::cdn::FileKind;
@@ -21,15 +24,12 @@ pub async fn avatar(mut route: Route<ServerState>, kind: AvatarKind) -> Response
         _ => return StatusCode::BAD_REQUEST.into_response(),
     };
 
-    let avatar = match route.next().param::<HexidecimalInt<u128>>() {
-        Some(Ok(avatar)) => avatar,
+    let file_id = match route.next().param::<SmolStr>() {
+        Some(Ok(avatar)) => match decrypt_snowflake(&route.state, &avatar) {
+            Some(id) => id,
+            None => return StatusCode::BAD_REQUEST.into_response(),
+        },
         _ => return StatusCode::BAD_REQUEST.into_response(),
-    };
-
-    // decrypt file_id
-    let file_id = match Snowflake::decrypt(avatar.0, route.state.config.sf_key) {
-        Some(id) => id,
-        None => return StatusCode::BAD_REQUEST.into_response(),
     };
 
     let is_head = route.method() == Method::HEAD;

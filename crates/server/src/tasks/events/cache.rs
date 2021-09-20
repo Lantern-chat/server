@@ -1,7 +1,7 @@
 use std::{any::Any, time::Instant};
 
+use async_chashmap::CHashMap;
 use schema::Snowflake;
-use util::cmap::CHashMap;
 
 pub struct EventItemCache {
     max_len: usize,
@@ -27,7 +27,7 @@ impl EventItemCache {
     where
         T: Any + Send + Sync,
     {
-        if self.map.len() < self.max_len {
+        if self.map.size() < self.max_len {
             self.map.insert(key, (Instant::now(), Box::new(value))).await;
         }
     }

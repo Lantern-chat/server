@@ -6,7 +6,9 @@ use models::Snowflake;
 #[inline]
 fn nonce_from_user_id(user_id: Snowflake) -> Nonce {
     let mut nonce = [0u8; 12]; // 96-bit
-    nonce[0..8].copy_from_slice(&user_id.to_u64().to_be_bytes());
+    let id_bytes: [u8; 8] = user_id.to_u64().to_be_bytes();
+    nonce[0..8].copy_from_slice(&id_bytes[0..8]);
+    nonce[8..12].copy_from_slice(&id_bytes[2..6]);
     Nonce::from(nonce)
 }
 
