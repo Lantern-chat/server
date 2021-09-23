@@ -56,9 +56,9 @@ pub async fn register_user(
         return Err(Error::InsufficientAge);
     }
 
-    let existing = state
-        .read_db()
-        .await
+    let read_db = state.db.read.get().await?;
+
+    let existing = read_db
         .query_opt_cached_typed(
             || {
                 use schema::*;
@@ -100,9 +100,9 @@ pub async fn register_user(
 
     drop(permit);
 
-    state
-        .write_db()
-        .await
+    let write_db = state.db.write.get().await?;
+
+    write_db
         .execute_cached_typed(
             || {
                 use schema::*;

@@ -2,9 +2,9 @@ use crate::ctrl::{auth, Error};
 use crate::ServerState;
 
 pub async fn logout_user(state: ServerState, auth: auth::Authorization) -> Result<(), Error> {
-    let res = state
-        .write_db()
-        .await
+    let db = state.db.write.get().await?;
+
+    let res = db
         .execute_cached_typed(
             || {
                 use schema::*;

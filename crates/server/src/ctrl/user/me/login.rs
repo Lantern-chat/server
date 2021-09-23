@@ -113,32 +113,31 @@ pub async fn do_login(
 
     let expires = now + state.config.login_session_duration;
 
-    state
-        .write_db()
-        .await
-        .execute_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
+    let db = state.db.write.get().await?;
 
-                Query::insert()
-                    .into::<Sessions>()
-                    .cols(&[
-                        Sessions::Token,
-                        Sessions::UserId,
-                        Sessions::Expires,
-                        Sessions::Addr,
-                    ])
-                    .values(vec![
-                        Var::of(Sessions::Token),
-                        Var::of(Sessions::UserId),
-                        Var::of(Sessions::Expires),
-                        Var::of(Sessions::Addr),
-                    ])
-            },
-            &[&&token.0[..], &user_id, &expires, &addr.ip()],
-        )
-        .await?;
+    db.execute_cached_typed(
+        || {
+            use schema::*;
+            use thorn::*;
+
+            Query::insert()
+                .into::<Sessions>()
+                .cols(&[
+                    Sessions::Token,
+                    Sessions::UserId,
+                    Sessions::Expires,
+                    Sessions::Addr,
+                ])
+                .values(vec![
+                    Var::of(Sessions::Token),
+                    Var::of(Sessions::UserId),
+                    Var::of(Sessions::Expires),
+                    Var::of(Sessions::Addr),
+                ])
+        },
+        &[&&token.0[..], &user_id, &expires, &addr.ip()],
+    )
+    .await?;
 
     Ok(Session {
         auth: token.encode(),

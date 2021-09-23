@@ -11,9 +11,9 @@ pub async fn list_sessions(
     state: ServerState,
     auth: Authorization,
 ) -> Result<impl Stream<Item = Result<AnonymousSession, Error>>, Error> {
-    let sessions = state
-        .read_db()
-        .await
+    let db = state.db.read.get().await?;
+
+    let sessions = db
         .query_stream_cached_typed(
             || {
                 use schema::*;

@@ -15,8 +15,28 @@ use models::{AnyActivity, PartyMember, User, UserFlags, UserPresence, UserPresen
 pub async fn get_members(
     state: ServerState,
     party_id: Snowflake,
+    user_id: Snowflake,
 ) -> Result<impl Stream<Item = Result<PartyMember, Error>>, Error> {
     let db = state.db.read.get().await?;
+
+    let is_member = db
+        .query_opt_cached_typed(
+            || {
+                use schema::*;
+                use thorn::*;
+
+                Query::select()
+                    .from_table::<PartyMember>()
+                    .and_where(PartyMember::PartyId.equals(Var::of(Party::Id)))
+                    .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
+            },
+            &[&party_id, &user_id],
+        )
+        .await?;
+
+    if is_member.is_none() {
+        return Err(Error::NotFound);
+    }
 
     let stream = db
         .query_stream_cached_typed(|| select_members2(), &[&party_id])

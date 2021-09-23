@@ -117,22 +117,6 @@ impl ServerState {
             None => log::warn!("Duplicate shutdown signals detected!"),
         }
     }
-
-    pub async fn read_db(&self) -> db::pool::Object {
-        self.db
-            .read
-            .get()
-            .await
-            .expect("Could not acquire readonly database connection")
-    }
-
-    pub async fn write_db(&self) -> db::pool::Object {
-        self.db
-            .write
-            .get()
-            .await
-            .expect("Could not acquire writable database connection")
-    }
 }
 
 /// Simple concurrent map structure containing locks for any particular snowflake ID

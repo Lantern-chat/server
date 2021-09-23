@@ -12,8 +12,6 @@ pub mod party;
 pub mod room;
 pub mod user;
 
-pub mod test;
-
 pub async fn api_v1(mut route: Route<crate::ServerState>) -> Response {
     match route.next().method_segment() {
         (_, Exact("user")) => user::user(route).boxed().await,
