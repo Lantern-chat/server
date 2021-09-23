@@ -1,5 +1,7 @@
 use super::*;
 
+pub const UINT2: Type = Type::INT4;
+
 thorn::tables! {
     pub struct Host in Lantern {
         Migration: Type::INT8,
@@ -39,7 +41,7 @@ thorn::tables! {
         DeletedAt: Type::TIMESTAMP,
         Dob: Type::DATE,
         Flags: Type::INT2,
-        Discriminator: Type::INT2,
+        Discriminator: UINT2,
         Username: Type::VARCHAR,
         Email: Type::TEXT,
         Passhash: Type::TEXT,
@@ -50,9 +52,9 @@ thorn::tables! {
         MfaBackup: Type::BYTEA,
     }
 
-    pub struct UsersFreelist in Lantern {
+    pub struct UserFreelist in Lantern {
         Username: Type::VARCHAR,
-        Descriminator: Type::INT2,
+        Discriminator: UINT2,
     }
 
     pub struct UserTokens in Lantern {

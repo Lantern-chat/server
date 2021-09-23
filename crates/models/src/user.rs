@@ -30,7 +30,9 @@ impl UserFlags {
 pub struct User {
     pub id: Snowflake,
     pub username: SmolStr,
-    pub discriminator: i16,
+
+    /// Unsigned 16-bit integer
+    pub discriminator: i32,
     pub flags: UserFlags,
     pub avatar: Option<SmolStr>,
 

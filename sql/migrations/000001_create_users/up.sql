@@ -3,9 +3,10 @@ CREATE TABLE lantern.users (
     id              bigint              NOT NULL,
     deleted_at      timestamp,
     dob             date                NOT NULL,
+    -- 2-byte integer that can be displayed as 4 hex digits,
+    -- actually stored as a 4-byte signed integer because Postgres doesn't support unsigned...
+    discriminator   uint2               NOT NULL,
     flags           smallint            NOT NULL    DEFAULT 0,
-    -- 2-byte integer that can be displayed as 4 hex digits
-    discriminator   smallint            NOT NULL,
     username        varchar(64)         NOT NULL,
     email           text                NOT NULL,
     passhash        text                NOT NULL,
@@ -30,21 +31,24 @@ CREATE INDEX user_username_idx ON lantern.users
     USING hash (username);
 
 -- Fast lookup of users via `username#0000`
-CREATE INDEX user_username_discriminator_idx ON lantern.users
+CREATE UNIQUE INDEX user_username_discriminator_idx ON lantern.users
     USING btree (username, discriminator);
 
 CREATE UNIQUE INDEX user_email_idx ON lantern.users
     USING btree(email);
 
 
-CREATE TABLE lantern.users_freelist (
+CREATE TABLE lantern.user_freelist (
     username        varchar(64) NOT NULL,
-    descriminator   smallint    NOT NULL
+    discriminator   uint2       NOT NULL
 );
-ALTER TABLE lantern.users_freelist OWNER TO postgres;
+ALTER TABLE lantern.user_freelist OWNER TO postgres;
 
-CREATE INDEX CONCURRENTLY user_freelist_username_idx ON lantern.users_freelist
+CREATE INDEX user_freelist_username_idx ON lantern.user_freelist
     USING hash (username);
+
+CREATE UNIQUE INDEX user_freelist_username_discriminator_idx ON lantern.user_freelist
+    USING btree (username, discriminator);
 
 -- User verification/reset tokens
 CREATE TABLE lantern.user_tokens (
