@@ -18,7 +18,7 @@ Disallow: /api
 Disallow: /api/
 Disallow: /widget
 Disallow: /widget/
-Disallow: /profile/
+Disallow: /settings/
 
 User-agent: Twitterbot
 Disallow: /channels
@@ -35,7 +35,7 @@ Disallow: /api
 Disallow: /api/
 Disallow: /widget
 Disallow: /widget/
-Disallow: /profile/
+Disallow: /settings/
 Allow: /invite
 Allow: /invite/
 
