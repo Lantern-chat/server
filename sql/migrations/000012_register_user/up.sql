@@ -8,7 +8,7 @@ CREATE OR REPLACE PROCEDURE lantern.register_user(
 LANGUAGE plpgsql AS
 $$
 DECLARE
-   _discriminator uint2;
+   _discriminator lantern.uint2;
 BEGIN
     SELECT discriminator INTO _discriminator FROM lantern.user_freelist WHERE username = _username;
 
@@ -39,7 +39,7 @@ CREATE OR REPLACE PROCEDURE lantern.update_user(
 LANGUAGE plpgsql AS
 $$
 DECLARE
-    _discriminator uint2;
+    _discriminator lantern.uint2;
 BEGIN
     IF _username IS NOT NULL THEN
         SELECT discriminator INTO _discriminator FROM lantern.user_freelist WHERE username = _username;
