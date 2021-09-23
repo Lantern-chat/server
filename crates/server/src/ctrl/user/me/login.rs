@@ -5,7 +5,7 @@ use schema::Snowflake;
 use smol_str::SmolStr;
 
 use crate::{
-    ctrl::{auth::AuthToken, Error},
+    ctrl::{auth::AuthToken, util::validation::validate_email, Error},
     util::encrypt::{decrypt_user_message, encrypt_user_message},
     ServerState,
 };
@@ -21,14 +21,12 @@ pub struct LoginForm {
 
 use models::Session;
 
-use crate::ctrl::user::register::{hash_config, EMAIL_REGEX};
+use crate::ctrl::user::register::hash_config;
 
 // TODO: Determine if I should give any feedback at all or
 // just say catchall "invalid username/email/password"
 pub async fn login(state: ServerState, addr: SocketAddr, form: LoginForm) -> Result<Session, Error> {
-    if !EMAIL_REGEX.is_match(&form.email) {
-        return Err(Error::InvalidCredentials);
-    }
+    validate_email(&form.email)?;
 
     let db = state.db.read.get().await?;
 

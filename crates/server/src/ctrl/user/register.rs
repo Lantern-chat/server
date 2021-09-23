@@ -3,7 +3,10 @@ use std::{net::SocketAddr, sync::Arc, time::SystemTime};
 use schema::{Snowflake, SnowflakeExt};
 use smol_str::SmolStr;
 
-use crate::{ctrl::Error, ServerState};
+use crate::{
+    ctrl::{util::validation::*, Error},
+    ServerState,
+};
 
 #[derive(Clone, Deserialize)]
 pub struct RegisterForm {
@@ -17,33 +20,14 @@ pub struct RegisterForm {
 
 use models::Session;
 
-use regex::{Regex, RegexBuilder};
-
-lazy_static::lazy_static! {
-    pub static ref EMAIL_REGEX: Regex = Regex::new(r#"^[^@\s]{1,64}@[^@\s]+\.[^.@\s]+$"#).unwrap();
-    pub static ref USERNAME_REGEX: Regex = Regex::new(r#"^[^\s].*[^\s]$"#).unwrap();
-
-    static ref PASSWORD_REGEX: Regex = Regex::new(r#"[^\P{L}]|\p{N}"#).unwrap();
-
-    static ref USERNAME_SANITIZE_REGEX: Regex = Regex::new(r#"\s+"#).unwrap();
-}
-
 pub async fn register_user(
     state: ServerState,
     addr: SocketAddr,
     mut form: RegisterForm,
 ) -> Result<Session, Error> {
-    if !state.config.username_len.contains(&form.username.len()) || !USERNAME_REGEX.is_match(&form.username) {
-        return Err(Error::InvalidUsername);
-    }
-
-    if !state.config.password_len.contains(&form.password.len()) || !PASSWORD_REGEX.is_match(&form.password) {
-        return Err(Error::InvalidPassword);
-    }
-
-    if form.email.len() > 320 || !EMAIL_REGEX.is_match(&form.email) {
-        return Err(Error::InvalidEmail);
-    }
+    validate_username(&state.config, &form.username)?;
+    validate_password(&state.config, &form.password)?;
+    validate_email(&form.email)?;
 
     let dob = match chrono::NaiveDate::from_ymd_opt(form.year, form.month as u32 + 1, form.day as u32 + 1) {
         Some(dob) => dob,
