@@ -9,11 +9,9 @@ pub async fn friends(
     state: ServerState,
     auth: Authorization,
 ) -> Result<impl Stream<Item = Result<Friend, Error>>, Error> {
-    let stream = state
-        .db
-        .read
-        .get()
-        .await?
+    let db = state.db.read.get().await?;
+
+    let stream = db
         .query_stream_cached_typed(
             || {
                 use schema::*;
