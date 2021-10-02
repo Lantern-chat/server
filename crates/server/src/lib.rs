@@ -56,11 +56,12 @@ pub struct DatabasePools {
 }
 
 use ftl::Reply;
+use tokio::net::TcpListener;
 
 pub async fn start_server(
     addr: SocketAddr,
     db: DatabasePools,
-) -> (impl Future<Output = Result<(), hyper::Error>>, ServerState) {
+) -> anyhow::Result<(impl Future<Output = Result<(), hyper::Error>>, ServerState)> {
     let (snd, rcv) = tokio::sync::oneshot::channel();
     let state = ServerState::new(snd, db);
 
@@ -87,11 +88,16 @@ pub async fn start_server(
         .boxed(),
     );
 
+    let listener = TcpListener::bind(&addr).await?;
+
     let inner_state = state.clone();
-    let server = Server::bind(&addr)
-        .http2_adaptive_window(true)
-        .tcp_nodelay(true)
-        .serve(make_service_fn(move |socket: &AddrStream| {
+    let server = Server::builder(net::filtered_addr_incoming::FilteredAddrIncoming::from_listener(
+        listener,
+        (),
+    )?)
+    .http2_adaptive_window(true)
+    .serve(make_service_fn(
+        move |socket: &crate::net::addr_stream::AddrStream| {
             let remote_addr = socket.remote_addr();
             let state = inner_state.clone();
 
@@ -112,8 +118,9 @@ pub async fn start_server(
                     }
                 }))
             }
-        }))
-        .with_graceful_shutdown(rcv.map(|_| { /* ignore errors */ }));
+        },
+    ))
+    .with_graceful_shutdown(rcv.map(|_| { /* ignore errors */ }));
 
-    (server, state)
+    Ok((server, state))
 }
