@@ -162,7 +162,7 @@ impl IpList {
 
 use hashbrown::{hash_map::DefaultHashBuilder, raw::RawTable};
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct IpSet {
     ipv4: Vec<Ipv4Addr>,
     ipv6: Vec<Ipv6Addr>,
@@ -174,40 +174,51 @@ const MAX_LEN: usize = 1 << 31;
 const INDEX_MASK: usize = 0x7FFFFFFF;
 
 impl IpSet {
-    pub fn new(ips: Vec<IpAddr>) -> Self {
-        use std::hash::{BuildHasher, Hash, Hasher};
-
+    pub fn new(ips: &[IpAddr]) -> Self {
         let mut this = IpSet {
             ipv4: Vec::new(),
             ipv6: Vec::new(),
-            set: RawTable::with_capacity(ips.len()),
+            set: RawTable::new(),
             hash_builder: DefaultHashBuilder::new(),
         };
 
-        for ip in ips {
-            let mut hasher = this.hash_builder.build_hasher();
+        this.refresh(ips);
+
+        this
+    }
+
+    // Recreate IpSet without freeing memory
+    pub fn refresh(&mut self, ips: &[IpAddr]) {
+        use std::hash::{BuildHasher, Hash, Hasher};
+
+        self.ipv4.clear();
+        self.ipv6.clear();
+
+        self.set.clear();
+        self.set.reserve(ips.len(), |_| 0); // there are no elements to rehash
+
+        for &ip in ips {
+            let mut hasher = self.hash_builder.build_hasher();
 
             let idx = match ip {
                 IpAddr::V4(ip) => {
                     ip.hash(&mut hasher);
-                    let idx = this.ipv4.len();
+                    let idx = self.ipv4.len();
                     assert!(idx < MAX_LEN);
-                    this.ipv4.push(ip);
+                    self.ipv4.push(ip);
                     idx as u32
                 }
                 IpAddr::V6(ip) => {
                     ip.hash(&mut hasher);
-                    let idx = this.ipv6.len();
+                    let idx = self.ipv6.len();
                     assert!(idx < MAX_LEN);
-                    this.ipv6.push(ip);
+                    self.ipv6.push(ip);
                     idx as u32 | (1 << 31)
                 }
             };
 
-            this.set.insert_no_grow(hasher.finish(), idx);
+            self.set.insert_no_grow(hasher.finish(), idx);
         }
-
-        this
     }
 
     fn hash(&self, ip: &IpAddr) -> u64 {
@@ -285,5 +296,24 @@ impl IpSet {
 
             hasher.finish()
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ipset() {
+        let banned = vec![
+            "2604:f4a0:2:a::b75e".parse().unwrap(),
+            "65.105.159.243".parse().unwrap(),
+        ];
+
+        let set = IpSet::new(&banned);
+
+        for banned in &banned {
+            assert!(set.contains(banned));
+        }
     }
 }

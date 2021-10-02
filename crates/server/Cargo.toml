@@ -16,6 +16,7 @@ schema = { path = "../schema" }
 mime_db = { path = "../mime_db" }
 totp = { path = "../totp" }
 processing = { path = "../processing" }
+iplist = { path = "../iplist" }
 
 blurhash = { path = "../../../deps/blurhash" }
 

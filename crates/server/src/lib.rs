@@ -58,6 +58,8 @@ pub struct DatabasePools {
 use ftl::Reply;
 use tokio::net::TcpListener;
 
+use crate::net::ip_filter::IpFilter;
+
 pub async fn start_server(
     addr: SocketAddr,
     db: DatabasePools,
@@ -93,7 +95,7 @@ pub async fn start_server(
     let inner_state = state.clone();
     let server = Server::builder(net::filtered_addr_incoming::FilteredAddrIncoming::from_listener(
         listener,
-        (),
+        IpFilter::default(),
     )?)
     .http2_adaptive_window(true)
     .serve(make_service_fn(

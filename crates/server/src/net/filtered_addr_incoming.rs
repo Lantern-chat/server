@@ -18,14 +18,6 @@ use tokio::net::{TcpListener, TcpStream};
 //use tokio_rustls::server::TlsStream;
 //use tokio_rustls::TlsAcceptor;
 
-pub trait AddrFilter {
-    fn allow(&self, addr: SocketAddr) -> bool {
-        true
-    }
-}
-
-impl AddrFilter for () {}
-
 pub struct FilteredAddrIncoming<F = ()> {
     addr: SocketAddr,
     listener: TcpListener,
@@ -46,6 +38,7 @@ pub enum AddrIncomingError {
 }
 
 use super::addr_stream::AddrStream;
+use super::ip_filter::AddrFilter;
 
 impl<F: AddrFilter> FilteredAddrIncoming<F> {
     pub fn from_listener(listener: TcpListener, filter: F) -> io::Result<Self> {
@@ -118,7 +111,13 @@ impl<F: AddrFilter> FilteredAddrIncoming<F> {
         loop {
             match ready!(self.listener.poll_accept(cx)) {
                 Ok((socket, addr)) => {
-                    if !self.filter.allow(addr) {
+                    if !self.filter.allow(&addr.ip()) {
+                        if cfg!(debug_assertions) {
+                            log::trace!("Dropping IP: {}", addr.ip());
+                        }
+
+                        drop(socket);
+
                         return Poll::Ready(Err(AddrIncomingError::ConnectionRefused));
                     }
 
