@@ -28,15 +28,6 @@ pub struct FilteredAddrIncoming<F = ()> {
     filter: F,
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum AddrIncomingError {
-    #[error("IO Error: {0}")]
-    Io(#[from] io::Error),
-
-    #[error("Connection Refused")]
-    ConnectionRefused,
-}
-
 use super::addr_stream::AddrStream;
 use super::ip_filter::AddrFilter;
 
@@ -101,7 +92,7 @@ impl<F: AddrFilter> FilteredAddrIncoming<F> {
         self.sleep_on_errors = val;
     }
 
-    fn poll_next_(&mut self, cx: &mut Context<'_>) -> Poll<Result<AddrStream, AddrIncomingError>> {
+    fn poll_next_(&mut self, cx: &mut Context<'_>) -> Poll<Result<AddrStream, io::Error>> {
         // Check if a previous timeout is active that was set by IO errors.
         if let Some(ref mut to) = self.timeout {
             ready!(Pin::new(to).poll(cx));
@@ -116,9 +107,7 @@ impl<F: AddrFilter> FilteredAddrIncoming<F> {
                             log::trace!("Dropping IP: {}", addr.ip());
                         }
 
-                        drop(socket);
-
-                        return Poll::Ready(Err(AddrIncomingError::ConnectionRefused));
+                        continue;
                     }
 
                     if let Some(dur) = self.tcp_keepalive_timeout {
@@ -129,9 +118,11 @@ impl<F: AddrFilter> FilteredAddrIncoming<F> {
                             log::trace!("error trying to set TCP keepalive: {}", e);
                         }
                     }
+
                     if let Err(e) = socket.set_nodelay(self.tcp_nodelay) {
                         log::trace!("error trying to set TCP nodelay: {}", e);
                     }
+
                     return Poll::Ready(Ok(AddrStream::new(socket, addr)));
                 }
                 Err(e) => {
@@ -172,14 +163,14 @@ where
     F: Unpin,
 {
     type Conn = AddrStream;
-    type Error = AddrIncomingError;
+    type Error = io::Error;
 
+    #[inline]
     fn poll_accept(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<Self::Conn, Self::Error>>> {
-        let result = ready!(self.poll_next_(cx));
-        Poll::Ready(Some(result))
+        Poll::Ready(Some(ready!(self.poll_next_(cx))))
     }
 }
 
