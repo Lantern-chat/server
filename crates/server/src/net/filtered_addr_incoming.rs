@@ -9,6 +9,7 @@ use std::future::Future;
 use std::net::{SocketAddr, TcpListener as StdTcpListener};
 use std::task::{Context, Poll};
 use std::time::Duration;
+use tls_listener::AsyncAccept;
 use tokio::time::Sleep;
 //use rustls::internal::pemfile;
 use std::pin::Pin;
@@ -171,6 +172,22 @@ where
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<Self::Conn, Self::Error>>> {
         Poll::Ready(Some(ready!(self.poll_next_(cx))))
+    }
+}
+
+impl<F: AddrFilter> AsyncAccept for FilteredAddrIncoming<F>
+where
+    F: Unpin,
+{
+    type Connection = AddrStream;
+    type Error = io::Error;
+
+    #[inline]
+    fn poll_accept(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Result<Self::Connection, Self::Error>> {
+        Poll::Ready(ready!(self.poll_next_(cx)))
     }
 }
 

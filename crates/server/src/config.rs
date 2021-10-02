@@ -28,6 +28,9 @@ pub struct LanternConfig {
     pub sf_key: u128,
 
     pub data_path: PathBuf,
+
+    pub cert_path: PathBuf,
+    pub key_path: PathBuf,
 }
 
 impl Default for LanternConfig {
@@ -72,6 +75,8 @@ impl Default for LanternConfig {
                 u128::from_le_bytes(key)
             },
             data_path: { PathBuf::from(env::var("DATA_DIR").unwrap()) },
+            cert_path: { PathBuf::from(env::var("CERT_PATH").unwrap()) },
+            key_path: { PathBuf::from(env::var("KEY_PATH").unwrap()) },
         }
     }
 }

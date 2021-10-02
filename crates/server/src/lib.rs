@@ -90,16 +90,20 @@ pub async fn start_server(
         .boxed(),
     );
 
-    let listener = TcpListener::bind(&addr).await?;
+    let tcp_listener = TcpListener::bind(&addr).await?;
+    let filtered_tcp_listener =
+        net::filtered_addr_incoming::FilteredAddrIncoming::from_listener(tcp_listener, IpFilter::default())?;
+    //let tls_config = net::tls::load_config(&state.config)?;
+    //let tls_listener = tls_listener::builder(tls_config).listen(filtered_tcp_listener);
+
+    //type Connection = tokio_rustls::server::TlsStream<net::addr_stream::AddrStream>;
+    type Connection = net::addr_stream::AddrStream;
 
     let inner_state = state.clone();
-    let server = Server::builder(net::filtered_addr_incoming::FilteredAddrIncoming::from_listener(
-        listener,
-        IpFilter::default(),
-    )?)
-    .http2_adaptive_window(true)
-    .serve(make_service_fn(
-        move |socket: &crate::net::addr_stream::AddrStream| {
+    let server = Server::builder(filtered_tcp_listener)
+        .http2_adaptive_window(true)
+        .serve(make_service_fn(move |socket: &Connection| {
+            //let remote_addr = socket.get_ref().0.remote_addr();
             let remote_addr = socket.remote_addr();
             let state = inner_state.clone();
 
@@ -120,9 +124,8 @@ pub async fn start_server(
                     }
                 }))
             }
-        },
-    ))
-    .with_graceful_shutdown(rcv.map(|_| { /* ignore errors */ }));
+        }))
+        .with_graceful_shutdown(rcv.map(|_| { /* ignore errors */ }));
 
     Ok((server, state))
 }
