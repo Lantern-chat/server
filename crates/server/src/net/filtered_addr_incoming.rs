@@ -102,7 +102,7 @@ impl<F: AddrFilter> FilteredAddrIncoming<F> {
         loop {
             match ready!(self.listener.poll_accept(cx)) {
                 Ok((socket, addr)) => {
-                    if !self.filter.allow(&addr.ip()) {
+                    if self.filter.reject(&addr.ip()) {
                         if cfg!(debug_assertions) {
                             log::trace!("Dropping IP: {}", addr.ip());
                         }

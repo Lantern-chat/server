@@ -6,8 +6,8 @@ use iplist::IpSet;
 
 pub trait AddrFilter {
     #[inline]
-    fn allow(&self, _addr: &IpAddr) -> bool {
-        true
+    fn reject(&self, _addr: &IpAddr) -> bool {
+        false
     }
 }
 
@@ -26,8 +26,9 @@ impl Default for IpFilter {
 }
 
 impl AddrFilter for IpFilter {
-    fn allow(&self, addr: &IpAddr) -> bool {
-        !self.filter.load().contains(&addr)
+    #[inline]
+    fn reject(&self, addr: &IpAddr) -> bool {
+        self.filter.load().contains(&addr)
     }
 }
 
