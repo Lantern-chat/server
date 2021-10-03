@@ -75,8 +75,16 @@ pub enum UserPreference {
     ChatFontSize,
     /// UI Font Size
     UIFontSize,
+    /// Message Tab Size (in spaces)
+    TabSize,
     /// Time format
     TimeFormat,
+
+    /*
+        Advanced
+    */
+    /// Whether to enable certain dev features such as copy-id
+    DevMode,
 
     #[serde(other)]
     InvalidField,
@@ -170,9 +178,12 @@ impl UserPreference {
                 _ => false,
             },
             // These are all just booleans
-            Self::AllowDms | Self::ReduceAnim | Self::UnfocusPause | Self::Light | Self::Compact => {
-                value.is_boolean()
-            }
+            Self::AllowDms
+            | Self::ReduceAnim
+            | Self::UnfocusPause
+            | Self::Light
+            | Self::Compact
+            | Self::DevMode => value.is_boolean(),
             // Color temperature in kelvin degrees
             Self::Temp => match value.as_f64() {
                 Some(temp) => {
@@ -195,6 +206,13 @@ impl UserPreference {
                 }
                 _ => false,
             },
+            Self::TabSize => match value.as_u64() {
+                Some(value) => {
+                    kind = UserPreferenceErrorKind::InvalidValue;
+                    value > 0 && value < 64
+                }
+                _ => false,
+            },
             // Font sizes can be floats for smooth scaling, but must be positive
             Self::ChatFontSize | Self::UIFontSize => match value.as_f64() {
                 Some(value) => {
@@ -214,7 +232,7 @@ impl UserPreference {
 
     fn is_default(self, value: &Value) -> bool {
         match self {
-            Self::Light | Self::ReduceAnim | Self::UnfocusPause | Self::Compact => {
+            Self::Light | Self::ReduceAnim | Self::UnfocusPause | Self::Compact | Self::DevMode => {
                 *value == Value::Bool(false)
             }
             Self::AllowDms => *value == Value::Bool(true),
@@ -222,7 +240,8 @@ impl UserPreference {
             Self::Temp => value.as_f64() == Some(7500.0),
             Self::FriendAdd => value.as_u64() == Some(3),
             Self::Locale => value.as_u64() == Some(Locale::enUS as u64),
-            Self::ChatFont | Self::UiFont => value.as_u64() == Some(0),
+            Self::ChatFont | Self::UiFont => value.as_f64() == Some(1.0),
+            Self::TabSize => value.as_u64() == Some(4),
             _ => false,
         }
     }
