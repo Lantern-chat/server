@@ -30,8 +30,10 @@ pub enum Font {
     Serif,
     Monospace,
     Cursive,
+    ComicSans,
 
-    OpenDyslexic,
+    // third-party fonts
+    OpenDyslexic = 30,
 
     __MAX_FONT,
 }
@@ -240,7 +242,7 @@ impl UserPreference {
             Self::Temp => value.as_f64() == Some(7500.0),
             Self::FriendAdd => value.as_u64() == Some(3),
             Self::Locale => value.as_u64() == Some(Locale::enUS as u64),
-            Self::ChatFont | Self::UiFont => value.as_f64() == Some(1.0),
+            Self::ChatFont | Self::UiFont => value.as_u64() == Some(0),
             Self::TabSize => value.as_u64() == Some(4),
             _ => false,
         }
