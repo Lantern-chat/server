@@ -142,6 +142,9 @@ pub enum Error {
 
     #[error("Mime Parse Error: {0}")]
     MimeParseError(#[from] mime::FromStrError),
+
+    #[error("Temporarily Disabled")]
+    TemporarilyDisabled,
 }
 
 impl From<db::pg::Error> for Error {
@@ -184,6 +187,7 @@ impl Error {
 
         match self {
             Error::NoSession | Error::InvalidCredentials | Error::TOTPRequired => StatusCode::UNAUTHORIZED,
+            Error::TemporarilyDisabled => StatusCode::FORBIDDEN,
             Error::NotFound => StatusCode::NOT_FOUND,
             Error::BadRequest => StatusCode::BAD_REQUEST,
             Error::AlreadyExists => StatusCode::CONFLICT,
@@ -242,6 +246,7 @@ impl Error {
             Error::InvalidImageFormat       => 40026,
             Error::TOTPRequired             => 40027,
             Error::InvalidPreferences(_)    => 40028,
+            Error::TemporarilyDisabled      => 40029,
 
             // HTTP-like error codes
             Error::BadRequest               => 40400,

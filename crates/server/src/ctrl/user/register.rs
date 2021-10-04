@@ -25,6 +25,10 @@ pub async fn register_user(
     addr: SocketAddr,
     mut form: RegisterForm,
 ) -> Result<Session, Error> {
+    if cfg!(debug_assertions) {
+        return Err(Error::TemporarilyDisabled);
+    }
+
     validate_username(&state.config, &form.username)?;
     validate_password(&state.config, &form.password)?;
     validate_email(&form.email)?;
