@@ -21,6 +21,13 @@ pub struct GatewayConnectionInner {
     pub tx: mpsc::Sender<Event>,
 }
 
+#[cfg(debug_assertions)]
+impl Drop for GatewayConnectionInner {
+    fn drop(&mut self) {
+        log::debug!("Dropping connection {}", self.id);
+    }
+}
+
 #[derive(Clone)]
 pub struct GatewayConnection(Arc<GatewayConnectionInner>);
 
