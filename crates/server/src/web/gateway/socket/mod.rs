@@ -137,6 +137,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
         'event_loop: while let Some(event) = events.next().await {
             let resp = match event {
                 Item::MissedHeartbeat => Err(MessageOutgoingError::SocketClosed),
+
                 Item::Event(event) => match event {
                     Ok(event) => {
                         use super::msg::server::payloads::*;
@@ -200,7 +201,27 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                                     }
 
                                     match event.msg {
-                                        // TODO: Party ADD subscribe
+                                        ServerMsg::PartyCreate { ref payload, .. } => {
+                                            let subs = state
+                                                .gateway
+                                                .sub_and_activate_connection(
+                                                    user_id,
+                                                    conn.clone(),
+                                                    &[payload.inner.id],
+                                                )
+                                                .await;
+
+                                            events.extend(subs.into_iter().map(|sub| {
+                                                let (stream, cancel) =
+                                                    CancelableStream::new(BroadcastStream::new(sub.rx));
+
+                                                listener_table.insert(sub.party_id, cancel);
+
+                                                stream
+                                                    .map(|event| Item::Event(event.map_err(Into::into)))
+                                                    .boxed()
+                                            }))
+                                        }
                                         // TODO: Party REMOVE unsubscribe
                                         _ => {}
                                     }
@@ -250,7 +271,8 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                                     ));
                                 }
                             }
-                            continue;
+
+                            continue 'event_loop; // no reply, so continue event loop
                         }
                     },
                     Err(e) => match e {

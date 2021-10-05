@@ -122,7 +122,7 @@ pub mod server {
 
     use models::{
         events::{Hello, Ready, TypingStart},
-        Intent, Message as RoomMessage, User, UserPresence,
+        Intent, Message as RoomMessage, Party, User, UserPresence,
     };
 
     type Room = (); // TODO
@@ -141,8 +141,8 @@ pub mod server {
         2 => Ready { #[serde(flatten)] inner: Box<Ready> },
         3 => InvalidSession: Default {},
 
-        4 => PartyCreate {},
-        5 => PartyUpdate {},
+        4 => PartyCreate { #[serde(flatten)] inner: Box<Party> },
+        5 => PartyUpdate { #[serde(flatten)] inner: Box<Party> },
         6 => PartyDelete {},
 
         7 => RoleCreate {},
