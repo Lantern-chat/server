@@ -122,7 +122,7 @@ pub mod server {
 
     use models::{
         events::{Hello, Ready, TypingStart},
-        Intent, Message as RoomMessage, Party, User, UserPresence,
+        Intent, Message as RoomMessage, Party, PartyMember, User, UserPresence,
     };
 
     type Room = (); // TODO
@@ -143,15 +143,15 @@ pub mod server {
 
         4 => PartyCreate { #[serde(flatten)] inner: Box<Party> },
         5 => PartyUpdate { #[serde(flatten)] inner: Box<Party> },
-        6 => PartyDelete {},
+        6 => PartyDelete { id: Snowflake },
 
         7 => RoleCreate {},
         8 => RoleUpdate {},
         9 => RoleDelete {},
 
-        10 => MemberAdd {},
-        11 => MemberUpdate {},
-        12 => MemberRemove {},
+        10 => MemberAdd    { #[serde(flatten)] inner: Box<PartyMember> },
+        11 => MemberUpdate { #[serde(flatten)] inner: Box<PartyMember> },
+        12 => MemberRemove { #[serde(flatten)] inner: Box<PartyMember> },
 
         13 => RoomCreate { #[serde(flatten)] room: Room },
         14 => RoomUpdate { #[serde(flatten)] room: Room },
@@ -226,10 +226,22 @@ pub mod client {
 
     decl_msgs! {
         0 => Heartbeat: Default {},
-        1 => Identify { #[serde(flatten)] inner: Identify },
+        1 => Identify { #[serde(flatten)] inner: Box<Identify> },
         2 => Resume {
             session: Snowflake,
         },
-        3 => SetPresence { #[serde(flatten)] inner: SetPresence }
+        3 => SetPresence { #[serde(flatten)] inner: Box<SetPresence> }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use std::mem::size_of;
+
+        use super::*;
+
+        #[test]
+        fn test_client_msg_size() {
+            assert_eq!(16, size_of::<Message>());
+        }
     }
 }

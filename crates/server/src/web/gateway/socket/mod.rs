@@ -117,8 +117,10 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
             })
         });
 
+        // for each party that is being listened on, keep the associated cancel handle, to kill the stream if we unsub from them
         let mut listener_table = HashMap::new();
 
+        // aggregates all event streams into one
         let mut events = stream::SelectAll::<stream::BoxStream<Item>>::new();
 
         // Push Hello event to begin stream and forward ws_rx/conn_rx into events
@@ -202,6 +204,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
 
                                     match event.msg {
                                         ServerMsg::PartyCreate { ref payload, .. } => {
+                                            // this follows the same pattern as ServerMsg::Ready
                                             let subs = state
                                                 .gateway
                                                 .sub_and_activate_connection(
@@ -222,7 +225,11 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                                                     .boxed()
                                             }))
                                         }
-                                        // TODO: Party REMOVE unsubscribe
+                                        ServerMsg::PartyDelete { ref payload, .. } => {
+                                            if let Some(event_stream) = listener_table.get(&payload.id) {
+                                                event_stream.cancel();
+                                            }
+                                        }
                                         _ => {}
                                     }
                                 }
@@ -300,16 +307,23 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                     println!("Message sent!");
                 }
                 Ok(Err(e)) => {
-                    todo!("Handle errors from websocket: {}", e);
+                    log::error!("Handle errors from websocket: {}", e);
+                    break 'event_loop;
                 }
                 Err(_timeout_error) => {
-                    todo!("Force kick socket?")
+                    log::error!("Force kick socket?");
+                    break 'event_loop;
                 }
             }
         } // END 'event_loop
 
         log::trace!("Gateway event loop ended");
 
+        // if there was a user_id, that means the connection had been readied and a presence possibly set,
+        // so kick off a task that will clear the presence after 5 seconds.
+        //
+        // 5 seconds would give enough time for a page reload, so if the user starts a new connection before then
+        // we can avoid flickering presences
         if user_id.is_some() {
             let conn_id = conn.id;
             let state2 = state.clone();
@@ -322,10 +336,12 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
             });
         }
 
-        // TODO: Cleanup connection
+        // TODO: Cleanup connection, what else is there?
         tokio::join! {
+            // remove connection from gateway tables
             state.gateway.remove_connection(conn.id, user_id),
             async {
+                // un-cache permissions
                 if let Some(user_id) = user_id {
                     state.perm_cache.remove_reference(user_id).await;
                 }

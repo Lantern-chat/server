@@ -12,6 +12,7 @@ pub struct CancelableStream<S> {
     inner: S,
 }
 
+#[repr(transparent)]
 pub struct Cancel {
     canceled: Arc<AtomicBool>,
 }
@@ -44,8 +45,9 @@ where
 {
     type Item = <S as Stream>::Item;
 
+    #[inline]
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.canceled.load(Ordering::SeqCst) {
+        if self.canceled.load(Ordering::Relaxed) {
             return Poll::Ready(None);
         }
 
