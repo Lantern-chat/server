@@ -120,8 +120,8 @@ impl MainFileCache {
 
         self.map
             .retain(|_, file| match now.duration_since(file.last_checked) {
-                // retain if duration since last checked is less than 1 hour (debug) or 24 hours (release)
-                Ok(dur) => dur < Duration::from_secs(60 * 60 * if cfg!(debug_assertions) { 1 } else { 24 }),
+                // retain if duration since last checked is less than 20 minutes (debug) or 24 hours (release)
+                Ok(dur) => dur < Duration::from_secs(60 * if cfg!(debug_assertions) { 20 } else { 24 * 60 }),
                 // if checked since `now`, then don't retain (or time travel, but whatever)
                 Err(_) => false,
             })
