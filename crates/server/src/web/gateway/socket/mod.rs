@@ -301,9 +301,8 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
         }
 
         // TODO: Cleanup connection
-        // still missing per-user connection cleanup
         tokio::join! {
-            state.gateway.conns.remove(&conn.id),
+            state.gateway.remove_connection(conn.id, user_id),
             async {
                 if let Some(user_id) = user_id {
                     state.perm_cache.remove_reference(user_id).await;

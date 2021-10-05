@@ -12,7 +12,7 @@ use tokio::sync::{broadcast, mpsc, RwLock};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use schema::Snowflake;
-use util::cmap::CHashMap;
+use util::cmap::{CHashMap, EntryValue};
 
 pub type PartyId = Snowflake;
 pub type UserId = Snowflake;
@@ -138,6 +138,26 @@ impl Gateway {
 
     pub async fn add_connection(&self, conn: GatewayConnection) {
         self.conns.insert(conn.id, conn).await;
+    }
+
+    pub async fn remove_connection(&self, conn_id: Snowflake, user_id: Option<Snowflake>) {
+        self.conns.remove(&conn_id).await;
+
+        if let Some(user_id) = user_id {
+            use hashbrown::hash_map::RawEntryMut;
+
+            let EntryValue { lock, entry } = self.users.entry(&user_id).await;
+
+            if let RawEntryMut::Occupied(mut occupied) = entry {
+                let user = occupied.get_mut();
+                user.remove(&conn_id);
+                if user.is_empty() {
+                    occupied.remove();
+                }
+            }
+
+            drop(lock);
+        }
     }
 
     async fn activate_connection(&self, user_id: UserId, conn: GatewayConnection) {
