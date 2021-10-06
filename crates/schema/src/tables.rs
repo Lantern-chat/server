@@ -94,6 +94,12 @@ thorn::tables! {
         NoteB: Type::VARCHAR
     }
 
+    pub struct UserBlocks in Lantern {
+        UserId: Users::Id,
+        BlockId: Users::Id,
+        BlockedAt: Type::TIMESTAMP,
+    }
+
     pub struct Party in Lantern {
         Id: SNOWFLAKE,
         AvatarId: Files::Id,
@@ -113,6 +119,13 @@ thorn::tables! {
         SortOrder: Type::INT2,
         Nickname: Type::VARCHAR,
         CustomStatus: Type::VARCHAR,
+    }
+
+    pub struct PartyBans in Lantern {
+        PartyId: Party::Id,
+        UserId: Users::Id,
+        Reason: Type::TEXT,
+        BannedAt: Type::TIMESTAMP,
     }
 
     pub struct Subscriptions in Lantern {
