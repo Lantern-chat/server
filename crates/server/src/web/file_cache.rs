@@ -107,6 +107,18 @@ pub struct CacheEntry {
     last_checked: SystemTime,
 }
 
+#[cfg(debug_assertions)]
+impl Drop for CacheEntry {
+    fn drop(&mut self) {
+        let count = Arc::strong_count(&self.iden)
+            + Arc::strong_count(&self.brotli)
+            + Arc::strong_count(&self.gzip)
+            + Arc::strong_count(&self.deflate);
+
+        log::debug!("Dropping cached file! References: {}", count);
+    }
+}
+
 use hashbrown::HashMap;
 
 #[derive(Default)]
@@ -120,8 +132,8 @@ impl MainFileCache {
 
         self.map
             .retain(|_, file| match now.duration_since(file.last_checked) {
-                // retain if duration since last checked is less than 20 minutes (debug) or 24 hours (release)
-                Ok(dur) => dur < Duration::from_secs(60 * if cfg!(debug_assertions) { 20 } else { 24 * 60 }),
+                // retain if duration since last checked is less than 10 minutes (debug) or 24 hours (release)
+                Ok(dur) => dur < Duration::from_secs(60 * if cfg!(debug_assertions) { 10 } else { 24 * 60 }),
                 // if checked since `now`, then don't retain (or time travel, but whatever)
                 Err(_) => false,
             })
