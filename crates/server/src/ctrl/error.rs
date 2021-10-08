@@ -145,6 +145,9 @@ pub enum Error {
 
     #[error("Temporarily Disabled")]
     TemporarilyDisabled,
+
+    #[error("Unauthorized")]
+    Unauthorized,
 }
 
 impl From<db::pg::Error> for Error {
@@ -186,7 +189,9 @@ impl Error {
         }
 
         match self {
-            Error::NoSession | Error::InvalidCredentials | Error::TOTPRequired => StatusCode::UNAUTHORIZED,
+            Error::NoSession | Error::InvalidCredentials | Error::TOTPRequired | Error::Unauthorized => {
+                StatusCode::UNAUTHORIZED
+            }
             Error::TemporarilyDisabled => StatusCode::FORBIDDEN,
             Error::NotFound => StatusCode::NOT_FOUND,
             Error::BadRequest => StatusCode::BAD_REQUEST,
@@ -250,6 +255,7 @@ impl Error {
 
             // HTTP-like error codes
             Error::BadRequest               => 40400,
+            Error::Unauthorized             => 40401,
             Error::NotFound                 => 40404,
             Error::Conflict                 => 40409,
             Error::RequestEntityTooLarge    => 40413,
