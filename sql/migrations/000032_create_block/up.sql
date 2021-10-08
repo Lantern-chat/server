@@ -16,4 +16,4 @@ ALTER TABLE lantern.user_blocks ADD CONSTRAINT block_fk FOREIGN KEY (block_id)
     REFERENCES lantern.users (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
-CREATE INDEX user_block_user_idx ON lanterrn.user_blocks USING btree(user_id);
+CREATE INDEX user_block_user_idx ON lantern.user_blocks USING btree(user_id);
