@@ -15,6 +15,7 @@ pub mod processors {
     use crate::{ctrl::Error, ServerState};
 
     pub mod message_create;
+    pub mod message_delete;
     pub mod presence_update;
     pub mod typing_start;
 }
@@ -39,6 +40,9 @@ pub async fn process(
     match event.code {
         EventCode::MessageCreate => {
             processors::message_create::message_create(state, db, event.id, party_id).await?;
+        }
+        EventCode::MessageDelete => {
+            processors::message_delete::message_delete(state, db, event.id, party_id).await?;
         }
         EventCode::TypingStarted => {
             if let Some(room_id) = event.room_id {

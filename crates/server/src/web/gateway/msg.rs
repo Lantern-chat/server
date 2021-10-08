@@ -22,7 +22,7 @@ macro_rules! decl_msgs {
         }
 
         pub mod payloads { use super::*; $(
-            #[derive(Debug, Clone, Serialize, Deserialize)]
+            #[derive(Debug, Serialize, Deserialize)]
             $(#[derive($Default, PartialEq, Eq)])?
             pub struct [<$opcode Payload>] {
                 $($(#[$field_meta])* pub $field : $ty,)*
@@ -133,6 +133,15 @@ pub mod server {
         pub presence: UserPresence,
     }
 
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct MessageDeleteInner {
+        pub id: Snowflake,
+        pub room_id: Snowflake,
+
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub party_id: Option<Snowflake>,
+    }
+
     // TODO: Check that this enum doesn't grow too large, allocate large payloads like Ready
     decl_msgs! {
         0 => Hello { #[serde(flatten)] inner: Hello },
@@ -160,7 +169,7 @@ pub mod server {
 
         17 => MessageCreate { #[serde(flatten)] msg: RoomMessage },
         18 => MessageUpdate { #[serde(flatten)] msg: RoomMessage },
-        19 => MessageDelete { #[serde(flatten)] msg: RoomMessage },
+        19 => MessageDelete { #[serde(flatten)] msg: Box<MessageDeleteInner> },
 
         20 => MessageReactionAdd {},
         21 => MessageReactionRemove {},

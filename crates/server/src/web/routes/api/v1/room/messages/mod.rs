@@ -4,7 +4,7 @@ use schema::Snowflake;
 
 use crate::{ctrl::auth::Authorization, web::routes::api::ApiError};
 
-//pub mod delete;
+pub mod delete;
 pub mod get_many;
 pub mod get_one;
 //pub mod patch;
@@ -32,7 +32,8 @@ pub async fn messages(
                 //&Method::PATCH => "Edit Message".into_response(),
 
                 // DELETE /api/v1/room/1234/messages/5678
-                //&Method::DELETE => "Delete Message".into_response(),
+                &Method::DELETE => delete::delete(route, auth, room_id, msg_id).await,
+
                 _ => StatusCode::METHOD_NOT_ALLOWED.into_response(),
             },
             Some(Err(_)) => ApiError::bad_request().into_response(),
