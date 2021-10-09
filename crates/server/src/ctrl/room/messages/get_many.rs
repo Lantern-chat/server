@@ -73,41 +73,38 @@ pub async fn get_many(
         _ => limit,
     };
 
-    let stream = if had_perms {
-        let params: &[&(dyn ToSql + Sync)] = &[&room_id, &msg_id, &limit];
+    use arrayvec::ArrayVec;
+
+    let mut params: ArrayVec<&(dyn ToSql + Sync), 4> =
+        ArrayVec::from([&room_id as _, &msg_id as _, &limit as _, &auth.user_id as _]);
+
+    let query = if had_perms {
+        params.pop(); // remove auth.user_id for these queries
+
+        use MessageSearch::*;
+        const NULL: Snowflake = Snowflake::null();
 
         match form.query {
-            None | Some(MessageSearch::Before(_)) => db
-                .query_stream_cached_typed(|| query(MessageSearch::Before(Snowflake::null()), false), params)
-                .await?
-                .boxed(),
-            Some(MessageSearch::After(_)) => db
-                .query_stream_cached_typed(|| query(MessageSearch::After(Snowflake::null()), false), params)
-                .await?
-                .boxed(),
-            Some(MessageSearch::Around(_)) => db
-                .query_stream_cached_typed(|| query(MessageSearch::Around(Snowflake::null()), false), params)
-                .await?
-                .boxed(),
+            None | Some(MessageSearch::Before(_)) => {
+                db.prepare_cached_typed(|| query(Before(NULL), false)).await
+            }
+            Some(MessageSearch::After(_)) => db.prepare_cached_typed(|| query(After(NULL), false)).await,
+            Some(MessageSearch::Around(_)) => db.prepare_cached_typed(|| query(Around(NULL), false)).await,
         }
     } else {
-        let params: &[&(dyn ToSql + Sync)] = &[&room_id, &msg_id, &limit, &auth.user_id];
+        use MessageSearch::*;
+        const NULL: Snowflake = Snowflake::null();
 
         match form.query {
-            None | Some(MessageSearch::Before(_)) => db
-                .query_stream_cached_typed(|| query(MessageSearch::Before(Snowflake::null()), true), params)
-                .await?
-                .boxed(),
-            Some(MessageSearch::After(_)) => db
-                .query_stream_cached_typed(|| query(MessageSearch::After(Snowflake::null()), true), params)
-                .await?
-                .boxed(),
-            Some(MessageSearch::Around(_)) => db
-                .query_stream_cached_typed(|| query(MessageSearch::Around(Snowflake::null()), true), params)
-                .await?
-                .boxed(),
+            None | Some(MessageSearch::Before(_)) => {
+                db.prepare_cached_typed(|| query(Before(NULL), true)).await
+            }
+            Some(MessageSearch::After(_)) => db.prepare_cached_typed(|| query(After(NULL), true)).await,
+            Some(MessageSearch::Around(_)) => db.prepare_cached_typed(|| query(Around(NULL), true)).await,
         }
     };
+
+    let stream = db.query_stream(&query?, &params).await?;
 
     // for many messages from the same user in a row, avoid duplicating work of encoding user things at the cost of cloning it
     let mut last_user: Option<User> = None;
