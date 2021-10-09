@@ -582,7 +582,11 @@ impl Client {
             return Ok(stmt);
         }
 
-        let stmt = self.client.prepare(self.debug_check_readonly(query())).await?;
+        let stmt = self
+            .client
+            .prepare(self.debug_check_readonly(query()))
+            .boxed()
+            .await?;
 
         self.stmt_cache.insert(id, &stmt);
 
@@ -737,9 +741,12 @@ impl Client {
 
         log::debug!("Preparing {} query: \"{}\"", self.conn.id, query);
 
+        // this future is boxed to avoid extra growth on the stack of async functions calling this
+        // and since it's rare for this to be reached (only on startup), the allocation cost is trivial
         let stmt = self
             .client
             .prepare_typed(self.debug_check_readonly(&query), &types)
+            .boxed()
             .await?;
 
         self.stmt_cache.insert(id, &stmt);
