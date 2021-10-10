@@ -17,25 +17,30 @@ pub async fn cleanup_sessions(state: ServerState) {
 
         let now = SystemTime::now();
 
-        tokio::join! {
-            state.session_cache.cleanup(now),
-            async {
-                match state.db.write.get().await {
-                    Ok(db) => {
-                        let res = db
-                            .execute_cached(
-                                || "DELETE FROM lantern.sessions WHERE expires < $1",
-                                &[&now],
-                            )
-                            .await;
-
-                        if let Err(e) = res {
-                            log::error!("Error during session cleanup: {}", e);
-                        }
+        let db_task = async {
+            match state.db.write.get().await {
+                Ok(db) => {
+                    if let Err(e) = db.execute_cached_typed(|| query(), &[&now]).await {
+                        log::error!("Error during session cleanup: {}", e);
                     }
-                    Err(e) => log::error!("Database connection error during session cleanup: {}", e),
                 }
+                Err(e) => log::error!("Database connection error during session cleanup: {}", e),
             }
         };
+
+        tokio::join! {
+            state.session_cache.cleanup(now),
+            db_task,
+        };
     }
+}
+
+use thorn::*;
+
+fn query() -> impl AnyQuery {
+    use schema::*;
+
+    Query::delete()
+        .from::<Sessions>()
+        .and_where(Sessions::Expires.less_than(Var::of(Sessions::Expires)))
 }
