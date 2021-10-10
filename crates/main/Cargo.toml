@@ -10,6 +10,7 @@ publish = false
 [dependencies]
 db = { path = "../db" }
 server = { path = "../server" }
+util = { path = "../util" }
 
 tokio = { version = "1", features = ["full", "parking_lot"] }
 futures = "0.3"

@@ -23,6 +23,7 @@ pub mod built {
 pub mod config;
 pub mod ctrl;
 pub mod filesystem;
+pub mod metric;
 pub mod net;
 pub mod permission_cache;
 pub mod queues;
@@ -37,6 +38,7 @@ pub mod tasks {
     pub mod id_lock_cleanup;
     pub mod item_cache_cleanup;
     pub mod perm_cache_cleanup;
+    pub mod record_metrics;
     pub mod refresh_ip_bans;
     pub mod rl_cleanup;
     pub mod session_cleanup;
@@ -83,6 +85,7 @@ pub async fn start_server(
                 tokio::spawn(tasks::id_lock_cleanup::id_lock_cleanup(ts.clone())),
                 tokio::spawn(tasks::totp_cleanup::totp_cleanup(ts.clone())),
                 tokio::spawn(tasks::events::task::start(ts.clone())),
+                tokio::spawn(tasks::record_metrics::record_metrics(ts.clone())),
                 //tokio::spawn(tasks::refresh_ip_bans::refresh_ip_bans(task_state.clone())),
             )
             .map(|_| {})

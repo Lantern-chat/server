@@ -8,6 +8,22 @@ thorn::tables! {
         Migrated: Type::TIMESTAMP,
     }
 
+    pub struct Metrics in Lantern {
+        Ts: Type::TIMESTAMP,
+        Mem: Type::INT8,
+
+        Upload: Type::INT8,
+
+        Msgs: Type::INT4,
+        Reqs: Type::INT4,
+        Errs: Type::INT4,
+        Conns: Type::INT4,
+
+        P50: Type::INT2,
+        P95: Type::INT2,
+        P99: Type::INT2,
+    }
+
     pub struct EventLog in Lantern {
         /// Incrementing counter for sorting
         Counter: Type::INT8,

@@ -6,6 +6,7 @@ use tracing_subscriber::{
 };
 
 pub mod cli;
+pub mod allocator;
 
 use std::{net::SocketAddr, str::FromStr};
 

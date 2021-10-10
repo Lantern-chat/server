@@ -31,3 +31,9 @@ pub fn bytes_as_msgpack(bytes: Bytes) -> Response {
         .with_header(ContentType::from(mime::APPLICATION_MSGPACK))
         .into_response()
 }
+
+pub fn bytes_as_json(bytes: Bytes) -> Response {
+    hyper::Body::from(bytes)
+        .with_header(ContentType::json())
+        .into_response()
+}

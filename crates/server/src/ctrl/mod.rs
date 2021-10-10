@@ -65,3 +65,5 @@ pub mod file {
 pub mod cdn;
 
 pub mod util;
+
+pub mod metrics;
