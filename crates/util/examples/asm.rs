@@ -31,4 +31,10 @@ pub fn test128_to_b64(x: u128) -> SmolStr {
     util::base64::encode_u128(x)
 }
 
+#[inline(never)]
+#[no_mangle]
+pub fn format_iso8061(ts: time::PrimitiveDateTime) -> SmolStr {
+    util::time::format_iso8061(ts)
+}
+
 fn main() {}

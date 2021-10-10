@@ -22,6 +22,8 @@ pin-project = "1.0.7"
 hex = "0.4"
 base64 = "0.13.0"
 serde = "1"
+time = "0.2"
+itoa = "0.4.8"
 # strength_reduce = "0.2.3"
 
 # static_init = "1.0.1"
@@ -29,6 +31,7 @@ serde = "1"
 
 [dev-dependencies]
 criterion = "0.3"
+chrono = "0.4"
 
 [[bench]]
 name = "utils"

@@ -7,3 +7,4 @@ pub mod hex;
 pub mod laggy;
 pub mod rng;
 pub mod serde;
+pub mod time;
