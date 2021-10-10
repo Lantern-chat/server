@@ -14,7 +14,7 @@ pub async fn get_many(route: Route<crate::ServerState>, auth: Authorization, roo
     };
 
     match crate::ctrl::room::messages::get_many::get_many(route.state, auth, room_id, form).await {
-        Ok(msg) => reply::json_stream(msg).into_response(),
+        Ok(msg) => reply::json_array_stream(msg).into_response(),
         Err(e) => ApiError::err(e).into_response(),
     }
 }
