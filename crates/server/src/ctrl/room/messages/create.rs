@@ -22,7 +22,7 @@ pub async fn create_message(
     let permissions = get_cached_room_permissions(&state, auth.user_id, room_id).await?;
 
     if !permissions.room.contains(RoomPermissions::SEND_MESSAGES) {
-        return Err(Error::NotFound);
+        return Err(Error::Unauthorized);
     }
 
     let db = state.db.write.get().await?;
@@ -30,69 +30,7 @@ pub async fn create_message(
     let msg_id = Snowflake::now();
 
     let row = db
-        .query_opt_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
-
-                tables! {
-                    struct AggMsg {
-                        UserId: Users::Id,
-                        RoomId: Rooms::Id,
-                    }
-                }
-
-                let user_id_var = Var::at(Users::Id, 1);
-                let room_id_var = Var::at(Rooms::Id, 2);
-                let msg_id_var = Var::at(Messages::Id, 3);
-                let content_var = Var::at(Messages::Content, 4);
-
-                let insert = AggMsg::as_query(
-                    Query::insert()
-                        .into::<Messages>()
-                        .cols(&[
-                            Messages::Id,
-                            Messages::UserId,
-                            Messages::RoomId,
-                            Messages::Content,
-                        ])
-                        .values(vec![msg_id_var, user_id_var, room_id_var, content_var])
-                        .returning(Messages::UserId.alias_to(AggMsg::UserId))
-                        .returning(Messages::RoomId.alias_to(AggMsg::RoomId)),
-                );
-
-                let roles = Query::select()
-                    .expr(Builtin::array_agg(RoleMembers::RoleId))
-                    .from(RoleMembers::inner_join_table::<Roles>().on(RoleMembers::RoleId.equals(Roles::Id)))
-                    .and_where(RoleMembers::UserId.equals(AggMsg::UserId))
-                    .and_where(Roles::PartyId.equals(Party::Id));
-
-                Query::with()
-                    .with(insert)
-                    .select()
-                    .col(Party::Id)
-                    .col(PartyMember::Nickname)
-                    .expr(roles.as_value())
-                    .cols(&[
-                        Users::Username,
-                        Users::Discriminator,
-                        Users::Flags,
-                        Users::CustomStatus,
-                        Users::Biography,
-                    ])
-                    .from_table::<Users>()
-                    .from(
-                        PartyMember::right_join(
-                            Party::right_join_table::<Rooms>().on(Party::Id.equals(Rooms::PartyId)),
-                        )
-                        .on(PartyMember::PartyId.equals(Party::Id)),
-                    )
-                    .and_where(Rooms::Id.equals(AggMsg::RoomId))
-                    .and_where(Users::Id.equals(AggMsg::UserId))
-                    .and_where(PartyMember::UserId.equals(AggMsg::UserId))
-            },
-            &[&auth.user_id, &room_id, &msg_id, &form.content],
-        )
+        .query_opt_cached_typed(|| query(), &[&auth.user_id, &room_id, &msg_id, &form.content])
         .await?;
 
     let row = match row {
@@ -137,4 +75,64 @@ pub async fn create_message(
         attachments: Vec::new(),
         embeds: Vec::new(),
     })
+}
+
+use thorn::*;
+
+fn query() -> impl AnyQuery {
+    use schema::*;
+
+    tables! {
+        struct AggMsg {
+            UserId: Users::Id,
+            RoomId: Rooms::Id,
+        }
+    }
+
+    let user_id_var = Var::at(Users::Id, 1);
+    let room_id_var = Var::at(Rooms::Id, 2);
+    let msg_id_var = Var::at(Messages::Id, 3);
+    let content_var = Var::at(Messages::Content, 4);
+
+    let insert = AggMsg::as_query(
+        Query::insert()
+            .into::<Messages>()
+            .cols(&[
+                Messages::Id,
+                Messages::UserId,
+                Messages::RoomId,
+                Messages::Content,
+            ])
+            .values(vec![msg_id_var, user_id_var, room_id_var, content_var])
+            .returning(Messages::UserId.alias_to(AggMsg::UserId))
+            .returning(Messages::RoomId.alias_to(AggMsg::RoomId)),
+    );
+
+    let roles = Query::select()
+        .expr(Builtin::array_agg(RoleMembers::RoleId))
+        .from(RoleMembers::inner_join_table::<Roles>().on(RoleMembers::RoleId.equals(Roles::Id)))
+        .and_where(RoleMembers::UserId.equals(AggMsg::UserId))
+        .and_where(Roles::PartyId.equals(Party::Id));
+
+    Query::with()
+        .with(insert)
+        .select()
+        .col(Party::Id)
+        .col(PartyMember::Nickname)
+        .expr(roles.as_value())
+        .cols(&[
+            Users::Username,
+            Users::Discriminator,
+            Users::Flags,
+            Users::CustomStatus,
+            Users::Biography,
+        ])
+        .from_table::<Users>()
+        .from(
+            PartyMember::right_join(Party::right_join_table::<Rooms>().on(Party::Id.equals(Rooms::PartyId)))
+                .on(PartyMember::PartyId.equals(Party::Id)),
+        )
+        .and_where(Rooms::Id.equals(AggMsg::RoomId))
+        .and_where(Users::Id.equals(AggMsg::UserId))
+        .and_where(PartyMember::UserId.equals(AggMsg::UserId))
 }
