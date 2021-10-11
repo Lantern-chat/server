@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS lantern.metrics (
     p50     smallint    NOT NULL,
     p95     smallint    NOT NULL,
     p99     smallint    NOT NULL,
+
+    CONSTRAINT metrics_pk PRIMARY KEY (ts)
 );
 ALTER TABLE lantern.metrics OWNER TO postgres;
 
