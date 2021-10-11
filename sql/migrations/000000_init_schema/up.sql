@@ -3,7 +3,8 @@
 CREATE SCHEMA lantern;
 ALTER SCHEMA lantern OWNER TO postgres;
 
--- ALTER SYSTEM SET enable_seqscan = 1;
+ALTER SYSTEM SET enable_seqscan = 1;
+ALTER SYSTEM SET jit = 0; -- honestly buggy, and we never create insane queries that need it anyway
 ALTER SYSTEM SET random_page_cost = 1; -- Database on SSD
 SELECT pg_reload_conf();
 

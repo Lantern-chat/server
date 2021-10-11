@@ -79,7 +79,7 @@ BEGIN
         last_notif, max_interval
     INTO
         _last_notif, _max_interval
-    FROM lantern.event_log_last_notification;
+    FROM lantern.event_log_last_notification FETCH FIRST ROW ONLY;
 
     IF (_now - _last_notif) >= _max_interval THEN
         PERFORM pg_notify('event_log', (NEW.id)::text);
@@ -90,5 +90,6 @@ BEGIN
 END
 $$;
 
+DROP TRIGGER IF EXISTS event_log_notify ON lantern.event_log CASCADE;
 CREATE TRIGGER event_log_notify AFTER INSERT ON lantern.event_log
 FOR EACH ROW EXECUTE FUNCTION lantern.ev_notify();
