@@ -19,6 +19,6 @@ pub fn is_of_age(min_age: i64, now: SystemTime, dob: NaiveDate) -> bool {
     days >= min_age * 365
 }
 
-pub fn format_naivedatetime(dt: NaiveDateTime) -> String {
-    DateTime::<Utc>::from_utc(dt, Utc).to_rfc3339_opts(SecondsFormat::Millis, true)
-}
+//pub fn format_naivedatetime(dt: NaiveDateTime) -> String {
+//    DateTime::<Utc>::from_utc(dt, Utc).to_rfc3339_opts(SecondsFormat::Millis, true)
+//}

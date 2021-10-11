@@ -121,9 +121,7 @@ pub async fn get_many(
                 created_at: msg_id.format_timestamp(),
                 room_id,
                 flags: MessageFlags::from_bits_truncate(row.try_get(10)?),
-                edited_at: row
-                    .try_get::<_, Option<chrono::NaiveDateTime>>(9)?
-                    .map(crate::util::time::format_naivedatetime),
+                edited_at: row.try_get::<_, Option<_>>(9)?.map(util::time::format_iso8061),
                 content: row.try_get(11)?,
                 author: {
                     let id = row.try_get(1)?;

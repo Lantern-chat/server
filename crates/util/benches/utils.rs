@@ -40,7 +40,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 criterion_group!(benches, criterion_benchmark);
 criterion_main!(benches);
 
-use chrono::{Date, DateTime, Datelike, NaiveDate, NaiveDateTime, SecondsFormat, Utc};
+use chrono::{DateTime, NaiveDateTime, SecondsFormat, Utc};
 
 pub fn format_naivedatetime(dt: NaiveDateTime) -> String {
     DateTime::<Utc>::from_utc(dt, Utc).to_rfc3339_opts(SecondsFormat::Millis, true)

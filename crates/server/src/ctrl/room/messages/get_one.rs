@@ -48,9 +48,7 @@ pub async fn get_one(
         created_at: msg_id.format_timestamp(),
         room_id,
         flags: MessageFlags::from_bits_truncate(row.try_get(9)?),
-        edited_at: row
-            .try_get::<_, Option<chrono::NaiveDateTime>>(8)?
-            .map(crate::util::time::format_naivedatetime),
+        edited_at: row.try_get::<_, Option<_>>(8)?.map(util::time::format_iso8061),
         content: row.try_get(10)?,
         author: User {
             id: row.try_get(0)?,

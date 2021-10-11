@@ -10,14 +10,17 @@ impl fmt::Display for AuthToken {
     }
 }
 
+// (4 * bytes) / 4, rounded up to nearest multiple of 4 for padding
 const fn base64bytes(bytes: usize) -> usize {
     ((4 * bytes / 3) + 3) & !3
 }
 
 impl AuthToken {
-    pub const TOKEN_LEN: usize = 21; // produces 31 characters of base64 exactly, no padding
+    pub const TOKEN_LEN: usize = 21; // produces 28 characters of base64 exactly, no padding
     pub const CHAR_LEN: usize = base64bytes(Self::TOKEN_LEN);
 }
+
+pub type SmolToken = arrayvec::ArrayString<{ AuthToken::CHAR_LEN }>;
 
 impl AuthToken {
     /// Generate a new random auth token using a cryptographically secure random number generator
@@ -33,8 +36,16 @@ impl AuthToken {
     }
 
     /// Encode the auth token as a base-64 string
-    pub fn encode(&self) -> String {
-        base64::encode(&self.0)
+    pub fn encode(&self) -> SmolToken {
+        let mut bytes = [0; Self::CHAR_LEN];
+
+        // len is unneeded since we know it will encode to the exact number of bytes
+        base64::encode_config_slice(&self.0, base64::STANDARD, &mut bytes);
+
+        match SmolToken::from_byte_string(&bytes) {
+            Ok(s) => s,
+            Err(_) => unsafe { std::hint::unreachable_unchecked() },
+        }
     }
 }
 

@@ -8,7 +8,7 @@ use std::{
 
 use std::num::NonZeroU64;
 
-use chrono::{DateTime, Utc};
+use time::PrimitiveDateTime;
 
 /**
     Snowflakes are a UUID-like system designed to embed timestamp information in a monotonic format.
@@ -40,13 +40,14 @@ impl Snowflake {
     }
 
     #[inline]
-    pub fn timestamp(&self) -> DateTime<Utc> {
-        DateTime::<Utc>::from(self.system_timestamp())
+    #[allow(deprecated)]
+    pub fn timestamp(&self) -> PrimitiveDateTime {
+        PrimitiveDateTime::unix_epoch() + Duration::from_millis(self.epoch_ms())
     }
 
-    pub fn format_timestamp(&self) -> String {
-        self.timestamp()
-            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+    #[inline]
+    pub fn format_timestamp(&self) -> SmolStr {
+        util::time::format_iso8061(self.timestamp())
     }
 
     #[inline]

@@ -59,10 +59,10 @@ pub async fn get_members(
                     preferences: None,
                     avatar: encrypt_snowflake_opt(&state, row.try_get(9)?),
                 }),
-                presence: match row.try_get::<_, Option<chrono::NaiveDateTime>>(7)? {
+                presence: match row.try_get::<_, Option<_>>(7)? {
                     None => None,
                     Some(updated_at) => Some(UserPresence {
-                        updated_at: Some(crate::util::time::format_naivedatetime(updated_at)),
+                        updated_at: Some(util::time::format_iso8061(updated_at)),
                         flags: UserPresenceFlags::from_bits_truncate(row.try_get(6)?),
                         activity: match row.try_get::<_, Option<serde_json::Value>>(8)? {
                             None => None,

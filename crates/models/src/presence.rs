@@ -17,7 +17,7 @@ pub struct UserPresence {
 
     /// Updated-At timestamp as ISO-8061
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub updated_at: Option<String>,
+    pub updated_at: Option<SmolStr>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub activity: Option<AnyActivity>,
