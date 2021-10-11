@@ -60,3 +60,27 @@ pub async fn trigger_typing(
 
     Ok(())
 }
+
+/*
+use thorn::*;
+fn query() -> impl AnyQuery {
+    use schema::*;
+
+    let user_id_var = Var::at(Users::Id, 1);
+    let room_id_var = Var::at(Rooms::Id, 2);
+
+    Query::insert()
+        .into::<EventLog>()
+        .cols(&[EventLog::Code, EventLog::Id, EventLog::PartyId, EventLog::RoomId])
+        .query(
+            Query::select()
+                .from(Rooms::left_join_table::<Party>().on(Party::Id.equals(Rooms::PartyId)))
+                .expr(EventCode::TypingStarted)
+                .expr(user_id_var)
+                .expr(Party::Id)
+                .expr(Rooms::Id)
+                .and_where(Rooms::Id.equals(room_id_var))
+                .as_value(),
+        )
+}
+ */
