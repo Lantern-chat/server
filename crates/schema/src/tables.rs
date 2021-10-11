@@ -10,14 +10,14 @@ thorn::tables! {
 
     pub struct Metrics in Lantern {
         Ts: Type::TIMESTAMP,
-        Mem: Type::INT8,
 
+        Mem: Type::INT8,
         Upload: Type::INT8,
 
-        Msgs: Type::INT4,
         Reqs: Type::INT4,
         Errs: Type::INT4,
         Conns: Type::INT4,
+        Events: Type::INT4,
 
         P50: Type::INT2,
         P95: Type::INT2,

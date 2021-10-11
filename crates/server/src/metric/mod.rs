@@ -45,6 +45,8 @@ pub struct MemoryMetrics {
 pub struct ApiMetrics {
     pub reqs: Counter,
     pub errs: Counter,
+    pub events: Counter,
+    pub upload: Counter,
     pub histogram: LatencyHistogram,
 }
 

@@ -25,10 +25,10 @@ pub async fn record_metrics(state: ServerState) {
                 &[
                     &metrics.mem,
                     &metrics.upload,
-                    &metrics.msgs,
                     &metrics.reqs,
                     &metrics.errs,
                     &metrics.conns,
+                    &metrics.events,
                     &metrics.p50,
                     &metrics.p95,
                     &metrics.p99,
@@ -53,10 +53,10 @@ fn query() -> impl AnyQuery {
     const COLS: &[Metrics] = &[
         Metrics::Mem,
         Metrics::Upload,
-        Metrics::Msgs,
         Metrics::Reqs,
         Metrics::Errs,
         Metrics::Conns,
+        Metrics::Events,
         Metrics::P50,
         Metrics::P95,
         Metrics::P99,

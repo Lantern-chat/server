@@ -102,8 +102,11 @@ impl Gateway {
                 for conn in users.values() {
                     if let Err(e) = conn.tx.try_send(event.clone()) {
                         log::warn!("Could not send message to user connection: {}", e);
+
                         conn.is_active.store(false, std::sync::atomic::Ordering::Relaxed);
                         conn.kill.notify_waiters();
+
+                        crate::metric::API_METRICS.load().errs.add(1);
 
                         // TODO: Better handling of this
                     }
@@ -113,12 +116,16 @@ impl Gateway {
             if let Some(party) = self.parties.get(&id).await {
                 log::debug!("Sending event to party tx: {}", id);
                 if let Err(e) = party.tx.send(event) {
-                    log::error!("Could not broadcast to party: {}", e);
+                    crate::metric::API_METRICS.load().errs.add(1);
+
+                    return log::error!("Could not broadcast to party: {}", e);
                 }
             } else {
                 log::warn!("Could not find party {}!", id);
             }
         }
+
+        crate::metric::API_METRICS.load().events.add(1);
     }
 
     /// After identifying, a connection can be added to active subscriptions

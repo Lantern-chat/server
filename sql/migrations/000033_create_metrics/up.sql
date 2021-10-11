@@ -3,18 +3,17 @@ CREATE TABLE IF NOT EXISTS lantern.metrics (
 
     -- allocated memory usage, in bytes
     mem     bigint      NOT NULL,
-
     -- bytes uploaded by users since last metric
     upload  bigint      NOT NULL,
 
-    -- number of messages since last metric
-    msgs    int      NOT NULL,
     -- requests since last metric
-    reqs    int      NOT NULL,
+    reqs    int         NOT NULL,
     -- errors since last metric
-    errs    int      NOT NULL,
+    errs    int         NOT NULL,
     -- number of connected gateway users
-    conns   int      NOT NULL,
+    conns   int         NOT NULL,
+    -- number of gateway events since last metric
+    events  int         NOT NULL,
 
     -- latency percentiles
     p50     smallint    NOT NULL,
