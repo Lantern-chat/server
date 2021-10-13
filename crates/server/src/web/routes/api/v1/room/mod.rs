@@ -13,7 +13,7 @@ pub mod typing;
 pub async fn room(mut route: Route<crate::ServerState>) -> Response {
     let auth = match authorize(&route).await {
         Ok(auth) => auth,
-        Err(_err) => return StatusCode::UNAUTHORIZED.into_response(),
+        Err(e) => return ApiError::err(e).into_response(),
     };
 
     // ANY /api/v1/room/1234

@@ -25,7 +25,7 @@ pub async fn post_room(
 ) -> Response {
     let form = match body::any::<RoomCreateForm, _>(&mut route).await {
         Ok(form) => form,
-        Err(e) => return StatusCode::BAD_REQUEST.into_response(),
+        Err(e) => return ApiError::bad_request().into_response(),
     };
 
     match create_room(route.state, form, auth, party_id).await {
@@ -35,10 +35,7 @@ pub async fn post_room(
                 log::error!("Room Create Error: {}", e);
                 StatusCode::INTERNAL_SERVER_ERROR.into_response()
             }
-            _ => e
-                .to_string()
-                .with_status(StatusCode::BAD_REQUEST)
-                .into_response(),
+            _ => ApiError::err(e).into_response(),
         },
     }
 }

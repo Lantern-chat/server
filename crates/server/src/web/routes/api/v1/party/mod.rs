@@ -43,7 +43,7 @@ pub async fn party(mut route: Route<crate::ServerState>) -> Response {
 
                 _ => ApiError::not_found().into_response(),
             },
-            _ => return StatusCode::BAD_REQUEST.into_response(),
+            _ => return ApiError::bad_request().into_response(),
         },
 
         _ => ApiError::not_found().into_response(),
