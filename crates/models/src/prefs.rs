@@ -248,7 +248,7 @@ impl UserPreference {
 
     fn is_default(self, value: &Value) -> bool {
         match self {
-            Self::Flags => value.as_u64() == Some(UserPrefsFlags::all().bits() as u64),
+            Self::Flags => value.as_u64() == Some(UserPrefsFlags::DEFAULT_FLAGS.bits() as u64),
             Self::ChatFontSize | Self::UIFontSize => value.as_f64() == Some(1.0),
             Self::Temp => value.as_f64() == Some(7500.0),
             Self::FriendAdd => value.as_u64() == Some(3),
