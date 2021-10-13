@@ -38,16 +38,39 @@ pub enum Font {
     __MAX_FONT,
 }
 
+bitflags::bitflags! {
+    pub struct UserPrefsFlags: i32 {
+        /// Reduce movement and animations in the UI
+        const REDUCE_ANIMATIONS = 1 << 0;
+        /// Pause animations on window unfocus
+        const UNFOCUS_PAUSE = 1 << 1;
+        const LIGHT_MODE = 1 << 2;
+
+        /// Allow direct messages from shared server memmbers
+        const ALLOW_DMS = 1 << 3;
+        /// Show small lines between message groups
+        const GROUP_LINES = 1 << 4;
+
+        // give some space for other flags, and possibly switching compact view out for more options (multiple view types)
+        const COMPACT_VIEW = 1 << 9;
+        const DEVELOPER_MODE = 1 << 15;
+
+        const DEFAULT_FLAGS = Self::ALLOW_DMS.bits | Self::GROUP_LINES.bits;
+    }
+}
+
+serde_shims::impl_serde_for_bitflags!(UserPrefsFlags);
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Hash, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum UserPreference {
     Locale,
 
+    Flags,
+
     /*
         PRIVACY
     */
-    /// Allow DMs from server members
-    AllowDms,
     /// Who can add you as a friend,
     /// number 0-3 where 0 = no one, 1 = friends of friends, 2 = server members, 3 = anyone
     FriendAdd,
@@ -55,20 +78,12 @@ pub enum UserPreference {
     /*
         ACCESSIBILITY
     */
-    /// Reduce animations
-    ReduceAnim,
-    /// Pause media/GIFs when window/tab is unfocused
-    UnfocusPause,
 
     /*
         APPEARANCE
     */
-    /// Light-theme toggle
-    Light,
     /// Color temperature
     Temp,
-    /// Compact chat view
-    Compact,
     /// Chat font
     ChatFont,
     /// UI Font
@@ -85,9 +100,6 @@ pub enum UserPreference {
     /*
         Advanced
     */
-    /// Whether to enable certain dev features such as copy-id
-    DevMode,
-
     #[serde(other)]
     InvalidField,
 }
@@ -179,13 +191,15 @@ impl UserPreference {
                 }
                 _ => false,
             },
-            // These are all just booleans
-            Self::AllowDms
-            | Self::ReduceAnim
-            | Self::UnfocusPause
-            | Self::Light
-            | Self::Compact
-            | Self::DevMode => value.is_boolean(),
+            Self::Flags => match value.as_u64() {
+                Some(value) => {
+                    kind = UserPreferenceErrorKind::InvalidValue;
+
+                    // contained within 2^32 AND a valid flag
+                    value <= (u32::MAX as u64) && UserPrefsFlags::from_bits(value as i32).is_some()
+                }
+                _ => false,
+            },
             // Color temperature in kelvin degrees
             Self::Temp => match value.as_f64() {
                 Some(temp) => {
@@ -234,10 +248,7 @@ impl UserPreference {
 
     fn is_default(self, value: &Value) -> bool {
         match self {
-            Self::Light | Self::ReduceAnim | Self::UnfocusPause | Self::Compact | Self::DevMode => {
-                *value == Value::Bool(false)
-            }
-            Self::AllowDms => *value == Value::Bool(true),
+            Self::Flags => value.as_u64() == Some(UserPrefsFlags::all().bits() as u64),
             Self::ChatFontSize | Self::UIFontSize => value.as_f64() == Some(1.0),
             Self::Temp => value.as_f64() == Some(7500.0),
             Self::FriendAdd => value.as_u64() == Some(3),
