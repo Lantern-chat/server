@@ -19,6 +19,12 @@ pub async fn create_message(
     room_id: Snowflake,
     form: CreateMessageForm,
 ) -> Result<Message, Error> {
+    let trimmed_content = form.content.trim();
+
+    if trimmed_content.is_empty() {
+        return Err(Error::BadRequest);
+    }
+
     let permissions = get_cached_room_permissions(&state, auth.user_id, room_id).await?;
 
     if !permissions.room.contains(RoomPermissions::SEND_MESSAGES) {
@@ -30,7 +36,7 @@ pub async fn create_message(
     let msg_id = Snowflake::now();
 
     let row = db
-        .query_opt_cached_typed(|| query(), &[&auth.user_id, &room_id, &msg_id, &form.content])
+        .query_opt_cached_typed(|| query(), &[&auth.user_id, &room_id, &msg_id, &trimmed_content])
         .await?;
 
     let row = match row {
