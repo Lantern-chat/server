@@ -50,6 +50,7 @@ bitflags::bitflags! {
         const ALLOW_DMS = 1 << 3;
         /// Show small lines between message groups
         const GROUP_LINES = 1 << 4;
+        const HIDE_AVATARS = 1 << 5;
 
         // give some space for other flags, and possibly switching compact view out for more options (multiple view types)
         const COMPACT_VIEW = 1 << 9;
