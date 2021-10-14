@@ -96,6 +96,8 @@ pub enum UserPreference {
     TabSize,
     /// Time format
     TimeFormat,
+    /// Group padding
+    Pad,
 
     /*
         Advanced
@@ -149,9 +151,18 @@ impl UserPreferences {
         self.0.retain(|field, value| field.validate(value).is_ok())
     }
 
+    pub fn flags(&self) -> UserPrefsFlags {
+        match self.0.get(&UserPreference::Flags).and_then(Value::as_u64) {
+            Some(value) => UserPrefsFlags::from_bits_truncate(value as _),
+            None => UserPrefsFlags::DEFAULT_FLAGS,
+        }
+    }
+
     pub fn nullify_defaults(&mut self) {
+        let flags = self.flags();
+
         for (field, value) in self.0.iter_mut() {
-            if field.is_default(value) {
+            if field.is_default(value, flags) {
                 *value = Value::Null;
             }
         }
@@ -237,6 +248,13 @@ impl UserPreference {
                 }
                 _ => false,
             },
+            Self::Pad => match value.as_u64() {
+                Some(value) => {
+                    kind = UserPreferenceErrorKind::InvalidValue;
+                    value <= 32
+                }
+                _ => false,
+            },
         };
 
         if !valid_type {
@@ -246,7 +264,7 @@ impl UserPreference {
         }
     }
 
-    fn is_default(self, value: &Value) -> bool {
+    fn is_default(self, value: &Value, flags: UserPrefsFlags) -> bool {
         match self {
             Self::Flags => value.as_u64() == Some(UserPrefsFlags::DEFAULT_FLAGS.bits() as u64),
             Self::ChatFontSize | Self::UIFontSize => value.as_f64() == Some(1.0),
@@ -255,6 +273,15 @@ impl UserPreference {
             Self::Locale => value.as_u64() == Some(Locale::enUS as u64),
             Self::ChatFont | Self::UiFont => value.as_u64() == Some(0),
             Self::TabSize => value.as_u64() == Some(4),
+            Self::Pad => {
+                let value = value.as_u64();
+
+                if flags.contains(UserPrefsFlags::COMPACT_VIEW) {
+                    value == Some(0)
+                } else {
+                    value == Some(16)
+                }
+            }
             _ => false,
         }
     }
