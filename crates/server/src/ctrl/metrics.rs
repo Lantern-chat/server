@@ -73,10 +73,15 @@ use crate::ctrl::Error;
 //         .await?;
 // }
 
-#[derive(Debug, Default, Clone, Copy, Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize)]
 pub struct MetricsOptions {
     #[serde(default)]
     pub resolution: Option<u64>,
+
+    #[serde(default)]
+    pub start: Option<SmolStr>,
+    #[serde(default)]
+    pub end: Option<SmolStr>,
 }
 
 #[allow(deprecated)]
@@ -84,18 +89,37 @@ pub async fn get_metrics(
     state: ServerState,
     options: MetricsOptions,
 ) -> Result<impl Stream<Item = Result<(SmolStr, FloatMetrics), Error>>, Error> {
-    let db = state.db.read.get().await?;
-
     let minute_resolution = match options.resolution {
         Some(res) if res > 5 => res as i64,
         _ => 5,
     };
 
-    let second_resolution = minute_resolution * 60;
+    let secs = minute_resolution * 60;
 
-    let stream = db
-        .query_stream_cached_typed(|| query(), &[&second_resolution])
-        .await?;
+    let start = options.start.and_then(|s| util::time::parse_iso8061(&s));
+    let end = options.end.and_then(|s| util::time::parse_iso8061(&s));
+
+    let db = state.db.read.get().await?;
+
+    //#[rustfmt::skip]
+    let stream = match (start, end) {
+        (None, None) => db
+            .query_stream_cached_typed(|| query(false, false), &[&secs])
+            .await?
+            .boxed(),
+        (Some(start), Some(end)) => db
+            .query_stream_cached_typed(|| query(true, true), &[&secs, &start, &end])
+            .await?
+            .boxed(),
+        (Some(start), None) => db
+            .query_stream_cached_typed(|| query(true, false), &[&secs, &start])
+            .await?
+            .boxed(),
+        (None, Some(end)) => db
+            .query_stream_cached_typed(|| query(false, true), &[&secs, &end])
+            .await?
+            .boxed(),
+    };
 
     Ok(stream.map(|row| match row {
         Err(e) => Err(e.into()),
@@ -120,7 +144,7 @@ pub async fn get_metrics(
 
 use thorn::*;
 
-fn query() -> impl AnyQuery {
+fn query(start: bool, end: bool) -> impl AnyQuery {
     use schema::*;
 
     const AVG_COLS: &[(Metrics, bool)] = &[
@@ -136,6 +160,8 @@ fn query() -> impl AnyQuery {
     ];
 
     let resolution = Var::at(Type::INT8, 1);
+    let first_ts = Var::at(Metrics::Ts, 2);
+    let second_ts = Var::at(Metrics::Ts, 3);
 
     let rounded_ts = Builtin::round(
         Call::custom("date_part")
@@ -147,7 +173,7 @@ fn query() -> impl AnyQuery {
     .rename_as("rounded_ts")
     .unwrap();
 
-    Query::select()
+    let query = Query::select()
         .from_table::<Metrics>()
         .group_by(rounded_ts.reference())
         .expr(rounded_ts)
@@ -158,5 +184,16 @@ fn query() -> impl AnyQuery {
                 Builtin::avg(*col)
             }
             .cast(Type::FLOAT4)
-        }))
+        }));
+
+    match (start, end) {
+        (false, false) => query,
+        (true, false) => query.and_where(Metrics::Ts.greater_than_equal(first_ts)),
+        (false, true) => query.and_where(Metrics::Ts.less_than(first_ts)),
+        (true, true) => query.and_where(
+            Metrics::Ts
+                .greater_than_equal(first_ts)
+                .and(Metrics::Ts.less_than(second_ts)),
+        ),
+    }
 }
