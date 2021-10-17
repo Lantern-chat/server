@@ -27,7 +27,7 @@ pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
             .into_response(),
 
         (&Method::GET | &Method::HEAD, Exact("favicon.ico")) => {
-            fs::file(&route, "frontend/dist/favicon.ico", &route.state.file_cache)
+            fs::file(&route, "frontend/assets/favicon.ico", &route.state.file_cache)
                 .boxed()
                 .await
                 .into_response()
