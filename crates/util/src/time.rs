@@ -4,7 +4,7 @@ use time::{Date, PrimitiveDateTime, Time};
 
 use smol_str::SmolStr;
 
-use itoa::Buffer;
+//use itoa::Buffer;
 
 /*
 #[rustfmt::skip]
@@ -28,6 +28,27 @@ pub fn format_iso8061_old(ts: PrimitiveDateTime) -> SmolStr {
 }
 */
 
+trait FastFormat {
+    unsafe fn write(self, buf: *mut u8);
+}
+
+macro_rules! impl_ff {
+    ($($t:ty),*) => {$(
+        impl FastFormat for $t {
+            #[inline]
+            unsafe fn write(mut self, mut buf: *mut u8) {
+                while self > 0 {
+                    buf = buf.sub(1);
+                    *buf = (self % 10) as u8 + b'0';
+                    self /= 10;
+                }
+            }
+        }
+    )*}
+}
+
+impl_ff!(u8, u16);
+
 pub fn format_iso8061(ts: PrimitiveDateTime) -> SmolStr {
     let (date, time) = (ts.date(), ts.time());
 
@@ -41,30 +62,53 @@ pub fn format_iso8061(ts: PrimitiveDateTime) -> SmolStr {
     let mut buf: [u8; 20] = *b"00000000T000000.000Z";
 
     macro_rules! write_num {
-        ($s: expr, $len: expr) => {{
+        ($s: expr, $len: expr, $max: expr) => {{
             // NOTE: This likely is coalesced with the += 1's below
-            pos += $len; // skip to end, then go back in the ptr below to pad with zeroes
+            //pos += $len; // skip to end, then go back in the ptr below to pad with zeroes
 
-            let mut num = Buffer::new();
-            let s = num.format($s);
+            let value = $s;
+
+            debug_assert!(value <= $max);
+            if value > $max {
+                unsafe { std::hint::unreachable_unchecked() }
+            }
+
+            pos += $len;
+            unsafe { value.write(buf.as_mut_ptr().add(pos)) }
+            //pos += 1;
+
+            if pos > 19 {
+                unsafe { std::hint::unreachable_unchecked() }
+            }
+
+            /*
+            let mut num_buffer = Buffer::new();
+            let s = num_buffer.format(value);
 
             unsafe {
                 buf.as_mut_ptr()
                     .add(pos - s.len())
                     .copy_from_nonoverlapping(s.as_ptr(), s.len())
             }
+             */
         }};
     }
 
-    write_num!(year, 4);
-    write_num!(month, 2);
-    write_num!(day, 2);
+    write_num!(year as u16, 4, 9999);
+    write_num!(month, 2, 12);
+    write_num!(day, 2, 31);
     pos += 1; // T
-    write_num!(hour, 2);
-    write_num!(minute, 2);
-    write_num!(second, 2);
+    write_num!(hour, 2, 59);
+    write_num!(minute, 2, 59);
+    write_num!(second, 2, 59);
     pos += 1; // .
-    write_num!(milliseconds, 3);
+    write_num!(milliseconds, 3, 999);
+
+    debug_assert_eq!(pos, 19);
+
+    if pos != 19 {
+        unsafe { std::hint::unreachable_unchecked() }
+    }
 
     SmolStr::new_inline(unsafe { std::str::from_utf8_unchecked(&buf) })
 }
@@ -182,26 +226,73 @@ pub fn parse_iso8061_old(ts: &str) -> Option<PrimitiveDateTime> {
 }
  */
 
+/// Trait implemented locally for very fast parsing of small unsigned integers
 trait FastParse: Sized {
     fn parse(s: &[u8]) -> Option<Self>;
+}
+
+#[inline]
+pub fn parse_2(s: &[u8]) -> u16 {
+    let zero: u16 = 0x3030;
+
+    let mut buf = [0; 2];
+    buf.copy_from_slice(s);
+
+    let digits = u16::from_le_bytes(buf).wrapping_sub(zero);
+
+    //println!("DIGITS: {:04X}", digits);
+
+    ((digits & 0x0f00) >> 8) + ((digits & 0x0f) * 10)
+}
+
+#[inline]
+pub fn parse_4(s: &[u8]) -> u16 {
+    let zero: u32 = 0x30303030;
+
+    let mut buf = [0; 4];
+    buf.copy_from_slice(s);
+
+    let mut digits = u32::from_le_bytes(buf).wrapping_sub(zero);
+    digits = ((digits & 0x0f000f00) >> 8) + ((digits & 0x000f000f) * 10);
+    digits = ((digits & 0x00ff00ff) >> 16) + ((digits & 0x000000ff) * 100);
+    digits as u16
+}
+
+#[inline]
+pub fn parse_3(s: &[u8]) -> u16 {
+    let mut buf = [b'0'; 4];
+    buf[1..4].copy_from_slice(s);
+
+    parse_4(&buf)
 }
 
 macro_rules! impl_fp {
     ($($t:ty),*) => {$(
         impl FastParse for $t {
+            #[inline]
             fn parse(s: &[u8]) -> Option<Self> {
-                let mut base = 0;
-
-                for byte in s {
-                    let digit = match byte {
-                        b'0'..=b'9' => byte - b'0',
-                        _ => return None,
-                    };
-
-                    base = (base * 10) + digit as $t;
+                match s.len() {
+                    2 => return Some(parse_2(s) as $t),
+                    4 => return Some(parse_4(s) as $t),
+                    3 => return Some(parse_3(s) as $t),
+                    //1 => return Some((s[0].wrapping_sub(b'0')) as $t),
+                    _ => {}
                 }
 
-                Some(base)
+
+                let mut num = 0;
+                let mut overflow = false;
+
+                for byte in s {
+                    let digit = byte.wrapping_sub(b'0');
+                    overflow |= digit > 9;
+                    num = (num * 10) + digit as $t;
+                }
+
+                match overflow {
+                    false => Some(num),
+                    true => None,
+                }
             }
         }
     )*};
@@ -212,6 +303,7 @@ impl_fp!(u8, u16, u32);
 pub fn parse_iso8061(ts: &str) -> Option<PrimitiveDateTime> {
     let b = ts.as_bytes();
 
+    #[inline]
     fn parse_offset<T: FastParse>(b: &[u8], offset: usize, len: usize) -> Option<T> {
         b.get(offset..(offset + len)).and_then(|x| T::parse(x))
     }
@@ -236,6 +328,11 @@ pub fn parse_iso8061(ts: &str) -> Option<PrimitiveDateTime> {
     offset += 2; // DD
 
     //println!("DAY: {}", day);
+
+    // only parsed 4 digits
+    if year > 9999 {
+        unsafe { std::hint::unreachable_unchecked() }
+    }
 
     let ymd = Date::try_from_ymd(year as i32, month, day).ok()?;
 
@@ -269,6 +366,11 @@ pub fn parse_iso8061(ts: &str) -> Option<PrimitiveDateTime> {
             if b.get(offset).copied() == Some(b'.') {
                 let millisecond = parse_offset::<u16>(b, offset + 1, 3)?;
                 offset += 4;
+
+                // only parsed 3 digits
+                if millisecond > 999 {
+                    unsafe { std::hint::unreachable_unchecked() }
+                }
 
                 maybe_time = Time::try_from_hms_milli(hour, minute, second, millisecond)
             } else {
@@ -399,5 +501,26 @@ mod tests {
 
             println!("{:?}", parsed.unwrap());
         }
+    }
+
+    #[test]
+    fn test_parse_int() {
+        let i = u32::parse(b"1234567890");
+
+        assert_eq!(i, Some(1234567890));
+    }
+
+    #[test]
+    fn test_parse_int2() {
+        let res = parse_2(b"12");
+
+        assert_eq!(res, 12);
+    }
+
+    #[test]
+    fn test_parse_int4() {
+        let res = parse_4(b"1234");
+
+        assert_eq!(res, 1234);
     }
 }
