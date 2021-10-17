@@ -72,18 +72,19 @@ impl ApiMetrics {
         let targets: [f64; 3] = [countf * 0.5, countf * 0.95, countf * 0.99];
         let mut percentiles = [u16::MAX; 3];
 
-        let mut sumf = 0.0;
+        let mut sum = 0.0;
         let mut i = 0;
 
-        for (idx, val) in histogram.iter().enumerate() {
-            sumf += val.get() as f64;
+        'outer: for (idx, val) in histogram.iter().enumerate() {
+            sum += val.get() as f64;
 
-            if sumf >= targets[i] {
+            while sum >= targets[i] {
                 percentiles[i] = idx as u16;
+
                 i += 1;
 
                 if i == 3 {
-                    break;
+                    break 'outer;
                 }
             }
         }
