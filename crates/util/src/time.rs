@@ -198,8 +198,7 @@ macro_rules! impl_fp {
                         _ => return None,
                     };
 
-                    base *= 10;
-                    base += digit as $t;
+                    base = (base * 10) + digit as $t;
                 }
 
                 Some(base)
@@ -259,59 +258,92 @@ pub fn parse_iso8061(ts: &str) -> Option<PrimitiveDateTime> {
 
     //println!("MINUTE: {}", minute);
 
-    let second = parse_offset::<u8>(b, offset, 2)?;
-    offset += 2;
+    let maybe_time;
+
+    // if the next character is a digit, parse seconds and milliseconds, otherwise move on
+    match b.get(offset) {
+        Some(b'0'..=b'9') => {
+            let second = parse_offset::<u8>(b, offset, 2)?;
+            offset += 2;
+
+            if b.get(offset).copied() == Some(b'.') {
+                let millisecond = parse_offset::<u16>(b, offset + 1, 3)?;
+                offset += 4;
+
+                maybe_time = Time::try_from_hms_milli(hour, minute, second, millisecond)
+            } else {
+                maybe_time = Time::try_from_hms(hour, minute, second);
+            }
+        }
+        _ => {
+            maybe_time = Time::try_from_hms(hour, minute, 0);
+        }
+    }
 
     //println!("SECOND: {}", second);
 
-    let maybe_time = if b.get(offset).copied() == Some(b'.') {
-        let millisecond = parse_offset::<u16>(b, offset + 1, 3)?;
-        offset += 4;
+    let mut date_time = PrimitiveDateTime::new(
+        ymd,
+        match maybe_time {
+            Ok(time) => time,
+            _ => return None,
+        },
+    );
 
-        Time::try_from_hms_milli(hour, minute, second, millisecond)
-    } else {
-        Time::try_from_hms(hour, minute, second)
-    };
+    let tz = b.get(offset);
 
-    let mut time = maybe_time.ok()?;
+    offset += 1;
 
-    if b.get(offset).map(|c| *c | 32) == Some(b'z') {
-        offset += 1;
-    } else {
-        match b.get(offset).copied() {
-            Some(c @ b'+') | Some(c @ b'-') | Some(c @ 0xe2) => {
-                if c == 0xe2 {
-                    // check for UTF8 Unicode MINUS SIGN
-                    if b.get(offset..(offset + 3)) == Some(&[0xe2, 0x88, 0x92]) {
-                        offset += 2;
-                    } else {
+    match tz.copied() {
+        // Z
+        Some(b'z' | b'Z') => {}
+
+        // timezone, like +00:00
+        Some(c @ b'+' | c @ b'-' | c @ 0xe2) => {
+            if c == 0xe2 {
+                // check for UTF8 Unicode MINUS SIGN
+                if b.get(offset..(offset + 2)) == Some(&[0x88, 0x92]) {
+                    offset += 2;
+                } else {
+                    return None;
+                }
+            }
+
+            let offset_hour = parse_offset::<u8>(b, offset, 2)? as u64;
+            offset = is_byte(b, offset + 2, b':');
+            let offset_minute = parse_offset::<u8>(b, offset, 2)? as u64;
+            offset += 2;
+
+            let dur = Duration::from_secs(60 * 60 * offset_hour + offset_minute * 60);
+
+            if c == b'+' {
+                date_time += dur;
+            } else {
+                date_time -= dur;
+            }
+        }
+
+        // Parse trailing "UTC", but it does nothing, same as Z
+        Some(b'U' | b'u') => match b.get(offset..(offset + 2)) {
+            None => return None,
+            Some(tc) => {
+                for (c, r) in tc.iter().zip(b"tc") {
+                    if (*c | 32) != *r {
                         return None;
                     }
                 }
 
-                offset += 1;
-                let offset_hour = parse_offset::<u8>(b, offset, 2)? as u64;
-                offset = is_byte(b, offset + 2, b':');
-                let offset_minute = parse_offset::<u8>(b, offset, 2)? as u64;
                 offset += 2;
-
-                let dur = Duration::from_secs(60 * 60 * offset_hour + offset_minute * 60);
-
-                if c == b'+' {
-                    time += dur;
-                } else {
-                    time -= dur;
-                }
             }
-            _ => return None,
-        }
+        },
+        _ => return None,
     }
 
     if offset != b.len() {
         return None;
     }
 
-    Some(PrimitiveDateTime::new(ymd, time))
+    Some(date_time)
 }
 
 #[cfg(test)]
@@ -344,22 +376,28 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_iso8061() {
+    fn test_parse_iso8061_variations() {
         let fixtures = [
             "2021-10-17T02:03:01+00:00",
-            "2021-10-17t02:03:01+00:00",
+            "2021-10-17t02:03:01+10:00",
+            "2021-10-17t02:03+00:00", // without seconds
             "2021-10-17t02:03:01.111+00:00",
             "2021-10-17T02:03:01-00:00",
-            "2021-10-17T02:03:01−00:00", // UNICODE MINUS SIGN in offset
+            "2021-10-17T02:03:01−04:00", // UNICODE MINUS SIGN in offset
             "2021-10-17T02:03:01Z",
             "20211017T020301Z",
-            "20211017T020301z",
+            "20211017t020301z",
+            "20211017T0203z", // without seconds
             "20211017T020301.123Z",
             "20211017T020301.123+00:00",
+            "20211017T020301.123uTc",
         ];
 
         for fixture in fixtures {
-            assert!(parse_iso8061(fixture).is_some());
+            let parsed = parse_iso8061(fixture);
+            assert!(parsed.is_some());
+
+            println!("{:?}", parsed.unwrap());
         }
     }
 }
