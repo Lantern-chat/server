@@ -1,4 +1,5 @@
 use smol_str::SmolStr;
+use time::PrimitiveDateTime;
 use util::hex::HexidecimalInt;
 
 #[inline(never)]
@@ -35,6 +36,12 @@ pub fn test128_to_b64(x: u128) -> SmolStr {
 #[no_mangle]
 pub fn format_iso8061(ts: time::PrimitiveDateTime) -> SmolStr {
     util::time::format_iso8061(ts)
+}
+
+#[inline(never)]
+#[no_mangle]
+pub fn parse_iso8061(ts: &str) -> Option<PrimitiveDateTime> {
+    util::time::parse_iso8061(ts)
 }
 
 fn main() {}

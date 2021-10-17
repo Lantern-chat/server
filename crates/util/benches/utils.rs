@@ -18,6 +18,8 @@ fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| util::base64::encode_u128(black_box(u128::MAX)))
     });
 
+    ////////////////////
+
     c.bench_function("format_iso8061", |b| {
         let ts = black_box(time::PrimitiveDateTime::now());
 
@@ -26,7 +28,6 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     //c.bench_function("format_iso8061_old", |b| {
     //    let ts = black_box(time::PrimitiveDateTime::now());
-    //
     //    b.iter(|| util::time::format_iso8061_old(ts));
     //});
 
@@ -34,6 +35,25 @@ fn criterion_benchmark(c: &mut Criterion) {
         let ts = black_box(Utc::now().naive_utc());
 
         b.iter(|| format_naivedatetime(ts));
+    });
+
+    //c.bench_function("parse_iso8061_regex", |b| {
+    //    let ts = black_box(util::time::format_iso8061(time::PrimitiveDateTime::now()));
+    //    b.iter(|| util::time::parse_iso8061_regex(&ts));
+    //});
+
+    c.bench_function("parse_iso8061_custom", |b| {
+        let ts = black_box(util::time::format_iso8061(time::PrimitiveDateTime::now()));
+
+        b.iter(|| util::time::parse_iso8061(&ts));
+    });
+
+    c.bench_function("parse_iso8061_chrono", |b| {
+        let ts = black_box("2021-10-17T02:03:01+00:00");
+
+        type T = DateTime<chrono::FixedOffset>;
+
+        b.iter(|| T::parse_from_rfc3339(&ts).unwrap());
     });
 }
 

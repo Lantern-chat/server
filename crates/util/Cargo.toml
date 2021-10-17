@@ -24,6 +24,8 @@ base64 = "0.13.0"
 serde = "1"
 time = "0.2"
 itoa = "0.4.8"
+# regex = "1.5.4"
+# regex-automata = "0.1.10"
 # strength_reduce = "0.2.3"
 
 # static_init = "1.0.1"
