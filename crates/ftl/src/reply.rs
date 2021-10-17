@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use headers::{ContentType, Header, HeaderMapExt};
 use http::{Response as HttpResponse, StatusCode};
 use hyper::Body;
@@ -163,7 +165,7 @@ pub struct JsonStream {
 
 pub fn json_map_stream<K, T, E>(stream: impl Stream<Item = Result<(K, T), E>> + Send + 'static) -> impl Reply
 where
-    K: AsRef<str>,
+    K: Borrow<str>,
     T: serde::Serialize + Send + Sync + 'static,
     E: Into<Box<dyn std::error::Error + Send + Sync>> + Send + Sync + 'static,
 {
@@ -180,10 +182,11 @@ where
             match stream.next().await {
                 Some(Ok((key, ref value))) => {
                     let pos = buffer.len();
+                    let key = key.borrow();
 
                     // most keys will be well-behaved and not need escaping, so `,"key":`
                     // extra byte won't hurt anything when the value is serialized
-                    buffer.reserve(key.as_ref().len() + 4);
+                    buffer.reserve(key.len() + 4);
 
                     if !first {
                         buffer.push_str(",\"");
@@ -192,7 +195,7 @@ where
                     }
 
                     use std::fmt::Write;
-                    if let Err(e) = write!(buffer, "{}", v_jsonescape::escape(key.as_ref())) {
+                    if let Err(e) = write!(buffer, "{}", v_jsonescape::escape(key)) {
                         buffer.truncate(pos); // revert back to previous element
                         break Err(e.into());
                     }
