@@ -20,3 +20,6 @@ tracing-subscriber = { version = "0.2.15", features = ["env-filter"] }
 structopt = "0.3.21"
 dotenv = "0.15.0"
 anyhow = "1"
+
+[target.'cfg(unix)'.dependencies]
+tikv-jemallocator = "0.4.1"
