@@ -26,6 +26,12 @@ fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| util::time::format_iso8061(ts));
     });
 
+    c.bench_function("format_iso8061_full", |b| {
+        let ts = black_box(time::PrimitiveDateTime::now());
+
+        b.iter(|| util::time::format_iso8061_full(ts));
+    });
+
     //c.bench_function("format_iso8061_old", |b| {
     //    let ts = black_box(time::PrimitiveDateTime::now());
     //    b.iter(|| util::time::format_iso8061_old(ts));

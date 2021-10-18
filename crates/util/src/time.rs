@@ -50,6 +50,15 @@ macro_rules! impl_ff {
 impl_ff!(u8, u16);
 
 pub fn format_iso8061(ts: PrimitiveDateTime) -> SmolStr {
+    format_iso8061_opt::<true>(ts)
+}
+
+pub fn format_iso8061_full(ts: PrimitiveDateTime) -> SmolStr {
+    format_iso8061_opt::<false>(ts)
+}
+
+#[inline]
+pub fn format_iso8061_opt<const SHORT: bool>(ts: PrimitiveDateTime) -> SmolStr {
     let (date, time) = (ts.date(), ts.time());
 
     let (year, month, day) = date.as_ymd();
@@ -58,8 +67,16 @@ pub fn format_iso8061(ts: PrimitiveDateTime) -> SmolStr {
 
     let mut pos = 0;
 
-    //  mut buf: [u8; 20] = *b"YYYYMMDDTHHmmss.SSSZ";
-    let mut buf: [u8; 20] = *b"00000000T000000.000Z";
+    //  mut short_buf: [u8; 20] = *b"YYYYMMDDTHHmmss.SSSZ";
+    let mut short_buf: [u8; 20] = *b"00000000T000000.000Z";
+
+    //  mut full_buf: [u8; 20] = *b"YYYY-MM-DDTHH:mm:ss.SSSZ";
+    let mut full_buf: [u8; 24] = *b"0000-00-00T00:00:00.000Z";
+
+    let buf: &mut [u8] = if SHORT { &mut short_buf } else { &mut full_buf };
+
+    // full-form also increments 1 past the last digit
+    let end = if SHORT { 19 } else { 24 };
 
     macro_rules! write_num {
         ($s: expr, $len: expr, $max: expr) => {{
@@ -75,9 +92,12 @@ pub fn format_iso8061(ts: PrimitiveDateTime) -> SmolStr {
 
             pos += $len;
             unsafe { value.write(buf.as_mut_ptr().add(pos)) }
-            //pos += 1;
 
-            if pos > 19 {
+            if !SHORT {
+                pos += 1;
+            }
+
+            if pos > end {
                 unsafe { std::hint::unreachable_unchecked() }
             }
 
@@ -97,20 +117,30 @@ pub fn format_iso8061(ts: PrimitiveDateTime) -> SmolStr {
     write_num!(year as u16, 4, 9999);
     write_num!(month, 2, 12);
     write_num!(day, 2, 31);
-    pos += 1; // T
+    if SHORT {
+        pos += 1; // T
+    }
     write_num!(hour, 2, 59);
     write_num!(minute, 2, 59);
     write_num!(second, 2, 59);
-    pos += 1; // .
+    if SHORT {
+        pos += 1; // .
+    }
     write_num!(milliseconds, 3, 999);
 
-    debug_assert_eq!(pos, 19);
+    debug_assert_eq!(pos, end);
 
-    if pos != 19 {
+    if pos != end {
         unsafe { std::hint::unreachable_unchecked() }
     }
 
-    SmolStr::new_inline(unsafe { std::str::from_utf8_unchecked(&buf) })
+    let text = unsafe { std::str::from_utf8_unchecked(buf) };
+
+    if SHORT {
+        SmolStr::new_inline(text)
+    } else {
+        SmolStr::new(text)
+    }
 }
 
 /*
@@ -458,6 +488,15 @@ mod tests {
         let now = PrimitiveDateTime::now();
 
         let formatted = format_iso8061(now);
+
+        println!("{}", formatted);
+    }
+
+    #[test]
+    fn test_format_iso8061_full() {
+        let now = PrimitiveDateTime::now();
+
+        let formatted = format_iso8061_opt::<false>(now);
 
         println!("{}", formatted);
     }
