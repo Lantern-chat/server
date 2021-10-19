@@ -15,13 +15,13 @@ pub struct Metrics {
 }
 
 #[derive(Clone, Copy, Serialize)]
-pub struct FloatMetrics {
+pub struct AggregatedMetrics {
     pub mem: f32,
-    pub upload: f32,
-    pub reqs: f32,
-    pub errs: f32,
+    pub upload: i64,
+    pub reqs: i64,
+    pub errs: i64,
     pub conns: f32,
-    pub events: f32,
+    pub events: i64,
     pub p50: f32,
     pub p95: f32,
     pub p99: f32,
@@ -88,7 +88,7 @@ pub struct MetricsOptions {
 pub async fn get_metrics(
     state: ServerState,
     options: MetricsOptions,
-) -> Result<impl Stream<Item = Result<(SmolStr, FloatMetrics), Error>>, Error> {
+) -> Result<impl Stream<Item = Result<(SmolStr, AggregatedMetrics), Error>>, Error> {
     let minute_resolution = match options.resolution {
         Some(res) if res > 5 => res as i64,
         _ => 5,
@@ -127,7 +127,7 @@ pub async fn get_metrics(
             // key
             util::time::format_iso8061(time::PrimitiveDateTime::from_unix_timestamp(row.try_get(0)?)),
             // value
-            FloatMetrics {
+            AggregatedMetrics {
                 mem: row.try_get(1)?,
                 upload: row.try_get(2)?,
                 reqs: row.try_get(3)?,
@@ -173,18 +173,23 @@ fn query(start: bool, end: bool) -> impl AnyQuery {
     .rename_as("rounded_ts")
     .unwrap();
 
-    let query = Query::select()
+    let mut query = Query::select()
         .from_table::<Metrics>()
         .group_by(rounded_ts.reference())
         .expr(rounded_ts)
         .exprs(AVG_COLS.iter().map(|(col, use_sum)| {
             if *use_sum {
-                Builtin::sum(*col)
+                Builtin::sum(*col).cast(Type::INT8)
             } else {
-                Builtin::avg(*col)
+                Builtin::avg(*col).cast(Type::FLOAT4)
             }
-            .cast(Type::FLOAT4)
         }));
+
+    //query = if start {
+    //    query.order_by(Metrics::Ts.ascending())
+    //} else {
+    //    query.order_by(Metrics::Ts.descending())
+    //}.limit_n(500);
 
     match (start, end) {
         (false, false) => query,
