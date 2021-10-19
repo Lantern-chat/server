@@ -1,3 +1,4 @@
+use futures::FutureExt;
 use schema::{Snowflake, SnowflakeExt};
 use smol_str::SmolStr;
 
@@ -11,6 +12,9 @@ use models::*;
 #[derive(Debug, Deserialize)]
 pub struct CreateMessageForm {
     content: SmolStr,
+
+    #[serde(default)]
+    attachments: Vec<Snowflake>,
 }
 
 pub async fn create_message(
@@ -21,7 +25,7 @@ pub async fn create_message(
 ) -> Result<Message, Error> {
     let trimmed_content = form.content.trim();
 
-    if trimmed_content.is_empty() {
+    if !state.config.message_len.contains(&trimmed_content.len()) {
         return Err(Error::BadRequest);
     }
 
@@ -29,6 +33,16 @@ pub async fn create_message(
 
     if !permissions.room.contains(RoomPermissions::SEND_MESSAGES) {
         return Err(Error::Unauthorized);
+    }
+
+    if !form.attachments.is_empty() {
+        if !permissions.room.contains(RoomPermissions::ATTACH_FILES) {
+            return Err(Error::Unauthorized);
+        }
+
+        return create_message_full(state, auth, room_id, &form, trimmed_content)
+            .boxed()
+            .await;
     }
 
     let db = state.db.write.get().await?;
@@ -141,4 +155,100 @@ fn query() -> impl AnyQuery {
         .and_where(Rooms::Id.equals(AggMsg::RoomId))
         .and_where(Users::Id.equals(AggMsg::UserId))
         .and_where(PartyMember::UserId.equals(AggMsg::UserId))
+}
+
+pub async fn create_message_full(
+    state: ServerState,
+    auth: Authorization,
+    room_id: Snowflake,
+    form: &CreateMessageForm,
+    trimmed: &str,
+) -> Result<Message, Error> {
+    let mut db = state.db.write.get().await?;
+
+    let msg_id = Snowflake::now();
+
+    let t = db.transaction().await?;
+
+    let msg_future = async {
+        t.execute_cached_typed(
+            || {
+                use schema::*;
+                use thorn::*;
+
+                Query::insert()
+                    .into::<Messages>()
+                    .cols(&[
+                        Messages::Id,
+                        Messages::UserId,
+                        Messages::RoomId,
+                        Messages::Content,
+                    ])
+                    .values(vec![
+                        Var::of(Messages::Id),
+                        Var::of(Messages::UserId),
+                        Var::of(Messages::RoomId),
+                        Var::of(Messages::Content),
+                    ])
+            },
+            &[&msg_id, &auth.user_id, &room_id, &trimmed],
+        )
+        .await?;
+
+        Ok(())
+    };
+
+    let attachment_future = async {
+        t.execute_cached_typed(
+            || {
+                use schema::*;
+                use thorn::*;
+
+                tables! {
+                    struct AggIds {
+                        Id: Files::Id,
+                    }
+                }
+
+                let msg_id = Var::at(Messages::Id, 1);
+                let att_id = Var::at(SNOWFLAKE_ARRAY, 2);
+
+                Query::with()
+                    .with(
+                        AggIds::as_query(
+                            Query::select().expr(Call::custom("UNNEST").arg(att_id).alias_to(AggIds::Id)),
+                        )
+                        .exclude(),
+                    )
+                    .insert()
+                    .into::<Attachments>()
+                    .cols(&[Attachments::FileId, Attachments::MessageId])
+                    .query(
+                        Query::select()
+                            .col(AggIds::Id)
+                            .expr(msg_id)
+                            .from_table::<AggIds>()
+                            .as_value(),
+                    )
+            },
+            &[&msg_id, &form.attachments],
+        )
+        .await?;
+
+        Ok(())
+    };
+
+    let get_message_future = async {
+        let row = t
+            .query_one_cached_typed(|| super::get_one::get_one_without_perms(), &[&room_id, &msg_id])
+            .await?;
+
+        super::get_one::parse_msg(&state, room_id, msg_id, row)
+    };
+
+    let (_, _, msg) = tokio::try_join!(msg_future, attachment_future, get_message_future)?;
+
+    t.commit().await?;
+
+    Ok(msg)
 }

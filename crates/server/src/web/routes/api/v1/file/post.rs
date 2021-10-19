@@ -39,10 +39,8 @@ pub async fn post(route: Route<ServerState>, auth: Authorization) -> Response {
             res.headers_mut()
                 .extend(super::TUS_HEADERS.iter().map(|(k, v)| (k.clone(), v.clone())));
 
-            res.headers_mut().insert(
-                "Location",
-                HeaderValue::from_str(&format!("/api/v1/file/{}", file_id)).unwrap(),
-            );
+            res.headers_mut()
+                .insert("Location", HeaderValue::from_str(&file_id.to_string()).unwrap());
 
             res
         }

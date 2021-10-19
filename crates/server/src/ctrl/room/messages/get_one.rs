@@ -35,11 +35,18 @@ pub async fn get_one(
             .await?
     };
 
-    let row = match row {
+    match row {
         None => return Err(Error::NotFound),
-        Some(row) => row,
-    };
+        Some(row) => parse_msg(&state, room_id, msg_id, row),
+    }
+}
 
+pub(crate) fn parse_msg(
+    state: &ServerState,
+    room_id: Snowflake,
+    msg_id: Snowflake,
+    row: db::Row,
+) -> Result<Message, Error> {
     let party_id: Option<Snowflake> = row.try_get(1)?;
 
     let mut msg = Message {
@@ -158,7 +165,7 @@ mod consts {
     ];
 }
 
-fn get_one_without_perms() -> impl AnyQuery {
+pub(crate) fn get_one_without_perms() -> impl AnyQuery {
     use schema::*;
 
     Query::select()
