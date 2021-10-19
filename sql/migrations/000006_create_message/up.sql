@@ -42,8 +42,8 @@ CREATE TABLE lantern.attachments (
 );
 ALTER TABLE lantern.attachments OWNER TO postgres;
 
-CREATE INDEX attachment_msg_idx ON lantern.attachments USING hash(message_id);
-CREATE INDEX attachment_file_idx ON lantern.attachments USING hash(file_id);
+CREATE INDEX attachment_msg_idx ON lantern.attachments USING btree(message_id);
+CREATE UNIQUE INDEX attachment_file_idx ON lantern.attachments USING btree(file_id);
 
 ALTER TABLE lantern.attachments ADD CONSTRAINT message_fk FOREIGN KEY (message_id)
     REFERENCES lantern.messages (id) MATCH FULL
