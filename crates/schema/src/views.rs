@@ -45,6 +45,7 @@ thorn::tables! {
         UserId: Users::Id,
         PartyId: Party::Id,
         Nickname: PartyMember::Nickname,
+        Flags: PartyMember::Flags,
         AvatarId: UserAvatars::FileId,
         JoinedAt: PartyMember::JoinedAt,
         RoleIds: SNOWFLAKE_ARRAY,

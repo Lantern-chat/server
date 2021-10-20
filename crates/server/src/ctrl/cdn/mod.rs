@@ -76,7 +76,7 @@ pub async fn get_file(
 
     let file_id: Snowflake = row.try_get(0)?;
     let size: i32 = row.try_get(1)?;
-    let flags = FileFlags::from_bits_truncate(row.try_get(2)?);
+    let _flags = FileFlags::from_bits_truncate(row.try_get(2)?);
     let nonce: i64 = row.try_get(3)?;
     let mime: Option<&str> = row.try_get(5)?;
 

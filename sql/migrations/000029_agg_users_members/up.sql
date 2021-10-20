@@ -51,6 +51,7 @@ CREATE OR REPLACE VIEW lantern.agg_members(
     user_id,
     party_id,
     nickname,
+    flags,
     avatar_id,
     joined_at,
     role_ids
@@ -60,6 +61,7 @@ SELECT
     party_member.user_id,
     party_member.party_id,
     party_member.nickname,
+    party_member.flags,
     user_avatars.file_id,
     party_member.joined_at,
     ARRAY(

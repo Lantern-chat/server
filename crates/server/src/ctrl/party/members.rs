@@ -44,34 +44,31 @@ pub async fn get_members(
 
     Ok(stream.map(move |row| match row {
         Err(e) => Err(e.into()),
-        Ok(row) => Ok({
-            let user_id = row.try_get(0)?;
-            PartyMember {
-                nick: row.try_get(10)?,
-                user: Some(User {
-                    id: user_id,
-                    username: row.try_get(2)?,
-                    discriminator: row.try_get(1)?,
-                    flags: UserFlags::from_bits_truncate(row.try_get(3)?).publicize(),
-                    status: row.try_get(5)?,
-                    bio: row.try_get(4)?,
-                    email: None,
-                    preferences: None,
-                    avatar: encrypt_snowflake_opt(&state, row.try_get(9)?),
+        Ok(row) => Ok(PartyMember {
+            user: Some(User {
+                id: row.try_get(0)?,
+                username: row.try_get(2)?,
+                discriminator: row.try_get(1)?,
+                flags: UserFlags::from_bits_truncate(row.try_get(3)?).publicize(),
+                status: row.try_get(5)?,
+                bio: row.try_get(4)?,
+                email: None,
+                preferences: None,
+                avatar: encrypt_snowflake_opt(&state, row.try_get(9)?),
+            }),
+            nick: row.try_get(10)?,
+            presence: match row.try_get::<_, Option<_>>(7)? {
+                None => None,
+                Some(updated_at) => Some(UserPresence {
+                    updated_at: Some(util::time::format_iso8061(updated_at)),
+                    flags: UserPresenceFlags::from_bits_truncate(row.try_get(6)?),
+                    activity: match row.try_get::<_, Option<serde_json::Value>>(8)? {
+                        None => None,
+                        Some(value) => Some(AnyActivity::Any(value)),
+                    },
                 }),
-                presence: match row.try_get::<_, Option<_>>(7)? {
-                    None => None,
-                    Some(updated_at) => Some(UserPresence {
-                        updated_at: Some(util::time::format_iso8061(updated_at)),
-                        flags: UserPresenceFlags::from_bits_truncate(row.try_get(6)?),
-                        activity: match row.try_get::<_, Option<serde_json::Value>>(8)? {
-                            None => None,
-                            Some(value) => Some(AnyActivity::Any(value)),
-                        },
-                    }),
-                },
-                roles: row.try_get(12)?,
-            }
+            },
+            roles: row.try_get(12)?,
         }),
     }))
 }
@@ -103,6 +100,12 @@ fn select_members2() -> impl AnyQuery {
             /*12*/ AggMembers::RoleIds,
         ])
         .and_where(AggMembers::PartyId.equals(Var::of(Party::Id)))
+        .and_where(
+            // not banned
+            AggMembers::Flags
+                .bit_and(Literal::Int2(1))
+                .equals(Literal::Int2(0)),
+        )
 
     /*
 

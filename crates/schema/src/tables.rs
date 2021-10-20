@@ -137,13 +137,6 @@ thorn::tables! {
         CustomStatus: Type::VARCHAR,
     }
 
-    pub struct PartyBans in Lantern {
-        PartyId: Party::Id,
-        UserId: Users::Id,
-        Reason: Type::TEXT,
-        BannedAt: Type::TIMESTAMP,
-    }
-
     pub struct Subscriptions in Lantern {
         UserId: Users::Id,
         RoomId: Rooms::Id,

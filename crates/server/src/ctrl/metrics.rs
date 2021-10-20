@@ -173,7 +173,7 @@ fn query(start: bool, end: bool) -> impl AnyQuery {
     .rename_as("rounded_ts")
     .unwrap();
 
-    let mut query = Query::select()
+    let query = Query::select()
         .from_table::<Metrics>()
         .group_by(rounded_ts.reference())
         .expr(rounded_ts)
