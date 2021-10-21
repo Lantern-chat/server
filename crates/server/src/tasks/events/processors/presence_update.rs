@@ -73,7 +73,6 @@ pub async fn presence_updated(
 
     let presence = match row.try_get::<_, Option<_>>(3)? {
         Some(updated_at) => {
-            let updated_at = util::time::format_iso8061(updated_at);
             let flags = UserPresenceFlags::from_bits_truncate(row.try_get(4)?);
             let activity = None; // TODO
 

@@ -84,7 +84,7 @@ pub async fn create_message(
             preferences: None,
         },
         thread_id: None,
-        created_at: msg_id.format_timestamp(),
+        created_at: msg_id.timestamp(),
         edited_at: None,
         flags: MessageFlags::empty(),
         content: form.content,

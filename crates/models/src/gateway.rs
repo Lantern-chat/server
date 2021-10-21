@@ -84,7 +84,7 @@ pub mod commands {
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct Identify {
-        pub auth: SmolStr,
+        pub auth: SmolToken,
         pub intent: Intent,
     }
 

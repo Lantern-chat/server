@@ -41,13 +41,13 @@ impl Snowflake {
 
     #[inline]
     #[allow(deprecated)]
-    pub fn timestamp(&self) -> PrimitiveDateTime {
-        PrimitiveDateTime::unix_epoch() + Duration::from_millis(self.epoch_ms())
+    pub fn timestamp(&self) -> ISO8061 {
+        ISO8061::from(PrimitiveDateTime::unix_epoch() + Duration::from_millis(self.epoch_ms()))
     }
 
     #[inline]
     pub fn format_timestamp(&self) -> SmolStr {
-        util::time::format_iso8061(self.timestamp())
+        self.timestamp().format()
     }
 
     #[inline]

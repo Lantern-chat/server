@@ -1,3 +1,4 @@
+use std::ops::{Deref, DerefMut};
 use std::time::Duration;
 
 use time::{Date, PrimitiveDateTime, Time};
@@ -476,6 +477,136 @@ pub fn parse_iso8061(ts: &str) -> Option<PrimitiveDateTime> {
     }
 
     Some(date_time)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct ISO8061(PrimitiveDateTime);
+
+impl ISO8061 {
+    #[inline]
+    pub fn format(&self) -> SmolStr {
+        format_iso8061(self.0)
+    }
+}
+
+impl From<std::time::SystemTime> for ISO8061 {
+    #[inline]
+    fn from(ts: std::time::SystemTime) -> Self {
+        PrimitiveDateTime::from(ts).into()
+    }
+}
+
+impl From<PrimitiveDateTime> for ISO8061 {
+    #[inline]
+    fn from(ts: PrimitiveDateTime) -> Self {
+        ISO8061(ts)
+    }
+}
+
+impl From<ISO8061> for PrimitiveDateTime {
+    #[inline]
+    fn from(ts: ISO8061) -> Self {
+        ts.0
+    }
+}
+
+impl Deref for ISO8061 {
+    type Target = PrimitiveDateTime;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for ISO8061 {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+mod serde_impl {
+    use serde::de::{Deserialize, Deserializer, Visitor};
+    use serde::ser::{Serialize, Serializer};
+
+    use super::ISO8061;
+
+    impl Serialize for ISO8061 {
+        #[inline]
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            super::format_iso8061(self.0).serialize(serializer)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for ISO8061 {
+        #[inline]
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            use std::fmt;
+
+            struct TsVisitor;
+
+            impl<'de> Visitor<'de> for TsVisitor {
+                type Value = ISO8061;
+
+                fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                    formatter.write_str("an ISO8061 Timestamp")
+                }
+
+                fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                where
+                    E: serde::de::Error,
+                {
+                    match super::parse_iso8061(v) {
+                        Some(ts) => Ok(ISO8061(ts)),
+                        None => Err(E::custom("Invalid Format")),
+                    }
+                }
+            }
+
+            deserializer.deserialize_str(TsVisitor)
+        }
+    }
+}
+
+mod pg_impl {
+    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
+    use time::PrimitiveDateTime;
+
+    use super::ISO8061;
+
+    impl ToSql for ISO8061 {
+        #[inline]
+        fn to_sql(
+            &self,
+            ty: &Type,
+            out: &mut bytes::BytesMut,
+        ) -> Result<IsNull, Box<dyn std::error::Error + Sync + Send>>
+        where
+            Self: Sized,
+        {
+            self.0.to_sql(ty, out)
+        }
+
+        accepts!(TIMESTAMP);
+        to_sql_checked!();
+    }
+
+    impl<'a> FromSql<'a> for ISO8061 {
+        #[inline]
+        fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+            PrimitiveDateTime::from_sql(ty, raw).map(ISO8061)
+        }
+
+        accepts!(TIMESTAMP);
+    }
 }
 
 #[cfg(test)]

@@ -54,7 +54,7 @@ pub async fn message_create(
     let mut msg = Message {
         id,
         party_id: ext_party_id,
-        created_at: id.format_timestamp(),
+        created_at: id.timestamp(),
         room_id,
         flags: MessageFlags::from_bits_truncate(row.try_get(9)?),
         edited_at: None, // new message, not edited

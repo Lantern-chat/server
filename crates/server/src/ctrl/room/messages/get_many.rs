@@ -118,10 +118,10 @@ pub async fn get_many(
             let mut msg = Message {
                 id: msg_id,
                 party_id,
-                created_at: msg_id.format_timestamp(),
+                created_at: msg_id.timestamp(),
                 room_id,
                 flags: MessageFlags::from_bits_truncate(row.try_get(10)?),
-                edited_at: row.try_get::<_, Option<_>>(9)?.map(util::time::format_iso8061),
+                edited_at: row.try_get::<_, Option<_>>(9)?,
                 content: row.try_get(11)?,
                 author: {
                     let id = row.try_get(1)?;

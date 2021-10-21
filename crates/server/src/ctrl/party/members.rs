@@ -60,7 +60,7 @@ pub async fn get_members(
             presence: match row.try_get::<_, Option<_>>(7)? {
                 None => None,
                 Some(updated_at) => Some(UserPresence {
-                    updated_at: Some(util::time::format_iso8061(updated_at)),
+                    updated_at: Some(updated_at),
                     flags: UserPresenceFlags::from_bits_truncate(row.try_get(6)?),
                     activity: match row.try_get::<_, Option<serde_json::Value>>(8)? {
                         None => None,

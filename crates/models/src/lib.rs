@@ -4,6 +4,9 @@
 extern crate serde;
 
 use smol_str::SmolStr;
+use util::time::ISO8061;
+
+pub type SmolToken = arrayvec::ArrayString<28>;
 
 pub mod emote;
 pub mod file;

@@ -29,9 +29,10 @@ pub async fn list_sessions(
         )
         .await?;
 
-    Ok(sessions.map(|row| {
-        Ok(AnonymousSession {
-            expires: util::time::format_iso8061(row?.try_get(0)?),
-        })
+    Ok(sessions.map(|row| match row {
+        Err(e) => Err(e.into()),
+        Ok(row) => Ok(AnonymousSession {
+            expires: row.try_get(0)?,
+        }),
     }))
 }

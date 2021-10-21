@@ -139,7 +139,7 @@ pub async fn do_login(
 
     Ok(Session {
         auth: token.encode(),
-        expires: util::time::format_iso8061(expires.into()),
+        expires: expires.into(),
     })
 }
 

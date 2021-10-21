@@ -52,6 +52,7 @@ impl Metrics {
     }
 }
 
+use ::util::time::ISO8061;
 use futures::{Stream, StreamExt};
 use smol_str::SmolStr;
 
@@ -79,9 +80,9 @@ pub struct MetricsOptions {
     pub resolution: Option<u64>,
 
     #[serde(default)]
-    pub start: Option<SmolStr>,
+    pub start: Option<ISO8061>,
     #[serde(default)]
-    pub end: Option<SmolStr>,
+    pub end: Option<ISO8061>,
 }
 
 #[allow(deprecated)]
@@ -89,15 +90,18 @@ pub async fn get_metrics(
     state: ServerState,
     options: MetricsOptions,
 ) -> Result<impl Stream<Item = Result<(SmolStr, AggregatedMetrics), Error>>, Error> {
-    let minute_resolution = match options.resolution {
+    let MetricsOptions {
+        resolution,
+        start,
+        end,
+    } = options;
+
+    let minute_resolution = match resolution {
         Some(res) if res > 5 => res as i64,
         _ => 5,
     };
 
     let secs = minute_resolution * 60;
-
-    let start = options.start.and_then(|s| util::time::parse_iso8061(&s));
-    let end = options.end.and_then(|s| util::time::parse_iso8061(&s));
 
     let db = state.db.read.get().await?;
 
