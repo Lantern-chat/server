@@ -136,12 +136,7 @@ impl IpValues {
 
 impl IpList {
     pub fn sort(&mut self) {
-        let IpList {
-            ref values,
-            ref mut sorted,
-        } = *self;
-
-        sorted.sort_unstable_by(|a, b| values.compare(*a, *b))
+        self.sorted.sort_unstable_by(|a, b| self.values.compare(*a, *b))
     }
 
     pub fn contains(&self, ip: IpAddr) -> bool {
