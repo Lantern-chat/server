@@ -142,6 +142,14 @@ pub mod server {
         pub party_id: Option<Snowflake>,
     }
 
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct PartyMemberInner {
+        pub party_id: Snowflake,
+
+        #[serde(flatten)]
+        pub member: PartyMember,
+    }
+
     // TODO: Check that this enum doesn't grow too large, allocate large payloads like Ready
     decl_msgs! {
         0 => Hello { #[serde(flatten)] inner: Hello },
@@ -158,30 +166,32 @@ pub mod server {
         8 => RoleUpdate {},
         9 => RoleDelete {},
 
-        10 => MemberAdd    { #[serde(flatten)] inner: Box<PartyMember> },
-        11 => MemberUpdate { #[serde(flatten)] inner: Box<PartyMember> },
-        12 => MemberRemove { #[serde(flatten)] inner: Box<PartyMember> },
+        10 => MemberAdd     { #[serde(flatten)] inner: Box<PartyMemberInner> },
+        11 => MemberUpdate  { #[serde(flatten)] inner: Box<PartyMemberInner> },
+        12 => MemberRemove  { #[serde(flatten)] inner: Arc<PartyMemberInner> },
+        13 => MemberBan     { #[serde(flatten)] inner: Arc<PartyMemberInner> },
+        14 => MemberUnban   { #[serde(flatten)] inner: Box<PartyMemberInner> },
 
-        13 => RoomCreate { #[serde(flatten)] room: Room },
-        14 => RoomUpdate { #[serde(flatten)] room: Room },
-        15 => RoomDelete { id: Snowflake },
-        16 => RoomPinsUpdate {},
+        15 => RoomCreate { #[serde(flatten)] room: Room },
+        16 => RoomUpdate { #[serde(flatten)] room: Room },
+        17 => RoomDelete { id: Snowflake },
+        18 => RoomPinsUpdate {},
 
-        17 => MessageCreate { #[serde(flatten)] msg: RoomMessage },
-        18 => MessageUpdate { #[serde(flatten)] msg: RoomMessage },
-        19 => MessageDelete { #[serde(flatten)] msg: Box<MessageDeleteInner> },
+        19 => MessageCreate { #[serde(flatten)] msg: RoomMessage },
+        20 => MessageUpdate { #[serde(flatten)] msg: RoomMessage },
+        21 => MessageDelete { #[serde(flatten)] msg: Box<MessageDeleteInner> },
 
-        20 => MessageReactionAdd {},
-        21 => MessageReactionRemove {},
-        22 => MessageReactionRemoveAll {},
-        23 => MessageReactionRemoveEmote {},
+        22 => MessageReactionAdd {},
+        23 => MessageReactionRemove {},
+        24 => MessageReactionRemoveAll {},
+        25 => MessageReactionRemoveEmote {},
 
-        24 => PresenceUpdate {
+        26 => PresenceUpdate {
             party: Option<Snowflake>,
             #[serde(flatten)] inner: Arc<UserPresenceInner>,
         },
-        25 => TypingStart { #[serde(flatten)] t: Box<TypingStart> },
-        26 => UserUpdate { user: Arc<User> }
+        27 => TypingStart { #[serde(flatten)] t: Box<TypingStart> },
+        28 => UserUpdate { user: Arc<User> }
     }
 
     impl Message {
@@ -202,6 +212,8 @@ pub mod server {
                 Message::MemberAdd { .. } |
                 Message::MemberRemove { .. } |
                 Message::MemberUpdate { .. } => Intent::PARTY_MEMBERS,
+
+                Message::MemberBan {..} | Message::MemberUnban {..} => Intent::PARTY_BANS,
 
                 Message::MessageCreate { .. } |
                 Message::MessageDelete { .. } |

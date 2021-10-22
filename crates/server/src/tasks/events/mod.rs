@@ -14,6 +14,7 @@ pub mod processors {
 
     use crate::{ctrl::Error, ServerState};
 
+    pub mod member_event;
     pub mod message_create;
     pub mod message_delete;
     pub mod presence_update;
@@ -54,6 +55,11 @@ pub async fn process(
         EventCode::PresenceUpdated => {
             processors::presence_update::presence_updated(state, db, event.id).await?;
         }
+        EventCode::MemberJoined
+        | EventCode::MemberLeft
+        | EventCode::MemberUpdated
+        | EventCode::MemberBan
+        | EventCode::MemberUnban => {}
         _ => unimplemented!(),
     }
 

@@ -23,6 +23,6 @@ END
 $$;
 
 
-DROP TRIGGER IF EXISTS message_event on lantern.messages CASCADE;
+DROP TRIGGER IF EXISTS message_event ON lantern.messages CASCADE;
 CREATE TRIGGER message_event AFTER UPDATE OR INSERT ON lantern.messages
 FOR EACH ROW EXECUTE FUNCTION lantern.msg_trigger();

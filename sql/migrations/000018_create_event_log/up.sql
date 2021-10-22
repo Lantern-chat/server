@@ -15,6 +15,8 @@ CREATE TYPE lantern.event_code AS ENUM (
     'member_updated',
     'member_joined',
     'member_left',
+    'member_ban',
+    'member_unban',
     'role_created',
     'role_updated',
     'role_deleted',

@@ -28,6 +28,10 @@ thorn::enums! {
         MemberJoined,
         /// Member left party
         MemberLeft,
+        /// Member was banned, only sent if proper intent was used
+        MemberBan,
+        /// Member was unbanned, only sent if proper intent was used
+        MemberUnban,
 
         RoleCreated,
         RoleUpdated,
