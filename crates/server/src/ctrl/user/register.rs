@@ -45,7 +45,7 @@ pub async fn register_user(
 
     let now = SystemTime::now();
 
-    if !util::time::is_of_age(state.config.min_user_age_in_years as i64, now, dob) {
+    if !util::time::is_of_age(state.config.min_user_age_in_years as i32, now, dob) {
         return Err(Error::InsufficientAge);
     }
 
