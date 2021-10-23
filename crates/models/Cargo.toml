@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 util = { path = "../util" }
+timestamp = { path = "../timestamp" }
 
 postgres-types = { version = "0.2.1", optional = true }
 bytes = { version = "1", optional = true }
@@ -17,7 +18,7 @@ serde_shims = { version = "0.2", features = ["std", "mime", "bitflags"] }
 bitflags = "1.2"
 serde_repr = "0.1"
 itoa = "0.4.7"
-time = "0.2"
+time = "=0.3.3"
 smol_str = { path = "../../deps/smol_str", features = ["serde"] }
 arrayvec = { version = "0.7.1", features = ["serde"] }
 # typescript-definitions = { git = "https://github.com/storyscript/typescript-definitions" }

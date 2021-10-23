@@ -52,9 +52,9 @@ impl Metrics {
     }
 }
 
-use ::util::time::ISO8061;
 use futures::{Stream, StreamExt};
 use smol_str::SmolStr;
+use timestamp::Timestamp;
 
 use crate::ctrl::Error;
 
@@ -80,9 +80,9 @@ pub struct MetricsOptions {
     pub resolution: Option<u64>,
 
     #[serde(default)]
-    pub start: Option<ISO8061>,
+    pub start: Option<Timestamp>,
     #[serde(default)]
-    pub end: Option<ISO8061>,
+    pub end: Option<Timestamp>,
 }
 
 #[allow(deprecated)]
@@ -129,7 +129,7 @@ pub async fn get_metrics(
         Err(e) => Err(e.into()),
         Ok(row) => Ok((
             // key
-            util::time::format_iso8061(time::PrimitiveDateTime::from_unix_timestamp(row.try_get(0)?)),
+            Timestamp::from_unix_timestamp(row.try_get(0)?).format(),
             // value
             AggregatedMetrics {
                 mem: row.try_get(1)?,

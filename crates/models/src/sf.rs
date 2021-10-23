@@ -40,9 +40,8 @@ impl Snowflake {
     }
 
     #[inline]
-    #[allow(deprecated)]
-    pub fn timestamp(&self) -> ISO8061 {
-        ISO8061::from(PrimitiveDateTime::unix_epoch() + Duration::from_millis(self.epoch_ms()))
+    pub fn timestamp(&self) -> Timestamp {
+        Timestamp::UNIX_EPOCH + Duration::from_millis(self.epoch_ms())
     }
 
     #[inline]

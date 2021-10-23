@@ -12,6 +12,7 @@ ftl = { path = "../ftl" }
 models = { path = "../models" }
 db = { path = "../db" }
 util = { path = "../util" }
+timestamp = { path = "../timestamp" }
 schema = { path = "../schema" }
 mime_db = { path = "../mime_db" }
 totp = { path = "../totp" }
@@ -58,8 +59,7 @@ paste = "1.0.5"
 serde_json = "1.0.64"
 rmp-serde = "0.15.4"
 rand = "0.8.3"
-chrono = "0.4.19"
-time = "0.2"
+time = { version = "0.3", features = ["macros"] }
 regex = "1.4.6"
 tokio-tungstenite = "0.15.0"
 ahash = "0.7.2"

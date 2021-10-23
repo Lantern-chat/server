@@ -4,7 +4,7 @@
 extern crate serde;
 
 use smol_str::SmolStr;
-use util::time::ISO8061;
+use timestamp::Timestamp;
 
 pub type SmolToken = arrayvec::ArrayString<28>;
 

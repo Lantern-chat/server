@@ -9,6 +9,7 @@ publish = false
 
 [dependencies]
 smol_str = { path = "../../deps/smol_str" }
+timestamp = { path = "../timestamp" }
 
 rand = "0.8"
 rand_chacha = "0.3.0"
@@ -22,9 +23,7 @@ pin-project = "1.0.7"
 hex = "0.4"
 base64 = "0.13.0"
 serde = "1"
-time = "0.2"
-postgres-types = "0.2.2"
-bytes = "1.1.0"
+time = { version = "0.3", features = ["macros"] }
 # itoa = "0.4.8"
 # regex = "1.5.4"
 # regex-automata = "0.1.10"
@@ -35,7 +34,6 @@ bytes = "1.1.0"
 
 [dev-dependencies]
 criterion = "0.3"
-chrono = "0.4"
 
 [[bench]]
 name = "utils"

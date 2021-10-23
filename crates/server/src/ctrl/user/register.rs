@@ -33,14 +33,19 @@ pub async fn register_user(
     validate_password(&state.config, &form.password)?;
     validate_email(&form.email)?;
 
-    let dob = match chrono::NaiveDate::from_ymd_opt(form.year, form.month as u32 + 1, form.day as u32 + 1) {
-        Some(dob) => dob,
-        None => return Err(Error::InvalidDate),
+    let month = match time::Month::try_from(form.month) {
+        Ok(month) => month,
+        Err(_) => return Err(Error::InvalidDate),
+    };
+
+    let dob = match time::Date::from_calendar_date(form.year, month, form.day) {
+        Ok(dob) => dob,
+        Err(_) => return Err(Error::InvalidDate),
     };
 
     let now = SystemTime::now();
 
-    if !crate::util::time::is_of_age(state.config.min_user_age_in_years as i64, now, dob) {
+    if !util::time::is_of_age(state.config.min_user_age_in_years as i64, now, dob) {
         return Err(Error::InsufficientAge);
     }
 

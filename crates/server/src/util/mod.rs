@@ -1,5 +1,4 @@
 pub mod encrypt;
-pub mod time;
 
 #[inline(always)]
 pub fn passthrough<F, T, U>(f: F) -> F

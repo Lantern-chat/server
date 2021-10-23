@@ -45,10 +45,10 @@ pub struct Message {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thread_id: Option<Snowflake>,
 
-    pub created_at: ISO8061,
+    pub created_at: Timestamp,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub edited_at: Option<ISO8061>,
+    pub edited_at: Option<Timestamp>,
 
     pub content: SmolStr,
 
