@@ -80,7 +80,7 @@ pub struct PartyMember {
     pub user: Option<User>,
 
     /// Per-party nickname
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub nick: Option<SmolStr>,
 
     // /// Per-party status

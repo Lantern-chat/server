@@ -148,7 +148,7 @@ pub async fn message_create(
 
         state
             .gateway
-            .broadcast_event(Event::new(event, Some(room_id))?, party_id, false)
+            .broadcast_event(Event::new(event, Some(room_id))?, party_id)
             .await;
     }
 

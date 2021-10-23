@@ -8,10 +8,18 @@ use crate::{
 };
 
 use models::*;
-
 pub async fn get_party(state: ServerState, auth: Authorization, party_id: Snowflake) -> Result<Party, Error> {
     let db = state.db.read.get().await?;
 
+    get_party_inner(state, &db, auth.user_id, party_id).await
+}
+
+pub async fn get_party_inner(
+    state: ServerState,
+    db: &db::pool::Client,
+    user_id: Snowflake,
+    party_id: Snowflake,
+) -> Result<Party, Error> {
     let row = db
         .query_opt_cached_typed(
             || {
@@ -26,7 +34,7 @@ pub async fn get_party(state: ServerState, auth: Authorization, party_id: Snowfl
                     .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
                     .and_where(Party::DeletedAt.is_null())
             },
-            &[&party_id, &auth.user_id],
+            &[&party_id, &user_id],
         )
         .await?;
 

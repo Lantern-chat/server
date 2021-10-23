@@ -109,7 +109,6 @@ pub async fn presence_updated(
             .broadcast_event(
                 Event::new(ServerMsg::new_presenceupdate(Some(party_id), inner.clone()), None)?,
                 party_id,
-                false,
             )
             .await;
     }

@@ -96,33 +96,35 @@ pub struct Gateway {
 }
 
 impl Gateway {
-    pub async fn broadcast_event(&self, event: Event, id: Snowflake, user: bool) {
-        if user {
-            if let Some(users) = self.users.get(&id).await {
-                for conn in users.values() {
-                    if let Err(e) = conn.tx.try_send(event.clone()) {
-                        log::warn!("Could not send message to user connection: {}", e);
+    pub async fn broadcast_user_event(&self, event: Event, user_id: Snowflake) {
+        if let Some(users) = self.users.get(&user_id).await {
+            for conn in users.values() {
+                if let Err(e) = conn.tx.try_send(event.clone()) {
+                    log::warn!("Could not send message to user connection: {}", e);
 
-                        conn.is_active.store(false, std::sync::atomic::Ordering::Relaxed);
-                        conn.kill.notify_waiters();
+                    conn.is_active.store(false, std::sync::atomic::Ordering::Relaxed);
+                    conn.kill.notify_waiters();
 
-                        crate::metric::API_METRICS.load().errs.add(1);
-
-                        // TODO: Better handling of this
-                    }
-                }
-            }
-        } else {
-            if let Some(party) = self.parties.get(&id).await {
-                log::debug!("Sending event to party tx: {}", id);
-                if let Err(e) = party.tx.send(event) {
                     crate::metric::API_METRICS.load().errs.add(1);
 
-                    return log::error!("Could not broadcast to party: {}", e);
+                    // TODO: Better handling of this
                 }
-            } else {
-                log::warn!("Could not find party {}!", id);
             }
+        }
+
+        crate::metric::API_METRICS.load().events.add(1);
+    }
+
+    pub async fn broadcast_event(&self, event: Event, party_id: Snowflake) {
+        if let Some(party) = self.parties.get(&party_id).await {
+            log::debug!("Sending event to party tx: {}", party_id);
+            if let Err(e) = party.tx.send(event) {
+                crate::metric::API_METRICS.load().errs.add(1);
+
+                return log::error!("Could not broadcast to party: {}", e);
+            }
+        } else {
+            log::warn!("Could not find party {}!", party_id);
         }
 
         crate::metric::API_METRICS.load().events.add(1);

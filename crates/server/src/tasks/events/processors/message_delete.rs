@@ -45,7 +45,7 @@ pub async fn message_delete(
     if let Some(party_id) = party_id {
         state
             .gateway
-            .broadcast_event(Event::new(event, Some(room_id))?, party_id, false)
+            .broadcast_event(Event::new(event, Some(room_id))?, party_id)
             .await;
     }
 
