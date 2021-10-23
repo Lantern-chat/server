@@ -59,7 +59,9 @@ pub async fn process(
         | EventCode::MemberLeft
         | EventCode::MemberUpdated
         | EventCode::MemberBan
-        | EventCode::MemberUnban => {}
+        | EventCode::MemberUnban => {
+            processors::member_event::member_event(state, event.code, db, event.id, party_id).await?;
+        }
         _ => unimplemented!(),
     }
 

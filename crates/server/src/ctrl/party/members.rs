@@ -75,7 +75,7 @@ pub async fn get_members(
 
 use thorn::*;
 
-fn select_members2() -> impl AnyQuery {
+pub(crate) fn select_members2() -> query::SelectQuery {
     use schema::*;
 
     Query::select()
