@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::time::SystemTime;
 
 use time::{Date, PrimitiveDateTime};
@@ -57,7 +59,7 @@ fn birthday(year: i32, dob: Date) -> Date {
     Date::from_ordinal_date(year, ordinal).unwrap()
 }
 
-fn is_of_age_inner(min_age: i32, ts: PrimitiveDateTime, dob: Date) -> bool {
+fn is_of_age_inner2(min_age: i32, ts: PrimitiveDateTime, dob: Date) -> bool {
     let today = ts.date();
 
     let birthday = birthday(today.year(), dob);
@@ -69,6 +71,20 @@ fn is_of_age_inner(min_age: i32, ts: PrimitiveDateTime, dob: Date) -> bool {
     }
 
     age >= min_age
+}
+
+fn is_of_age_inner(min_age: i32, ts: PrimitiveDateTime, dob: Date) -> bool {
+    let today = ts.date();
+
+    let mut years = today.year() - dob.year() - 1;
+
+    if (today.month() as u8) > (dob.month() as u8)
+        || (today.month() == dob.month() && today.day() >= dob.day())
+    {
+        years += 1;
+    }
+
+    years >= min_age
 }
 
 #[inline]
@@ -150,7 +166,7 @@ mod tests {
 
         assert!(!is_of_age_inner(
             min_age,
-            datetime!(2017 - 02 - 27 23:59),
+            datetime!(2017 - 02 - 28 23:59),
             date!(2004 - 02 - 29)
         ));
 
@@ -194,6 +210,12 @@ mod tests {
             min_age,
             datetime!(2020 - 06 - 27 23:59),
             date!(2007 - 06 - 28)
+        ));
+
+        assert!(is_of_age_inner(
+            min_age,
+            datetime!(2020 - 06 - 26 23:59),
+            date!(2007 - 06 - 25)
         ));
     }
 }
