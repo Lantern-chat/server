@@ -6,13 +6,13 @@ BEGIN
     INSERT INTO lantern.event_log (code, id, party_id)
     SELECT
         -- when old was not deleted, and new is deleted
-        CASE WHEN ((OLD.flags & (1 << 5)) = 0) AND ((NEW.flags & (1 << 5)) != 0)
+        CASE WHEN (OLD.flags & 1 = 0) AND (NEW.flags & 1 != 0)
                 THEN 'message_delete'::lantern.event_code
 
              WHEN TG_OP = 'INSERT'
                 THEN 'message_create'::lantern.event_code
 
-             WHEN TG_OP = 'UPDATE' AND ((NEW.flags & (1 << 5)) = 0)
+             WHEN TG_OP = 'UPDATE' AND (NEW.flags & 1 = 0)
                 THEN 'message_update'::lantern.event_code
         END,
         NEW.id,

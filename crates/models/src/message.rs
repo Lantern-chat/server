@@ -16,13 +16,12 @@ pub struct MessageCreateForm {
 
 bitflags::bitflags! {
     pub struct MessageFlags: i16 {
-        const TTS               = 1 << 0;
+        const DELETED           = 1 << 0;
         const MENTIONS_EVERYONE = 1 << 1;
         const MENTIONS_HERE     = 1 << 2;
-        const SUPRESS_EMBEDS    = 1 << 3;
-        const PINNED            = 1 << 4;
-        const DELETED           = 1 << 5;
-        const REMOVED           = 1 << 6;
+        const PINNED            = 1 << 3;
+        const TTS               = 1 << 4;
+        const SUPRESS_EMBEDS    = 1 << 5;
     }
 }
 
