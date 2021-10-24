@@ -55,9 +55,17 @@ pub mod room {
     }
 }
 
+pub mod invite {
+    pub mod create;
+    pub mod get;
+    pub mod redeem;
+    pub mod revoke;
+}
+
 pub mod file {
     pub mod delete;
     pub mod head;
+    pub mod options;
     pub mod patch;
     pub mod post;
 }
