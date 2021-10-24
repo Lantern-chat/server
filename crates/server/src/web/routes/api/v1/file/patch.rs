@@ -54,10 +54,7 @@ pub async fn patch(
 
     headers.extend(super::TUS_HEADERS.iter().map(|(k, v)| (k.clone(), v.clone())));
 
-    headers.insert(
-        "Upload-Offset",
-        HeaderValue::from_str(&patch.upload_offset.to_string())?,
-    );
+    headers.insert("Upload-Offset", super::header_from_int(patch.upload_offset));
 
     Ok(res)
 }

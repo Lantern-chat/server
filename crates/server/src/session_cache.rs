@@ -1,5 +1,6 @@
 use std::time::SystemTime;
 
+use models::UserFlags;
 use util::cmap::CHashMap;
 
 use schema::Snowflake;
@@ -10,6 +11,7 @@ use crate::ctrl::auth::{AuthToken, Authorization};
 struct PartialAuthorization {
     user_id: Snowflake,
     expires: SystemTime,
+    flags: UserFlags,
 }
 
 #[derive(Default)]
@@ -25,6 +27,7 @@ impl SessionCache {
                 token: *token,
                 user_id: part.user_id,
                 expires: part.expires,
+                flags: part.flags,
             }),
         }
     }
@@ -36,6 +39,7 @@ impl SessionCache {
                 PartialAuthorization {
                     user_id: auth.user_id,
                     expires: auth.expires,
+                    flags: auth.flags,
                 },
             )
             .await;
@@ -44,6 +48,10 @@ impl SessionCache {
     }
 
     pub async fn cleanup(&self, now: SystemTime) {
-        self.map.retain(|_, part| part.expires < now).await
+        self.map.retain(|_, part| part.expires < now).await;
+    }
+
+    pub async fn clear_user(&self, user_id: Snowflake) {
+        self.map.retain(|_, part| part.user_id != user_id).await;
     }
 }

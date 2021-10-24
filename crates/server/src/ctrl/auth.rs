@@ -20,6 +20,7 @@ impl AuthToken {
     pub const CHAR_LEN: usize = base64bytes(Self::TOKEN_LEN);
 }
 
+// TODO: Unify this with the type from `models` somehow
 pub type SmolToken = arrayvec::ArrayString<{ AuthToken::CHAR_LEN }>;
 
 impl AuthToken {
@@ -94,6 +95,7 @@ impl AuthToken {
     }
 }
 
+use models::UserFlags;
 use schema::Snowflake;
 
 use crate::ServerState;
@@ -103,6 +105,7 @@ pub struct Authorization {
     pub token: AuthToken,
     pub user_id: Snowflake,
     pub expires: SystemTime,
+    pub flags: UserFlags,
 }
 
 use super::Error;
@@ -123,7 +126,10 @@ pub async fn do_auth(state: &ServerState, raw_token: &[u8]) -> Result<Authorizat
 
                         Query::select()
                             .cols(&[Sessions::UserId, Sessions::Expires])
-                            .from_table::<Sessions>()
+                            .col(Users::Flags)
+                            .from(
+                                Sessions::inner_join_table::<Users>().on(Users::Id.equals(Sessions::UserId)),
+                            )
                             .and_where(Sessions::Token.equals(Var::of(Sessions::Token)))
                     },
                     &[&&token.0[..]],
@@ -136,6 +142,7 @@ pub async fn do_auth(state: &ServerState, raw_token: &[u8]) -> Result<Authorizat
                         token,
                         user_id: row.try_get(0)?,
                         expires: row.try_get(1)?,
+                        flags: UserFlags::from_bits_truncate(row.try_get(2)?),
                     };
 
                     state.session_cache.set(auth).await;

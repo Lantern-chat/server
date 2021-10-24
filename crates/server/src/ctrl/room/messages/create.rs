@@ -25,7 +25,10 @@ pub async fn create_message(
 ) -> Result<Message, Error> {
     let trimmed_content = form.content.trim();
 
-    if !state.config.message_len.contains(&trimmed_content.len()) {
+    // if NOT the trimmed length is valid or there are attachments
+    if !(state.config.message_len.contains(&trimmed_content.len())
+        || (trimmed_content.is_empty() && !form.attachments.is_empty()))
+    {
         return Err(Error::BadRequest);
     }
 

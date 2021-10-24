@@ -6,6 +6,7 @@ use std::{
 use std::num::NonZeroU64;
 
 pub use models::sf::{Snowflake, LANTERN_EPOCH};
+use models::LANTERN_EPOCH_PDT;
 
 /// Incremenent counter to ensure unique snowflakes
 pub static INCR: AtomicU16 = AtomicU16::new(0);
@@ -37,8 +38,10 @@ pub trait SnowflakeExt {
     /// Create a snowflake at the given unix epoch (milliseconds)
     fn at_ms(ms: u64) -> Snowflake {
         // offset by Lantern epoch
-        let ms = (ms - LANTERN_EPOCH) as u64;
+        Self::at_ms_since_lantern_epoch(ms - LANTERN_EPOCH)
+    }
 
+    fn at_ms_since_lantern_epoch(ms: u64) -> Snowflake {
         // update incremenent counter, making sure it wraps at 12 bits
         let incr = INCR
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |incr| {
@@ -65,6 +68,12 @@ pub trait SnowflakeExt {
 
     fn at(ts: SystemTime) -> Snowflake {
         Self::at_ms(ts.duration_since(UNIX_EPOCH).unwrap().as_millis() as u64)
+    }
+
+    fn at_date(ts: time::Date) -> Snowflake {
+        let seconds = ts - LANTERN_EPOCH_PDT.date();
+
+        Self::at_ms_since_lantern_epoch(seconds.whole_seconds() as u64 * 1000)
     }
 
     fn encrypt(self, key: u128) -> u128;

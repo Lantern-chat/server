@@ -23,10 +23,10 @@ pub async fn head(
 
     headers.insert("Upload-Metadata", encode_metadata(&head));
 
-    headers.insert("Upload-Length", HeaderValue::from_str(&head.size.to_string())?);
+    headers.insert("Upload-Length", super::header_from_int(head.size));
 
     if head.size != head.offset {
-        headers.insert("Upload-Offset", HeaderValue::from_str(&head.offset.to_string())?);
+        headers.insert("Upload-Offset", super::header_from_int(head.offset));
     }
 
     headers.typed_insert(CacheControl::new().with_no_store());

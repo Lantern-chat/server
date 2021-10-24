@@ -1,18 +1,20 @@
 use super::*;
 
 bitflags::bitflags! {
+    /// NOTE: Remember to clear flag caches when they change
     pub struct UserFlags: i16 {
-        const VERIFIED              = 1 << 0;
-        const MFA_ENABLED           = 1 << 1;
         const SYSTEM                = 1 << 2;
         const BOT                   = 1 << 3;
         const STAFF                 = 1 << 4;
         const PREMIUM               = 1 << 5;
+
+        const VERIFIED              = 1 << 0;
+        const MFA_ENABLED           = 1 << 1;
         const DELETED               = 1 << 6;
         const NEEDS_PASSWORD_RESET  = 1 << 7;
 
         /// Always strip these from public responses
-        const PRIVATE_FLAGS = Self::VERIFIED.bits | Self::MFA_ENABLED.bits | Self::NEEDS_PASSWORD_RESET.bits;
+        const PRIVATE_FLAGS = Self::VERIFIED.bits | Self::MFA_ENABLED.bits | Self::DELETED.bits | Self::NEEDS_PASSWORD_RESET.bits;
     }
 }
 

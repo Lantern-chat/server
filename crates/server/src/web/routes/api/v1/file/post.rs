@@ -40,7 +40,7 @@ pub async fn post(route: Route<ServerState>, auth: Authorization) -> Response {
                 .extend(super::TUS_HEADERS.iter().map(|(k, v)| (k.clone(), v.clone())));
 
             res.headers_mut()
-                .insert("Location", HeaderValue::from_str(&file_id.to_string()).unwrap());
+                .insert("Location", super::header_from_int(file_id.to_u64()));
 
             res
         }

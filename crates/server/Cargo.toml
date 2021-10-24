@@ -79,6 +79,7 @@ socket2 = "0.4.2"
 anyhow = "1.0.44"
 arrayvec = "0.7.1"
 cache-padded = "1.1.1"
+itoa = "0.4.8"
 
 [build-dependencies]
 built = { version = "0.5", features = ["git2", "chrono"] }

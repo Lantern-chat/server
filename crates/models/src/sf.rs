@@ -8,7 +8,7 @@ use std::{
 
 use std::num::NonZeroU64;
 
-use time::PrimitiveDateTime;
+use time::{OffsetDateTime, PrimitiveDateTime};
 
 /**
     Snowflakes are a UUID-like system designed to embed timestamp information in a monotonic format.
@@ -21,6 +21,9 @@ pub struct Snowflake(pub NonZeroU64);
 
 /// Arbitrarily chosen starting epoch to offset the clock by
 pub const LANTERN_EPOCH: u64 = 1550102400000;
+
+pub const LANTERN_EPOCH_ODT: OffsetDateTime = time::macros::datetime!(2019 - 02 - 14 00:00 +0);
+pub const LANTERN_EPOCH_PDT: PrimitiveDateTime = time::macros::datetime!(2019 - 02 - 14 00:00);
 
 impl Snowflake {
     #[inline]
@@ -194,5 +197,10 @@ mod tests {
         let _: Snowflake = serde_json::from_str(r#"12234"#).unwrap();
         let _: Nested = serde_json::from_str(r#"{"x": 12234}"#).unwrap();
         let _: Nested = serde_json::from_str(r#"{"x": "12234"}"#).unwrap();
+    }
+
+    #[test]
+    fn test_epoch() {
+        assert_eq!(LANTERN_EPOCH, LANTERN_EPOCH_ODT.unix_timestamp() as u64 * 1000);
     }
 }
