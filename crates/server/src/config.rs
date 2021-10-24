@@ -36,7 +36,7 @@ pub struct LanternConfig {
     pub key_path: PathBuf,
 }
 
-const KIBIBYTE: i32 = 1024 * 1024;
+const KIBIBYTE: i32 = 1024;
 const MIBIBYTE: i32 = KIBIBYTE * 1024;
 const GIBIBYTE: i64 = MIBIBYTE as i64 * 1024;
 
