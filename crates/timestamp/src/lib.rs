@@ -58,6 +58,7 @@ fn format_iso8061_full(ts: PrimitiveDateTime) -> SmolStr {
     format_iso8061_opt::<false>(ts)
 }
 
+#[rustfmt::skip]
 #[inline(always)]
 fn format_iso8061_opt<const SHORT: bool>(ts: PrimitiveDateTime) -> SmolStr {
     let (year, month, day) = ts.to_calendar_date();
@@ -78,37 +79,17 @@ fn format_iso8061_opt<const SHORT: bool>(ts: PrimitiveDateTime) -> SmolStr {
 
     macro_rules! write_num {
         ($s: expr, $len: expr, $max: expr) => {{
-            // NOTE: This likely is coalesced with the += 1's below
-            //pos += $len; // skip to end, then go back in the ptr below to pad with zeroes
-
             let value = $s;
 
             debug_assert!(value <= $max);
-            if value > $max {
-                unsafe { std::hint::unreachable_unchecked() }
-            }
+            if value > $max { unsafe { std::hint::unreachable_unchecked() } }
 
             pos += $len;
             unsafe { value.write(buf.as_mut_ptr().add(pos)) }
 
-            if !SHORT {
-                pos += 1;
-            }
+            if !SHORT { pos += 1; } // punctuation
 
-            if pos > end {
-                unsafe { std::hint::unreachable_unchecked() }
-            }
-
-            /*
-            let mut num_buffer = Buffer::new();
-            let s = num_buffer.format(value);
-
-            unsafe {
-                buf.as_mut_ptr()
-                    .add(pos - s.len())
-                    .copy_from_nonoverlapping(s.as_ptr(), s.len())
-            }
-             */
+            if pos > end { unsafe { std::hint::unreachable_unchecked() } }
         }};
     }
 
@@ -128,17 +109,10 @@ fn format_iso8061_opt<const SHORT: bool>(ts: PrimitiveDateTime) -> SmolStr {
 
     debug_assert_eq!(pos, end);
 
-    if pos != end {
-        unsafe { std::hint::unreachable_unchecked() }
-    }
+    if pos != end { unsafe { std::hint::unreachable_unchecked() } }
 
     let text = unsafe { std::str::from_utf8_unchecked(buf) };
-
-    if SHORT {
-        SmolStr::new_inline(text)
-    } else {
-        SmolStr::new(text)
-    }
+    if SHORT { SmolStr::new_inline(text) } else { SmolStr::new(text) }
 }
 
 /*
