@@ -3,45 +3,22 @@ use std::time::{Duration, SystemTime};
 
 use time::{Date, Month, OffsetDateTime, PrimitiveDateTime, Time, UtcOffset};
 
-use smol_str::SmolStr;
-
-//use itoa::Buffer;
-
-/*
-#[rustfmt::skip]
-pub fn format_iso8061_old(ts: PrimitiveDateTime) -> SmolStr {
-    use std::io::{Cursor, Write};
-
-    let (date, time) = (ts.date(), ts.time());
-
-    let (year, month, day) = date.as_ymd();
-    let (hour, minute, second, milliseconds) =
-        (time.hour(), time.minute(), time.second(), time.millisecond());
-
-    let mut buf = [0u8; 22];
-    let mut cur = Cursor::new(buf.as_mut());
-
-    write!(cur, "{:04}{:02}{:02}T{:02}{:02}{:02}.{:03}Z",
-        year, month, day, hour, minute, second, milliseconds).unwrap();
-
-    let written = cur.position() as usize;
-    SmolStr::new_inline(unsafe { std::str::from_utf8_unchecked(&buf[..written]) })
-}
-*/
-
 trait FastFormat {
-    unsafe fn write(self, buf: *mut u8);
+    unsafe fn write(self, buf: *mut u8, size: usize);
 }
 
 macro_rules! impl_ff {
     ($($t:ty),*) => {$(
         impl FastFormat for $t {
-            #[inline]
-            unsafe fn write(mut self, mut buf: *mut u8) {
-                while self > 0 {
-                    buf = buf.sub(1);
-                    *buf = (self % 10) as u8 + b'0';
+            #[inline(always)]
+            unsafe fn write(mut self, buf: *mut u8, mut size: usize) {
+                let mut offset = 1;
+
+                while size > 0 {
+                    *buf.sub(offset) = (self % 10) as u8;
                     self /= 10;
+                    offset += 1;
+                    size -= 1;
                 }
             }
         }
@@ -50,69 +27,45 @@ macro_rules! impl_ff {
 
 impl_ff!(u8, u16);
 
-fn format_iso8061(ts: PrimitiveDateTime) -> SmolStr {
-    format_iso8061_opt::<true>(ts)
-}
+mod ts_str;
 
-fn format_iso8061_full(ts: PrimitiveDateTime) -> SmolStr {
-    format_iso8061_opt::<false>(ts)
-}
+use ts_str::TimestampStrStorage;
+pub use ts_str::{Full, Short, TimestampStr};
 
 #[rustfmt::skip]
+#[allow(unused_assignments)]
 #[inline(always)]
-fn format_iso8061_opt<const SHORT: bool>(ts: PrimitiveDateTime) -> SmolStr {
+pub fn format_iso8061<S: TimestampStrStorage>(ts: PrimitiveDateTime) -> TimestampStr<S> {
     let (year, month, day) = ts.to_calendar_date();
     let (hour, minute, second, milliseconds) = ts.as_hms_milli();
 
+    let mut buf = S::template();
+
     let mut pos = 0;
-
-    //  mut short_buf: [u8; 20] = *b"YYYYMMDDTHHmmss.SSSZ";
-    let mut short_buf: [u8; 20] = *b"00000000T000000.000Z";
-
-    //  mut full_buf: [u8; 20] = *b"YYYY-MM-DDTHH:mm:ss.SSSZ";
-    let mut full_buf: [u8; 24] = *b"0000-00-00T00:00:00.000Z";
-
-    let buf: &mut [u8] = if SHORT { &mut short_buf } else { &mut full_buf };
-
-    // full-form also increments 1 past the last digit
-    let end = if SHORT { 19 } else { 24 };
 
     macro_rules! write_num {
         ($s: expr, $len: expr, $max: expr) => {{
-            let value = $s;
-
-            debug_assert!(value <= $max);
-            if value > $max { unsafe { std::hint::unreachable_unchecked() } }
-
             pos += $len;
-            unsafe { value.write(buf.as_mut_ptr().add(pos)) }
-
-            if !SHORT { pos += 1; } // punctuation
-
-            if pos > end { unsafe { std::hint::unreachable_unchecked() } }
+            unsafe { $s.write(buf.as_mut_ptr().add(pos), $len) }
+            if S::IS_FULL { pos += 1; }
         }};
     }
 
     write_num!(year as u16, 4, 9999);
     write_num!(month as u8, 2, 12);
     write_num!(day, 2, 31);
-    if SHORT {
-        pos += 1; // T
-    }
+    if !S::IS_FULL { pos += 1; } // T
     write_num!(hour, 2, 59);
     write_num!(minute, 2, 59);
     write_num!(second, 2, 59);
-    if SHORT {
-        pos += 1; // .
-    }
+    if !S::IS_FULL { pos += 1; } // .
     write_num!(milliseconds, 3, 999);
 
-    debug_assert_eq!(pos, end);
+    for (dst, offset) in buf.as_mut_slice().iter_mut().zip(S::offset().as_slice()) {
+        *dst += *offset;
+    }
 
-    if pos != end { unsafe { std::hint::unreachable_unchecked() } }
-
-    let text = unsafe { std::str::from_utf8_unchecked(buf) };
-    if SHORT { SmolStr::new_inline(text) } else { SmolStr::new(text) }
+    TimestampStr(buf)
 }
 
 /*
@@ -505,14 +458,12 @@ impl Timestamp {
         }
     }
 
-    #[inline]
-    pub fn format(&self) -> SmolStr {
+    pub fn format(&self) -> TimestampStr<Short> {
         format_iso8061(self.0)
     }
 
-    #[inline]
-    pub fn format_full(&self) -> SmolStr {
-        format_iso8061_full(self.0)
+    pub fn format_full(&self) -> TimestampStr<Full> {
+        format_iso8061(self.0)
     }
 
     #[inline]
@@ -573,7 +524,7 @@ mod serde_impl {
         where
             S: Serializer,
         {
-            super::format_iso8061(self.0).serialize(serializer)
+            self.format_full().serialize(serializer)
         }
     }
 

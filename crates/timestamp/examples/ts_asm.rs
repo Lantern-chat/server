@@ -1,10 +1,8 @@
-use smol_str::SmolStr;
-
-use timestamp::Timestamp;
+use timestamp::{Short, Timestamp, TimestampStr};
 
 #[inline(never)]
 #[no_mangle]
-pub fn format_iso8061(ts: Timestamp) -> SmolStr {
+pub fn format_iso8061(ts: Timestamp) -> TimestampStr<Short> {
     ts.format()
 }
 
