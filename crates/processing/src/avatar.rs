@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use crate::read_image::{read_image, Image, ImageInfo, ImageReadError, Limits};
 
 pub struct ProcessConfig {
     pub max_width: u32,
@@ -10,9 +10,18 @@ pub struct ProcessedImage {
     pub image: EncodedImage,
 }
 
+#[derive(Debug, thiserror::Error)]
 pub enum ProcessingError {
+    #[error("Invalid Image Format")]
     InvalidImageFormat,
+
+    #[error("Image Read Error")]
+    ImageReadError(#[from] ImageReadError),
+
+    #[error("Image Too Large")]
     TooLarge,
+
+    #[error("Other: {0}")]
     Other(String),
 }
 
@@ -21,38 +30,27 @@ pub fn process_avatar(
     preview: Option<Vec<u8>>,
     config: ProcessConfig,
 ) -> Result<ProcessedImage, ProcessingError> {
-    use image::{imageops::FilterType, io::Reader, ImageFormat};
+    use image::{imageops::FilterType, ImageFormat};
 
     let format = match image::guess_format(&buffer) {
         Ok(format) => format,
         Err(_) => return Err(ProcessingError::InvalidImageFormat),
     };
 
-    let (mut width, height) = {
-        let mut reader = Reader::new(Cursor::new(&buffer));
-        reader.set_format(format);
-
-        match reader.into_dimensions() {
-            Ok(dim) => dim,
-            Err(_) => return Err(ProcessingError::InvalidImageFormat),
-        }
-    };
-
-    if (width * height) > config.max_pixels {
-        return Err(ProcessingError::TooLarge);
-    }
+    let Image { mut image, info } = read_image(
+        &buffer,
+        format,
+        &Limits {
+            max_pixels: config.max_pixels,
+        },
+    )?;
 
     let max_width = config.max_width;
 
+    let mut width = info.width;
+    let height = info.height;
+
     let try_use_existing = format == ImageFormat::Png && width == height && width <= max_width;
-
-    let mut reader = Reader::new(Cursor::new(&buffer));
-    reader.set_format(format);
-
-    let mut image = match reader.decode() {
-        Ok(image) => image,
-        Err(_) => return Err(ProcessingError::InvalidImageFormat),
-    };
 
     // crop out the center
     if width != height {
@@ -90,7 +88,7 @@ pub fn process_avatar(
     }
 
     // encode the image and generate a blurhash preview if needed
-    match encode_png_best(image, preview) {
+    match encode_png_best(image, preview, info) {
         Ok(mut output) => {
             let mut reused = false;
 
@@ -121,16 +119,25 @@ pub struct EncodedImage {
     pub preview: Option<Vec<u8>>,
 }
 
+#[allow(unused_imports, unused_variables)]
 fn encode_png_best(
     mut image: image::DynamicImage,
     mut preview: Option<Vec<u8>>,
-) -> Result<EncodedImage, image::ImageError> {
-    use image::{codecs::png, DynamicImage, GenericImageView};
-    use png::{CompressionType, FilterType, PngEncoder};
+    info: ImageInfo,
+) -> std::io::Result<EncodedImage> {
+    use image::{ColorType, DynamicImage, GenericImageView};
+    use png::{
+        AdaptiveFilterType, BitDepth, Compression, Encoder as PngEncoder, FilterType, ScaledFloat,
+        SourceChromaticities, SrgbRenderingIntent,
+    };
 
     image = match image {
-        DynamicImage::ImageBgra8(_) => DynamicImage::ImageRgba8(image.to_rgba8()),
-        DynamicImage::ImageBgr8(_) => DynamicImage::ImageRgb8(image.to_rgb8()),
+        DynamicImage::ImageBgra8(_) | DynamicImage::ImageRgba16(_) => {
+            DynamicImage::ImageRgba8(image.to_rgba8())
+        }
+        DynamicImage::ImageBgr8(_) | DynamicImage::ImageRgb16(_) => DynamicImage::ImageRgb8(image.to_rgb8()),
+        DynamicImage::ImageLuma16(_) => DynamicImage::ImageLuma8(image.to_luma8()),
+        DynamicImage::ImageLumaA16(_) => DynamicImage::ImageLumaA8(image.to_luma_alpha8()),
         _ => image,
     };
 
@@ -146,8 +153,44 @@ fn encode_png_best(
 
     let mut out = Vec::with_capacity(expected_bytes);
 
-    PngEncoder::new_with_quality(&mut out, CompressionType::Best, FilterType::Paeth)
-        .encode(&bytes, width, height, color)?;
+    let mut encoder = PngEncoder::new(&mut out, width, height);
+
+    encoder.set_depth(BitDepth::Eight);
+    encoder.set_color(match color {
+        ColorType::L8 => png::ColorType::Grayscale,
+        ColorType::La8 => png::ColorType::GrayscaleAlpha,
+        ColorType::Rgb8 => png::ColorType::Rgb,
+        ColorType::Rgba8 => png::ColorType::Rgba,
+        _ => unreachable!(),
+    });
+
+    //encoder.set_trns(&[0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8] as &'static [u8]);
+    encoder.set_compression(Compression::Best);
+    encoder.set_filter(FilterType::Paeth);
+    encoder.set_adaptive_filter(AdaptiveFilterType::Adaptive);
+
+    //encoder.set_srgb(info.srgb.unwrap_or(SrgbRenderingIntent::AbsoluteColorimetric));
+    //encoder.set_source_gamma(info.source_gamma.unwrap_or_else(|| {
+    //    // Value taken from https://www.w3.org/TR/2003/REC-PNG-20031110/#11sRGB
+    //    ScaledFloat::from_scaled(45455)
+    //}));
+    //encoder.set_source_chromaticities(info.source_chromaticities.unwrap_or_else(|| {
+    //    // Values taken from https://www.w3.org/TR/2003/REC-PNG-20031110/#11sRGB
+    //    SourceChromaticities {
+    //        white: (ScaledFloat::from_scaled(31270), ScaledFloat::from_scaled(32900)),
+    //        red: (ScaledFloat::from_scaled(64000), ScaledFloat::from_scaled(33000)),
+    //        green: (ScaledFloat::from_scaled(30000), ScaledFloat::from_scaled(60000)),
+    //        blue: (ScaledFloat::from_scaled(15000), ScaledFloat::from_scaled(6000)),
+    //    }
+    //}));
+    //if let Some(_icc_profile) = info.icc_profile {
+    //    // TODO: ICC Profile
+    //}
+
+    let mut writer = encoder.write_header()?;
+    writer.write_image_data(&bytes)?;
+
+    drop(writer);
 
     if preview.is_none() {
         let has_alpha = image.color().has_alpha();

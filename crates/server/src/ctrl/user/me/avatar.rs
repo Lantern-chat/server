@@ -84,19 +84,26 @@ pub async fn process_avatar(state: ServerState, user_id: Snowflake, file_id: Sno
     let encode_state = state.clone();
     let encode_task = tokio::task::spawn_blocking(move || -> Result<_, Error> {
         use processing::avatar::{EncodedImage, ProcessConfig, ProcessingError};
+        use processing::read_image::ImageReadError;
 
         processing::avatar::process_avatar(
             buffer,
             preview,
             ProcessConfig {
-                max_pixels: encode_state.config.max_avatar_pixels,
                 max_width: encode_state.config.max_avatar_width,
+                max_pixels: encode_state.config.max_avatar_pixels,
             },
         )
         .map_err(|err| match err {
-            ProcessingError::InvalidImageFormat => Error::InvalidImageFormat,
-            ProcessingError::TooLarge => Error::RequestEntityTooLarge,
+            ProcessingError::InvalidImageFormat
+            | ProcessingError::ImageReadError(ImageReadError::InvalidImageFormat) => {
+                Error::InvalidImageFormat
+            }
+            ProcessingError::TooLarge | ProcessingError::ImageReadError(ImageReadError::ImageTooLarge) => {
+                Error::RequestEntityTooLarge
+            }
             ProcessingError::Other(e) => Error::InternalError(e),
+            ProcessingError::ImageReadError(_) => Error::BadRequest,
         })
     });
 
