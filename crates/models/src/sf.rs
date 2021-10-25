@@ -48,11 +48,6 @@ impl Snowflake {
     }
 
     #[inline]
-    pub fn format_timestamp(&self) -> SmolStr {
-        self.timestamp().format()
-    }
-
-    #[inline]
     pub fn raw_timestamp(&self) -> u64 {
         self.0.get() >> 22
     }

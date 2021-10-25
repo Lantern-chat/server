@@ -61,6 +61,15 @@ impl<S: TimestampStrStorage> AsRef<str> for TimestampStr<S> {
     }
 }
 
+use std::borrow::Borrow;
+
+impl<S: TimestampStrStorage> Borrow<str> for TimestampStr<S> {
+    #[inline]
+    fn borrow(&self) -> &str {
+        self.as_ref()
+    }
+}
+
 use std::ops::Deref;
 
 impl<S: TimestampStrStorage> Deref for TimestampStr<S> {

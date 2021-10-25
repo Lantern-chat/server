@@ -54,7 +54,7 @@ impl Metrics {
 
 use futures::{Stream, StreamExt};
 use smol_str::SmolStr;
-use timestamp::Timestamp;
+use timestamp::{Short, Timestamp, TimestampStr};
 
 use crate::ctrl::Error;
 
@@ -89,7 +89,7 @@ pub struct MetricsOptions {
 pub async fn get_metrics(
     state: ServerState,
     options: MetricsOptions,
-) -> Result<impl Stream<Item = Result<(SmolStr, AggregatedMetrics), Error>>, Error> {
+) -> Result<impl Stream<Item = Result<(TimestampStr<Short>, AggregatedMetrics), Error>>, Error> {
     let MetricsOptions {
         resolution,
         start,
