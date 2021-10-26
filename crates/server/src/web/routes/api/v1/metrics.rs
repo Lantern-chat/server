@@ -19,7 +19,7 @@ pub async fn metrics(route: Route<ServerState>) -> Response {
     };
 
     match crate::ctrl::metrics::get_metrics(route.state, options).await {
-        Ok(stream) => reply::json_map_stream(stream).into_response(),
+        Ok(stream) => reply::json::map_stream(stream).into_response(),
         Err(e) => ApiError::err(e).into_response(),
     }
 }

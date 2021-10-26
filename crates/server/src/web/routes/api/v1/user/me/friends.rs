@@ -10,7 +10,7 @@ use crate::{
 
 pub async fn friends(route: Route<ServerState>, auth: Authorization) -> Response {
     match list_friends(route.state, auth).await {
-        Ok(sessions) => reply::json_array_stream(sessions).into_response(),
+        Ok(sessions) => reply::json::array_stream(sessions).into_response(),
         Err(e) => ApiError::err(e).into_response(),
     }
 }
