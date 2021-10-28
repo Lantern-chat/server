@@ -4,6 +4,7 @@ use schema::Snowflake;
 
 use crate::{
     ctrl::{auth::Authorization, perm::get_cached_room_permissions_with_conn, Error, SearchMode},
+    permission_cache::PermMute,
     ServerState,
 };
 
@@ -11,18 +12,21 @@ use models::*;
 
 // TODO: This
 pub async fn get_room(state: ServerState, auth: Authorization, room_id: Snowflake) -> Result<Room, Error> {
-    let had_perms = if let Some(perms) = state.perm_cache.get(auth.user_id, room_id).await {
-        if !perms.perm.room.contains(RoomPermissions::VIEW_ROOM) {
-            return Err(Error::NotFound);
+    // TODO: Ensure the room permissions are cached after this
+    let perms = match state.perm_cache.get(auth.user_id, room_id).await {
+        Some(PermMute { perm, .. }) => {
+            if !perm.room.contains(RoomPermissions::VIEW_ROOM) {
+                return Err(Error::NotFound);
+            }
+
+            Some(perm)
         }
-        true
-    } else {
-        false
+        None => None,
     };
 
     let db = state.db.read.get().await?;
 
-    let row = if had_perms {
+    let row = if let Some(perms) = perms {
         db.query_opt_cached_typed(|| query(false), &[&room_id]).await
     } else {
         db.query_opt_cached_typed(|| query(true), &[&room_id, &auth.user_id])
