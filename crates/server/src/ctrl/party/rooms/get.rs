@@ -87,7 +87,7 @@ pub async fn get_rooms(
 
                     Query::select()
                         .from(
-                            Rooms::left_join_table::<PartyMember>()
+                            Rooms::inner_join_table::<PartyMember>()
                                 .on(Rooms::PartyId.equals(PartyMember::PartyId)),
                         )
                         .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
