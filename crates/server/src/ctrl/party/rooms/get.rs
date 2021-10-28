@@ -7,9 +7,7 @@ use schema::Snowflake;
 use models::*;
 
 use crate::{
-    ctrl::{
-        auth::Authorization, perm::get_party_permissions, util::encrypted_asset::encrypt_snowflake_opt, Error,
-    },
+    ctrl::{auth::Authorization, util::encrypted_asset::encrypt_snowflake_opt, Error},
     ServerState,
 };
 
@@ -48,8 +46,8 @@ pub async fn get_rooms(
 
                     Query::select()
                         .col(Party::OwnerId)
-                        .expr(Builtin::bit_or(Roles::Permissions))
                         .expr(Builtin::array_agg(Roles::Id))
+                        .expr(Builtin::bit_or(Roles::Permissions))
                         .from(
                             RoleMembers::right_join(
                                 Roles::left_join_table::<Party>().on(Roles::PartyId.equals(Party::Id)),
@@ -69,19 +67,13 @@ pub async fn get_rooms(
             .await?;
 
         let owner_id: Snowflake = row.try_get(0)?;
-        let role_ids: Vec<Snowflake> = row.try_get(2)?;
+        let role_ids: Vec<Snowflake> = row.try_get(1)?;
 
-        let mut permissions;
-
-        if owner_id == auth.user_id {
-            permissions = Permission::PACKED_ALL;
+        let permissions = if owner_id == auth.user_id {
+            Permission::ALL
         } else {
-            permissions = row.try_get::<_, i64>(1)? as u64;
-
-            if (permissions as u64 & Permission::PACKED_ADMIN) == Permission::PACKED_ADMIN {
-                permissions = Permission::PACKED_ALL;
-            }
-        }
+            Permission::unpack(row.try_get::<_, i64>(2)? as u64)
+        };
 
         Ok((permissions, role_ids))
     };
@@ -115,7 +107,7 @@ pub async fn get_rooms(
             )
             .await?;
 
-        let mut rooms = HashMap::new();
+        let mut rooms = HashMap::with_capacity(rows.len());
 
         for row in &rows {
             let room = Room {
@@ -161,7 +153,7 @@ pub async fn get_rooms(
             )
             .await?;
 
-        let mut raw_overwrites = Vec::new();
+        let mut raw_overwrites = Vec::with_capacity(rows.len());
 
         for row in rows {
             raw_overwrites.push(RawOverwrite {
@@ -177,10 +169,12 @@ pub async fn get_rooms(
     };
 
     let ((base_perm, roles), mut rooms, raw_overwrites) =
-        futures::future::try_join3(base_perm_future, rooms_future, overwrites_future).await?;
+        tokio::try_join!(base_perm_future, rooms_future, overwrites_future)?;
 
+    // iterate over raw overwrites and accumulate them in the correct room
+    // this lazily fetches different rooms only when the room_id changes,
+    // rather than a hashtable look up each iteration. Just an opportunistic thing for free.
     let mut raw_overwrites = raw_overwrites.into_iter();
-
     if let Some(raw) = raw_overwrites.next() {
         let mut room = rooms.get_mut(&raw.room_id).unwrap();
 
@@ -195,36 +189,9 @@ pub async fn get_rooms(
         }
     }
 
-    if (base_perm & Permission::PACKED_ADMIN) != Permission::PACKED_ADMIN {
-        // base user permissions for user
-        let base = Permission::unpack(base_perm);
-
+    if !base_perm.is_admin() {
         rooms.retain(|_, room| {
-            let mut room_perm = base;
-
-            let mut allow = Permission::empty();
-            let mut deny = Permission::empty();
-
-            let mut user_overwrite = None;
-
-            // overwrites are sorted role-first
-            for overwrite in &room.overwrites {
-                if roles.contains(&overwrite.id) {
-                    deny |= overwrite.deny;
-                    allow |= overwrite.allow;
-                } else if overwrite.id == auth.user_id {
-                    user_overwrite = Some((overwrite.deny, overwrite.allow));
-                    break;
-                }
-            }
-
-            room_perm &= !deny;
-            room_perm |= allow;
-
-            if let Some((user_deny, user_allow)) = user_overwrite {
-                room_perm &= !user_deny;
-                room_perm |= user_allow;
-            }
+            let room_perm = base_perm.compute_overwrites(&room.overwrites, &roles, auth.user_id);
 
             let can_view = room_perm.room.contains(RoomPermissions::VIEW_ROOM);
 

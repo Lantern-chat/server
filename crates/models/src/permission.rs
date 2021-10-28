@@ -237,3 +237,42 @@ impl Overwrite {
         (base & !self.deny) | self.allow
     }
 }
+
+impl Permission {
+    pub fn compute_overwrites(
+        mut self,
+        overwrites: &[Overwrite],
+        roles: &[Snowflake],
+        user_id: Snowflake,
+    ) -> Permission {
+        if self.is_admin() {
+            return Permission::ALL;
+        }
+
+        let mut allow = Permission::empty();
+        let mut deny = Permission::empty();
+
+        let mut user_overwrite = None;
+
+        // overwrites are always sorted role-first
+        for overwrite in overwrites {
+            if roles.contains(&overwrite.id) {
+                deny |= overwrite.deny;
+                allow |= overwrite.allow;
+            } else if overwrite.id == user_id {
+                user_overwrite = Some((overwrite.deny, overwrite.allow));
+                break;
+            }
+        }
+
+        self &= !deny;
+        self |= allow;
+
+        if let Some((user_deny, user_allow)) = user_overwrite {
+            self &= !user_deny;
+            self |= user_allow;
+        }
+
+        self
+    }
+}
