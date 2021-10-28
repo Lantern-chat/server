@@ -52,9 +52,14 @@ impl Snowflake {
         self.0.get() >> 22
     }
 
-    #[inline]
+    #[inline(always)]
     pub const fn to_u64(self) -> u64 {
         self.0.get()
+    }
+
+    #[inline(always)]
+    pub const fn to_i64(self) -> i64 {
+        unsafe { std::mem::transmute(self.0.get()) }
     }
 }
 
@@ -80,42 +85,28 @@ mod pg_impl {
     use std::error::Error;
 
     use bytes::BytesMut;
-    use postgres_types::{FromSql, IsNull, ToSql, Type};
+    use postgres_types::{accepts, to_sql_checked, FromSql, IsNull, ToSql, Type};
 
     impl<'a> FromSql<'a> for Snowflake {
+        #[inline]
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn Error + Sync + Send>> {
             <i64 as FromSql<'a>>::from_sql(ty, raw).map(|raw| Snowflake(NonZeroU64::new(raw as u64).unwrap()))
         }
 
-        fn accepts(ty: &Type) -> bool {
-            <i64 as FromSql<'a>>::accepts(ty)
-        }
+        accepts!(INT8);
     }
 
     impl ToSql for Snowflake {
+        #[inline]
         fn to_sql(&self, ty: &Type, out: &mut BytesMut) -> Result<IsNull, Box<dyn Error + Sync + Send>>
         where
             Self: Sized,
         {
-            let value = self.0.get() as i64;
-            value.to_sql(ty, out)
+            self.to_i64().to_sql(ty, out)
         }
 
-        fn accepts(ty: &Type) -> bool
-        where
-            Self: Sized,
-        {
-            <i64 as ToSql>::accepts(ty)
-        }
-
-        fn to_sql_checked(
-            &self,
-            ty: &Type,
-            out: &mut BytesMut,
-        ) -> Result<IsNull, Box<dyn Error + Sync + Send>> {
-            let value = self.0.get() as i64;
-            value.to_sql_checked(ty, out)
-        }
+        accepts!(INT8);
+        to_sql_checked!();
     }
 }
 
