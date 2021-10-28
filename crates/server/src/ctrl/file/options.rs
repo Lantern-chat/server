@@ -40,10 +40,10 @@ pub async fn file_options(state: ServerState, auth: Authorization) -> Result<Fil
         )
         .await?;
 
-    let quota_used = row.try_get(0)?;
+    let quota_used: Option<i64> = row.try_get(0)?;
 
     Ok(FileOptions {
-        quota_used,
+        quota_used: quota_used.unwrap_or(0),
         quota_total,
     })
 }
