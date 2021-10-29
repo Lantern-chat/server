@@ -9,6 +9,7 @@ pub mod logout;
 pub mod prefs;
 pub mod sessions;
 pub mod account;
+pub mod billing;
 
 pub async fn me(mut route: Route<crate::ServerState>) -> Response {
     match route.next().method_segment() {
