@@ -37,8 +37,8 @@ CREATE TABLE lantern.group_members (
 );
 ALTER TABLE lantern.group_members OWNER TO postgres;
 
-CREATE INDEX CONCURRENTLY group_member_id_idx ON lantern.group_members USING hash(group_id);
-CREATE INDEX CONCURRENTLY group_member_user_idx ON lantern.group_members USING hash(user_id);
+CREATE INDEX group_member_id_idx ON lantern.group_members USING hash(group_id);
+CREATE INDEX group_member_user_idx ON lantern.group_members USING hash(user_id);
 
 ALTER TABLE lantern.group_members ADD CONSTRAINT group_id_fk FOREIGN KEY (group_id)
     REFERENCES lantern.groups (id) MATCH FULL
