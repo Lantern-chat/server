@@ -1,7 +1,9 @@
-use bytes::Buf;
+use std::marker::PhantomData;
+
+use bytes::{Buf, Bytes};
 use headers::ContentType;
 use http::StatusCode;
-use serde::de::DeserializeOwned;
+use serde::de::{Deserialize, DeserializeOwned};
 
 use super::{BodyError, Reply, ReplyError, Response, Route};
 
@@ -69,6 +71,33 @@ where
 
     Ok(serde_json::from_reader(body.reader())?)
 }
+
+// pub struct OwnedBodyObject<'a, T: Deserialize<'a>> {
+//     body: Bytes,
+//     object: T,
+//     _lt: PhantomData<&'a T>,
+// }
+
+// pub async fn json_ref<'a, T: 'a, S>(
+//     route: &mut Route<S>,
+// ) -> Result<OwnedBodyObject<'a, T>, BodyDeserializeError>
+// where
+//     T: Deserialize<'a>,
+// {
+//     if route.header::<ContentType>() != Some(ContentType::json()) {
+//         return Err(BodyDeserializeError::IncorrectContentType);
+//     }
+
+//     let body = route.bytes().await?;
+
+//     let object = serde_json::from_slice(unsafe { std::mem::transmute::<&[u8], &'static [u8]>(&*body) })?;
+
+//     Ok(OwnedBodyObject {
+//         body,
+//         object,
+//         _lt: PhantomData,
+//     })
+// }
 
 pub async fn form<T, S>(route: &mut Route<S>) -> Result<T, BodyDeserializeError>
 where
