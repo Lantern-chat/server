@@ -136,8 +136,8 @@ pub async fn ready(
             )
             .await?;
 
-        let mut parties = HashMap::new();
-        let mut ids = Vec::new();
+        let mut parties = HashMap::with_capacity(rows.len());
+        let mut ids = Vec::with_capacity(rows.len());
 
         for row in rows {
             let id = row.try_get(0)?;
