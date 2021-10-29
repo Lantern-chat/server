@@ -56,9 +56,10 @@ pub async fn get_rooms(
                         )
                         .and_where(Party::Id.equals(Var::of(Party::Id)))
                         .and_where(
+                            // @user and @everyone roles
                             RoleMembers::UserId
                                 .equals(Var::of(Users::Id))
-                                .or(Roles::PartyId.equals(Party::Id)),
+                                .or(Roles::Id.equals(Party::Id)),
                         )
                         .group_by(Party::OwnerId)
                 },
