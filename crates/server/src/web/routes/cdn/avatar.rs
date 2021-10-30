@@ -46,6 +46,7 @@ pub async fn avatar(mut route: Route<ServerState>, kind: AvatarKind) -> Response
         },
         None,
         is_head,
+        false,
     )
     .await
     {

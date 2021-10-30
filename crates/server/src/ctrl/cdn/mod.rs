@@ -37,6 +37,7 @@ pub async fn get_file(
     kind: FileKind,
     filename: Option<SmolStr>,
     is_head: bool,
+    download: bool,
 ) -> Result<Response, Error> {
     let range: Option<Range> = route.header();
 
@@ -203,11 +204,13 @@ pub async fn get_file(
     headers.typed_insert(ContentLength(len));
     headers.typed_insert(AcceptRanges::bytes());
 
-    // always try to display the file inline
-    headers.insert(
-        "Content-Disposition",
-        HeaderValue::from_str(&format!("inline; filename=\"{}\"", name))?,
-    );
+    let cd = if download {
+        format!("attachment; filename=\"{}\"", name)
+    } else {
+        format!("inline; filename=\"{}\"", name)
+    };
+
+    headers.insert("Content-Disposition", HeaderValue::from_str(&cd)?);
 
     if let Some(mime) = mime {
         headers.insert("Content-Type", HeaderValue::from_str(&mime)?);

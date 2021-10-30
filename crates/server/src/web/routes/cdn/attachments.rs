@@ -25,6 +25,8 @@ pub async fn attachments(mut route: Route<ServerState>) -> Response {
 
     let is_head = route.method() == Method::HEAD;
 
+    let download = route.raw_query() == Some("download");
+
     match crate::ctrl::cdn::get_file(
         route,
         room_id,
@@ -32,6 +34,7 @@ pub async fn attachments(mut route: Route<ServerState>) -> Response {
         crate::ctrl::cdn::FileKind::Attachment,
         Some(filename),
         is_head,
+        download,
     )
     .await
     {
