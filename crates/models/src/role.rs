@@ -2,7 +2,7 @@ use super::*;
 
 bitflags::bitflags! {
     pub struct RoleFlags: i16 {
-        const ADMIN         = 1 << 0;
+        const HOIST         = 1 << 0;
         const MENTIONABLE   = 1 << 1;
     }
 }
@@ -26,6 +26,7 @@ pub struct Role {
     pub name: Option<SmolStr>,
     pub permissions: Permission,
     pub color: Option<u32>,
+    pub sort: i16,
     pub flags: RoleFlags,
 }
 
@@ -35,6 +36,6 @@ impl Role {
     }
 
     pub fn is_admin(&self) -> bool {
-        self.flags.contains(RoleFlags::ADMIN)
+        self.permissions.is_admin()
     }
 }

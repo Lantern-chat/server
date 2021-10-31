@@ -20,8 +20,9 @@ fn base_query() -> thorn::query::SelectQuery {
         /*2*/ Roles::Name,
         /*3*/ Roles::Permissions,
         /*4*/ Roles::Color,
-        /*5*/ Roles::Flags,
-        /*6*/ Roles::AvatarId,
+        /*5*/ Roles::Sort,
+        /*6*/ Roles::Flags,
+        /*7*/ Roles::AvatarId,
     ])
 }
 
@@ -65,8 +66,9 @@ pub async fn get_roles_raw<'a>(
             name: row.try_get(2)?,
             permissions: Permission::unpack(row.try_get::<_, i64>(3)? as u64),
             color: row.try_get::<_, Option<i32>>(4)?.map(|c| c as u32),
-            flags: RoleFlags::from_bits_truncate(row.try_get(5)?),
-            avatar: encrypt_snowflake_opt(&state, row.try_get(6)?),
+            sort: row.try_get(5)?,
+            flags: RoleFlags::from_bits_truncate(row.try_get(6)?),
+            avatar: encrypt_snowflake_opt(&state, row.try_get(7)?),
         }),
     }))
 }

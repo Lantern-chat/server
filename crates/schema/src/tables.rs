@@ -151,6 +151,7 @@ thorn::tables! {
         Permissions: Type::INT8,
         /// Color encoded as a 32-bit integer
         Color: Type::INT4,
+        Sort: Type::INT2,
         Flags: Type::INT2,
         Name: Type::VARCHAR,
     }

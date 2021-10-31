@@ -42,6 +42,7 @@ pub async fn create_party(
         name: None,
         permissions: Permission::default(),
         color: None,
+        sort: 0,
         flags: RoleFlags::default(),
     };
 
@@ -118,6 +119,7 @@ fn insert_member() -> impl AnyQuery {
         .values(vec![Var::of(Party::Id), Var::of(Users::Id)])
 }
 
+// NOTE: Does not set sort order manually, defaults to 0
 fn insert_role() -> impl AnyQuery {
     use schema::*;
 

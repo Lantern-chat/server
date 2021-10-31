@@ -5,6 +5,7 @@ CREATE TABLE lantern.roles (
     -- Actually contains 3 16-bit fields
     permissions     bigint      NOT NULL    DEFAULT 0,
     color           integer,
+    sort            smallint    NOT NULL    DEFAULT 0,
     flags           smallint    NOT NULL    DEFAULT 0,
     name            varchar(32),
 
