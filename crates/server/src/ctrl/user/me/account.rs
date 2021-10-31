@@ -170,7 +170,7 @@ pub async fn modify_account(
         u = Some(new_username);
     }
 
-    drop(user);
+    drop(user); // referenced data from `user` row no longer needed, last used borrow of username above.
 
     if let Some((permit, password_hash_task)) = password_hash_task {
         let password_hash = password_hash_task.await??;
