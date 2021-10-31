@@ -42,7 +42,7 @@ pub async fn create_party(
         name: None,
         permissions: Permission::default(),
         color: None,
-        sort: 0,
+        position: 0,
         flags: RoleFlags::default(),
     };
 
@@ -57,7 +57,7 @@ pub async fn create_party(
         roles: Vec::new(),
         emotes: Vec::new(),
         avatar: None,
-        sort_order: 0,
+        position: 0,
     };
 
     let mut db = state.db.write.get().await?;
@@ -142,14 +142,14 @@ fn insert_room() -> impl AnyQuery {
             Rooms::Id,
             Rooms::PartyId,
             Rooms::Name,
-            Rooms::SortOrder,
+            Rooms::Position,
             Rooms::Flags,
         ])
         .values(vec![
             Var::of(Rooms::Id),
             Var::of(Party::Id),
             Var::of(Rooms::Name),
-            Var::of(Rooms::SortOrder),
+            Var::of(Rooms::Position),
             Var::of(Rooms::Flags),
         ])
 }

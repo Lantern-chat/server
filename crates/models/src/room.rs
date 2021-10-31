@@ -31,7 +31,7 @@ pub struct Room {
     pub topic: Option<SmolStr>,
 
     /// Sort order
-    pub sort_order: i16,
+    pub position: i16,
 
     pub flags: RoomFlags,
 

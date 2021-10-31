@@ -26,7 +26,7 @@ pub struct Role {
     pub name: Option<SmolStr>,
     pub permissions: Permission,
     pub color: Option<u32>,
-    pub sort: i16,
+    pub position: i16,
     pub flags: RoleFlags,
 }
 

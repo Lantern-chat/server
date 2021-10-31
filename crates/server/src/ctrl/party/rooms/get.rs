@@ -98,7 +98,7 @@ pub async fn get_rooms(
                             Rooms::Topic,
                             Rooms::Flags,
                             Rooms::AvatarId,
-                            Rooms::SortOrder,
+                            Rooms::Position,
                             Rooms::ParentId,
                         ])
                         .and_where(Rooms::DeletedAt.is_null())
@@ -118,7 +118,7 @@ pub async fn get_rooms(
                 topic: row.try_get(2)?,
                 flags: RoomFlags::from_bits_truncate(row.try_get(3)?),
                 avatar: encrypt_snowflake_opt(&state, row.try_get(4)?),
-                sort_order: row.try_get(5)?,
+                position: row.try_get(5)?,
                 rate_limit_per_user: None,
                 parent_id: row.try_get(6)?,
                 overwrites: Vec::new(),

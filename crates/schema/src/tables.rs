@@ -132,7 +132,7 @@ thorn::tables! {
         InviteId: Invite::Id,
         JoinedAt: Type::TIMESTAMP,
         Flags: Type::INT2,
-        SortOrder: Type::INT2,
+        Position: Type::INT2,
         Nickname: Type::VARCHAR,
         CustomStatus: Type::VARCHAR,
     }
@@ -151,7 +151,7 @@ thorn::tables! {
         Permissions: Type::INT8,
         /// Color encoded as a 32-bit integer
         Color: Type::INT4,
-        Sort: Type::INT2,
+        Position: Type::INT2,
         Flags: Type::INT2,
         Name: Type::VARCHAR,
     }
@@ -193,7 +193,7 @@ thorn::tables! {
         AvatarId: SNOWFLAKE,
         ParentId: Rooms::Id,
         DeletedAt: Type::TIMESTAMP,
-        SortOrder: Type::INT2,
+        Position: Type::INT2,
         Flags: Type::INT2,
         Name: Type::TEXT,
         Topic: Type::VARCHAR,

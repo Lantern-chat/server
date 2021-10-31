@@ -36,7 +36,9 @@ pub async fn get_room(state: ServerState, auth: Authorization, room_id: Snowflak
         }
     }
 
-    return get_room_full(state, db, room_id).boxed().await;
+    return get_room_full(state, db, auth.user_id, room_id, perms)
+        .boxed()
+        .await;
 }
 
 /// Simple version for regular users with cached permissions saying they cannot view overwrites
@@ -58,7 +60,7 @@ async fn get_room_simple(
                         /*1*/ Rooms::AvatarId,
                         /*2*/ Rooms::Name,
                         /*3*/ Rooms::Topic,
-                        /*4*/ Rooms::SortOrder,
+                        /*4*/ Rooms::Position,
                         /*5*/ Rooms::Flags,
                         /*6*/ Rooms::ParentId,
                     ])
@@ -77,7 +79,7 @@ async fn get_room_simple(
             avatar: encrypt_snowflake_opt(&state, row.try_get(1)?),
             name: row.try_get(2)?,
             topic: row.try_get(3)?,
-            sort_order: row.try_get(4)?,
+            position: row.try_get(4)?,
             flags: RoomFlags::from_bits_truncate(row.try_get(5)?),
             rate_limit_per_user: None,
             parent_id: row.try_get(6)?,
@@ -86,6 +88,50 @@ async fn get_room_simple(
     }
 }
 
-async fn get_room_full(state: ServerState, db: db::pool::Object, room_id: Snowflake) -> Result<Room, Error> {
+async fn get_room_full(
+    state: ServerState,
+    db: db::pool::Object,
+    user_id: Snowflake,
+    room_id: Snowflake,
+    perms: Option<Permission>,
+) -> Result<Room, Error> {
+    let base_perm_future = async {
+        let row = db
+            .query_opt_cached_typed(
+                || {
+                    use schema::*;
+                    use thorn::*;
+
+                    let room_id_var = Var::at(Rooms::Id, 1);
+                    let user_id_var = Var::at(Users::Id, 2);
+
+                    Query::select()
+                        .col(Party::OwnerId)
+                        .expr(Builtin::array_agg(Roles::Id))
+                        .expr(Builtin::bit_or(Roles::Permissions))
+                        .from(
+                            // select rooms and everything else dervied
+                            Rooms::inner_join(
+                                RoleMembers::right_join(
+                                    Roles::left_join_table::<Party>().on(Roles::PartyId.equals(Party::Id)),
+                                )
+                                .on(RoleMembers::RoleId.equals(Roles::Id)),
+                            )
+                            .on(Party::Id.equals(Rooms::PartyId)),
+                        )
+                        .and_where(Rooms::Id.equals(room_id_var))
+                        .and_where(
+                            RoleMembers::UserId
+                                .equals(user_id_var)
+                                .or(Roles::Id.equals(Party::Id)),
+                        )
+                },
+                &[&room_id, &user_id],
+            )
+            .await?;
+
+        Ok::<_, Error>(())
+    };
+
     unimplemented!()
 }

@@ -50,7 +50,7 @@ pub struct Party {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub avatar: Option<SmolStr>,
 
-    pub sort_order: u16,
+    pub position: i16,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

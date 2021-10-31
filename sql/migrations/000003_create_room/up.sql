@@ -4,7 +4,7 @@ CREATE TABLE lantern.rooms (
     avatar_id   bigint,
     parent_id   bigint,
     deleted_at  timestamp,
-    sort_order  smallint            NOT NULL,
+    position    smallint            NOT NULL,
     flags       smallint            NOT NULL    DEFAULT 0,
     name        varchar(128)        NOT NULL,
     topic       varchar(2048),

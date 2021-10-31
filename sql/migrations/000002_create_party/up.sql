@@ -33,7 +33,7 @@ CREATE TABLE lantern.party_member (
     invite_id   bigint,
     joined_at   timestamp   NOT NULL    DEFAULT now(),
     flags       smallint    NOT NULL    DEFAULT 0,
-    sort_order  smallint    NOT NULL    DEFAULT 0,
+    position    smallint    NOT NULL    DEFAULT 0,
 
     -- same as for user, but per-party
     nickname        varchar(256),
