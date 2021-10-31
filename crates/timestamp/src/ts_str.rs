@@ -8,7 +8,7 @@ mod sealed {
 pub trait TimestampStrStorage: sealed::Sealed {
     type Length: ArrayLength<u8>;
 
-    fn template() -> GenericArray<u8, Self::Length>;
+    fn zero() -> GenericArray<u8, Self::Length>;
     fn offset() -> GenericArray<u8, Self::Length>;
 
     const IS_FULL: bool;
@@ -23,14 +23,15 @@ impl sealed::Sealed for Full {}
 impl TimestampStrStorage for Short {
     type Length = generic_array::typenum::consts::U20;
 
-    fn template() -> GenericArray<u8, Self::Length> {
-        //nericArray::from(*b" Y Y Y Y M M D DT H H m m s s. S S SZ")
-        GenericArray::from(*b"\0\0\0\0\0\0\0\0T\0\0\0\0\0\0.\0\0\0Z")
+    #[inline(always)]
+    fn zero() -> GenericArray<u8, Self::Length> {
+        GenericArray::from([0; 20])
     }
 
+    #[inline(always)]
     fn offset() -> GenericArray<u8, Self::Length> {
-        //nericArray::from(*b"YYYYMMDD THHmmss .SSS Z")
-        GenericArray::from(*b"00000000\0000000\0000\0")
+        //nericArray::from(*b"YYYYMMDDTHHmmss.SSSZ")
+        GenericArray::from(*b"00000000T000000.000Z")
     }
 
     const IS_FULL: bool = false;
@@ -39,14 +40,15 @@ impl TimestampStrStorage for Short {
 impl TimestampStrStorage for Full {
     type Length = generic_array::typenum::consts::U24;
 
-    fn template() -> GenericArray<u8, Self::Length> {
-        //nericArray::from(*b" Y Y Y Y- M M- D DT H H: m m: s s. S S SZ")
-        GenericArray::from(*b"\0\0\0\0-\0\0-\0\0T\0\0:\0\0:\0\0.\0\0\0Z")
+    #[inline(always)]
+    fn zero() -> GenericArray<u8, Self::Length> {
+        GenericArray::from([0; 24])
     }
 
+    #[inline(always)]
     fn offset() -> GenericArray<u8, Self::Length> {
-        //nericArray::from(*b"YYYY -MM -DD THH :mm :ss .SSS Z")
-        GenericArray::from(*b"0000\000\000\000\000\000\0000\0")
+        //nericArray::from(*b"YYYY-MM-DDTHH:mm:ss.SSSZ")
+        GenericArray::from(*b"0000-00-00T00:00:00.000Z")
     }
 
     const IS_FULL: bool = true;
