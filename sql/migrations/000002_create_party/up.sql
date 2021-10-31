@@ -45,7 +45,7 @@ CREATE TABLE lantern.party_member (
 ALTER TABLE lantern.party_member OWNER TO postgres;
 
 -- Memberships belong to the user, so it's different from rooms/roles (which belong to the party)
-ALTER TABLE lantern.party_member ADD CONSTRAINT unique_party_position UNIQUE(user_id, position);
+ALTER TABLE lantern.party_member ADD CONSTRAINT unique_party_position UNIQUE(user_id, position) DEFERRABLE INITIALLY DEFERRED;
 
 ALTER TABLE lantern.party_member ADD CONSTRAINT party_fk FOREIGN KEY (party_id)
     REFERENCES lantern.party (id) MATCH FULL

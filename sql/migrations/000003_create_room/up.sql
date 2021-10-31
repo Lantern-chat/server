@@ -13,7 +13,7 @@ CREATE TABLE lantern.rooms (
 );
 ALTER TABLE lantern.rooms OWNER TO postgres;
 
-ALTER TABLE lantern.rooms ADD CONSTRAINT unique_room_position UNIQUE(party_id, position);
+ALTER TABLE lantern.rooms ADD CONSTRAINT unique_room_position UNIQUE(party_id, position) DEFERRABLE INITIALLY DEFERRED;
 
 CREATE INDEX room_name_idx ON lantern.rooms USING hash (name);
 CREATE INDEX room_avatar_idx ON lantern.rooms USING hash(avatar_id);

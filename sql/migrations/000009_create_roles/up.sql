@@ -13,7 +13,7 @@ CREATE TABLE lantern.roles (
 );
 ALTER TABLE lantern.roles OWNER TO postgres;
 
-ALTER TABLE lantern.roles ADD CONSTRAINT unique_role_position UNIQUE(party_id, position);
+ALTER TABLE lantern.roles ADD CONSTRAINT unique_role_position UNIQUE(party_id, position) DEFERRABLE INITIALLY DEFERRED;
 
 -- faster lookup `WHERE party_id`
 CREATE INDEX role_party_idx ON lantern.roles USING hash (party_id);
