@@ -75,7 +75,7 @@ async fn create_room(
         name: form.name,
         topic: form.topic,
         avatar_id: None,
-        sort_order: 0,
+        position: 0,
         flags: RoomFlags::empty(),
         parent_id: None,
     };
