@@ -204,6 +204,8 @@ pub async fn get_file(
     headers.typed_insert(ContentLength(len));
     headers.typed_insert(AcceptRanges::bytes());
 
+    // ensure filename in HTTP header is urlencoded for Unicode and such.
+    let name = urlencoding::encode(&name);
     let cd = if download {
         format!("attachment; filename=\"{}\"", name)
     } else {
