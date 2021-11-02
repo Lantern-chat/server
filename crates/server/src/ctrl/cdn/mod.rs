@@ -1,11 +1,15 @@
 use std::{io::SeekFrom, str::FromStr, time::Instant};
 
 use bytes::{Bytes, BytesMut};
-use ftl::{fs::bytes_range, *};
+use ftl::{
+    fs::{bytes_range, Cond, Conditionals},
+    *,
+};
 
 use futures::FutureExt;
 use headers::{
-    AcceptRanges, ContentLength, ContentRange, ContentType, HeaderMap, HeaderMapExt, HeaderValue, Range,
+    AcceptRanges, ContentLength, ContentRange, ContentType, HeaderMap, HeaderMapExt, HeaderValue,
+    IfModifiedSince, LastModified, Range,
 };
 use hyper::Body;
 use smol_str::SmolStr;
@@ -39,7 +43,14 @@ pub async fn get_file(
     is_head: bool,
     download: bool,
 ) -> Result<Response, Error> {
-    let range: Option<Range> = route.header();
+    let range = route.header::<headers::Range>();
+    let conditionals = Conditionals::new(&route, range);
+    let last_modified = LastModified::from(file_id.system_timestamp());
+
+    let range = match conditionals.check(Some(last_modified)) {
+        Cond::NoBody(resp) => return Ok(resp),
+        Cond::WithBody(range) => range,
+    };
 
     let route_start = route.start;
     let state = route.state;
@@ -201,8 +212,13 @@ pub async fn get_file(
 
     let headers = res.headers_mut();
 
+    headers.insert(
+        "Cache-Control",
+        HeaderValue::from_static("public, max-age=2678400"),
+    );
     headers.typed_insert(ContentLength(len));
     headers.typed_insert(AcceptRanges::bytes());
+    headers.typed_insert(last_modified);
 
     // ensure filename in HTTP header is urlencoded for Unicode and such.
     let name = urlencoding::encode(&name);

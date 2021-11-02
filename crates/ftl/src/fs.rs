@@ -117,13 +117,23 @@ pub struct Conditionals {
     range: Option<Range>,
 }
 
-enum Cond {
+pub enum Cond {
     NoBody(Response<Body>),
     WithBody(Option<Range>),
 }
 
 impl Conditionals {
-    fn check(self, last_modified: Option<LastModified>) -> Cond {
+    pub fn new<S>(route: &Route<S>, range: Option<Range>) -> Conditionals {
+        let req_headers = route.req.headers();
+        Conditionals {
+            range,
+            if_modified_since: req_headers.typed_get(),
+            if_unmodified_since: req_headers.typed_get(),
+            if_range: req_headers.typed_get(),
+        }
+    }
+
+    pub fn check(self, last_modified: Option<LastModified>) -> Cond {
         if let Some(since) = self.if_unmodified_since {
             let precondition = last_modified
                 .map(|time| since.precondition_passes(time.into()))
@@ -260,13 +270,7 @@ async fn file_reply<S>(route: &Route<S>, path: impl AsRef<Path>, cache: &impl Fi
     };
 
     // parse after opening the file handle to save time on open error
-    let headers = route.req.headers();
-    let conditionals = Conditionals {
-        range,
-        if_modified_since: headers.typed_get(),
-        if_unmodified_since: headers.typed_get(),
-        if_range: headers.typed_get(),
-    };
+    let conditionals = Conditionals::new(&route, range);
 
     let modified = match metadata.modified() {
         Err(_) => None,
@@ -320,10 +324,11 @@ async fn file_reply<S>(route: &Route<S>, path: impl AsRef<Path>, cache: &impl Fi
 
                 headers.insert(TRAILER, HeaderValue::from_static("Server-Timing"));
 
-                resp.with_header(ContentLength(len))
-                    .with_header(ContentType::from(mime))
-                    .with_header(AcceptRanges::bytes())
-                    .into_response()
+                headers.typed_insert(ContentLength(len));
+                headers.typed_insert(ContentType::from(mime));
+                headers.typed_insert(AcceptRanges::bytes());
+
+                resp
             }
         },
     }
