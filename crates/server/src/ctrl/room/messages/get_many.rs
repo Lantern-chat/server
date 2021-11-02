@@ -17,7 +17,6 @@ use crate::{
 pub enum MessageSearch {
     After(Snowflake),
     Before(Snowflake),
-    Around(Snowflake),
 }
 
 #[derive(Deserialize)]
@@ -61,20 +60,13 @@ pub async fn get_many(
 
     let msg_id = match form.query {
         Some(MessageSearch::After(id)) => id,
-        Some(MessageSearch::Around(id)) => id,
         Some(MessageSearch::Before(id)) => id,
         None => Snowflake::max_value(),
     };
 
     let limit = 100.min(form.limit as i16);
 
-    let limit = match form.query {
-        Some(MessageSearch::Around(_)) => (limit + limit % 2) / 2,
-        _ => limit,
-    };
-
     use arrayvec::ArrayVec;
-
     let mut params: ArrayVec<&(dyn ToSql + Sync), 4> =
         ArrayVec::from([&room_id as _, &msg_id as _, &limit as _, &auth.user_id as _]);
 
@@ -89,7 +81,6 @@ pub async fn get_many(
                 db.prepare_cached_typed(|| query(Before(NULL), false)).await
             }
             Some(MessageSearch::After(_)) => db.prepare_cached_typed(|| query(After(NULL), false)).await,
-            Some(MessageSearch::Around(_)) => db.prepare_cached_typed(|| query(Around(NULL), false)).await,
         }
     } else {
         use MessageSearch::*;
@@ -100,7 +91,6 @@ pub async fn get_many(
                 db.prepare_cached_typed(|| query(Before(NULL), true)).await
             }
             Some(MessageSearch::After(_)) => db.prepare_cached_typed(|| query(After(NULL), true)).await,
-            Some(MessageSearch::Around(_)) => db.prepare_cached_typed(|| query(Around(NULL), true)).await,
         }
     };
 
@@ -238,7 +228,36 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
     let limit_var = Var::at(Type::INT2, 3);
     let user_id_var = Var::at(Users::Id, 4);
 
+    tables! {
+        struct SelectedMessages {
+            Id: Messages::Id,
+        }
+    }
+
+    let mut selected = Query::select()
+        .expr(Messages::Id.alias_to(SelectedMessages::Id))
+        .from_table::<Messages>()
+        .and_where(Messages::RoomId.equals(room_id_var.clone()))
+        .and_where(
+            // test if message is deleted
+            Messages::Flags
+                .bit_and(Literal::Int2(MessageFlags::DELETED.bits()))
+                .equals(Literal::Int2(0)),
+        )
+        .limit(limit_var.clone());
+
+    selected = match mode {
+        MessageSearch::After(_) => selected
+            .and_where(Messages::Id.greater_than(msg_id_var))
+            .order_by(Messages::Id.ascending()),
+
+        MessageSearch::Before(_) => selected
+            .and_where(Messages::Id.less_than(msg_id_var))
+            .order_by(Messages::Id.descending()),
+    };
+
     let mut query = Query::select()
+        .with(SelectedMessages::as_query(selected).exclude())
         .cols(&[
             /* 0*/ AggMessages::MsgId,
             /* 1*/ AggMessages::UserId,
@@ -257,89 +276,10 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
             /*14*/ AggMessages::AttachmentMeta,
             /*15*/ AggMessages::AttachmentPreview,
         ])
-        .and_where(AggMessages::RoomId.equals(room_id_var.clone()))
-        .and_where(
-            // test if message is deleted
-            AggMessages::MessageFlags
-                .bit_and(Literal::Int2(MessageFlags::DELETED.bits()))
-                .equals(Literal::Int2(0)),
+        .from(
+            AggMessages::inner_join_table::<SelectedMessages>()
+                .on(AggMessages::MsgId.equals(SelectedMessages::Id)),
         );
-
-    match mode {
-        MessageSearch::Before(_) | MessageSearch::After(_) => {
-            query = query.from_table::<AggMessages>().limit(limit_var.clone())
-        }
-        _ => {}
-    }
-
-    query = match mode {
-        MessageSearch::After(_) => query
-            .and_where(AggMessages::MsgId.greater_than(msg_id_var))
-            .order_by(AggMessages::MsgId.ascending()),
-        MessageSearch::Before(_) => query
-            .and_where(AggMessages::MsgId.less_than(msg_id_var))
-            .order_by(AggMessages::MsgId.descending()),
-
-        MessageSearch::Around(_) => {
-            tables! {
-                struct NumberedMsgs {
-                    MsgId: Messages::Id,
-                    RowNumber: Type::INT8,
-                }
-
-                struct Offsets {
-                    Offset: Type::INT8,
-                }
-            }
-
-            // generate a sequence of message ids with their row number
-            let numbered = NumberedMsgs::as_query(
-                Query::select()
-                    .from_table::<AggMessages>()
-                    .expr(AggMessages::MsgId.alias_to(NumberedMsgs::MsgId))
-                    .expr(
-                        Builtin::row_number(())
-                            .over(AggMessages::MsgId.ascending())
-                            .alias_to(NumberedMsgs::RowNumber),
-                    ),
-            );
-
-            // generate a set of offsets around 0
-            let offsets = Offsets::as_query(
-                Query::select()
-                    .expr(
-                        Builtin::generate_series((limit_var.clone().neg(), Literal::Int8(-1)))
-                            .alias_to(Offsets::Offset),
-                    )
-                    .union_all(
-                        Query::select().expr(
-                            Builtin::generate_series((Literal::Int8(1), limit_var.clone()))
-                                .alias_to(Offsets::Offset),
-                        ),
-                    ),
-            );
-
-            query = query
-                .with(numbered.exclude())
-                .with(offsets.exclude())
-                .from(
-                    AggMessages::inner_join_table::<NumberedMsgs>()
-                        .on(AggMessages::MsgId.equals(NumberedMsgs::MsgId)),
-                )
-                .and_where(
-                    // select only messages in the offset range
-                    NumberedMsgs::RowNumber.in_query(
-                        Query::select()
-                            .expr(NumberedMsgs::RowNumber.add(Offsets::Offset))
-                            .from(NumberedMsgs::cross_join_table::<Offsets>())
-                            .and_where(NumberedMsgs::MsgId.equals(msg_id_var)),
-                    ),
-                )
-                .order_by(AggMessages::MsgId.ascending());
-
-            query
-        }
-    };
 
     if check_perms {
         tables! {

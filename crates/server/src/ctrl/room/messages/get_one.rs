@@ -47,6 +47,13 @@ pub(crate) fn parse_msg(
     msg_id: Snowflake,
     row: db::Row,
 ) -> Result<Message, Error> {
+    let flags = MessageFlags::from_bits_truncate(row.try_get(9)?);
+
+    // doing this here results in a simpler query
+    if flags.contains(MessageFlags::DELETED) {
+        return Err(Error::NotFound);
+    }
+
     let party_id: Option<Snowflake> = row.try_get(1)?;
 
     let mut msg = Message {
@@ -54,7 +61,7 @@ pub(crate) fn parse_msg(
         party_id,
         created_at: msg_id.timestamp(),
         room_id,
-        flags: MessageFlags::from_bits_truncate(row.try_get(9)?),
+        flags,
         edited_at: row.try_get::<_, Option<_>>(8)?,
         content: row.try_get(10)?,
         author: User {
@@ -173,12 +180,6 @@ pub(crate) fn get_one_without_perms() -> impl AnyQuery {
         .cols(consts::COLUMNS)
         .and_where(AggMessages::RoomId.equals(Var::of(Rooms::Id)))
         .and_where(AggMessages::MsgId.equals(Var::of(Messages::Id)))
-        .and_where(
-            // test if message is deleted
-            AggMessages::MessageFlags
-                .bit_and(Literal::Int2(MessageFlags::DELETED.bits()))
-                .equals(Literal::Int2(0)),
-        )
 }
 
 fn get_one_with_perms() -> impl AnyQuery {
@@ -221,10 +222,4 @@ fn get_one_with_perms() -> impl AnyQuery {
         .cols(consts::COLUMNS)
         .and_where(AggMessages::RoomId.equals(room_id_var))
         .and_where(AggMessages::MsgId.equals(msg_id_var))
-        .and_where(
-            // test if message is deleted
-            AggMessages::MessageFlags
-                .bit_and(Literal::Int2(MessageFlags::DELETED.bits()))
-                .equals(Literal::Int2(0)),
-        )
 }
