@@ -38,14 +38,11 @@ SELECT
     agg_attachments.meta,
     agg_attachments.preview
 FROM
-lantern.agg_attachments RIGHT JOIN
-    lantern.agg_mentions RIGHT JOIN
-        lantern.agg_members member RIGHT JOIN
-            lantern.rooms INNER JOIN
-                lantern.messages INNER JOIN lantern.agg_users users ON users.id = messages.user_id
-            ON rooms.id = messages.room_id
-        ON (member.user_id = messages.user_id AND member.party_id = rooms.party_id)
-    ON agg_mentions.msg_id = messages.id
-ON agg_attachments.msg_id = messages.id
+lantern.messages INNER JOIN lantern.agg_users users ON users.id = messages.user_id
+INNER JOIN lantern.rooms ON rooms.id = messages.room_id
+
+LEFT JOIN lantern.agg_members member ON (member.user_id = messages.user_id AND member.party_id = rooms.party_id)
+LEFT JOIN lantern.agg_attachments ON agg_attachments.msg_id = messages.id
+LEFT JOIN lantern.agg_mentions ON agg_mentions.msg_id = messages.id
 ;
 

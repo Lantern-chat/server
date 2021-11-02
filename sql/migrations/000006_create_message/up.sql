@@ -17,11 +17,11 @@ ALTER TABLE lantern.messages SET (toast_tuple_target = 128);
 
 -- Since id is a snowflake, it's always sorted by time
 -- so index with btree for the times when we need to fetch by timestamps
-CREATE UNIQUE INDEX msg_id_idx ON lantern.messages USING btree (id);
+CREATE INDEX msg_id_idx ON lantern.messages USING btree (id);
 
 -- Index user and room ids for faster lookups
-CREATE INDEX msg_user_idx ON lantern.messages USING hash (user_id);
-CREATE INDEX msg_room_idx ON lantern.messages USING hash (room_id);
+CREATE INDEX msg_user_idx ON lantern.messages USING btree (user_id, id);
+CREATE INDEX msg_room_idx ON lantern.messages USING btree (room_id, id);
 
 ALTER TABLE lantern.messages ADD CONSTRAINT room_fk FOREIGN KEY (room_id)
     REFERENCES lantern.rooms (id) MATCH FULL
