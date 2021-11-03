@@ -2,7 +2,7 @@ use futures::FutureExt;
 
 use ftl::*;
 
-use headers::ContentType;
+use headers::{ContentType, HeaderValue};
 
 pub mod api;
 pub mod cdn;
@@ -57,10 +57,21 @@ pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
                 return StatusCode::NOT_FOUND.into_response();
             }
 
-            fs::file(&route, "frontend/dist/index.html", &route.state.file_cache)
+            let mut resp = fs::file(&route, "frontend/dist/index.html", &route.state.file_cache)
                 .boxed()
                 .await
-                .into_response()
+                .into_response();
+
+            if cfg!(debug_assertions) {
+                resp.headers_mut().insert(
+                    "Cache-Control",
+                    HeaderValue::from_static(
+                        "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+                    ),
+                );
+            }
+
+            resp
         }
 
         _ => StatusCode::METHOD_NOT_ALLOWED.into_response(),
