@@ -242,10 +242,10 @@ impl UserPreference {
                 _ => false,
             },
             // Font sizes can be floats for smooth scaling, but must be positive
-            Self::ChatFontSize | Self::UIFontSize => match value.as_f64() {
+            Self::ChatFontSize | Self::UIFontSize => match value.as_u64() {
                 Some(value) => {
                     kind = UserPreferenceErrorKind::InvalidValue;
-                    value > 0.0
+                    8 <= value && value <= 32
                 }
                 _ => false,
             },
@@ -268,7 +268,7 @@ impl UserPreference {
     fn is_default(self, value: &Value, flags: UserPrefsFlags) -> bool {
         match self {
             Self::Flags => value.as_u64() == Some(UserPrefsFlags::DEFAULT_FLAGS.bits() as u64),
-            Self::ChatFontSize | Self::UIFontSize => value.as_f64() == Some(1.0),
+            Self::ChatFontSize | Self::UIFontSize => value.as_u64() == Some(16),
             Self::Temp => value.as_f64() == Some(7500.0),
             Self::FriendAdd => value.as_u64() == Some(3),
             Self::Locale => value.as_u64() == Some(Locale::enUS as u64),
