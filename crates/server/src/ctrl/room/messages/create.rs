@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use futures::FutureExt;
 use schema::{Snowflake, SnowflakeExt};
 use smol_str::SmolStr;
@@ -23,12 +25,56 @@ pub async fn create_message(
     room_id: Snowflake,
     form: CreateMessageForm,
 ) -> Result<Message, Error> {
-    let trimmed_content = form.content.trim();
+    let mut trimmed_content = Cow::Borrowed(form.content.trim());
 
-    // if NOT the trimmed length is valid or there are attachments
-    if !(state.config.message_len.contains(&trimmed_content.len())
-        || (trimmed_content.is_empty() && !form.attachments.is_empty()))
-    {
+    // if empty but not containing attachments
+    if trimmed_content.is_empty() && !form.attachments.is_empty() {
+        return Err(Error::BadRequest);
+    }
+
+    let mut trimming = false;
+    let mut new_content = String::new();
+    let mut count = 0;
+
+    // TODO: Don't strip newlines inside code blocks?
+    for (idx, &byte) in trimmed_content.as_bytes().iter().enumerate() {
+        // if we encounted a newline
+        if byte == b'\n' {
+            count += 1; // count up
+
+            // if over 2 consecutive newlines, begin trimming
+            if count > 2 {
+                // if not already trimming, push everything tested up until this point
+                // notably not including the third newline
+                if !trimming {
+                    trimming = true;
+                    new_content.push_str(&trimmed_content[..idx]);
+                }
+
+                // skip any additional newlines
+                continue;
+            }
+        } else {
+            // reset count if newline streak broken
+            count = 0;
+        }
+
+        // if trimming, push the new byte
+        if trimming {
+            unsafe { new_content.as_mut_vec().push(byte) };
+        }
+    }
+
+    if trimming {
+        trimmed_content = Cow::Owned(new_content);
+    }
+
+    let newlines = bytecount::count(trimmed_content.as_bytes(), b'\n');
+
+    let not_too_large = state.config.message_len.contains(&trimmed_content.len());
+    let not_too_long = newlines <= state.config.max_newlines;
+
+    if !(not_too_large && not_too_long) {
         return Err(Error::BadRequest);
     }
 
@@ -43,7 +89,7 @@ pub async fn create_message(
             return Err(Error::Unauthorized);
         }
 
-        return create_message_full(state, auth, room_id, &form, trimmed_content)
+        return create_message_full(state, auth, room_id, &form, &trimmed_content)
             .boxed()
             .await;
     }
