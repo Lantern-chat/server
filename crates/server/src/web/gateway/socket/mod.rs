@@ -201,6 +201,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                                                 tokio::spawn(async move {
                                                     if let Ok(db) = state.db.read.get().await {
                                                         if let Ok(_) = crate::ctrl::gateway::refresh::refresh_room_perms(&state, &db, user_id).await {
+                                                            // double-check once refreshed. Only if it really exists should it continue.
                                                             if state.perm_cache.get(user_id, room_id).await.is_some() {
                                                                 // we don't care about the result of this
                                                                 let _ = conn.tx.send(event).await;
@@ -213,8 +214,6 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                                                     // if we *still* don't have the permissions or an error occured, kick.
                                                     let _ = conn.tx.send(INVALID_SESSION.clone()).await;
                                                 });
-
-                                                log::warn!("Missing room permissions for {} {}", user_id, room_id);
 
                                                 continue 'event_loop;
                                             }
