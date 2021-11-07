@@ -82,32 +82,29 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
         // map each incoming websocket message such that it will decompress/decode the message
         // AND update the last_msg value concurrently.
         let conn2 = conn.clone();
-        let ws_rx = ws_rx
-            .map(|msg| (msg, &conn2))
-            .then(move |(msg, conn)| async move {
-                match msg {
-                    Err(e) => Err(MessageIncomingError::from(e)),
-                    Ok(msg) if msg.is_close() => Err(MessageIncomingError::SocketClosed),
-                    Ok(msg) => {
-                        // Block to decompress and parse
-                        let block =
-                            tokio::task::spawn_blocking(move || -> Result<_, MessageIncomingError> {
-                                let msg = decompress_if(query.compress, msg.as_bytes())?;
+        let ws_rx = ws_rx.map(|msg| (msg, &conn2)).then(move |(msg, conn)| async move {
+            match msg {
+                Err(e) => Err(MessageIncomingError::from(e)),
+                Ok(msg) if msg.is_close() => Err(MessageIncomingError::SocketClosed),
+                Ok(msg) => {
+                    // Block to decompress and parse
+                    let block = tokio::task::spawn_blocking(move || -> Result<_, MessageIncomingError> {
+                        let msg = decompress_if(query.compress, msg.as_bytes())?;
 
-                                Ok(match query.encoding {
-                                    Encoding::Json => serde_json::from_slice(&msg)?,
-                                    Encoding::MsgPack => rmp_serde::from_slice(&msg)?,
-                                })
-                            });
+                        Ok(match query.encoding {
+                            Encoding::Json => serde_json::from_slice(&msg)?,
+                            Encoding::MsgPack => rmp_serde::from_slice(&msg)?,
+                        })
+                    });
 
-                        // do the parsing/decompressing at the same time as updating the heartbeat
-                        // TODO: Only count heartbeats on the actual event?
-                        let (res, _) = future::join(block, conn.heartbeat()).await;
+                    // do the parsing/decompressing at the same time as updating the heartbeat
+                    // TODO: Only count heartbeats on the actual event?
+                    let (res, _) = future::join(block, conn.heartbeat()).await;
 
-                        res?
-                    }
+                    res?
                 }
-            });
+            }
+        });
 
         // by placing the WsMessage constructor here, it avoids allocation ahead of when it can send the message
         let mut ws_tx = ws_tx.with(move |event: Result<Event, MessageOutgoingError>| {
@@ -172,28 +169,55 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                                         ready.user.id,
                                         conn.clone(),
                                         // NOTE: https://github.com/rust-lang/rust/issues/70263
-                                        ready
-                                            .parties
-                                            .iter()
-                                            .map(crate::util::passthrough(|p: &models::Party| &p.id)),
+                                        ready.parties.iter().map(crate::util::passthrough(|p: &models::Party| &p.id)),
                                     )
                                     .await;
 
+                                // iterate through subscribed parties
                                 events.extend(subs.into_iter().map(|sub| {
-                                    let (stream, cancel) =
-                                        CancelableStream::new(BroadcastStream::new(sub.rx));
+                                    // take their broadcast stream and wrap it in a cancel signal
+                                    // this is so we can unsubscribe later if needed
+                                    let (stream, cancel) = CancelableStream::new(BroadcastStream::new(sub.rx));
 
                                     listener_table.insert(sub.party_id, cancel);
 
+                                    // map the stream to the `Item` type
                                     stream.map(|event| Item::Event(event.map_err(Into::into))).boxed()
                                 }));
                             }
                             _ => match user_id {
-                                None => break 'event_loop,
+                                None => {
+                                    log::warn!("Attempted to receive events before user_id was set");
+                                    break 'event_loop;
+                                }
                                 Some(user_id) => {
                                     if let Some(room_id) = event.room_id {
                                         match state.perm_cache.get(user_id, room_id).await {
-                                            None => break 'event_loop,
+                                            // if no permission cache was found, refresh it
+                                            // takes ownership of the event and will retry when done
+                                            None => {
+                                                let state = state.clone();
+                                                let conn = conn.clone();
+                                                tokio::spawn(async move {
+                                                    if let Ok(db) = state.db.read.get().await {
+                                                        if let Ok(_) = crate::ctrl::gateway::refresh::refresh_room_perms(&state, &db, user_id).await {
+                                                            if state.perm_cache.get(user_id, room_id).await.is_some() {
+                                                                // we don't care about the result of this
+                                                                let _ = conn.tx.send(event).await;
+
+                                                                return;
+                                                            }
+                                                        }
+                                                    }
+
+                                                    // if we *still* don't have the permissions or an error occured, kick.
+                                                    let _ = conn.tx.send(INVALID_SESSION.clone()).await;
+                                                });
+
+                                                log::warn!("Missing room permissions for {} {}", user_id, room_id);
+
+                                                continue 'event_loop;
+                                            }
                                             Some(PermMute { perm, .. }) => {
                                                 if !perm.room.contains(RoomPermissions::READ_MESSAGES) {
                                                     continue 'event_loop;
@@ -205,27 +229,18 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                                     match event.msg {
                                         ServerMsg::PartyCreate { ref payload, .. } => {
                                             // this follows the same pattern as ServerMsg::Ready
-                                            let subs = state
-                                                .gateway
-                                                .sub_and_activate_connection(
-                                                    user_id,
-                                                    conn.clone(),
-                                                    &[payload.inner.id],
-                                                )
-                                                .await;
+                                            let subs = state.gateway.sub_and_activate_connection(user_id, conn.clone(), &[payload.inner.id]).await;
 
                                             events.extend(subs.into_iter().map(|sub| {
-                                                let (stream, cancel) =
-                                                    CancelableStream::new(BroadcastStream::new(sub.rx));
+                                                let (stream, cancel) = CancelableStream::new(BroadcastStream::new(sub.rx));
 
                                                 listener_table.insert(sub.party_id, cancel);
 
-                                                stream
-                                                    .map(|event| Item::Event(event.map_err(Into::into)))
-                                                    .boxed()
+                                                stream.map(|event| Item::Event(event.map_err(Into::into))).boxed()
                                             }))
                                         }
                                         ServerMsg::PartyDelete { ref payload, .. } => {
+                                            // by cancelling a stream, it will be removed from the SelectStream automatically
                                             if let Some(event_stream) = listener_table.get(&payload.id) {
                                                 event_stream.cancel();
                                             }
@@ -240,7 +255,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                     }
                     Err(e) => {
                         log::warn!("Event error: {}", e);
-                        Err(MessageOutgoingError::SocketClosed) // kick for lag
+                        Err(MessageOutgoingError::SocketClosed) // kick for lag?
                     }
                 },
                 Item::Msg(msg) => match msg {
@@ -249,12 +264,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                         ClientMsg::Heartbeat { .. } => Ok(HEARTBEAT_ACK.clone()),
                         ClientMsg::Identify { payload, .. } => {
                             // this will send a ready event on success
-                            tokio::spawn(identify::identify(
-                                state.clone(),
-                                conn.clone(),
-                                payload.inner.auth,
-                                payload.inner.intent,
-                            ));
+                            tokio::spawn(identify::identify(state.clone(), conn.clone(), payload.inner.auth, payload.inner.intent));
                             intent = payload.inner.intent;
                             continue;
                         }
@@ -270,12 +280,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                                     break 'event_loop;
                                 }
                                 Some(user_id) => {
-                                    tokio::spawn(set_presence(
-                                        state.clone(),
-                                        user_id,
-                                        conn.id,
-                                        payload.inner.presence,
-                                    ));
+                                    tokio::spawn(set_presence(state.clone(), user_id, conn.id, payload.inner.presence));
                                 }
                             }
 
@@ -319,12 +324,15 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
 
         log::trace!("Gateway event loop ended");
 
-        // if there was a user_id, that means the connection had been readied and a presence possibly set,
-        // so kick off a task that will clear the presence after 5 seconds.
-        //
-        // 5 seconds would give enough time for a page reload, so if the user starts a new connection before then
-        // we can avoid flickering presences
-        if user_id.is_some() {
+        // un-cache permissions
+        if let Some(user_id) = user_id {
+            state.perm_cache.remove_reference(user_id).await;
+
+            // if there was a user_id, that means the connection had been readied and a presence possibly set,
+            // so kick off a task that will clear the presence after 5 seconds.
+            //
+            // 5 seconds would give enough time for a page reload, so if the user starts a new connection before then
+            // we can avoid flickering presences
             let conn_id = conn.id;
             let state2 = state.clone();
             tokio::spawn(async move {
@@ -336,17 +344,8 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
             });
         }
 
-        // TODO: Cleanup connection, what else is there?
-        tokio::join! {
-            // remove connection from gateway tables
-            state.gateway.remove_connection(conn.id, user_id),
-            async {
-                // un-cache permissions
-                if let Some(user_id) = user_id {
-                    state.perm_cache.remove_reference(user_id).await;
-                }
-            },
-        };
+        // remove connection from gateway tables
+        state.gateway.remove_connection(conn.id, user_id).await;
     });
 }
 
@@ -384,9 +383,7 @@ impl MessageIncomingError {
         match self {
             Self::SocketClosed => true,
             Self::TungsteniteError(e) => match e {
-                Error::AlreadyClosed
-                | Error::ConnectionClosed
-                | Error::Protocol(ProtocolError::ResetWithoutClosingHandshake) => true,
+                Error::AlreadyClosed | Error::ConnectionClosed | Error::Protocol(ProtocolError::ResetWithoutClosingHandshake) => true,
                 _ => false,
             },
             _ => false,

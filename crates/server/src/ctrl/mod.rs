@@ -15,6 +15,7 @@ pub enum SearchMode<'a> {
 pub mod gateway {
     pub mod presence;
     pub mod ready;
+    pub mod refresh;
 }
 
 pub mod user {

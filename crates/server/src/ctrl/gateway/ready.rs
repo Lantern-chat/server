@@ -22,49 +22,14 @@ pub async fn ready(
 ) -> Result<models::events::Ready, Error> {
     use models::*;
 
+    log::trace!("Processing Ready Event for {}", auth.user_id);
+
     let db = state.db.read.get().await?;
 
     let perms_future = async {
-        if state.perm_cache.add_reference(auth.user_id).await {
-            return Ok::<_, Error>(());
-        }
+        state.perm_cache.add_reference(auth.user_id).await;
 
-        let stream = db
-            .query_stream_cached_typed(
-                || {
-                    use schema::*;
-                    use thorn::*;
-
-                    Query::select()
-                        .from_table::<AggRoomPerms>()
-                        .cols(&[AggRoomPerms::RoomId, AggRoomPerms::Perms])
-                        .and_where(AggRoomPerms::UserId.equals(Var::of(Users::Id)))
-                },
-                &[&auth.user_id],
-            )
-            .await?;
-
-        let mut cache = Vec::new();
-
-        futures::pin_mut!(stream);
-        while let Some(row) = stream.next().await {
-            let row = row?;
-
-            let room_id: Snowflake = row.try_get(0)?;
-            let perm: i64 = row.try_get(1)?;
-
-            cache.push((
-                room_id,
-                PermMute {
-                    perm: Permission::unpack(perm as u64),
-                    muted: false,
-                },
-            ));
-        }
-
-        state.perm_cache.batch_set(auth.user_id, cache.into_iter()).await;
-
-        Ok(())
+        super::refresh::refresh_room_perms(&state, &db, auth.user_id).await
     };
 
     let user_future = async {
@@ -194,7 +159,20 @@ pub async fn ready(
         Ok::<_, Error>(parties.into_iter().map(|(_, v)| v).collect())
     };
 
-    let (user, parties, _) = futures::future::try_join3(user_future, parties_future, perms_future).await?;
+    // run all futures to competion, rather than quiting out after the first error as with `try_join!`
+    // because `perm_cache` also takes some time to set, this avoids a possible race condition
+    // and it doesn't really matter anyway, since the other two database tasks are pretty quick to fail
+    let (user, parties) = match tokio::join!(user_future, parties_future, perms_future) {
+        (Ok(user), Ok(parties), Ok(())) => (user, parties),
+        (Err(e), _, _) | (_, Err(e), _) | (_, _, Err(e)) => {
+            log::warn!("Error during ready event: {}", e);
+
+            //if failed, make sure the cache reference is cleaned up
+            state.perm_cache.remove_reference(auth.user_id).await;
+
+            return Err(e);
+        }
+    };
 
     Ok(events::Ready {
         user,
