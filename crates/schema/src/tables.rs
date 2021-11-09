@@ -56,7 +56,7 @@ thorn::tables! {
         Id: SNOWFLAKE,
         DeletedAt: Type::TIMESTAMP,
         Dob: Type::DATE,
-        Flags: Type::INT2,
+        Flags: Type::INT4,
         Discriminator: UINT2,
         Username: Type::VARCHAR,
         Email: Type::TEXT,

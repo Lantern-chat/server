@@ -2,7 +2,7 @@ use super::*;
 
 bitflags::bitflags! {
     /// NOTE: Remember to clear flag caches when they change
-    pub struct UserFlags: i16 {
+    pub struct UserFlags: i32 {
         //const SYSTEM                = 1 << 2;
         //const BOT                   = 1 << 3;
         //const STAFF                 = 1 << 4;
@@ -81,7 +81,7 @@ impl UserFlags {
     }
 
     pub fn with_elevation(self, ev: ElevationLevel) -> Self {
-        self.difference(Self::ELEVATION) | Self::from_bits_truncate(((ev as u8) as i16) << 6)
+        self.difference(Self::ELEVATION) | Self::from_bits_truncate(((ev as u8) as i32) << 6)
     }
 
     pub fn premium_level(self) -> u8 {

@@ -19,7 +19,7 @@ pub struct LoginForm {
     pub totp: Option<SmolStr>,
 }
 
-use models::Session;
+use models::{ElevationLevel, Session, UserFlags};
 
 use crate::ctrl::user::register::hash_config;
 
@@ -38,7 +38,13 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: LoginForm) -> Res
 
                 Query::select()
                     .from_table::<Users>()
-                    .cols(&[Users::Id, Users::Passhash, Users::MfaSecret, Users::MfaBackup])
+                    .cols(&[
+                        Users::Id,
+                        Users::Flags,
+                        Users::Passhash,
+                        Users::MfaSecret,
+                        Users::MfaBackup,
+                    ])
                     .and_where(Users::Email.equals(Var::of(Users::Email)))
                     .and_where(Users::DeletedAt.is_null())
             },
@@ -52,9 +58,24 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: LoginForm) -> Res
     };
 
     let user_id: Snowflake = user.try_get(0)?;
-    let passhash: &str = user.try_get(1)?;
-    let secret: Option<&[u8]> = user.try_get(2)?;
-    let backup: Option<&[u8]> = user.try_get(3)?;
+    let flags = UserFlags::from_bits_truncate(user.try_get(1)?);
+    let passhash: &str = user.try_get(2)?;
+    let secret: Option<&[u8]> = user.try_get(3)?;
+    let backup: Option<&[u8]> = user.try_get(4)?;
+
+    let elevation = flags.elevation();
+
+    // System user flat out cannot log in. Pretend it doesn't exist.
+    if elevation == ElevationLevel::System {
+        return Err(Error::NotFound);
+    }
+
+    // don't allow staff to login without 2FA
+    if elevation == ElevationLevel::Staff && secret.is_none() {
+        log::error!("Staff user {} tried to login without 2FA enabled", user_id);
+
+        return Err(Error::NotFound);
+    }
 
     if secret.is_some() != backup.is_some() {
         return Err(Error::InternalErrorStatic("Secret/Backup Mismatch!"));
