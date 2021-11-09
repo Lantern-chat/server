@@ -51,6 +51,7 @@ bitflags::bitflags! {
 
 serde_shims::impl_serde_for_bitflags!(UserFlags);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
 pub enum ElevationLevel {
     None = 0,
@@ -77,6 +78,10 @@ impl UserFlags {
             4 => ElevationLevel::System,
             _ => ElevationLevel::None,
         }
+    }
+
+    pub fn with_elevation(self, ev: ElevationLevel) -> Self {
+        self.difference(Self::ELEVATION) | Self::from_bits_truncate(((ev as u8) as i16) << 6)
     }
 
     pub fn premium_level(self) -> u8 {
@@ -128,4 +133,27 @@ pub struct Friend {
     pub note: Option<SmolStr>,
     pub flags: FriendFlags,
     pub user: User,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_user_elevation_flags() {
+        let f = UserFlags::ELEVATION_3;
+        assert_eq!(f.elevation(), ElevationLevel::System);
+
+        for &ev in &[
+            ElevationLevel::None,
+            ElevationLevel::Bot,
+            ElevationLevel::Staff,
+            ElevationLevel::System,
+        ] {
+            assert_eq!(UserFlags::empty().with_elevation(ev).elevation(), ev);
+            assert_eq!(UserFlags::all().with_elevation(ev).elevation(), ev);
+        }
+
+        println!("{}", f.bits());
+    }
 }
