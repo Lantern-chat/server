@@ -10,6 +10,9 @@ bitflags::bitflags! {
         const GROUP   = 1 << 3;
         const NSFW    = 1 << 4;
         const DEFAULT = 1 << 5;
+
+        /// Private rooms are those where @everyone cannot view them
+        const PRIVATE = 1 << 6;
     }
 }
 
