@@ -94,12 +94,21 @@ pub async fn create_message(
             .await;
     }
 
+    do_send_simple_message(state, auth.user_id, room_id, &trimmed_content).await
+}
+
+pub async fn do_send_simple_message(
+    state: ServerState,
+    user_id: Snowflake,
+    room_id: Snowflake,
+    content: &str,
+) -> Result<Message, Error> {
     let db = state.db.write.get().await?;
 
     let msg_id = Snowflake::now();
 
     let row = db
-        .query_opt_cached_typed(|| query(), &[&auth.user_id, &room_id, &msg_id, &trimmed_content])
+        .query_opt_cached_typed(|| query(), &[&user_id, &room_id, &msg_id, &content])
         .await?;
 
     let row = match row {
@@ -122,7 +131,7 @@ pub async fn create_message(
             presence: None,
         }),
         author: User {
-            id: auth.user_id,
+            id: user_id,
             username: row.try_get(3)?,
             discriminator: row.try_get(4)?,
             flags: UserFlags::from_bits_truncate(row.try_get(5)?).publicize(),
@@ -136,7 +145,7 @@ pub async fn create_message(
         created_at: msg_id.timestamp(),
         edited_at: None,
         flags: MessageFlags::empty(),
-        content: form.content,
+        content: content.into(),
         user_mentions: Vec::new(),
         role_mentions: Vec::new(),
         room_mentions: Vec::new(),
