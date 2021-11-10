@@ -1,0 +1,20 @@
+[package]
+name = "embed_parser"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+aho-corasick = "0.7.18"
+regex-automata = "0.1.10"
+lazy_static = "1.4.0"
+smallvec = "1.7.0"
+# bytecount = "0.6.2"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "parser"
+harness = false
