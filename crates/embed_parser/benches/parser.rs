@@ -1,6 +1,6 @@
 #![allow(deprecated)]
 
-use criterion::{criterion_group, criterion_main, Criterion, ParameterizedBenchmark};
+use criterion::{black_box, criterion_group, criterion_main, Criterion, ParameterizedBenchmark};
 
 static INPUT: &str = r#"
 ```rust
@@ -21,7 +21,9 @@ https://test.com
 http://last.net/test.php?query=true#hash
 "#;
 
-use embed_parser::msg;
+static HTML_FIXTURE: &str = include_str!("../tests/html_fixture.html");
+
+use embed_parser::{html, msg};
 
 fn criterion_benchmark(c: &mut Criterion) {
     c.bench(
@@ -41,6 +43,11 @@ fn criterion_benchmark(c: &mut Criterion) {
         })
         .with_function("regex_only", |b, x| b.iter(|| msg::find_urls_regex_only(x))),
     );
+
+    c.bench_function("html_meta", |b| {
+        let input = black_box(HTML_FIXTURE);
+        b.iter(|| html::parse_meta(input));
+    });
 }
 
 criterion_group!(benches, criterion_benchmark);
