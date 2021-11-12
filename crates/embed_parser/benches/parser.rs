@@ -23,7 +23,9 @@ http://last.net/test.php?query=true#hash
 
 static HTML_FIXTURE: &str = include_str!("../tests/html_fixture.html");
 
-use embed_parser::{html, msg};
+static LINK_HEADER: &str = r#"<https://lantern.chat/api/v1/oembed?format=xml&url=https%3A%2F%2Flantern.chat>; rel="alternate"; title="Testing"; type="text/xml+oembed""#;
+
+use embed_parser::{html, msg, oembed};
 
 fn criterion_benchmark(c: &mut Criterion) {
     c.bench(
@@ -47,6 +49,11 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("html_meta", |b| {
         let input = black_box(HTML_FIXTURE);
         b.iter(|| html::parse_meta(input));
+    });
+
+    c.bench_function("parse_link_header", |b| {
+        let input = black_box(LINK_HEADER);
+        b.iter(|| oembed::parse_link_header(input));
     });
 }
 
