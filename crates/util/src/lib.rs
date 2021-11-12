@@ -9,3 +9,4 @@ pub mod likely;
 pub mod rng;
 pub mod serde;
 pub mod time;
+pub mod string;
