@@ -29,6 +29,8 @@ pub enum Error {
     HashError(#[from] argon2::Error),
     #[error("Parse Error {0}")]
     JsonError(#[from] serde_json::Error),
+    #[error("XML Serialize Error {0}")]
+    XMLError(#[from] quick_xml::de::DeError),
     #[error("Encoding Error {0}")]
     EncodingError(#[from] EncodingError),
     #[error("IO Error: {0}")]
@@ -175,6 +177,7 @@ impl Error {
                 | Error::SemaphoreError(_)
                 | Error::HashError(_)
                 | Error::JsonError(_)
+                | Error::XMLError(_)
                 | Error::EncodingError(_)
                 | Error::IOError(_)
                 | Error::InternalError(_)
@@ -222,6 +225,7 @@ impl Error {
             Error::Utf8ParseError(_)        => 50009,
             Error::IOError(_)               => 50010,
             Error::InvalidHeaderValue(_)    => 50011,
+            Error::XMLError(_)              => 50012,
 
             Error::AlreadyExists            => 40001,
             Error::UsernameUnavailable      => 40002,

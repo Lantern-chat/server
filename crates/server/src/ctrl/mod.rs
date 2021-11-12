@@ -76,3 +76,7 @@ pub mod cdn;
 pub mod util;
 
 pub mod metrics;
+
+pub mod oembed {
+    pub mod get;
+}

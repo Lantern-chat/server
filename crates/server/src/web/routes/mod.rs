@@ -4,10 +4,12 @@ use ftl::*;
 
 use headers::{ContentType, HeaderValue};
 
+use crate::{web::routes::api::ApiError, ServerState};
+
 pub mod api;
 pub mod cdn;
 
-pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
+pub async fn entry(mut route: Route<ServerState>) -> Response {
     if route.path().len() > 255 || route.raw_query().map(|q| q.len() > 255) == Some(true) {
         return ApiError::bad_request().into_response();
     }
@@ -62,13 +64,19 @@ pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
                 .await
                 .into_response();
 
+            let headers = resp.headers_mut();
+
             if cfg!(debug_assertions) {
-                resp.headers_mut().insert(
+                headers.insert(
                     "Cache-Control",
                     HeaderValue::from_static(
                         "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
                     ),
                 );
+            }
+
+            if let Some(hvalue) = gen_oembed_header_value(&route) {
+                headers.insert("Link", hvalue);
             }
 
             resp
@@ -80,11 +88,22 @@ pub async fn entry(mut route: Route<crate::ServerState>) -> Response {
 
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 
-use crate::web::routes::api::ApiError;
-
 lazy_static::lazy_static! {
     static ref BAD_PATTERNS: AhoCorasick = AhoCorasickBuilder::new().dfa(true).build(&[
         "wp-includes", "wp-admin", "wp-login", "wp-content", "wordpress", "xmlrpc.php",
         "wlwmanifest", ".git", "drupal", "ajax", "claro", "wp-json"
     ]);
+}
+
+fn gen_oembed_header_value(route: &Route<ServerState>) -> Option<HeaderValue> {
+    let host = route.host()?;
+
+    let path = format!("https://{}/{}", host.as_str(), route.path());
+
+    let value = format!(
+        r#"<https://lantern.chat/api/v1/oembed?format=json&url={}>; rel="alternate"; type="application/json+oembed""#,
+        urlencoding::encode(&path)
+    );
+
+    HeaderValue::from_str(&value).ok()
 }

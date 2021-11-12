@@ -81,6 +81,8 @@ anyhow = "1.0.44"
 arrayvec = "0.7.1"
 cache-padded = "1.1.1"
 itoa = "0.4.8"
+regex-automata = "0.1.10"
+quick-xml = { version = "0.22.0", features = ["serialize"] }
 
 [build-dependencies]
 built = { version = "0.5", features = ["git2", "chrono"] }
