@@ -6,7 +6,7 @@ CREATE OR REPLACE VIEW lantern.agg_attachments(
 
 SELECT
     message_id as msg_id,
-    jsonb_agg(json_build_object(
+    jsonb_agg(jsonb_build_object(
         'id', files.id,
         'size', files.size,
         'flags', files.flags,

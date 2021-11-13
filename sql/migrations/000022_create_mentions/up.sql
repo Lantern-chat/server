@@ -11,9 +11,8 @@ ALTER TABLE lantern.mentions OWNER TO postgres;
 CREATE INDEX mention_msg_idx ON lantern.mentions USING btree (msg_id);
 
 -- allow a user to search for their own mentions
-CREATE INDEX mention_user_idx ON lantern.mentions USING hash (user_id);
-
-CREATE INDEX mention_role_idx ON lantern.mentions USING hash (role_id);
+CREATE INDEX mention_user_idx ON lantern.mentions USING btree (user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX mention_role_idx ON lantern.mentions USING btree (role_id) WHERE role_id IS NOT NULL;
 
 ALTER TABLE lantern.mentions ADD CONSTRAINT msg_fk FOREIGN KEY (msg_id)
     REFERENCES lantern.messages (id) MATCH FULL

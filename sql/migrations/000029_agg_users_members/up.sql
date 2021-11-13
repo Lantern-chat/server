@@ -28,7 +28,6 @@ CREATE OR REPLACE VIEW lantern.agg_users(
     presence_activity
 )
 AS
-
 SELECT
     users.id,
     users.discriminator,
@@ -42,9 +41,10 @@ SELECT
     agg_presence.flags, agg_presence.updated_at, agg_presence.activity
 
 FROM
-    lantern.user_avatars RIGHT JOIN
-        lantern.users LEFT JOIN lantern.agg_presence ON agg_presence.user_id = users.id
-    ON (user_avatars.user_id = users.id AND user_avatars.party_id IS NULL)
+    lantern.users
+
+LEFT JOIN lantern.agg_presence ON agg_presence.user_id = users.id
+LEFT JOIN lantern.user_avatars ON (user_avatars.user_id = users.id AND user_avatars.party_id IS NULL)
 ;
 
 CREATE OR REPLACE VIEW lantern.agg_members(
@@ -56,7 +56,6 @@ CREATE OR REPLACE VIEW lantern.agg_members(
     joined_at,
     role_ids
 ) AS
-
 SELECT
     party_member.user_id,
     party_member.party_id,
@@ -64,18 +63,16 @@ SELECT
     party_member.flags,
     user_avatars.file_id,
     party_member.joined_at,
-    ARRAY(
-    SELECT
-        role_id
-    FROM
-        lantern.role_members INNER JOIN lantern.roles
-        ON roles.id = role_members.role_id AND
-           roles.party_id = party_member.party_id
-    WHERE
-        role_members.user_id = party_member.user_id
-    )
-
+    agg_roles.roles
 FROM
-    lantern.party_member LEFT JOIN lantern.user_avatars ON
-        (user_avatars.user_id = party_member.user_id AND user_avatars.party_id = party_member.party_id)
+    lantern.party_member LEFT JOIN lantern.user_avatars ON (user_avatars.user_id = party_member.user_id AND user_avatars.party_id = party_member.party_id)
+    LEFT JOIN LATERAL (
+        SELECT
+            ARRAY_AGG(role_id) as roles
+        FROM
+            lantern.role_members INNER JOIN lantern.roles
+            ON  roles.id = role_members.role_id
+            AND roles.party_id = party_member.party_id
+            AND role_members.user_id = party_member.user_id
+    ) agg_roles ON TRUE
 ;

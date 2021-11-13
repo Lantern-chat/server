@@ -6,8 +6,8 @@ CREATE TABLE lantern.dms (
 );
 ALTER TABLE lantern.dms OWNER TO postgres;
 
-CREATE INDEX CONCURRENTLY dm_user_a_idx ON lantern.dms USING hash(user_id_a);
-CREATE INDEX CONCURRENTLY dm_user_b_idx ON lantern.dms USING hash(user_id_b);
+CREATE INDEX dm_user_a_idx ON lantern.dms USING hash(user_id_a);
+CREATE INDEX dm_user_b_idx ON lantern.dms USING hash(user_id_b);
 
 ALTER TABLE lantern.dms ADD CONSTRAINT user_id_a_fk FOREIGN KEY (user_id_a)
     REFERENCES lantern.users (id) MATCH FULL

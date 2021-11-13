@@ -7,8 +7,8 @@ CREATE TABLE lantern.friendlist (
 );
 ALTER TABLE lantern.friendlist OWNER TO postgres;
 
-CREATE INDEX friend_a_idx ON lantern.friendlist USING hash(user_a_id);
-CREATE INDEX friend_b_idx ON lantern.friendlist USING hash(user_b_id);
+CREATE INDEX friend_a_idx ON lantern.friendlist USING btree(user_a_id);
+CREATE INDEX friend_b_idx ON lantern.friendlist USING btree(user_b_id);
 
 ALTER TABLE lantern.friendlist ADD CONSTRAINT user_a_fk FOREIGN KEY(user_a_id)
     REFERENCES lantern.users (id) MATCH FULL

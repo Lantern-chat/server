@@ -9,8 +9,8 @@ DROP TABLE IF EXISTS lantern.attachments CASCADE;
 ALTER TABLE IF EXISTS lantern.messages DROP CONSTRAINT IF EXISTS user_fk CASCADE;
 ALTER TABLE IF EXISTS lantern.messages DROP CONSTRAINT IF EXISTS room_fk CASCADE;
 
-DROP INDEX IF EXISTS lantern.msg_room_idx CASCADE;
-DROP INDEX IF EXISTS lantern.msg_user_idx CASCADE;
+DROP INDEX IF EXISTS lantern.msg_dl_idx CASCADE;
+DROP INDEX IF EXISTS lantern.msg_nd_idx CASCADE;
 DROP INDEX IF EXISTS lantern.msg_id_idx CASCADE;
 
 DROP TABLE IF EXISTS lantern.messages CASCADE;

@@ -15,7 +15,7 @@ ALTER TABLE lantern.reactions ADD CONSTRAINT msg_fk FOREIGN KEY (msg_id)
     REFERENCES lantern.messages (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
-CREATE INDEX reaction_msg_idx ON lantern.reactions USING hash(msg_id);
+CREATE INDEX reaction_msg_idx ON lantern.reactions USING btree(msg_id);
 
 CREATE OR REPLACE PROCEDURE lantern.add_reaction(
     _emote_id bigint,

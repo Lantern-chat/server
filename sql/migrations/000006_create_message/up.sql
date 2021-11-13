@@ -20,8 +20,11 @@ ALTER TABLE lantern.messages SET (toast_tuple_target = 128);
 CREATE INDEX msg_id_idx ON lantern.messages USING btree (id);
 
 -- Index user and room ids for faster lookups
-CREATE INDEX msg_user_idx ON lantern.messages USING btree (user_id, id);
-CREATE INDEX msg_room_idx ON lantern.messages USING btree (room_id, id);
+-- CREATE INDEX msg_user_idx ON lantern.messages USING btree (user_id, id);
+
+-- mutually exclusive indexes
+CREATE INDEX msg_dl_idx ON lantern.messages USING btree(room_id, id) WHERE flags & 1 = 1;
+CREATE INDEX msg_nd_idx ON lantern.messages USING btree(room_id, id) WHERE flags & 1 = 0;
 
 ALTER TABLE lantern.messages ADD CONSTRAINT room_fk FOREIGN KEY (room_id)
     REFERENCES lantern.rooms (id) MATCH FULL
