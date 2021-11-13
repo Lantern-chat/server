@@ -3,10 +3,10 @@ CREATE TABLE lantern.users (
     id              bigint              NOT NULL,
     deleted_at      timestamp,
     dob             date                NOT NULL,
+    flags           int                 NOT NULL    DEFAULT 0,
     -- 2-byte integer that can be displayed as 4 hex digits,
     -- actually stored as a 4-byte signed integer because Postgres doesn't support unsigned...
     discriminator   uint2               NOT NULL,
-    flags           smallint            NOT NULL    DEFAULT 0,
     username        varchar(64)         NOT NULL,
     email           text                NOT NULL,
     passhash        text                NOT NULL,
