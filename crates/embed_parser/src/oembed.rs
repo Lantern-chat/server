@@ -44,7 +44,7 @@ pub fn parse_link_header<'a>(header: &'a str) -> LinkList<'a> {
                 continue;
             }
 
-            let right = right.trim_matches('"');
+            let right = crate::trim_quotes(right);
 
             match left {
                 "title" => {

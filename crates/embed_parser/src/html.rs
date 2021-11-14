@@ -111,7 +111,7 @@ pub fn parse_meta<'a>(mut input: &'a str) -> Option<HeaderList<'a>> {
         for part in meta_inner.split_ascii_whitespace() {
             // name=""
             if let Some((left, right)) = part.split_once('=') {
-                let value = right.trim_matches('"');
+                let value = crate::trim_quotes(right);
 
                 match header {
                     Header::Meta(ref mut meta) => {
