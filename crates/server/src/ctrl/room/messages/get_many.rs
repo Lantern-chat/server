@@ -65,14 +65,9 @@ pub async fn get_many(
     };
 
     let limit = 100.min(form.limit as i16);
-
-    use arrayvec::ArrayVec;
-    let mut params: ArrayVec<&(dyn ToSql + Sync), 4> =
-        ArrayVec::from([&room_id as _, &msg_id as _, &limit as _, &auth.user_id as _]);
+    let params: &[&(dyn ToSql + Sync)] = &[&room_id as _, &msg_id as _, &limit as _, &auth.user_id as _];
 
     let query = if had_perms {
-        params.pop(); // remove auth.user_id for these queries
-
         use MessageSearch::*;
         const NULL: Snowflake = Snowflake::null();
 
@@ -182,8 +177,15 @@ pub async fn get_many(
 
                     attachments
                 },
+                reactions: {
+                    let reactions: Option<Json<Vec<Reaction>>> = row.try_get(16)?;
+
+                    match reactions {
+                        Some(reactions) => reactions.0,
+                        None => Vec::new(),
+                    }
+                },
                 embeds: Vec::new(),
-                reactions: Vec::new(),
             };
 
             let mention_kinds: Option<Vec<i32>> = row.try_get(8)?;
@@ -232,6 +234,11 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
         struct SelectedMessages {
             Id: Messages::Id,
         }
+
+        struct TempReactions {
+            MsgId: Reactions::MsgId,
+            Reactions: Type::JSONB,
+        }
     }
 
     let mut selected = Query::select()
@@ -276,9 +283,34 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
             /*14*/ AggMessages::AttachmentMeta,
             /*15*/ AggMessages::AttachmentPreview,
         ])
+        .col(/*16*/ TempReactions::Reactions)
         .from(
             AggMessages::inner_join_table::<SelectedMessages>()
-                .on(AggMessages::MsgId.equals(SelectedMessages::Id)),
+                .on(AggMessages::MsgId.equals(SelectedMessages::Id))
+                .left_join(Lateral(TempReactions::as_query(
+                    Query::select()
+                        .expr(Reactions::MsgId.alias_to(TempReactions::MsgId))
+                        .expr(
+                            Call::custom("jsonb_agg")
+                                .arg(
+                                    Call::custom("jsonb_build_object")
+                                        .arg(Literal::TextStr("emote"))
+                                        .arg(Reactions::EmoteId)
+                                        .arg(Literal::TextStr("own"))
+                                        .arg(user_id_var.clone().equals(Builtin::any(Reactions::UserIds)))
+                                        .arg(Literal::TextStr("count"))
+                                        .arg(
+                                            Call::custom("array_length")
+                                                .arg(Reactions::UserIds)
+                                                .arg(Literal::Int2(1)),
+                                        ),
+                                )
+                                .alias_to(TempReactions::Reactions),
+                        )
+                        .from_table::<Reactions>()
+                        .group_by(Reactions::MsgId),
+                )))
+                .on(TempReactions::MsgId.equals(SelectedMessages::Id)),
         );
 
     if check_perms {

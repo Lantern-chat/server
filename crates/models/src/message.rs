@@ -71,9 +71,23 @@ pub struct Message {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Reaction {
+pub struct ReactionShorthand {
+    pub emote: Snowflake,
+    pub own: bool,
+    pub count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReactionFull {
     pub emote: Emote,
     pub users: Vec<Snowflake>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Reaction {
+    Shorthand(ReactionShorthand),
+    Full(ReactionFull),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
