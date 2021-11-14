@@ -23,14 +23,12 @@ pub async fn trigger_typing(
                             .cols(&[Users::Username, Users::Discriminator, Users::Flags])
                             .cols(&[RoleMembers::RoleId])
                             .from(
-                                RoleMembers::right_join(
-                                    Users::inner_join(
-                                        PartyMember::inner_join_table::<Rooms>()
-                                            .on(PartyMember::PartyId.equals(Rooms::PartyId)),
-                                    )
-                                    .on(PartyMember::UserId.equals(Users::Id)),
-                                )
-                                .on(RoleMembers::UserId.equals(Users::Id)),
+                                PartyMember::inner_join_table::<Rooms>()
+                                    .on(PartyMember::PartyId.equals(Rooms::PartyId))
+                                    .inner_join_table::<Users>()
+                                    .on(Users::Id.equals(PartyMember::UserId))
+                                    .left_join_table::<RoleMembers>()
+                                    .on(RoleMembers::UserId.equals(Users::Id)),
                             )
                             .and_where(Users::Id.equals(Var::of(Users::Id)))
                             .and_where(Rooms::Id.equals(Var::of(Rooms::Id)))

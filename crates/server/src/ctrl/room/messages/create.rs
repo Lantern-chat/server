@@ -207,7 +207,9 @@ fn query() -> impl AnyQuery {
         ])
         .from_table::<Users>()
         .from(
-            PartyMember::right_join(Party::right_join_table::<Rooms>().on(Party::Id.equals(Rooms::PartyId)))
+            Rooms::left_join_table::<Party>()
+                .on(Party::Id.equals(Rooms::PartyId))
+                .left_join_table::<PartyMember>()
                 .on(PartyMember::PartyId.equals(Party::Id)),
         )
         .and_where(Rooms::Id.equals(AggMsg::RoomId))

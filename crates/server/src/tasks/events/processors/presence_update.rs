@@ -39,11 +39,10 @@ pub async fn presence_updated(
                     )
                     .select()
                     .from(
-                        UserPresence::right_join(
-                            UserParties::inner_join_table::<Users>()
-                                .on(Users::Id.equals(UserParties::UserId)),
-                        )
-                        .on(UserParties::UserId.equals(UserPresence::UserId)),
+                        UserParties::inner_join_table::<Users>()
+                            .on(Users::Id.equals(UserParties::UserId))
+                            .left_join_table::<UserPresence>()
+                            .on(UserParties::UserId.equals(UserPresence::UserId)),
                     )
                     .cols(&[
                         /* 0 */ Users::Username,

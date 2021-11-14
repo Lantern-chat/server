@@ -112,10 +112,10 @@ async fn get_room_full(
                         .from(
                             // select rooms and everything else dervied
                             Rooms::inner_join(
-                                RoleMembers::right_join(
-                                    Roles::left_join_table::<Party>().on(Roles::PartyId.equals(Party::Id)),
-                                )
-                                .on(RoleMembers::RoleId.equals(Roles::Id)),
+                                Roles::left_join_table::<Party>()
+                                    .on(Roles::PartyId.equals(Party::Id))
+                                    .left_join_table::<RoleMembers>()
+                                    .on(RoleMembers::RoleId.equals(Roles::Id)),
                             )
                             .on(Party::Id.equals(Rooms::PartyId)),
                         )

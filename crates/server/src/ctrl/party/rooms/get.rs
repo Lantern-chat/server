@@ -49,10 +49,10 @@ pub async fn get_rooms(
                         .expr(Builtin::array_agg(Roles::Id))
                         .expr(Builtin::bit_or(Roles::Permissions))
                         .from(
-                            RoleMembers::right_join(
-                                Roles::left_join_table::<Party>().on(Roles::PartyId.equals(Party::Id)),
-                            )
-                            .on(RoleMembers::RoleId.equals(Roles::Id)),
+                            Roles::left_join_table::<Party>()
+                                .on(Roles::PartyId.equals(Party::Id))
+                                .left_join_table::<RoleMembers>()
+                                .on(RoleMembers::RoleId.equals(Roles::Id)),
                         )
                         .and_where(Party::Id.equals(Var::of(Party::Id)))
                         .and_where(

@@ -257,11 +257,10 @@ mod queries {
         Query::select()
             .cols(FILE_COLUMNS)
             .from(
-                Files::inner_join(
-                    Attachments::inner_join_table::<Messages>()
-                        .on(Attachments::MessageId.equals(Messages::Id)),
-                )
-                .on(Files::Id.equals(Attachments::FileId)),
+                Attachments::inner_join_table::<Messages>()
+                    .on(Attachments::MessageId.equals(Messages::Id))
+                    .inner_join_table::<Files>()
+                    .on(Files::Id.equals(Attachments::FileId)),
             )
             .and_where(Files::Id.equals(Var::of(Files::Id)))
             .and_where(Messages::RoomId.equals(Var::of(Rooms::Id)))
