@@ -17,7 +17,7 @@ ALTER TABLE lantern.user_avatars ADD CONSTRAINT user_fk FOREIGN KEY(user_id)
 
 ALTER TABLE lantern.user_avatars ADD CONSTRAINT party_fk FOREIGN KEY(party_id)
     REFERENCES lantern.party (id) MATCH FULL
-    ON DELETE CASCADEE ON UPDATE CASCADE;
+    ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE lantern.user_avatars ADD CONSTRAINT file_fk FOREIGN KEY(file_id)
     REFERENCES lantern.files (id) MATCH FULL
