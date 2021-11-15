@@ -9,6 +9,7 @@ mod ts_str;
 
 pub use ts_str::{Full, Short, TimestampStr};
 
+/// Timestamp with Nanosecond/Millisecond precision. Nanosecond internally, Millisecond when serialized to JSON
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(transparent)]
 pub struct Timestamp(PrimitiveDateTime);
@@ -66,6 +67,28 @@ impl Timestamp {
         }
     }
 
+    pub fn from_unix_timestamp_ms(milliseconds: i64) -> Self {
+        if milliseconds < 0 {
+            Self::UNIX_EPOCH - Duration::from_millis(-milliseconds as u64)
+        } else {
+            Self::UNIX_EPOCH + Duration::from_millis(milliseconds as u64)
+        }
+    }
+
+    pub fn to_unix_timestamp_ms(self) -> i64 {
+        const UNIX_EPOCH_JULIAN_DAY: i64 = time::macros::date!(1970 - 01 - 01).to_julian_day() as i64;
+
+        let day = self.to_julian_day() as i64 - UNIX_EPOCH_JULIAN_DAY;
+        let (hour, minute, second, ms) = self.as_hms_milli();
+
+        let hours = day * 24 + hour as i64;
+        let minutes = hours * 60 + minute as i64;
+        let seconds = minutes * 60 + second as i64;
+        let millis = seconds * 1000 + ms as i64;
+
+        millis
+    }
+
     pub fn format(&self) -> TimestampStr<Short> {
         format::format_iso8061(self.0)
     }
@@ -77,6 +100,10 @@ impl Timestamp {
     #[inline]
     pub fn parse(ts: &str) -> Option<Self> {
         parse::parse_iso8061(ts).map(Timestamp)
+    }
+
+    pub fn assume_offset(self, offset: time::UtcOffset) -> time::OffsetDateTime {
+        self.0.assume_offset(offset)
     }
 }
 
@@ -121,7 +148,7 @@ where
 }
 
 mod serde_impl {
-    use serde::de::{Deserialize, Deserializer, Visitor};
+    use serde::de::{Deserialize, Deserializer, Error, Visitor};
     use serde::ser::{Serialize, Serializer};
 
     use super::Timestamp;
@@ -132,7 +159,11 @@ mod serde_impl {
         where
             S: Serializer,
         {
-            self.format_full().serialize(serializer)
+            if serializer.is_human_readable() {
+                self.format_full().serialize(serializer)
+            } else {
+                self.to_unix_timestamp_ms().serialize(serializer)
+            }
         }
     }
 
@@ -155,12 +186,19 @@ mod serde_impl {
 
                 fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
                 where
-                    E: serde::de::Error,
+                    E: Error,
                 {
                     match Timestamp::parse(v) {
                         Some(ts) => Ok(ts),
                         None => Err(E::custom("Invalid Format")),
                     }
+                }
+
+                fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+                where
+                    E: Error,
+                {
+                    Ok(Timestamp::from_unix_timestamp_ms(v))
                 }
             }
 
@@ -264,5 +302,16 @@ mod tests {
 
             println!("{:?}", parsed.unwrap());
         }
+    }
+
+    #[test]
+    fn test_unix_timestamp_ms() {
+        let now_ts = Timestamp::now_utc();
+        let now_ot = now_ts.assume_offset(time::UtcOffset::UTC);
+
+        let unix_ms_a = now_ts.to_unix_timestamp_ms();
+        let unix_ms_b = (now_ot.unix_timestamp_nanos() / 1_000_000) as i64;
+
+        assert_eq!(unix_ms_a, unix_ms_b);
     }
 }

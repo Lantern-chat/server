@@ -45,6 +45,12 @@ fn criterion_benchmark(c: &mut Criterion) {
 
         b.iter(|| T::parse_from_rfc3339(&ts).unwrap());
     });
+
+    c.bench_function("to_unix_timestamp_ms", |b| {
+        let ts = black_box(Timestamp::now_utc());
+
+        b.iter(|| ts.to_unix_timestamp_ms());
+    });
 }
 
 criterion_group!(benches, criterion_benchmark);
