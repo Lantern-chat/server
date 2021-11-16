@@ -19,7 +19,7 @@ totp = { path = "../totp" }
 processing = { path = "../processing" }
 iplist = { path = "../iplist" }
 
-blurhash = { path = "../../../deps/blurhash" }
+blurhash = { path = "../blurhash" }
 
 smol_str = { path = "../../deps/smol_str", features = ["serde", "pg"] }
 
