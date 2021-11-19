@@ -35,6 +35,9 @@ pub struct LanternConfig {
 
     pub cert_path: PathBuf,
     pub key_path: PathBuf,
+
+    pub hcaptcha_secret: String,
+    pub hcaptcha_sitekey: String,
 }
 
 const KIBIBYTE: i32 = 1024;
@@ -89,6 +92,8 @@ impl Default for LanternConfig {
             data_path: { PathBuf::from(env::var("DATA_DIR").unwrap()) },
             cert_path: { PathBuf::from(env::var("CERT_PATH").unwrap()) },
             key_path: { PathBuf::from(env::var("KEY_PATH").unwrap()) },
+            hcaptcha_secret: { env::var("HCAPTCHA_SECRET").unwrap() },
+            hcaptcha_sitekey: { env::var("HCAPTCHA_SITEKEY").unwrap() },
         }
     }
 }

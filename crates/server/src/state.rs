@@ -15,7 +15,7 @@ use util::cmap::CHashMap;
 
 use crate::{
     config::LanternConfig, filesystem::store::FileStore, permission_cache::PermissionCache,
-    session_cache::SessionCache, web::file_cache::MainFileCache, DatabasePools,
+    services::Services, session_cache::SessionCache, web::file_cache::MainFileCache, DatabasePools,
 };
 use crate::{
     tasks::events::cache::EventItemCache,
@@ -43,6 +43,7 @@ pub struct InnerServerState {
     pub session_cache: SessionCache,
     pub file_cache: MainFileCache,
     pub totp_tokens: TokenStorage,
+    pub services: Services,
 }
 
 #[derive(Clone)]
@@ -79,6 +80,7 @@ impl ServerState {
             session_cache: SessionCache::default(),
             file_cache: MainFileCache::default(),
             totp_tokens: TokenStorage::default(),
+            services: Services::start().expect("Services failed to start correctly"),
         }))
     }
 

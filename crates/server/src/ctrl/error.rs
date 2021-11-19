@@ -41,6 +41,8 @@ pub enum Error {
     InternalError(String),
     #[error("Internal Error: {0}")]
     InternalErrorStatic(&'static str),
+    #[error("Request Error: {0}")]
+    RequestError(#[from] reqwest::Error),
 
     #[error("UTF8 Parse Error: {0}")]
     Utf8ParseError(#[from] FromUtf8Error),
@@ -150,6 +152,9 @@ pub enum Error {
 
     #[error("Unauthorized")]
     Unauthorized,
+
+    #[error("Invalid Captcha")]
+    BadCaptcha,
 }
 
 impl From<db::pg::Error> for Error {
@@ -183,6 +188,7 @@ impl Error {
                 | Error::InternalError(_)
                 | Error::InternalErrorStatic(_)
                 | Error::InvalidHeaderValue(_)
+                | Error::RequestError(_)
         )
     }
 
@@ -192,9 +198,11 @@ impl Error {
         }
 
         match self {
-            Error::NoSession | Error::InvalidCredentials | Error::TOTPRequired | Error::Unauthorized => {
-                StatusCode::UNAUTHORIZED
-            }
+            Error::NoSession
+            | Error::InvalidCredentials
+            | Error::TOTPRequired
+            | Error::Unauthorized
+            | Error::BadCaptcha => StatusCode::UNAUTHORIZED,
             Error::TemporarilyDisabled => StatusCode::FORBIDDEN,
             Error::NotFound => StatusCode::NOT_FOUND,
             Error::BadRequest => StatusCode::BAD_REQUEST,
@@ -226,6 +234,7 @@ impl Error {
             Error::IOError(_)               => 50010,
             Error::InvalidHeaderValue(_)    => 50011,
             Error::XMLError(_)              => 50012,
+            Error::RequestError(_)          => 50013,
 
             Error::AlreadyExists            => 40001,
             Error::UsernameUnavailable      => 40002,
@@ -256,6 +265,7 @@ impl Error {
             Error::TOTPRequired             => 40027,
             Error::InvalidPreferences(_)    => 40028,
             Error::TemporarilyDisabled      => 40029,
+            Error::BadCaptcha               => 40030,
 
             // HTTP-like error codes
             Error::BadRequest               => 40400,

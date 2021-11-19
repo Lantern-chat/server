@@ -27,6 +27,7 @@ pub mod metric;
 //pub mod net;
 pub mod permission_cache;
 pub mod queues;
+pub mod services;
 pub mod session_cache;
 pub mod state;
 pub mod util;

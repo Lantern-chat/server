@@ -5,6 +5,7 @@ use smol_str::SmolStr;
 
 use crate::{
     ctrl::{util::validation::*, Error},
+    services::hcaptcha::HCaptchaParameters,
     ServerState,
 };
 
@@ -16,6 +17,7 @@ pub struct RegisterForm {
     pub year: i32,
     pub month: u8,
     pub day: u8,
+    pub token: String, // TODO: Don't allocate?
 }
 
 use models::Session;
@@ -25,9 +27,9 @@ pub async fn register_user(
     addr: SocketAddr,
     mut form: RegisterForm,
 ) -> Result<Session, Error> {
-    if cfg!(debug_assertions) {
-        return Err(Error::TemporarilyDisabled);
-    }
+    //if cfg!(debug_assertions) {
+    //    return Err(Error::TemporarilyDisabled);
+    //}
 
     validate_username(&state.config, &form.username)?;
     validate_password(&state.config, &form.password)?;
@@ -47,6 +49,21 @@ pub async fn register_user(
 
     if !util::time::is_of_age(state.config.min_user_age_in_years as i32, now, dob) {
         return Err(Error::InsufficientAge);
+    }
+
+    let verified = state
+        .services
+        .hcaptcha
+        .verify(HCaptchaParameters {
+            secret: &state.config.hcaptcha_secret,
+            sitekey: Some(&state.config.hcaptcha_sitekey),
+            response: &form.token,
+            ..HCaptchaParameters::default()
+        })
+        .await?;
+
+    if !verified {
+        return Err(Error::BadCaptcha);
     }
 
     let read_db = state.db.read.get().await?;
