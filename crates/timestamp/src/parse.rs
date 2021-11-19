@@ -152,15 +152,16 @@ pub fn parse_iso8061(ts: &str) -> Option<PrimitiveDateTime> {
 
                     if d > 9 {
                         break; // break on non-numeric input
-                    } else if factor == 0 {
-                        // even if we're at nanoseconds, skip any additional digits
-                        continue;
                     }
 
-                    nanosecond = (nanosecond * 10) + d as u32;
+                    offset += 1; // consume character
 
-                    offset += 1;
-                    factor /= 10;
+                    // don't accumulate unless there is precision left,
+                    // but otherwise continue the loop to consume all remaining digits
+                    if factor > 0 {
+                        nanosecond = (nanosecond * 10) + d as u32;
+                        factor /= 10;
+                    }
                 }
 
                 maybe_time = Time::from_hms_nano(hour, minute, second, factor * nanosecond)
