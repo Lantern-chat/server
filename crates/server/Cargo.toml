@@ -18,6 +18,7 @@ mime_db = { path = "../mime_db" }
 totp = { path = "../totp" }
 processing = { path = "../processing" }
 iplist = { path = "../iplist" }
+embed_parser = { path = "../embed_parser" }
 
 blurhash = { path = "../blurhash" }
 

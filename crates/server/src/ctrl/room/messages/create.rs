@@ -28,54 +28,56 @@ pub async fn create_message(
     let mut trimmed_content = Cow::Borrowed(form.content.trim());
 
     // if empty but not containing attachments
-    if trimmed_content.is_empty() && !form.attachments.is_empty() {
+    if trimmed_content.is_empty() && form.attachments.is_empty() {
         return Err(Error::BadRequest);
     }
 
-    let mut trimming = false;
-    let mut new_content = String::new();
-    let mut count = 0;
+    if !trimmed_content.is_empty() {
+        let mut trimming = false;
+        let mut new_content = String::new();
+        let mut count = 0;
 
-    // TODO: Don't strip newlines inside code blocks?
-    for (idx, &byte) in trimmed_content.as_bytes().iter().enumerate() {
-        // if we encounted a newline
-        if byte == b'\n' {
-            count += 1; // count up
+        // TODO: Don't strip newlines inside code blocks?
+        for (idx, &byte) in trimmed_content.as_bytes().iter().enumerate() {
+            // if we encounted a newline
+            if byte == b'\n' {
+                count += 1; // count up
 
-            // if over 2 consecutive newlines, begin trimming
-            if count > 2 {
-                // if not already trimming, push everything tested up until this point
-                // notably not including the third newline
-                if !trimming {
-                    trimming = true;
-                    new_content.push_str(&trimmed_content[..idx]);
+                // if over 2 consecutive newlines, begin trimming
+                if count > 2 {
+                    // if not already trimming, push everything tested up until this point
+                    // notably not including the third newline
+                    if !trimming {
+                        trimming = true;
+                        new_content.push_str(&trimmed_content[..idx]);
+                    }
+
+                    // skip any additional newlines
+                    continue;
                 }
-
-                // skip any additional newlines
-                continue;
+            } else {
+                // reset count if newline streak broken
+                count = 0;
             }
-        } else {
-            // reset count if newline streak broken
-            count = 0;
+
+            // if trimming, push the new byte
+            if trimming {
+                unsafe { new_content.as_mut_vec().push(byte) };
+            }
         }
 
-        // if trimming, push the new byte
         if trimming {
-            unsafe { new_content.as_mut_vec().push(byte) };
+            trimmed_content = Cow::Owned(new_content);
         }
-    }
 
-    if trimming {
-        trimmed_content = Cow::Owned(new_content);
-    }
+        let newlines = bytecount::count(trimmed_content.as_bytes(), b'\n');
 
-    let newlines = bytecount::count(trimmed_content.as_bytes(), b'\n');
+        let too_large = !state.config.message_len.contains(&trimmed_content.len());
+        let too_long = newlines > state.config.max_newlines;
 
-    let not_too_large = state.config.message_len.contains(&trimmed_content.len());
-    let not_too_long = newlines <= state.config.max_newlines;
-
-    if !(not_too_large && not_too_long) {
-        return Err(Error::BadRequest);
+        if too_large || too_long {
+            return Err(Error::BadRequest);
+        }
     }
 
     let permissions = get_cached_room_permissions(&state, auth.user_id, room_id).await?;
@@ -84,28 +86,33 @@ pub async fn create_message(
         return Err(Error::Unauthorized);
     }
 
+    let msg_id = Snowflake::now();
+
+    if !trimmed_content.is_empty() && permissions.room.contains(RoomPermissions::EMBED_LINKS) {
+        process_embeds(msg_id, &trimmed_content);
+    }
+
     if !form.attachments.is_empty() {
         if !permissions.room.contains(RoomPermissions::ATTACH_FILES) {
             return Err(Error::Unauthorized);
         }
 
-        return create_message_full(state, auth, room_id, &form, &trimmed_content)
+        return create_message_full(state, auth, room_id, msg_id, &form, &trimmed_content)
             .boxed()
             .await;
     }
 
-    do_send_simple_message(state, auth.user_id, room_id, &trimmed_content).await
+    do_send_simple_message(state, auth.user_id, room_id, msg_id, &trimmed_content).await
 }
 
 pub async fn do_send_simple_message(
     state: ServerState,
     user_id: Snowflake,
     room_id: Snowflake,
+    msg_id: Snowflake,
     content: &str,
 ) -> Result<Message, Error> {
     let db = state.db.write.get().await?;
-
-    let msg_id = Snowflake::now();
 
     let row = db
         .query_opt_cached_typed(|| query(), &[&user_id, &room_id, &msg_id, &content])
@@ -221,12 +228,11 @@ pub async fn create_message_full(
     state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
+    msg_id: Snowflake,
     form: &CreateMessageForm,
     trimmed: &str,
 ) -> Result<Message, Error> {
     let mut db = state.db.write.get().await?;
-
-    let msg_id = Snowflake::now();
 
     let t = db.transaction().await?;
 
@@ -311,4 +317,12 @@ pub async fn create_message_full(
     t.commit().await?;
 
     Ok(msg)
+}
+
+pub fn process_embeds(msg_id: Snowflake, msg: &str) {
+    let urls = embed_parser::msg::find_urls(msg);
+
+    if urls.is_empty() {
+        return;
+    }
 }
