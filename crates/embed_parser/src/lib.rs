@@ -2,7 +2,7 @@ pub mod embed;
 pub mod html;
 pub mod msg;
 pub mod oembed;
-pub mod req;
+//pub mod req;
 
 #[inline(always)]
 fn is_quote(c: char) -> bool {
