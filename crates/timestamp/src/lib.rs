@@ -314,4 +314,16 @@ mod tests {
 
         assert_eq!(unix_ms_a, unix_ms_b);
     }
+
+    #[test]
+    fn test_parse_nanoseconds() {
+        let parsed = Timestamp::parse("2021-11-19T04:12:54.000123Z").unwrap();
+
+        let time = time::Time::from_hms_nano(4, 12, 54, 123000).unwrap();
+        let date = time::Date::from_calendar_date(2021, time::Month::November, 19).unwrap();
+
+        let expected = Timestamp::from(time::PrimitiveDateTime::new(date, time));
+
+        assert_eq!(parsed, expected);
+    }
 }

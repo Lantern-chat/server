@@ -42,6 +42,8 @@ fn parse_3(s: &[u8]) -> u16 {
     parse_4(&buf)
 }
 
+// TODO: Parse 5 and 6
+
 macro_rules! impl_fp {
     ($($t:ty),*) => {$(
         impl FastParse for $t {
@@ -140,15 +142,28 @@ pub fn parse_iso8061(ts: &str) -> Option<PrimitiveDateTime> {
             offset += 2;
 
             if b.get(offset).copied() == Some(b'.') {
-                let millisecond = parse_offset::<u16>(b, offset + 1, 3)?;
-                offset += 4;
+                offset += 1;
 
-                // only parsed 3 digits
-                if millisecond > 999 {
-                    unsafe { std::hint::unreachable_unchecked() }
+                let mut factor: u32 = 1_000_000_000; // up to 9 decimal places
+                let mut nanosecond: u32 = 0;
+
+                while let Some(c) = b.get(offset) {
+                    let d = c.wrapping_sub(b'0');
+
+                    if d > 9 {
+                        break; // break on non-numeric input
+                    } else if factor == 0 {
+                        // even if we're at nanoseconds, skip any additional digits
+                        continue;
+                    }
+
+                    nanosecond = (nanosecond * 10) + d as u32;
+
+                    offset += 1;
+                    factor /= 10;
                 }
 
-                maybe_time = Time::from_hms_milli(hour, minute, second, millisecond)
+                maybe_time = Time::from_hms_nano(hour, minute, second, factor * nanosecond)
             } else {
                 maybe_time = Time::from_hms(hour, minute, second)
             }
