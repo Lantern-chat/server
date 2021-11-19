@@ -5,8 +5,8 @@ use tracing_subscriber::{
     FmtSubscriber,
 };
 
-pub mod cli;
 pub mod allocator;
+pub mod cli;
 
 use std::{net::SocketAddr, str::FromStr};
 
@@ -38,6 +38,7 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter({
             let filter = EnvFilter::from_default_env()
                 .add_directive(level_filter.into())
+                .add_directive("hyper::client::pool=info".parse()?)
                 .add_directive("hyper::proto=info".parse()?);
 
             if !extreme_trace {
