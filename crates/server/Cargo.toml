@@ -31,8 +31,8 @@ serde_urlencoded = "0.7"
 tokio = { version = "1.4", features = ["full", "parking_lot"] }
 tokio-util = { version = "0.6", features = ["io"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
-tokio-rustls = "0.22.0"
-tls-listener = { version = "0.2.1", features = ["hyper-h1", "hyper-h2", "tokio-net"] }
+tokio-rustls = "0.23.0"
+# tls-listener = { version = "0.2.1", features = ["hyper-h1", "hyper-h2", "tokio-net"] }
 async-stream = "0.3"
 async-trait = "0.1.50"
 async-compression = { version = "0.3.8", features = ["brotli", "deflate", "gzip", "tokio"] }
@@ -62,7 +62,7 @@ rmp-serde = "0.15.4"
 rand = "0.8.3"
 time = { version = "0.3", features = ["macros"] }
 regex = "1.4.6"
-tokio-tungstenite = "0.15.0"
+tokio-tungstenite = "0.16.0"
 ahash = "0.7.2"
 either = "1.6.0"
 failsafe = "1.0.0"
@@ -83,6 +83,7 @@ cache-padded = "1.1.1"
 itoa = "0.4.8"
 regex-automata = "0.1.10"
 quick-xml = { version = "0.22.0", features = ["serialize"] }
+reqwest = { version = "0.11", features = ["gzip", "deflate", "brotli"] }
 
 [build-dependencies]
 built = { version = "0.5", features = ["git2", "chrono"] }

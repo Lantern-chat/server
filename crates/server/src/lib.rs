@@ -24,7 +24,7 @@ pub mod config;
 pub mod ctrl;
 pub mod filesystem;
 pub mod metric;
-pub mod net;
+//pub mod net;
 pub mod permission_cache;
 pub mod queues;
 pub mod session_cache;
@@ -60,7 +60,7 @@ pub struct DatabasePools {
 use ftl::Reply;
 use tokio::net::TcpListener;
 
-use crate::net::ip_filter::IpFilter;
+//use crate::net::ip_filter::IpFilter;
 
 pub async fn start_server(
     addr: SocketAddr,
@@ -93,19 +93,20 @@ pub async fn start_server(
         .boxed(),
     );
 
-    let tcp_listener = TcpListener::bind(&addr).await?;
-    let filtered_tcp_listener =
-        net::filtered_addr_incoming::FilteredAddrIncoming::from_listener(tcp_listener, IpFilter::default())?;
+    //let tcp_listener = TcpListener::bind(&addr).await?;
+    //let filtered_tcp_listener =
+    //    net::filtered_addr_incoming::FilteredAddrIncoming::from_listener(tcp_listener, IpFilter::default())?;
     //let tls_config = net::tls::load_config(&state.config)?;
     //let tls_listener = tls_listener::builder(tls_config).listen(filtered_tcp_listener);
 
     //type Connection = tokio_rustls::server::TlsStream<net::addr_stream::AddrStream>;
-    type Connection = net::addr_stream::AddrStream;
+    //type Connection = net::addr_stream::AddrStream;
 
     let inner_state = state.clone();
-    let server = Server::builder(filtered_tcp_listener)
+    let server = Server::bind(&addr)
         .http2_adaptive_window(true)
-        .serve(make_service_fn(move |socket: &Connection| {
+        .tcp_nodelay(true)
+        .serve(make_service_fn(move |socket: &AddrStream| {
             //let remote_addr = socket.get_ref().0.remote_addr();
             let remote_addr = socket.remote_addr();
             let state = inner_state.clone();
