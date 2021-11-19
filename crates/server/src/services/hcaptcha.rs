@@ -1,9 +1,14 @@
+use tokio::sync::Semaphore;
+
+use crate::ctrl::Error;
+
 /// https://docs.hcaptcha.com/
 pub struct HCaptchaClient {
     client: reqwest::Client,
+    limit: Semaphore,
 }
 
-#[derive(Debug, thiserror::Error, Deserialize)]
+#[derive(Debug, Clone, Copy, thiserror::Error, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum HCaptchaError {
     #[error("Missing Input Secret")]
@@ -22,14 +27,6 @@ pub enum HCaptchaError {
     NotUsingDummyPasscode,
     #[error("Sitekey Secret Mismatch")]
     SitekeySecretMismatch,
-
-    #[serde(skip)]
-    #[error("Request Error: {0}")]
-    Request(#[from] reqwest::Error),
-
-    #[serde(skip)]
-    #[error("Json Error: {0}")]
-    Json(#[from] serde_json::Error),
 
     #[serde(other)]
     #[error("Unknown hCaptcha Error")]
@@ -60,8 +57,6 @@ impl Default for HCaptchaParameters<'_> {
 
 use timestamp::Timestamp;
 
-use crate::ctrl::Error;
-
 #[derive(Debug, Deserialize)]
 struct RawHCaptchaResponse {
     pub success: bool,
@@ -82,13 +77,16 @@ struct RawHCaptchaResponse {
 }
 
 impl HCaptchaClient {
-    pub fn new() -> Result<HCaptchaClient, reqwest::Error> {
+    pub fn new() -> Result<HCaptchaClient, Error> {
         Ok(HCaptchaClient {
             client: super::create_service_client()?,
+            limit: Semaphore::new(num_cpus::get() * 16),
         })
     }
 
-    pub async fn verify<'a>(&self, params: HCaptchaParameters<'a>) -> Result<bool, HCaptchaError> {
+    pub async fn verify<'a>(&self, params: HCaptchaParameters<'a>) -> Result<bool, Error> {
+        let _guard = self.limit.acquire().await?;
+
         log::debug!("Sending hCaptcha verification");
 
         let res = self
@@ -107,26 +105,16 @@ impl HCaptchaClient {
             }
         }
 
-        let mut response: RawHCaptchaResponse = serde_json::from_slice(&full)?;
+        let response: RawHCaptchaResponse = serde_json::from_slice(&full)?;
+
+        drop(_guard);
 
         log::debug!("hCaptcha verified: {}", response.success);
 
-        if response.success && !response.error_codes.is_empty() {
-            return Err(response.error_codes.swap_remove(0));
-        }
-
-        Ok(response.success)
-    }
-}
-
-impl From<HCaptchaError> for Error {
-    fn from(err: HCaptchaError) -> Self {
-        match err {
-            HCaptchaError::BadRequest => Error::BadRequest,
-            HCaptchaError::Request(err) => Error::RequestError(err),
-            HCaptchaError::Unknown => Error::InternalErrorStatic("Unknown hCaptcha Error"),
-            HCaptchaError::Json(err) => Error::JsonError(err),
-            _ => Error::BadCaptcha,
+        match (response.success, response.error_codes.first()) {
+            (true, _) => Ok(true),
+            (false, Some(&err)) => Err(err.into()),
+            (false, None) => Err(HCaptchaError::Unknown.into()),
         }
     }
 }

@@ -51,7 +51,7 @@ pub async fn register_user(
         return Err(Error::InsufficientAge);
     }
 
-    let verified = state
+    let _verified = state
         .services
         .hcaptcha
         .verify(HCaptchaParameters {
@@ -61,10 +61,6 @@ pub async fn register_user(
             ..HCaptchaParameters::default()
         })
         .await?;
-
-    if !verified {
-        return Err(Error::BadCaptcha);
-    }
 
     let read_db = state.db.read.get().await?;
 

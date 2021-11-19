@@ -153,8 +153,8 @@ pub enum Error {
     #[error("Unauthorized")]
     Unauthorized,
 
-    #[error("Invalid Captcha")]
-    BadCaptcha,
+    #[error("Captcha Error: {0}")]
+    InvalidCaptcha(#[from] crate::services::hcaptcha::HCaptchaError),
 }
 
 impl From<db::pg::Error> for Error {
@@ -202,7 +202,7 @@ impl Error {
             | Error::InvalidCredentials
             | Error::TOTPRequired
             | Error::Unauthorized
-            | Error::BadCaptcha => StatusCode::UNAUTHORIZED,
+            | Error::InvalidCaptcha(_) => StatusCode::UNAUTHORIZED,
             Error::TemporarilyDisabled => StatusCode::FORBIDDEN,
             Error::NotFound => StatusCode::NOT_FOUND,
             Error::BadRequest => StatusCode::BAD_REQUEST,
@@ -265,7 +265,7 @@ impl Error {
             Error::TOTPRequired             => 40027,
             Error::InvalidPreferences(_)    => 40028,
             Error::TemporarilyDisabled      => 40029,
-            Error::BadCaptcha               => 40030,
+            Error::InvalidCaptcha(_)        => 40030,
 
             // HTTP-like error codes
             Error::BadRequest               => 40400,

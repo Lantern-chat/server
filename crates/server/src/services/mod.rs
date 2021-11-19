@@ -17,12 +17,14 @@ pub mod oembed;
 
 pub struct Services {
     pub hcaptcha: hcaptcha::HCaptchaClient,
+    pub oembed: oembed::OEmbedClient,
 }
 
 impl Services {
-    pub fn start() -> Result<Services, ReqwestError> {
+    pub fn start() -> Result<Services, crate::ctrl::Error> {
         Ok(Services {
             hcaptcha: hcaptcha::HCaptchaClient::new()?,
+            oembed: oembed::OEmbedClient::new()?,
         })
     }
 }
