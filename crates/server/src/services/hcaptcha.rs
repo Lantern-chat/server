@@ -1,3 +1,4 @@
+use smol_str::SmolStr;
 use tokio::sync::Semaphore;
 
 use crate::ctrl::Error;
@@ -61,19 +62,24 @@ use timestamp::Timestamp;
 struct RawHCaptchaResponse {
     pub success: bool,
 
+    #[serde(default, rename = "error-codes")]
+    pub error_codes: Vec<HCaptchaError>,
+    // TODO: Decide whether to use these or not
+    /*
     pub challenge_ts: Timestamp,
 
     #[serde(default)]
-    pub credit: bool,
+    pub hostname: Option<SmolStr>,
 
-    #[serde(default, rename = "error-codes")]
-    pub error_codes: Vec<HCaptchaError>,
+    #[serde(default)]
+    pub credit: bool,
 
     #[serde(default)]
     pub score: Option<f32>,
 
     #[serde(default)]
     pub score_reason: Vec<String>,
+    */
 }
 
 impl HCaptchaClient {
