@@ -236,7 +236,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                                                 listener_table.insert(sub.party_id, handle);
 
                                                 stream.map(|event| Item::Event(event.map_err(Into::into))).boxed()
-                                            }))
+                                            }));
                                         }
                                         ServerMsg::PartyDelete { ref payload, .. } => {
                                             // by cancelling a stream, it will be removed from the SelectStream automatically
