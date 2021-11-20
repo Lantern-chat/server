@@ -4,8 +4,8 @@ pub struct BuildInfo {
     pub target: &'static str,
     pub debug: bool,
     pub time: &'static str,
-    pub commit: Option<&'static str>,
-    pub authors: &'static str,
+    //pub commit: Option<&'static str>,
+    //pub authors: &'static str,
 }
 
 pub const BUILD_INFO: BuildInfo = BuildInfo {
@@ -13,8 +13,8 @@ pub const BUILD_INFO: BuildInfo = BuildInfo {
     target: crate::built::TARGET,
     debug: crate::built::DEBUG,
     time: crate::built::BUILT_TIME_UTC,
-    commit: crate::built::GIT_VERSION,
-    authors: crate::built::PKG_AUTHORS,
+    //commit: crate::built::GIT_VERSION,
+    //authors: crate::built::PKG_AUTHORS,
 };
 
 use bytes::Bytes;

@@ -87,5 +87,5 @@ quick-xml = { version = "0.22.0", features = ["serialize"] }
 reqwest = { version = "0.11", features = ["gzip", "deflate", "brotli"] }
 
 [build-dependencies]
-built = { version = "0.5", features = ["git2", "chrono"] }
+built = { version = "0.5", features = ["chrono"] }
 
