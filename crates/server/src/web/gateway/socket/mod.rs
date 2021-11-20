@@ -9,7 +9,8 @@ use std::{
 
 use futures::{
     future::{self, Either},
-    stream, Future, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
+    stream::{self, AbortHandle, Abortable},
+    Future, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
 };
 
 use models::RoomPermissions;
@@ -20,7 +21,6 @@ use hashbrown::HashMap;
 
 use ftl::ws::{Message as WsMessage, SinkError, WebSocket};
 use schema::Snowflake;
-use util::cancel::{Cancel, CancelableStream};
 
 use crate::{
     ctrl::{
@@ -175,11 +175,11 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
 
                                 // iterate through subscribed parties
                                 events.extend(subs.into_iter().map(|sub| {
-                                    // take their broadcast stream and wrap it in a cancel signal
+                                    // take their broadcast stream and wrap it in an abort signal
                                     // this is so we can unsubscribe later if needed
-                                    let (stream, cancel) = CancelableStream::new(BroadcastStream::new(sub.rx));
+                                    let (stream, handle) = stream::abortable(BroadcastStream::new(sub.rx));
 
-                                    listener_table.insert(sub.party_id, cancel);
+                                    listener_table.insert(sub.party_id, handle);
 
                                     // map the stream to the `Item` type
                                     stream.map(|event| Item::Event(event.map_err(Into::into))).boxed()
@@ -231,9 +231,9 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                                             let subs = state.gateway.sub_and_activate_connection(user_id, conn.clone(), &[payload.inner.id]).await;
 
                                             events.extend(subs.into_iter().map(|sub| {
-                                                let (stream, cancel) = CancelableStream::new(BroadcastStream::new(sub.rx));
+                                                let (stream, handle) = stream::abortable(BroadcastStream::new(sub.rx));
 
-                                                listener_table.insert(sub.party_id, cancel);
+                                                listener_table.insert(sub.party_id, handle);
 
                                                 stream.map(|event| Item::Event(event.map_err(Into::into))).boxed()
                                             }))
@@ -241,7 +241,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                                         ServerMsg::PartyDelete { ref payload, .. } => {
                                             // by cancelling a stream, it will be removed from the SelectStream automatically
                                             if let Some(event_stream) = listener_table.get(&payload.id) {
-                                                event_stream.cancel();
+                                                event_stream.abort();
                                             }
                                         }
                                         _ => {}
