@@ -7,7 +7,7 @@ CREATE TABLE lantern.roles (
     color           integer,
     position        smallint    NOT NULL    DEFAULT 0,
     flags           smallint    NOT NULL    DEFAULT 0,
-    name            varchar(32),
+    name            varchar(32) NOT NULL,
 
     CONSTRAINT role_pk PRIMARY KEY (id)
 );

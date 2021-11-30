@@ -39,7 +39,7 @@ pub async fn create_party(
         id: party_id,
         party_id,
         avatar: None,
-        name: None,
+        name: SmolStr::new_inline("@everyone"),
         permissions: Permission::default(),
         color: None,
         position: 0,
