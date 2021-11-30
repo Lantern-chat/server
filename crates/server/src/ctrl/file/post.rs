@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::{ctrl::Error, web::routes::api::v1::file::post::Metadata, ServerState};
+use crate::{ctrl::Error, ServerState};
 
 use db::pool::Object;
 use schema::{flags::FileFlags, Snowflake, SnowflakeExt};
@@ -8,19 +8,33 @@ use schema::{flags::FileFlags, Snowflake, SnowflakeExt};
 use rand::Rng;
 use smol_str::SmolStr;
 
+#[derive(Debug, Deserialize)]
+pub struct FilePostBody {
+    filename: SmolStr,
+
+    size: i32,
+
+    #[serde(default)]
+    mime: Option<SmolStr>,
+
+    #[serde(default)]
+    width: Option<i32>,
+
+    #[serde(default)]
+    height: Option<i32>,
+
+    #[serde(default)]
+    preview: Option<String>,
+}
+
 pub async fn post_file(
     state: ServerState,
     user_id: Snowflake,
-    upload_size: i32,
-    metadata: Metadata<'_>,
+    body: FilePostBody,
 ) -> Result<Snowflake, Error> {
-    let filename = String::from_utf8(base64::decode(metadata.filename)?)?;
-
-    let mime = match metadata.mime {
+    let mime = match body.mime {
         None => None,
         Some(mime) => {
-            let mime = String::from_utf8(base64::decode(mime)?)?;
-
             // try parsing the mime given type
             let _ = mime::Mime::from_str(&mime)?;
 
@@ -28,12 +42,14 @@ pub async fn post_file(
         }
     };
 
-    let preview = match metadata.preview {
+    let preview = match body.preview {
         None => None,
         Some(preview) => Some({
-            let preview = base64::decode(preview)?;
+            use blurhash::{base85::*, decode};
 
-            if !blurhash::decode::is_valid(&preview)? {
+            let preview = preview.from_z85()?;
+
+            if !decode::is_valid(&preview)? {
                 return Err(Error::InvalidPreview);
             }
 
@@ -41,7 +57,18 @@ pub async fn post_file(
         }),
     };
 
-    match do_post_file(state, user_id, upload_size, filename, mime, preview).await {
+    match do_post_file(
+        state,
+        user_id,
+        body.size,
+        body.filename,
+        mime,
+        preview,
+        body.width,
+        body.height,
+    )
+    .await
+    {
         Ok((file_id, _nonce)) => Ok(file_id),
         Err(e) => Err(e),
     }
@@ -51,9 +78,11 @@ pub async fn do_post_file(
     state: ServerState,
     user_id: Snowflake,
     upload_size: i32,
-    filename: String,
-    mime: Option<String>,
+    filename: SmolStr,
+    mime: Option<SmolStr>,
     preview: Option<Vec<u8>>,
+    width: Option<i32>,
+    height: Option<i32>,
 ) -> Result<(Snowflake, i64), Error> {
     let file_id = Snowflake::now();
     let nonce: i64 = util::rng::crypto_thread_rng().gen();
@@ -73,6 +102,8 @@ pub async fn do_post_file(
                     Files::UserId,
                     Files::Nonce,
                     Files::Size,
+                    Files::Width,
+                    Files::Height,
                     Files::Flags,
                     Files::Name,
                     Files::Mime,
@@ -83,6 +114,8 @@ pub async fn do_post_file(
                     Var::of(Files::UserId),
                     Var::of(Files::Nonce),
                     Var::of(Files::Size),
+                    Var::of(Files::Width),
+                    Var::of(Files::Height),
                     Var::of(Files::Flags),
                     Var::of(Files::Name),
                     Var::of(Files::Mime),
@@ -94,6 +127,8 @@ pub async fn do_post_file(
             &user_id,
             &nonce,
             &upload_size,
+            &width,
+            &height,
             &FileFlags::PARTIAL.bits(),
             &filename,
             &mime,

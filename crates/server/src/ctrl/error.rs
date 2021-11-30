@@ -5,7 +5,7 @@ use ftl::{body::BodyDeserializeError, StatusCode};
 use http::header::InvalidHeaderValue;
 use models::UserPreferenceError;
 
-use crate::web::gateway::event::EncodingError;
+use crate::web::gateway::event::EventEncodingError;
 
 lazy_static::lazy_static! {
     // 460 Checksum Mismatch
@@ -32,7 +32,7 @@ pub enum Error {
     #[error("XML Serialize Error {0}")]
     XMLError(#[from] quick_xml::de::DeError),
     #[error("Encoding Error {0}")]
-    EncodingError(#[from] EncodingError),
+    EventEncodingError(#[from] EventEncodingError),
     #[error("IO Error: {0}")]
     IOError(std::io::Error),
     #[error("Invalid Header Value: {0}")]
@@ -129,8 +129,11 @@ pub enum Error {
     #[error("Auth Token Parse Error: {0}")]
     AuthTokenParseError(#[from] super::auth::AuthTokenFromStrError),
 
-    #[error("Decode Error: {0}")]
-    DecodeError(#[from] base64::DecodeError),
+    #[error("Base-64 Decode Error: {0}")]
+    Base64DecodeError(#[from] base64::DecodeError),
+
+    #[error("Base-85 Decode Error: {0}")]
+    Base85DecodeError(#[from] blurhash::base85::FromZ85Error),
 
     #[error("Body Deserialization Error: {0}")]
     BodyDeserializeError(#[from] BodyDeserializeError),
@@ -183,7 +186,7 @@ impl Error {
                 | Error::HashError(_)
                 | Error::JsonError(_)
                 | Error::XMLError(_)
-                | Error::EncodingError(_)
+                | Error::EventEncodingError(_)
                 | Error::IOError(_)
                 | Error::InternalError(_)
                 | Error::InternalErrorStatic(_)
@@ -211,7 +214,8 @@ impl Error {
             | Error::MissingUploadMetadataHeader
             | Error::HeaderParseError(_)
             | Error::AuthTokenParseError(_)
-            | Error::DecodeError(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            | Error::Base64DecodeError(_)
+            | Error::Base85DecodeError(_) => StatusCode::UNPROCESSABLE_ENTITY,
             Error::ChecksumMismatch => *CHECKSUM_MISMATCH,
             Error::RequestEntityTooLarge => *REQUEST_ENTITY_TOO_LARGE,
             Error::Conflict => StatusCode::CONFLICT,
@@ -227,7 +231,7 @@ impl Error {
             Error::SemaphoreError(_)        => 50003,
             Error::HashError(_)             => 50004,
             Error::JsonError(_)             => 50005,
-            Error::EncodingError(_)         => 50006,
+            Error::EventEncodingError(_)    => 50006,
             Error::InternalError(_)         => 50007,
             Error::InternalErrorStatic(_)   => 50008,
             Error::Utf8ParseError(_)        => 50009,
@@ -255,7 +259,7 @@ impl Error {
             Error::MissingFilename          => 40017,
             Error::MissingMime              => 40018,
             Error::AuthTokenParseError(_)   => 40019,
-            Error::DecodeError(_)           => 40020,
+            Error::Base64DecodeError(_)     => 40020,
             Error::BodyDeserializeError(_)  => 40021,
             Error::QueryParseError(_)       => 40022,
             Error::UploadError              => 40023,
@@ -266,6 +270,7 @@ impl Error {
             Error::InvalidPreferences(_)    => 40028,
             Error::TemporarilyDisabled      => 40029,
             Error::InvalidCaptcha(_)        => 40030,
+            Error::Base85DecodeError(_)     => 40031,
 
             // HTTP-like error codes
             Error::BadRequest               => 40400,
@@ -282,7 +287,8 @@ impl Error {
             // TODO: at least say if it's a database error, for now
             Error::DbError(_) => "Database Error",
             Error::AuthTokenParseError(_) => "Auth Token Parse Error",
-            Error::DecodeError(_) => "Base64 Decode Error",
+            Error::Base64DecodeError(_) => "Base64 Decode Error",
+            Error::Base85DecodeError(_) => "Base85 Decode Error",
             Error::IOError(_) => "IO Error",
             Error::InvalidHeaderValue(_) => "Invalid Header Value",
 

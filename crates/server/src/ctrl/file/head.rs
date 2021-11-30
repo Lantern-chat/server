@@ -2,7 +2,7 @@ use std::io::ErrorKind;
 
 use crate::{
     ctrl::Error,
-    web::{auth::Authorization, routes::api::v1::file::post::Metadata},
+    web::{auth::Authorization},
     ServerState,
 };
 

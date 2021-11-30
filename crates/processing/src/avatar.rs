@@ -117,6 +117,8 @@ pub fn process_avatar(
 pub struct EncodedImage {
     pub buffer: Vec<u8>,
     pub preview: Option<Vec<u8>>,
+    pub width: u32,
+    pub height: u32,
 }
 
 #[allow(unused_imports, unused_variables)]
@@ -228,5 +230,10 @@ fn encode_png_best(
         out.len()
     );
 
-    Ok(EncodedImage { buffer: out, preview })
+    Ok(EncodedImage {
+        buffer: out,
+        preview,
+        width,
+        height,
+    })
 }

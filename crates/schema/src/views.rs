@@ -54,7 +54,7 @@ thorn::tables! {
     pub struct AggAttachments in Lantern {
         MsgId: Messages::Id,
 
-        /// Vec<{id: Snowflake, size: i32, name: String, mime: Option<String>}>
+        /// Vec<{id: Snowflake, size: i32, name: String, mime: Option<String>, width: Option<i32>, height: Option<i32>}>
         Meta: Type::JSONB_ARRAY,
 
         /// Vec<Option<Vec<u8>>>
@@ -85,4 +85,10 @@ pub struct AggAttachmentsMeta {
 
     #[serde(default)]
     pub mime: Option<SmolStr>,
+
+    #[serde(default)]
+    pub width: Option<i32>,
+
+    #[serde(default)]
+    pub height: Option<i32>,
 }

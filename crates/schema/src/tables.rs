@@ -251,6 +251,8 @@ thorn::tables! {
         UserId: Users::Id,
         Nonce: Type::INT8,
         Size: Type::INT4,
+        Width: Type::INT4,
+        Height: Type::INT4,
         Flags: Type::INT2,
         Name: Type::TEXT,
         Mime: Type::TEXT,

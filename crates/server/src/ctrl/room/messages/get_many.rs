@@ -163,13 +163,14 @@ pub async fn get_many(
                             use blurhash::base85::ToZ85;
 
                             attachments.push(Attachment {
-                                id: meta.id,
-                                filename: meta.name,
-                                size: meta.size as usize,
-                                mime: meta.mime,
-                                embed: EmbedMediaAttributes {
+                                file: File {
+                                    id: meta.id,
+                                    filename: meta.name,
+                                    size: meta.size as i64,
+                                    mime: meta.mime,
+                                    width: meta.width,
+                                    height: meta.height,
                                     preview: preview.and_then(|p| p.to_z85().ok()),
-                                    ..EmbedMediaAttributes::default()
                                 },
                             })
                         }

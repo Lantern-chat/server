@@ -92,15 +92,8 @@ pub enum Reaction {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Attachment {
-    pub id: Snowflake,
-    pub filename: SmolStr,
-    pub size: usize,
-
     #[serde(flatten)]
-    pub embed: EmbedMediaAttributes,
-
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub mime: Option<SmolStr>,
+    pub file: File,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -142,10 +135,6 @@ pub struct EmbedMediaAttributes {
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub proxy_url: Option<SmolStr>,
-
-    /// Base-85 encoded blurhash, basically guaranteed to be larger than 22 bytes so just use a regular String
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub preview: Option<String>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub height: Option<u32>,

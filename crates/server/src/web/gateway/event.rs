@@ -41,7 +41,7 @@ impl Deref for Event {
 }
 
 impl Event {
-    pub fn new(msg: ServerMsg, room_id: Option<Snowflake>) -> Result<Event, EncodingError> {
+    pub fn new(msg: ServerMsg, room_id: Option<Snowflake>) -> Result<Event, EventEncodingError> {
         let encoded = EncodedEvent::new(&msg)?;
 
         Ok(Event(Arc::new(EventInner {
@@ -53,7 +53,7 @@ impl Event {
 }
 
 impl EncodedEvent {
-    pub fn new<S: serde::Serialize>(value: &S) -> Result<Self, EncodingError> {
+    pub fn new<S: serde::Serialize>(value: &S) -> Result<Self, EventEncodingError> {
         let as_msgpack = rmp_serde::to_vec(value)?;
         let as_json = serde_json::to_vec(value)?;
 
@@ -73,7 +73,7 @@ impl EncodedEvent {
 
 impl CompressedEvent {
     // TODO: Make async with `async-compression`?
-    pub fn new(value: Vec<u8>) -> Result<Self, EncodingError> {
+    pub fn new(value: Vec<u8>) -> Result<Self, EventEncodingError> {
         let compressed = miniz_oxide::deflate::compress_to_vec_zlib(&value, 7);
 
         //use flate2::{write::ZlibEncoder, Compression};
@@ -101,7 +101,7 @@ impl CompressedEvent {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum EncodingError {
+pub enum EventEncodingError {
     #[error("MsgPack Encoding Error: {0}")]
     MsgPackEncodingError(#[from] rmp_serde::encode::Error),
 

@@ -11,6 +11,9 @@ CREATE TABLE lantern.files (
     -- Size of file in bytes
     size    int         NOT NULL,
 
+    width   int,
+    height  int,
+
     -- Bitflags for state
     flags   smallint    NOT NULL,
 

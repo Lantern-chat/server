@@ -11,7 +11,9 @@ SELECT
         'size', files.size,
         'flags', files.flags,
         'name', files.name,
-        'mime', files.mime
+        'mime', files.mime,
+        'width', files.width,
+        'height', files.height
     )) AS meta,
     array_agg(files.preview) AS preview
 FROM

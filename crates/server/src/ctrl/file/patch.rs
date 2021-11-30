@@ -3,7 +3,7 @@ use std::io::SeekFrom;
 use crate::{
     ctrl::Error,
     filesystem::store::{CipherOptions, FileExt, OpenMode, RWSeekStream},
-    web::{auth::Authorization, routes::api::v1::file::post::Metadata},
+    web::auth::Authorization,
     ServerState,
 };
 

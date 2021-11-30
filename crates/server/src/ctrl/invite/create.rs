@@ -1,10 +1,6 @@
 use std::str::FromStr;
 
-use crate::{
-    ctrl::Error,
-    web::{auth::Authorization, routes::api::v1::file::post::Metadata},
-    ServerState,
-};
+use crate::{ctrl::Error, web::auth::Authorization, ServerState};
 
 use db::pool::Object;
 use schema::{flags::FileFlags, Snowflake, SnowflakeExt};
@@ -19,6 +15,6 @@ pub struct InviteOptions {
     pub expires: Option<Timestamp>,
 }
 
-pub async fn create_invite(state: ServerState, auth: Authorization) -> Result<(), Error> {
+pub async fn create_invite(_state: ServerState, _auth: Authorization) -> Result<(), Error> {
     unimplemented!()
 }
