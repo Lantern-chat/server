@@ -55,6 +55,8 @@ bitflags::bitflags! {
         /// Display dark theme in an OLED-compatible mode
         const OLED_MODE = 1 << 6;
 
+        const MUTE_MEDIA = 1 << 7;
+
         // give some space for other flags, and possibly switching compact view out for more options (multiple view types)
         const COMPACT_VIEW = 1 << 9;
         const DEVELOPER_MODE = 1 << 15;
