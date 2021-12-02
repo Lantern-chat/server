@@ -22,10 +22,10 @@ where
         match self.0.take() {
             None => serializer.serialize_none(),
             Some(seq) => {
-                let mut iter = seq.into_iter();
+                let iter = seq.into_iter();
                 let mut seq = serializer.serialize_seq(iter.size_hint().1)?;
 
-                while let Some(value) = iter.next() {
+                for value in iter {
                     seq.serialize_element(&value)?;
                 }
 

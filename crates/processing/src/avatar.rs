@@ -190,7 +190,7 @@ fn encode_png_best(
     //}
 
     let mut writer = encoder.write_header()?;
-    writer.write_image_data(&bytes)?;
+    writer.write_image_data(bytes)?;
 
     drop(writer);
 

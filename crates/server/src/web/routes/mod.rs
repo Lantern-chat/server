@@ -14,7 +14,7 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
         return ApiError::bad_request().into_response();
     }
 
-    if let Err(_) = route.apply_method_override() {
+    if route.apply_method_override().is_err() {
         return StatusCode::METHOD_NOT_ALLOWED.into_response();
     }
 

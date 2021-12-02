@@ -267,7 +267,7 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
                 futures::stream::iter(events.drain())
                     .for_each_concurrent(state.config.num_parallel_tasks, |(_room_id, events)| async move {
                         for event in events {
-                            if let Err(e) = super::process(&state, db, event, None).await {
+                            if let Err(e) = super::process(state, db, event, None).await {
                                 log::error!("Error processing direct event: {:?} {}", event, e);
                                 // TODO: Disconnect users
                             }
@@ -284,7 +284,7 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
             ) {
                 futures::stream::iter(events.drain(..))
                     .for_each_concurrent(state.config.num_parallel_tasks, |event| async move {
-                        if let Err(e) = super::process(&state, db, event, None).await {
+                        if let Err(e) = super::process(state, db, event, None).await {
                             log::error!("Error processing user event: {:?} {}", event, e);
                             // TODO: Disconnect users
                         }

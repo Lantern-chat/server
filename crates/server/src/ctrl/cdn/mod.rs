@@ -221,7 +221,7 @@ pub async fn get_file(
     headers.typed_insert(last_modified);
 
     // ensure filename in HTTP header is urlencoded for Unicode and such.
-    let name = urlencoding::encode(&name);
+    let name = urlencoding::encode(name);
     let cd = if download {
         format!("attachment; filename=\"{}\"", name)
     } else {
@@ -231,7 +231,7 @@ pub async fn get_file(
     headers.insert("Content-Disposition", HeaderValue::from_str(&cd)?);
 
     if let Some(mime) = mime {
-        headers.insert("Content-Type", HeaderValue::from_str(&mime)?);
+        headers.insert("Content-Type", HeaderValue::from_str(mime)?);
     } else {
         headers.typed_insert(ContentType::octet_stream());
     }

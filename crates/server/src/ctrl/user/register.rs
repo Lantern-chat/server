@@ -82,7 +82,7 @@ pub async fn register_user(
         return Err(Error::AlreadyExists);
     }
 
-    let password = std::mem::replace(&mut form.password, SmolStr::default());
+    let password = std::mem::take(&mut form.password);
 
     // NOTE: Given how expensive it can be to compute an argon2 hash,
     // this only allows a given number to process at once.

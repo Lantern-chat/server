@@ -37,17 +37,17 @@ pub async fn modify_account(
     let mut num_fields = 0;
 
     if let Some(ref username) = form.new_username {
-        validate_username(&state.config, &username)?;
+        validate_username(&state.config, username)?;
         num_fields += 1;
     }
 
     if let Some(ref password) = form.new_password {
-        validate_password(&state.config, &password)?;
+        validate_password(&state.config, password)?;
         num_fields += 1;
     }
 
     if let Some(ref email) = form.new_email {
-        validate_email(&email)?;
+        validate_email(email)?;
         num_fields += 1;
     }
 

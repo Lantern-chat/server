@@ -82,7 +82,7 @@ impl Ws {
     /// - Header `upgrade: websocket`
     /// - Header `sec-websocket-accept` with the hash value of the received key.
     pub fn new<S>(mut route: Route<S>, config: Option<WebSocketConfig>) -> Result<Ws, WsError> {
-        if route.req.method() != &Method::GET {
+        if route.req.method() != Method::GET {
             return Err(WsError::MethodNotAllowed);
         }
 
@@ -361,10 +361,10 @@ impl Message {
     }
 
     /// Try to get a reference to the string text, if this is a Text message.
-    pub fn to_str(&self) -> Result<&str, ()> {
+    pub fn to_str(&self) -> Option<&str> {
         match self.inner {
-            protocol::Message::Text(ref s) => Ok(s),
-            _ => Err(()),
+            protocol::Message::Text(ref s) => Some(s),
+            _ => None,
         }
     }
 
@@ -392,8 +392,8 @@ impl fmt::Debug for Message {
     }
 }
 
-impl Into<Vec<u8>> for Message {
-    fn into(self) -> Vec<u8> {
-        self.into_bytes()
+impl From<Message> for Vec<u8> {
+    fn from(m: Message) -> Self {
+        m.into_bytes()
     }
 }

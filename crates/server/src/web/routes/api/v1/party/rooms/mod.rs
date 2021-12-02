@@ -28,7 +28,7 @@ pub async fn party_rooms(
 
                 _ => ApiError::not_found().into_response(),
             },
-            _ => return ApiError::bad_request().into_response(),
+            _ => ApiError::bad_request().into_response(),
         },
     }
 }

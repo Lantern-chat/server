@@ -28,8 +28,8 @@ pub async fn invite(mut route: Route<ServerState>) -> Response {
 
                 _ => ApiError::not_found().into_response(),
             },
-            Some(Err(_)) => return ApiError::bad_request().into_response(),
-            None => return ApiError::not_found().into_response(),
+            Some(Err(_)) => ApiError::bad_request().into_response(),
+            None => ApiError::not_found().into_response(),
         },
         _ => StatusCode::METHOD_NOT_ALLOWED.into_response(),
     }

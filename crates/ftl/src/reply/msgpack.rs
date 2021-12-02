@@ -82,7 +82,7 @@ where
 
             // Flush buffer at 8KiB
             if buffer.len() >= (1024 * 8) {
-                let chunk = Bytes::from(std::mem::replace(&mut buffer, Vec::new()));
+                let chunk = Bytes::from(std::mem::take(&mut buffer));
                 if let Err(e) = sender.send_data(chunk).await {
                     log::error!("Error sending MessagePack chunk: {}", e);
                     return sender.abort();

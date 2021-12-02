@@ -134,7 +134,7 @@ impl PaddedCounter {
 impl AsRef<[Counter]> for LatencyHistogram {
     #[inline(always)]
     fn as_ref(&self) -> &[Counter] {
-        unsafe { std::mem::transmute::<&[u64], &[Counter]>(&self.0.as_ref()) }
+        unsafe { std::mem::transmute::<&[u64], &[Counter]>(self.0.as_ref()) }
     }
 }
 

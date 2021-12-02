@@ -67,8 +67,10 @@ pub fn decode(mut hash: &[u8], w: usize, h: usize, punch: f32) -> io::Result<Vec
     colors[0] = decode_dc(hash.read_u32::<BigEndian>()?);
 
     let mc = max_value * punch;
-    for i in 1..num_colors {
-        colors[i] = decode_ac(hash.read_u16::<BigEndian>()?, mc);
+
+    // for colors[i] in 1..num_colors
+    for color in colors.iter_mut().take(num_colors).skip(1) {
+        *color = decode_ac(hash.read_u16::<BigEndian>()?, mc);
     }
 
     let mut out = vec![0; w * h * 3];

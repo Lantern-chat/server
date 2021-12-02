@@ -89,7 +89,7 @@ pub async fn get_many(
         }
     };
 
-    let stream = db.query_stream(&query?, &params).await?;
+    let stream = db.query_stream(&query?, params).await?;
 
     // for many messages from the same user in a row, avoid duplicating work of encoding user things at the cost of cloning it
     let mut last_user: Option<User> = None;

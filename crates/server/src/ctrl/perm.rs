@@ -18,7 +18,7 @@ pub async fn get_cached_room_permissions_with_conn(
         return Ok(perm.perm);
     }
 
-    get_room_permissions(&db, user_id, room_id).await
+    get_room_permissions(db, user_id, room_id).await
 }
 
 pub async fn get_cached_room_permissions(

@@ -64,7 +64,7 @@ pub async fn member_event(
                     username: row.try_get(0)?,
                     discriminator: row.try_get(1)?,
                     flags: UserFlags::from_bits_truncate(row.try_get(2)?).publicize(),
-                    avatar: encrypt_snowflake_opt(&state, row.try_get(3)?),
+                    avatar: encrypt_snowflake_opt(state, row.try_get(3)?),
                     status: row.try_get(4)?,
                     bio: row.try_get(5)?,
                     email: None,
@@ -100,7 +100,7 @@ pub async fn member_event(
                     bio: row.try_get(4)?,
                     email: None,
                     preferences: None,
-                    avatar: encrypt_snowflake_opt(&state, row.try_get(9)?),
+                    avatar: encrypt_snowflake_opt(state, row.try_get(9)?),
                 }),
                 nick: row.try_get(10)?,
                 presence: match row.try_get::<_, Option<_>>(7)? {

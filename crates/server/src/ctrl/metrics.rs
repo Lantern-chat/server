@@ -173,7 +173,7 @@ fn query(start: bool, end: bool) -> impl AnyQuery {
             .div(resolution.clone()),
     )
     .cast(Type::INT8) // ensures integer rounding
-    .mul(resolution.clone())
+    .mul(resolution)
     .rename_as("rounded_ts")
     .unwrap();
 

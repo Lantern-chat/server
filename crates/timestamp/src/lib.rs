@@ -233,7 +233,7 @@ mod pg_impl {
     impl<'a> FromSql<'a> for Timestamp {
         #[inline]
         fn from_sql(ty: &Type, raw: &'a [u8]) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
-            PrimitiveDateTime::from_sql(ty, raw).map(|ts| Timestamp(ts))
+            PrimitiveDateTime::from_sql(ty, raw).map(Timestamp)
         }
 
         accepts!(TIMESTAMP, TIMESTAMPTZ);

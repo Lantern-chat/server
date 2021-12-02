@@ -7,10 +7,9 @@ pub use self::ToZ85Error::*;
 use std::error;
 use std::fmt;
 
-const CHARS: &'static [u8] =
-    b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#";
+const CHARS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#";
 
-const BYTE_OFFSETS: &'static [i8] = &[
+const BYTE_OFFSETS: &[i8] = &[
     -0x01, 0x44, -0x01, 0x54, 0x53, 0x52, 0x48, -0x01, 0x4B, 0x4C, 0x46, 0x41, -0x01, 0x3F, 0x3E, 0x45, 0x00,
     0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x40, -0x01, 0x49, 0x42, 0x4A, 0x47, 0x51, 0x24,
     0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35,
@@ -151,7 +150,7 @@ impl ToZ85 for [u8] {
             let mut out_chunk = [0_u8; 5];
             for c in &mut out_chunk[..] {
                 *c = CHARS[(block_num % 85) as usize];
-                block_num = block_num / 85;
+                block_num /= 85;
             }
             out_chunk.reverse();
             out_vec.extend_from_slice(&out_chunk);

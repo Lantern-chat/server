@@ -152,56 +152,53 @@ impl FileCache for MainFileCache {
     async fn open(&self, path: &Path, accepts: Option<AcceptEncoding>) -> io::Result<Self::File> {
         let mut last_modified = None;
 
-        match self.map.get_cloned(path).await {
-            Some(file) => {
-                let dur = SystemTime::now().duration_since(file.last_checked);
+        if let Some(file) = self.map.get_cloned(path).await {
+            let dur = SystemTime::now().duration_since(file.last_checked);
 
-                match dur {
-                    Err(_) => {
-                        log::warn!("Duration calculation failed, time reversed?");
-                    }
-                    // recheck every 15 seconds in debug, 2 minutes in release (TODO: Increase?)
-                    Ok(dur) if dur > Duration::from_secs(if cfg!(debug_assertions) { 15 } else { 120 }) => {
-                        last_modified = Some(file.last_modified);
-                    }
-                    Ok(_) => {
-                        let encoding = match accepts.and_then(|a| {
-                            // prefer best
-                            let mut encodings = a.sorted_encodings();
-                            let preferred = encodings.next();
-                            encodings.find(|e| *e == file.best).or(preferred)
-                        }) {
-                            None | Some(ContentCoding::COMPRESS | ContentCoding::IDENTITY) => {
-                                ContentCoding::IDENTITY
-                            }
-                            Some(encoding) => encoding,
-                        };
+            match dur {
+                Err(_) => {
+                    log::warn!("Duration calculation failed, time reversed?");
+                }
+                // recheck every 15 seconds in debug, 2 minutes in release (TODO: Increase?)
+                Ok(dur) if dur > Duration::from_secs(if cfg!(debug_assertions) { 15 } else { 120 }) => {
+                    last_modified = Some(file.last_modified);
+                }
+                Ok(_) => {
+                    let encoding = match accepts.and_then(|a| {
+                        // prefer best
+                        let mut encodings = a.sorted_encodings();
+                        let preferred = encodings.next();
+                        encodings.find(|e| *e == file.best).or(preferred)
+                    }) {
+                        None | Some(ContentCoding::COMPRESS | ContentCoding::IDENTITY) => {
+                            ContentCoding::IDENTITY
+                        }
+                        Some(encoding) => encoding,
+                    };
 
-                        let file = CachedFile {
-                            pos: 0,
-                            last_modified: file.last_modified,
-                            encoding,
-                            buf: match encoding {
-                                ContentCoding::BROTLI => file.brotli.clone(),
-                                ContentCoding::DEFLATE => file.deflate.clone(),
-                                ContentCoding::GZIP => file.gzip.clone(),
-                                ContentCoding::IDENTITY => file.iden.clone(),
-                                ContentCoding::COMPRESS => unreachable!(),
-                            },
-                        };
+                    let file = CachedFile {
+                        pos: 0,
+                        last_modified: file.last_modified,
+                        encoding,
+                        buf: match encoding {
+                            ContentCoding::BROTLI => file.brotli.clone(),
+                            ContentCoding::DEFLATE => file.deflate.clone(),
+                            ContentCoding::GZIP => file.gzip.clone(),
+                            ContentCoding::IDENTITY => file.iden.clone(),
+                            ContentCoding::COMPRESS => unreachable!(),
+                        },
+                    };
 
-                        log::trace!(
-                            "Serving cached {:?} ({}) encoded file: {}",
-                            encoding,
-                            file.buf.len(),
-                            path.display()
-                        );
+                    log::trace!(
+                        "Serving cached {:?} ({}) encoded file: {}",
+                        encoding,
+                        file.buf.len(),
+                        path.display()
+                    );
 
-                        return Ok(file);
-                    }
+                    return Ok(file);
                 }
             }
-            None => {}
         }
 
         use tokio::io::AsyncReadExt;

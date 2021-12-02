@@ -270,7 +270,7 @@ async fn file_reply<S>(route: &Route<S>, path: impl AsRef<Path>, cache: &impl Fi
     };
 
     // parse after opening the file handle to save time on open error
-    let conditionals = Conditionals::new(&route, range);
+    let conditionals = Conditionals::new(route, range);
 
     let modified = match metadata.modified() {
         Err(_) => None,
@@ -291,7 +291,7 @@ async fn file_reply<S>(route: &Route<S>, path: impl AsRef<Path>, cache: &impl Fi
                 let buf_size = metadata.blksize().max(DEFAULT_READ_BUF_SIZE).min(len) as usize;
                 let encoding = file.encoding();
 
-                let mut resp = if route.method() == &Method::GET {
+                let mut resp = if route.method() == Method::GET {
                     Response::new(file_body(route.start, file, buf_size, (start, end)))
                 } else {
                     Response::default()

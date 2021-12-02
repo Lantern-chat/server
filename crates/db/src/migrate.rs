@@ -73,7 +73,7 @@ pub async fn migrate<P: AsRef<Path>>(pool: Pool, path: P) -> Result<(), Migratio
             let migration = load_migration(migration_path).await?;
 
             async fn run_batch(client: &Client, sql: &str) -> Result<(), MigrationError> {
-                for command in SqlIterator::new(&sql) {
+                for command in SqlIterator::new(sql) {
                     client.execute(command, &[]).await?;
                 }
 

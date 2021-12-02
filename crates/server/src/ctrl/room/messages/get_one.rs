@@ -36,8 +36,8 @@ pub async fn get_one(
     };
 
     match row {
-        None => return Err(Error::NotFound),
         Some(row) => parse_msg(&state, room_id, msg_id, row),
+        None => Err(Error::NotFound),
     }
 }
 

@@ -11,7 +11,7 @@ use crate::ctrl::{
 use crate::ServerState;
 
 pub async fn authorize(route: &Route<ServerState>) -> Result<Authorization, Error> {
-    const BEARER: &'static [u8] = b"Bearer ";
+    const BEARER: &[u8] = b"Bearer ";
 
     let header = match route.req.headers().get("Authorization") {
         Some(header) => header.as_bytes(),

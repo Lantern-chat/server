@@ -102,9 +102,9 @@ pub fn encode(
 
     let mut factors: [[[f32; 3]; 9]; 9] = [[[0.0; 3]; 9]; 9];
 
-    for y in 0..yc {
-        for x in 0..xc {
-            factors[y][x] = multiply_basis_function(x, y, w, h, rgb, channels);
+    for (y, y_factors) in factors.iter_mut().enumerate().take(yc) {
+        for (x, factor) in y_factors.iter_mut().enumerate().take(xc) {
+            *factor = multiply_basis_function(x, y, w, h, rgb, channels);
         }
     }
 
@@ -117,12 +117,12 @@ pub fn encode(
 
     if ac_count > 0 {
         let mut actual_max: f32 = 0.0;
-        for y in 0..yc {
-            for x in 0..xc {
+        for (y, y_factors) in factors.iter().enumerate().take(yc) {
+            for (x, factor) in y_factors.iter().enumerate().take(xc) {
                 if y == 0 && x == 0 {
                     continue;
                 }
-                let [r, g, b] = factors[y][x];
+                let [r, g, b] = *factor;
                 actual_max = actual_max.max(r).max(g).max(b);
             }
         }
@@ -139,12 +139,12 @@ pub fn encode(
 
     buf.write_u32::<BigEndian>(encode_dc(factors[0][0]))?;
 
-    for y in 0..yc {
-        for x in 0..xc {
+    for (y, y_factors) in factors.iter().enumerate().take(yc) {
+        for (x, factor) in y_factors.iter().enumerate().take(xc) {
             if y == 0 && x == 0 {
                 continue;
             }
-            buf.write_u16::<BigEndian>(encode_ac(factors[y][x], max_value))?;
+            buf.write_u16::<BigEndian>(encode_ac(*factor, max_value))?;
         }
     }
 

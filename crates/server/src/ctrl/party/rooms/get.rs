@@ -181,7 +181,7 @@ pub async fn get_rooms(
 
         room.overwrites.push(raw.into());
 
-        while let Some(raw) = raw_overwrites.next() {
+        for raw in raw_overwrites {
             if room.id != raw.room_id {
                 room = rooms.get_mut(&raw.room_id).unwrap();
             }

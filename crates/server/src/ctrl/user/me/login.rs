@@ -176,7 +176,7 @@ pub async fn process_2fa(
         .unwrap()
         .as_secs();
 
-    let secret = match decrypt_user_message(&state.config.mfa_key, user_id, &secret) {
+    let secret = match decrypt_user_message(&state.config.mfa_key, user_id, secret) {
         Ok(secret) => secret,
         Err(_) => return Err(Error::InternalErrorStatic("Decrypt Error!")),
     };
@@ -184,17 +184,17 @@ pub async fn process_2fa(
     match token.len() {
         6 => {
             // TODO: Account for time skew in the check method
-            if Ok(true) != totp::TOTP6::new(&secret).check_str(&token, now) {
+            if Ok(true) != totp::TOTP6::new(&secret).check_str(token, now) {
                 return Ok(false);
             }
         }
         13 => {
-            let mut backup = match decrypt_user_message(&state.config.mfa_key, user_id, &backup) {
+            let mut backup = match decrypt_user_message(&state.config.mfa_key, user_id, backup) {
                 Ok(backup) if backup.len() % 8 == 0 => backup,
                 _ => return Err(Error::InternalErrorStatic("Decrypt Error!")),
             };
 
-            let token = match base32::decode(base32::Alphabet::Crockford, &token) {
+            let token = match base32::decode(base32::Alphabet::Crockford, token) {
                 Some(token) if token.len() == 8 => token,
                 _ => return Err(Error::InvalidCredentials),
             };

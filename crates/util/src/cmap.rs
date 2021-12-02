@@ -40,7 +40,7 @@ where
     S: Clone,
 {
     pub fn default_num_shards() -> usize {
-        return *NUM_CPUS * 32;
+        *NUM_CPUS * 32
     }
 
     pub fn with_hasher(num_shards: usize, hash_builder: S) -> Self {
@@ -125,12 +125,19 @@ where
         }
     }
 
+    #[inline]
     pub fn shards(&self) -> &[RwLock<HashMap<K, T, S>>] {
         &self.shards
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.size.load(Ordering::Relaxed)
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     pub fn try_maybe_contains_hash(&self, hash: u64) -> bool {
@@ -249,7 +256,7 @@ where
         let (hash, shard_idx) = self.hash_and_shard(&key);
         let mut shard = unsafe { self.shards.get_unchecked(shard_idx).write().await };
 
-        match shard.raw_entry_mut().from_key_hashed_nocheck(hash, &key) {
+        match shard.raw_entry_mut().from_key_hashed_nocheck(hash, key) {
             RawEntryMut::Occupied(occupied) => {
                 self.size.fetch_sub(1, Ordering::Relaxed);
                 Some(occupied.remove())

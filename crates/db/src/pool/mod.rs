@@ -493,7 +493,7 @@ impl Default for StatementCache {
 impl StatementCache {
     pub fn insert(&self, key: TypeId, stmt: &Statement) {
         self.cache.rcu(|cache| {
-            let mut cache = HashMap::clone(&cache);
+            let mut cache = HashMap::clone(cache);
             cache.insert(key, stmt.clone());
             cache
         });

@@ -20,7 +20,7 @@ pub fn parse_link_header<'a>(header: &'a str) -> LinkList<'a> {
 
     // multiple links can be comma-separated
     'links: for link in header.split(',') {
-        let mut parts = link.split(";").map(str::trim);
+        let mut parts = link.split(';').map(str::trim);
 
         let url = match parts.next() {
             Some(url) if url.starts_with("<http") && url.ends_with('>') => &url[1..url.len() - 1],
@@ -33,7 +33,8 @@ pub fn parse_link_header<'a>(header: &'a str) -> LinkList<'a> {
             format: OEmbedFormat::JSON,
         };
 
-        while let Some(part) = parts.next() {
+        //while let Some(part) = parts.next() {
+        for part in parts {
             let (left, right) = match part.split_once('=') {
                 Some(v) => v,
                 None => continue 'links,

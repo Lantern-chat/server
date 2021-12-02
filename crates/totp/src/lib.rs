@@ -28,7 +28,7 @@ impl<'a, const DIGITS: usize> TOTP<'a, DIGITS> {
         let ctr = (time / self.step).to_be_bytes();
 
         let hash = {
-            let mut mac = HmacSha256::new_from_slice(&self.key).expect("Invalid key");
+            let mut mac = HmacSha256::new_from_slice(self.key).expect("Invalid key");
             mac.update(&ctr);
             mac.finalize().into_bytes()
         };

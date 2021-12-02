@@ -381,10 +381,10 @@ impl MessageIncomingError {
 
         match self {
             Self::SocketClosed => true,
-            Self::TungsteniteError(e) => match e {
-                Error::AlreadyClosed | Error::ConnectionClosed | Error::Protocol(ProtocolError::ResetWithoutClosingHandshake) => true,
-                _ => false,
-            },
+            Self::TungsteniteError(e) => matches!(
+                e,
+                Error::AlreadyClosed | Error::ConnectionClosed | Error::Protocol(ProtocolError::ResetWithoutClosingHandshake)
+            ),
             _ => false,
         }
     }

@@ -69,7 +69,7 @@ pub async fn message_create(
             email: None,
             preferences: None,
             avatar: match row.try_get(14)? {
-                Some(avatar_id) => Some(encrypt_snowflake(&state, avatar_id)),
+                Some(avatar_id) => Some(encrypt_snowflake(state, avatar_id)),
                 None => None,
             },
         },

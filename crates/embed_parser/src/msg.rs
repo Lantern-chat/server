@@ -39,7 +39,7 @@ pub fn find_urls_aho_corasick<'a>(input: &'a str) -> UrlList<'a> {
     let mut state = FreeState::new();
 
     for m in PROTOCOLS.find_iter(bytes) {
-        if !state.is_free(&input, m.start()) {
+        if !state.is_free(input, m.start()) {
             continue;
         }
 
