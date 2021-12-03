@@ -11,6 +11,8 @@ use crate::{
 
 use models::*;
 
+pub mod slash;
+
 #[derive(Debug, Deserialize)]
 pub struct CreateMessageForm {
     content: SmolStr,
@@ -25,6 +27,18 @@ pub async fn create_message(
     room_id: Snowflake,
     form: CreateMessageForm,
 ) -> Result<Message, Error> {
+    // fast-path for if the perm_cache does contain a value, otherwise defer until content is checked
+    let perm = match state.perm_cache.get(auth.user_id, room_id).await {
+        Some(perm) => {
+            if !perm.perm.room.contains(RoomPermissions::SEND_MESSAGES) {
+                return Err(Error::Unauthorized);
+            }
+
+            Some(perm.perm)
+        }
+        None => None,
+    };
+
     let mut trimmed_content = Cow::Borrowed(form.content.trim());
 
     // if empty but not containing attachments
@@ -80,40 +94,65 @@ pub async fn create_message(
         }
     }
 
-    let permissions = get_cached_room_permissions(&state, auth.user_id, room_id).await?;
+    // since acquiring the database connection may be expensive,
+    // defer it until we need it, such as if the permissions cache didn't have a value
+    let mut maybe_db = None;
 
-    if !permissions.room.contains(RoomPermissions::SEND_MESSAGES) {
-        return Err(Error::Unauthorized);
-    }
+    let perm = match perm {
+        Some(perm) => perm,
+        None => {
+            let db = state.db.write.get().await?;
+
+            let perm = crate::ctrl::perm::get_room_permissions(&db, auth.user_id, room_id).await?;
+
+            if !perm.room.contains(RoomPermissions::SEND_MESSAGES) {
+                return Err(Error::Unauthorized);
+            }
+
+            maybe_db = Some(db);
+
+            perm
+        }
+    };
 
     let msg_id = Snowflake::now();
 
-    if !trimmed_content.is_empty() && permissions.room.contains(RoomPermissions::EMBED_LINKS) {
+    // check this before acquiring database connection
+    if !form.attachments.is_empty() && !perm.room.contains(RoomPermissions::ATTACH_FILES) {
+        return Err(Error::Unauthorized);
+    }
+
+    // message is good to go, so fire off the embed processing
+    if !trimmed_content.is_empty() && perm.room.contains(RoomPermissions::EMBED_LINKS) {
         process_embeds(msg_id, &trimmed_content);
     }
 
-    if !form.attachments.is_empty() {
-        if !permissions.room.contains(RoomPermissions::ATTACH_FILES) {
-            return Err(Error::Unauthorized);
-        }
+    // modify content before inserting it into the database
+    let modified_content = slash::process_slash(&trimmed_content);
 
-        return create_message_full(state, auth, room_id, msg_id, &form, &trimmed_content)
+    // if we avoided getting a database connection until now, do it now
+    let db = match maybe_db {
+        Some(db) => db,
+        None => state.db.write.get().await?,
+    };
+
+    if !form.attachments.is_empty() {
+        return create_message_full(db, state, auth, room_id, msg_id, &form, &modified_content)
             .boxed()
             .await;
     }
 
-    do_send_simple_message(state, auth.user_id, room_id, msg_id, &trimmed_content).await
+    do_send_simple_message(db, state, auth.user_id, room_id, msg_id, &modified_content).await
 }
 
 pub async fn do_send_simple_message(
+    db: db::pool::Object,
     state: ServerState,
     user_id: Snowflake,
     room_id: Snowflake,
     msg_id: Snowflake,
     content: &str,
 ) -> Result<Message, Error> {
-    let db = state.db.write.get().await?;
-
     let row = db
         .query_opt_cached_typed(|| query(), &[&user_id, &room_id, &msg_id, &content])
         .await?;
@@ -225,6 +264,7 @@ fn query() -> impl AnyQuery {
 }
 
 pub async fn create_message_full(
+    mut db: db::pool::Object,
     state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
@@ -232,8 +272,6 @@ pub async fn create_message_full(
     form: &CreateMessageForm,
     trimmed: &str,
 ) -> Result<Message, Error> {
-    let mut db = state.db.write.get().await?;
-
     let t = db.transaction().await?;
 
     let msg_future = async {
