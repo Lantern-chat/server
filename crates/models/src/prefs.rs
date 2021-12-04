@@ -55,10 +55,16 @@ bitflags::bitflags! {
         /// Display dark theme in an OLED-compatible mode
         const OLED_MODE = 1 << 6;
 
+        /// Mute videos/audio by default
         const MUTE_MEDIA = 1 << 7;
 
-        // give some space for other flags, and possibly switching compact view out for more options (multiple view types)
+        /// Hide images/video with unknown dimensions
+        const HIDE_UNKNOWN_DIMENSIONS = 1 << 8;
+
         const COMPACT_VIEW = 1 << 9;
+
+        // give some space for other flags, and possibly switching compact view out for more options (multiple view types)
+
         const DEVELOPER_MODE = 1 << 15;
 
         const DEFAULT_FLAGS = Self::ALLOW_DMS.bits | Self::GROUP_LINES.bits;
