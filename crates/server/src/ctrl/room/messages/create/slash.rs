@@ -2,6 +2,8 @@ use std::borrow::Cow;
 
 use aho_corasick::AhoCorasick;
 
+use crate::ctrl::Error;
+
 lazy_static::lazy_static! {
     static ref SLASH_PATTERNS: AhoCorasick = aho_corasick::AhoCorasickBuilder::new()
     .dfa(true).anchored(true).match_kind(aho_corasick::MatchKind::LeftmostFirst)
@@ -32,7 +34,7 @@ macro_rules! decl_patterns {
 }
 
 decl_patterns! {
-    Gimme, Shrug, TableFlip, Unflip, Lennyface, Disapproval
+    Gimme, Shrug, TableFlip, Unflip, Lenny, Disapprove, Me, Spoiler
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -41,9 +43,11 @@ enum Align {
     Right,
 }
 
-pub fn process_slash(content: &str) -> Cow<str> {
+pub fn process_slash(content: &str) -> Result<Option<Cow<str>>, Error> {
+    let unchanged = Ok(Some(Cow::Borrowed(content)));
+
     if !content.starts_with('/') {
-        return Cow::Borrowed(content);
+        return unchanged;
     }
 
     let bytes = &content.as_bytes()[1..];
@@ -60,7 +64,7 @@ pub fn process_slash(content: &str) -> Cow<str> {
         }
 
         if !do_command {
-            return Cow::Borrowed(content);
+            return unchanged;
         }
 
         // skip past the leading slash + match + any extra whitespace
@@ -68,16 +72,18 @@ pub fn process_slash(content: &str) -> Cow<str> {
 
         let (align, value) = match Pattern::from_index(m.pattern()) {
             Pattern::Gimme => (Align::Left, "༼ つ ◕_◕ ༽つ"),
-            Pattern::Lennyface => (Align::Right, "( ͡° ͜ʖ ͡°)"),
+            Pattern::Lenny => (Align::Right, "( ͡° ͜ʖ ͡°)"),
             Pattern::Shrug => (Align::Right, "¯\\\\_(ツ)_/¯"),
             Pattern::TableFlip => (Align::Right, "(╯°□°）╯︵ ┻━┻"),
             Pattern::Unflip => (Align::Right, "┬─┬ ノ( ゜-゜ノ)"),
-            Pattern::Disapproval => (Align::Right, "ಠ_ಠ"),
+            Pattern::Disapprove => (Align::Right, "ಠ_ಠ"),
+            Pattern::Me => return Ok(Some(format!("_{}_", content).into())),
+            Pattern::Spoiler => return Ok(Some(format!("||{}||", content).into())),
         };
 
         // nothing to pad
         if content.is_empty() {
-            return value.into();
+            return Ok(Some(value.into()));
         }
 
         let mut left = content;
@@ -88,8 +94,8 @@ pub fn process_slash(content: &str) -> Cow<str> {
             std::mem::swap(&mut left, &mut right);
         }
 
-        return format!("{} {}", left, right).into();
+        return Ok(Some(format!("{} {}", left, right).into()));
     }
 
-    return Cow::Borrowed(content);
+    return unchanged;
 }

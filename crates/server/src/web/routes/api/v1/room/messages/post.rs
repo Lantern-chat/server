@@ -14,7 +14,10 @@ pub async fn post(mut route: Route<ServerState>, auth: Authorization, room_id: S
     };
 
     match create_message(route.state, auth, room_id, form).await {
-        Ok(ref msg) => reply::json(msg).into_response(),
+        Ok(msg) => match msg {
+            Some(ref msg) => reply::json(msg).into_response(),
+            None => StatusCode::OK.into_response(),
+        },
         Err(e) => ApiError::err(e).into_response(),
     }
 }

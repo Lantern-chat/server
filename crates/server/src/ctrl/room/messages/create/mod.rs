@@ -11,6 +11,7 @@ use crate::{
 
 use models::*;
 
+pub mod embed;
 pub mod slash;
 
 #[derive(Debug, Deserialize)]
@@ -26,7 +27,7 @@ pub async fn create_message(
     auth: Authorization,
     room_id: Snowflake,
     form: CreateMessageForm,
-) -> Result<Message, Error> {
+) -> Result<Option<Message>, Error> {
     // fast-path for if the perm_cache does contain a value, otherwise defer until content is checked
     let perm = match state.perm_cache.get(auth.user_id, room_id).await {
         Some(perm) => {
@@ -122,13 +123,17 @@ pub async fn create_message(
         return Err(Error::Unauthorized);
     }
 
-    // message is good to go, so fire off the embed processing
-    if !trimmed_content.is_empty() && perm.room.contains(RoomPermissions::EMBED_LINKS) {
-        process_embeds(msg_id, &trimmed_content);
-    }
-
     // modify content before inserting it into the database
-    let modified_content = slash::process_slash(&trimmed_content);
+    let modified_content = match slash::process_slash(&trimmed_content) {
+        Ok(Some(content)) => content,
+        Ok(None) => return Ok(None),
+        Err(e) => return Err(e),
+    };
+
+    // message is good to go, so fire off the embed processing
+    if !modified_content.is_empty() && perm.room.contains(RoomPermissions::EMBED_LINKS) {
+        embed::process_embeds(msg_id, &modified_content);
+    }
 
     // if we avoided getting a database connection until now, do it now
     let db = match maybe_db {
@@ -136,13 +141,15 @@ pub async fn create_message(
         None => state.db.write.get().await?,
     };
 
-    if !form.attachments.is_empty() {
-        return create_message_full(db, state, auth, room_id, msg_id, &form, &modified_content)
+    let res = if !form.attachments.is_empty() {
+        create_message_full(db, state, auth, room_id, msg_id, &form, &modified_content)
             .boxed()
-            .await;
-    }
+            .await
+    } else {
+        do_send_simple_message(db, state, auth.user_id, room_id, msg_id, &modified_content).await
+    };
 
-    do_send_simple_message(db, state, auth.user_id, room_id, msg_id, &modified_content).await
+    res.map(Option::Some)
 }
 
 pub async fn do_send_simple_message(
@@ -355,12 +362,4 @@ pub async fn create_message_full(
     t.commit().await?;
 
     Ok(msg)
-}
-
-pub fn process_embeds(msg_id: Snowflake, msg: &str) {
-    let urls = embed_parser::msg::find_urls(msg);
-
-    if urls.is_empty() {
-        return; // TODO
-    }
 }
