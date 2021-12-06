@@ -63,6 +63,9 @@ bitflags::bitflags! {
 
         const COMPACT_VIEW = 1 << 9;
 
+        /// Prefer browser/platform emojis rather than twemoji
+        const USE_PLATFORM_EMOJIS = 1 << 10;
+
         // give some space for other flags, and possibly switching compact view out for more options (multiple view types)
 
         const DEVELOPER_MODE = 1 << 15;
