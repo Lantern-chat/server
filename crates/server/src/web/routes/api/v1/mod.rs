@@ -4,6 +4,7 @@ use ftl::*;
 
 use super::ApiError;
 
+pub mod admin;
 pub mod build;
 pub mod file;
 pub mod gateway;
@@ -24,6 +25,7 @@ pub async fn api_v1(mut route: Route<crate::ServerState>) -> Response {
         (&Method::GET, Exact("build")) => build::build(route),
         (&Method::GET, Exact("metrics")) => metrics::metrics(route).boxed().await,
         (&Method::GET, Exact("oembed")) => oembed::oembed(route).boxed().await,
+        (_, Exact("admin")) => admin::admin(route).boxed().await,
         _ => ApiError::not_found().into_response(),
     }
 }
