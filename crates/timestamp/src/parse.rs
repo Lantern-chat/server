@@ -81,24 +81,30 @@ impl_fp!(u8, u16, u32);
 pub fn parse_iso8061(ts: &str) -> Option<PrimitiveDateTime> {
     let b = ts.as_bytes();
 
-    #[inline]
+    #[inline(always)]
     fn parse_offset<T: FastParse>(b: &[u8], offset: usize, len: usize) -> Option<T> {
         b.get(offset..(offset + len)).and_then(|x| T::parse(x))
     }
 
+    #[inline(always)]
     fn is_byte(b: &[u8], offset: usize, byte: u8) -> usize {
-        offset + (b.get(offset).copied() == Some(byte)) as usize
+        match b.get(offset) {
+            Some(&b) => (b == byte) as usize,
+            None => 0,
+        }
     }
 
     let mut offset = 0;
 
     let year = parse_offset::<u16>(b, offset, 4)?;
-    offset = is_byte(b, offset + 4, b'-'); // YYYY-?
+    offset += 4;
+    offset += is_byte(b, offset, b'-'); // YYYY-?
 
     //println!("YEAR: {}", year);
 
     let month = parse_offset::<u8>(b, offset, 2)?;
-    offset = is_byte(b, offset + 2, b'-'); // MM-?
+    offset += 2;
+    offset += is_byte(b, offset, b'-'); // MM-?
 
     //println!("MONTH: {}", month);
 
@@ -124,12 +130,14 @@ pub fn parse_iso8061(ts: &str) -> Option<PrimitiveDateTime> {
     offset += 1; // T
 
     let hour = parse_offset::<u8>(b, offset, 2)?;
-    offset = is_byte(b, offset + 2, b':');
+    offset += 2;
+    offset += is_byte(b, offset, b':');
 
     //println!("HOUR: {}", hour);
 
     let minute = parse_offset::<u8>(b, offset, 2)?;
-    offset = is_byte(b, offset + 2, b':');
+    offset += 2;
+    offset += is_byte(b, offset, b':');
 
     //println!("MINUTE: {}", minute);
 
@@ -144,27 +152,30 @@ pub fn parse_iso8061(ts: &str) -> Option<PrimitiveDateTime> {
             if b.get(offset).copied() == Some(b'.') {
                 offset += 1;
 
-                let mut factor: u32 = 1_000_000_000; // up to 9 decimal places
+                let mut factor: u32 = 100_000_000; // up to 9 decimal places
                 let mut nanosecond: u32 = 0;
 
                 while let Some(c) = b.get(offset) {
                     let d = c.wrapping_sub(b'0');
 
-                    if d > 9 {
+                    if unlikely!(d > 9) {
                         break; // break on non-numeric input
                     }
 
-                    offset += 1; // consume character
-
-                    // don't accumulate unless there is precision left,
-                    // but otherwise continue the loop to consume all remaining digits
-                    if factor > 0 {
-                        nanosecond = (nanosecond * 10) + d as u32;
-                        factor /= 10;
-                    }
+                    nanosecond += d as u32 * factor;
+                    factor /= 10;
+                    offset += 1;
                 }
 
-                maybe_time = Time::from_hms_nano(hour, minute, second, factor * nanosecond)
+                // if leap seconds, ignore the parsed value and set it to just before 60
+                // doing it this way avoids duplicate code to consume the extra characters
+                if unlikely!(second == 60) {
+                    maybe_time = Time::from_hms_nano(hour, minute, 59, 999_999_999);
+                } else {
+                    maybe_time = Time::from_hms_nano(hour, minute, second, nanosecond);
+                }
+            } else if unlikely!(second == 60) {
+                maybe_time = Time::from_hms_nano(hour, minute, 59, 999_999_999);
             } else {
                 maybe_time = Time::from_hms(hour, minute, second)
             }
@@ -194,7 +205,7 @@ pub fn parse_iso8061(ts: &str) -> Option<PrimitiveDateTime> {
         Some(c @ b'+' | c @ b'-' | c @ 0xe2) => {
             if c == 0xe2 {
                 // check for UTF8 Unicode MINUS SIGN
-                if b.get(offset..(offset + 2)) == Some(&[0x88, 0x92]) {
+                if likely!(b.get(offset..(offset + 2)) == Some(&[0x88, 0x92])) {
                     offset += 2;
                 } else {
                     return None;
@@ -202,7 +213,8 @@ pub fn parse_iso8061(ts: &str) -> Option<PrimitiveDateTime> {
             }
 
             let offset_hour = parse_offset::<u8>(b, offset, 2)? as u64;
-            offset = is_byte(b, offset + 2, b':');
+            offset += 2;
+            offset += is_byte(b, offset, b':');
             let offset_minute = parse_offset::<u8>(b, offset, 2)? as u64;
             offset += 2;
 
@@ -231,7 +243,7 @@ pub fn parse_iso8061(ts: &str) -> Option<PrimitiveDateTime> {
         _ => return None,
     }
 
-    if offset != b.len() {
+    if unlikely!(offset != b.len()) {
         return None;
     }
 
