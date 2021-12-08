@@ -182,11 +182,21 @@ fn read_jpeg<R: Read>(source: R, limits: &Limits) -> Result<Image, ImageReadErro
 
     let image = match image_info.pixel_format {
         PixelFormat::L8 => DynamicImage::ImageLuma8(from_raw!(info, buf)),
+        PixelFormat::L16 => DynamicImage::ImageLuma16(from_raw!(info, l16_to_l16(&buf))),
         PixelFormat::RGB24 => DynamicImage::ImageRgb8(from_raw!(info, buf)),
         PixelFormat::CMYK32 => DynamicImage::ImageRgb8(from_raw!(info, cmyk_to_rgb(&buf))),
     };
 
     Ok(Image { image, info })
+}
+
+fn l16_to_l16(input: &[u8]) -> Vec<u16> {
+    let mut output = vec![0u16; input.len() / 2];
+    for (chunk, out) in input.chunks_exact(2).zip(&mut output) {
+        *out = ((chunk[0] as u16) << 8) | (chunk[1] as u16)
+    }
+
+    output
 }
 
 fn cmyk_to_rgb(input: &[u8]) -> Vec<u8> {
