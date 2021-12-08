@@ -129,7 +129,7 @@ pub async fn get_metrics(
         Err(e) => Err(e.into()),
         Ok(row) => Ok((
             // key
-            Timestamp::from_unix_timestamp(row.try_get(0)?).format(),
+            Timestamp::from_unix_timestamp(row.try_get(0)?).format_short(),
             // value
             AggregatedMetrics {
                 mem: row.try_get(1)?,
