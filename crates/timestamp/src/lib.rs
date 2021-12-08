@@ -3,6 +3,9 @@ use std::time::{Duration, SystemTime};
 
 use time::{OffsetDateTime, PrimitiveDateTime, UtcOffset};
 
+#[macro_use]
+mod macros;
+
 mod format;
 mod parse;
 mod ts_str;
@@ -18,7 +21,7 @@ use std::fmt;
 
 impl fmt::Debug for Timestamp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let ts = self.format_full();
+        let ts = self.format();
 
         f.debug_tuple("Timestamp").field(&ts).finish()
     }
@@ -89,11 +92,11 @@ impl Timestamp {
         millis
     }
 
-    pub fn format(&self) -> TimestampStr<Short> {
+    pub fn format(&self) -> TimestampStr<Full> {
         format::format_iso8061(self.0)
     }
 
-    pub fn format_full(&self) -> TimestampStr<Full> {
+    pub fn format_short(&self) -> TimestampStr<Short> {
         format::format_iso8061(self.0)
     }
 
@@ -160,7 +163,7 @@ mod serde_impl {
             S: Serializer,
         {
             if serializer.is_human_readable() {
-                self.format_full().serialize(serializer)
+                self.format().serialize(serializer)
             } else {
                 self.to_unix_timestamp_ms().serialize(serializer)
             }
@@ -257,7 +260,7 @@ mod tests {
     fn test_format_iso8061_full() {
         let now = Timestamp::now_utc();
 
-        let formatted = now.format_full();
+        let formatted = now.format();
 
         println!("{}", formatted);
     }
@@ -298,7 +301,7 @@ mod tests {
         for fixture in fixtures {
             let parsed = Timestamp::parse(fixture);
 
-            assert!(parsed.is_some());
+            assert!(parsed.is_some(), "Failed to parse: {}", fixture);
 
             println!("{:?}", parsed.unwrap());
         }

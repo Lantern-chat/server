@@ -10,10 +10,10 @@ fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| ts.format());
     });
 
-    c.bench_function("format_iso8061_full", |b| {
+    c.bench_function("format_iso8061_short", |b| {
         let ts = black_box(Timestamp::now_utc());
 
-        b.iter(|| ts.format_full());
+        b.iter(|| ts.format_short());
     });
 
     //c.bench_function("format_iso8061_old", |b| {
@@ -25,6 +25,12 @@ fn criterion_benchmark(c: &mut Criterion) {
         let ts = black_box(Utc::now().naive_utc());
 
         b.iter(|| format_naivedatetime(ts));
+    });
+
+    c.bench_function("format_time", |b| {
+        let ts = black_box(time::OffsetDateTime::now_utc());
+
+        b.iter(|| ts.format(&time::format_description::well_known::Rfc3339).unwrap());
     });
 
     //c.bench_function("parse_iso8061_regex", |b| {
@@ -44,6 +50,14 @@ fn criterion_benchmark(c: &mut Criterion) {
         type T = DateTime<chrono::FixedOffset>;
 
         b.iter(|| T::parse_from_rfc3339(&ts).unwrap());
+    });
+
+    c.bench_function("parse_iso8061_time", |b| {
+        let ts = black_box("2021-10-17T02:03:01+00:00");
+
+        use time::{format_description::well_known::Rfc3339, OffsetDateTime};
+
+        b.iter(|| OffsetDateTime::parse(ts, &Rfc3339).unwrap());
     });
 
     c.bench_function("to_unix_timestamp_ms", |b| {

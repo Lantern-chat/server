@@ -1,8 +1,8 @@
-use timestamp::{Short, Timestamp, TimestampStr};
+use timestamp::{Full, Timestamp, TimestampStr};
 
 #[inline(never)]
 #[no_mangle]
-pub fn format_iso8061(ts: Timestamp) -> TimestampStr<Short> {
+pub fn format_iso8061(ts: Timestamp) -> TimestampStr<Full> {
     ts.format()
 }
 
