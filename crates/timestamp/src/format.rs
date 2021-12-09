@@ -20,11 +20,49 @@ const fn make_table() -> [[u8; 2]; 100] {
 
 const LOOKUP: [[u8; 2]; 100] = make_table();
 
+/*
+use time::{Date, Month};
+
+const fn make_day_table(leap: bool) -> [(Month, u8); 366] {
+    let mut table = [(Month::January, 0); 366];
+
+    let mut i = 1;
+    while i < 366 {
+        if let Ok(date) = Date::from_ordinal_date(if leap { 2020 } else { 2019 }, i) {
+            let (_, month, day) = date.to_calendar_date();
+            table[i as usize] = (month, day);
+        }
+        i += 1;
+    }
+
+    table
+}
+
+const ORDINAL_TABLE: [(Month, u8); 366] = make_day_table(false);
+const ORDINAL_TABLE_L: [(Month, u8); 366] = make_day_table(true);
+
+fn get_ymd(d: Date) -> (i32, Month, u8) {
+    let year = d.year();
+
+    let table = match time::util::is_leap_year(year) {
+        true => &ORDINAL_TABLE_L,
+        false => &ORDINAL_TABLE,
+    };
+
+    let ordinal = d.ordinal();
+
+    let (month, day) = unsafe { *table.get_unchecked(ordinal as usize) };
+
+    (year, month, day)
+}
+*/
+
 #[rustfmt::skip]
 #[allow(unused_assignments)]
 #[inline(always)]
 pub fn format_iso8061<S: TimestampStrStorage>(ts: PrimitiveDateTime) -> TimestampStr<S> {
     // decompose timestamp
+    //let (year, month, day) = get_ymd(ts.date());
     let (year, month, day) = ts.to_calendar_date();
     let (hour, minute, second, milliseconds) = ts.as_hms_milli();
 
