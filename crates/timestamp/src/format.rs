@@ -12,14 +12,13 @@ const fn make_table() -> [[u8; 2]; 100] {
             table[(i as usize) * 10 + (j as usize)] = [i + b'0', j + b'0'];
             j += 1;
         }
-
         i += 1;
     }
 
     table
 }
 
-static LOOKUP: [[u8; 2]; 100] = make_table();
+const LOOKUP: [[u8; 2]; 100] = make_table();
 
 #[rustfmt::skip]
 #[allow(unused_assignments)]
@@ -40,18 +39,19 @@ pub fn format_iso8061<S: TimestampStrStorage>(ts: PrimitiveDateTime) -> Timestam
             if value > $max { std::hint::unreachable_unchecked() }
 
             let buf = buf.as_mut_ptr().add(pos);
+            let lookup = LOOKUP.as_ptr();
 
             match $len {
                 2 => {
-                    buf.copy_from_nonoverlapping(LOOKUP.as_ptr().add(value as usize) as *const u8, 2);
+                    buf.copy_from_nonoverlapping(lookup.add(value as usize) as *const u8, 2);
                 }
                 3 => {
                     let ab = value / 10;
                     let c = value % 10;
 
-                    buf.copy_from_nonoverlapping(LOOKUP.as_ptr().add(ab as usize) as *const u8, 2);
+                    buf.copy_from_nonoverlapping(lookup.add(ab as usize) as *const u8, 2);
                     //*buf.add(2) = c + b'0';
-                    *buf.add(2) = (*LOOKUP.as_ptr().add(c as usize))[1];
+                    *buf.add(2) = (*lookup.add(c as usize))[1];
                 }
                 4 => {
                     let value = value as u16;
@@ -59,8 +59,8 @@ pub fn format_iso8061<S: TimestampStrStorage>(ts: PrimitiveDateTime) -> Timestam
                     let ab = value / 100;
                     let cd = value % 100;
 
-                    buf.copy_from_nonoverlapping(LOOKUP.as_ptr().add(ab as usize) as *const u8, 2);
-                    buf.add(2).copy_from_nonoverlapping(LOOKUP.as_ptr().add(cd as usize) as *const u8, 2);
+                    buf.copy_from_nonoverlapping(lookup.add(ab as usize) as *const u8, 2);
+                    buf.add(2).copy_from_nonoverlapping(lookup.add(cd as usize) as *const u8, 2);
                 }
                 _ => std::hint::unreachable_unchecked()
             }
