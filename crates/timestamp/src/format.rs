@@ -50,7 +50,6 @@ pub fn format_iso8061<S: TimestampStrStorage>(ts: PrimitiveDateTime) -> Timestam
                     let c = value % 10;
 
                     buf.copy_from_nonoverlapping(lookup.add(ab as usize) as *const u8, 2);
-                    //*buf.add(2) = c + b'0';
                     *buf.add(2) = (*lookup.add(c as usize))[1];
                 }
                 4 => {
