@@ -57,10 +57,21 @@ fn get_ymd(d: Date) -> (i32, Month, u8) {
 }
 */
 
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
+
+#[cfg(target_arch = "x86")]
+pub use core::arch::x86::{_mm_prefetch, _MM_HINT_T0};
+
 #[rustfmt::skip]
 #[allow(unused_assignments)]
 #[inline(always)]
 pub fn format_iso8061<S: TimestampStrStorage>(ts: PrimitiveDateTime) -> TimestampStr<S> {
+    let lookup = LOOKUP.as_ptr();
+    if cfg!(any(target_arch = "x86_64", target_arch = "x86")) {
+        unsafe { _mm_prefetch::<_MM_HINT_T0>(lookup as _) }
+    }
+
     // decompose timestamp
     //let (year, month, day) = get_ymd(ts.date());
     let (year, month, day) = ts.to_calendar_date();
@@ -77,7 +88,6 @@ pub fn format_iso8061<S: TimestampStrStorage>(ts: PrimitiveDateTime) -> Timestam
             if value > $max { std::hint::unreachable_unchecked() }
 
             let buf = buf.as_mut_ptr().add(pos);
-            let lookup = LOOKUP.as_ptr();
 
             match $len {
                 2 => {
