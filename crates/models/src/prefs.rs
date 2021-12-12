@@ -66,11 +66,13 @@ bitflags::bitflags! {
         /// Prefer browser/platform emojis rather than twemoji
         const USE_PLATFORM_EMOJIS = 1 << 10;
 
+        const ENABLE_SPELLCHECK = 1 << 11;
+
         // give some space for other flags, and possibly switching compact view out for more options (multiple view types)
 
         const DEVELOPER_MODE = 1 << 15;
 
-        const DEFAULT_FLAGS = Self::ALLOW_DMS.bits | Self::GROUP_LINES.bits;
+        const DEFAULT_FLAGS = Self::ALLOW_DMS.bits | Self::GROUP_LINES.bits | Self::ENABLE_SPELLCHECK.bits;
     }
 }
 
