@@ -207,6 +207,7 @@ bitflags::bitflags! {
         const INSIDE_CODE_BLOCK     = 1 << 0;
         const INSIDE_SPOILER        = 1 << 1;
         const INSIDE_INLINE_CODE    = 1 << 2;
+        const ESCAPED               = 1 << 4;
     }
 }
 
@@ -234,9 +235,26 @@ impl FreeState {
         let input = unsafe { input.get_unchecked(self.position..new_position) };
 
         for c in input.bytes() {
+            if c == b'\\' {
+                self.flags.insert(Flags::ESCAPED);
+                continue;
+            }
+
+            if self.flags.contains(Flags::ESCAPED) {
+                self.flags.remove(Flags::ESCAPED);
+                continue;
+            }
+
             if c == b'`' {
                 self.consecutive_code += 1;
             } else {
+                // if this character is not part of a code token,
+                // but there were two consecitive code tokens,
+                // then it was probably a zero-length inline code span
+                if self.consecutive_code == 2 && !self.flags.contains(Flags::INSIDE_CODE_BLOCK) {
+                    self.flags.toggle(Flags::INSIDE_INLINE_CODE);
+                }
+
                 self.consecutive_code = 0;
             }
 
@@ -271,8 +289,8 @@ impl FreeState {
             return true;
         }
 
-        // escaped URL: <https://test.com>
-        if matches!(input.as_bytes()[new_position - 1], b'<' | b'\\') {
+        // escaped URL: <https://test.com> or prefixed to escape or be part of emote
+        if matches!(input.as_bytes()[new_position - 1], b'<' | b'\\' | b':') {
             return false;
         }
 
