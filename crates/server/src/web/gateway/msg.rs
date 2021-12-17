@@ -44,12 +44,14 @@ macro_rules! decl_msgs {
 
         impl Message {
             $(
+                #[inline]
                 pub const fn [<$opcode:lower>](payload: payloads::[<$opcode Payload>]) -> Message {
                     Message::$opcode { op: Opcode::$opcode, payload }
                 }
 
-                pub const fn [<new_ $opcode:lower>]($($field: $ty),*) -> Message {
-                    Message::$opcode { op: Opcode::$opcode, payload: payloads::[<$opcode Payload>] { $($field),* }}
+                #[inline]
+                pub fn [<new_ $opcode:lower>]($($field: impl Into<$ty>),*) -> Message {
+                    Message::$opcode { op: Opcode::$opcode, payload: payloads::[<$opcode Payload>] { $($field: $field.into()),* }}
                 }
             )*
         }
@@ -172,13 +174,13 @@ pub mod server {
         13 => MemberBan     { #[serde(flatten)] inner: Arc<PartyMemberInner> },
         14 => MemberUnban   { #[serde(flatten)] inner: Box<PartyMemberInner> },
 
-        15 => RoomCreate { #[serde(flatten)] room: Room },
-        16 => RoomUpdate { #[serde(flatten)] room: Room },
+        15 => RoomCreate { #[serde(flatten)] room: Box<Room> },
+        16 => RoomUpdate { #[serde(flatten)] room: Box<Room> },
         17 => RoomDelete { id: Snowflake },
         18 => RoomPinsUpdate {},
 
-        19 => MessageCreate { #[serde(flatten)] msg: RoomMessage },
-        20 => MessageUpdate { #[serde(flatten)] msg: RoomMessage },
+        19 => MessageCreate { #[serde(flatten)] msg: Box<RoomMessage> },
+        20 => MessageUpdate { #[serde(flatten)] msg: Box<RoomMessage> },
         21 => MessageDelete { #[serde(flatten)] msg: Box<MessageDeleteInner> },
 
         22 => MessageReactionAdd {},
