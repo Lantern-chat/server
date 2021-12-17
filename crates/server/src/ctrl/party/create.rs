@@ -70,11 +70,23 @@ pub async fn create_party(
     )
     .await?;
 
+    let position = {
+        let row = t
+            .query_one_cached_typed(|| query_max_position(), &[&auth.user_id])
+            .await?;
+
+        match row.try_get::<_, Option<i16>>(0)? {
+            Some(max_position) => max_position + 1,
+            None => 0,
+        }
+    };
+
     futures::future::try_join3(
-        t.execute_cached_typed(|| insert_member(), &[&party.id, &auth.user_id]),
+        t.execute_cached_typed(|| insert_member(), &[&party.id, &auth.user_id, &position]),
         t.execute_cached_typed(
             || insert_role(),
             &[
+                &default_role.name,
                 &default_role.id,
                 &party.id,
                 &(default_role.permissions.pack() as i64),
@@ -110,13 +122,26 @@ fn insert_party() -> impl AnyQuery {
         ])
 }
 
+fn query_max_position() -> impl AnyQuery {
+    use schema::*;
+
+    Query::select()
+        .expr(Builtin::max(PartyMember::Position))
+        .from_table::<PartyMember>()
+        .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
+}
+
 fn insert_member() -> impl AnyQuery {
     use schema::*;
 
     Query::insert()
         .into::<PartyMember>()
-        .cols(&[PartyMember::PartyId, PartyMember::UserId])
-        .values(vec![Var::of(Party::Id), Var::of(Users::Id)])
+        .cols(&[PartyMember::PartyId, PartyMember::UserId, PartyMember::Position])
+        .values(vec![
+            Var::of(Party::Id),
+            Var::of(Users::Id),
+            Var::of(PartyMember::Position),
+        ])
 }
 
 // NOTE: Does not set sort order manually, defaults to 0
@@ -125,8 +150,9 @@ fn insert_role() -> impl AnyQuery {
 
     Query::insert()
         .into::<Roles>()
-        .cols(&[Roles::Id, Roles::PartyId, Roles::Permissions])
+        .cols(&[Roles::Name, Roles::Id, Roles::PartyId, Roles::Permissions])
         .values(vec![
+            Var::of(Roles::Name),
             Var::of(Roles::Id),
             Var::of(Roles::PartyId),
             Var::of(Roles::Permissions),
