@@ -154,6 +154,7 @@ mod tests {
             assert_eq!(UserFlags::all().with_elevation(ev).elevation(), ev);
         }
 
-        println!("{}", f.bits());
+        println!("SYSTEM {}", f.bits());
+        println!("BOT: {}", f.with_elevation(ElevationLevel::Bot).bits());
     }
 }

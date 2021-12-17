@@ -9,6 +9,7 @@ use crate::web::{
 pub mod get;
 pub mod messages;
 pub mod typing;
+pub mod patch;
 
 pub async fn room(mut route: Route<crate::ServerState>) -> Response {
     let auth = match authorize(&route).await {
