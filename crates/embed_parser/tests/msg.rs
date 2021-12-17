@@ -4,16 +4,22 @@ use embed_parser::msg::{find_urls, is_free, Url};
 fn test_is_free() {
     assert!(is_free("`test` https", 6));
     assert!(!is_free("<test>", 1));
+    //assert!(is_free("\\<test>", 3));
     assert!(!is_free("||test||", 4));
+    assert!(is_free("\\||test||", 4));
+    assert!(!is_free("`test`", 4));
+    assert!(is_free("\\`test`", 4));
     assert!(!is_free("`https`", 3));
     assert!(!is_free(
         r#"
-    ```rust
-    fn main() {}
-    ```
+```rust
+fn main() {}
+```
     "#,
         10
     ));
+    let t = r#"\```rust fn main() {}```"#;
+    assert!(is_free(t, 10), "NOT free at {}", &t[10..11]);
 }
 
 #[test]

@@ -235,13 +235,13 @@ impl FreeState {
         let input = unsafe { input.get_unchecked(self.position..new_position) };
 
         for c in input.bytes() {
-            if c == b'\\' {
-                self.flags.insert(Flags::ESCAPED);
+            if self.flags.contains(Flags::ESCAPED) {
+                self.flags.remove(Flags::ESCAPED);
                 continue;
             }
 
-            if self.flags.contains(Flags::ESCAPED) {
-                self.flags.remove(Flags::ESCAPED);
+            if c == b'\\' {
+                self.flags.insert(Flags::ESCAPED);
                 continue;
             }
 
