@@ -15,8 +15,11 @@ pub mod processors {
     use crate::{ctrl::Error, ServerState};
 
     pub mod member_event;
+
     pub mod message_create;
     pub mod message_delete;
+    pub mod message_update;
+
     pub mod presence_update;
 }
 
@@ -39,23 +42,24 @@ pub async fn process(
 
     match event.code {
         EventCode::MessageCreate => {
-            processors::message_create::message_create(state, db, event.id, party_id).await?;
+            processors::message_create::message_create(state, db, event.id, party_id).await
         }
         EventCode::MessageDelete => {
-            processors::message_delete::message_delete(state, db, event.id, party_id).await?;
+            processors::message_delete::message_delete(state, db, event.id, party_id).await
+        }
+        EventCode::MessageUpdate => {
+            processors::message_update::message_update(state, db, event.id, party_id).await
         }
         EventCode::PresenceUpdated => {
-            processors::presence_update::presence_updated(state, db, event.id).await?;
+            processors::presence_update::presence_updated(state, db, event.id).await
         }
         EventCode::MemberJoined
         | EventCode::MemberLeft
         | EventCode::MemberUpdated
         | EventCode::MemberBan
         | EventCode::MemberUnban => {
-            processors::member_event::member_event(state, event.code, db, event.id, party_id).await?;
+            processors::member_event::member_event(state, event.code, db, event.id, party_id).await
         }
         _ => unimplemented!(),
     }
-
-    Ok(())
 }

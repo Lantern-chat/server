@@ -36,11 +36,11 @@ pub async fn message_delete(
         None => return Ok(()),
     };
 
-    let event = ServerMsg::new_messagedelete(Box::new(MessageDeleteInner {
+    let event = ServerMsg::new_messagedelete(MessageDeleteInner {
         id,
         room_id,
         party_id,
-    }));
+    });
 
     if let Some(party_id) = party_id {
         state

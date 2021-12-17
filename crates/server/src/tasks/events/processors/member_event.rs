@@ -119,19 +119,19 @@ pub async fn member_event(
         })
     };
 
-    let mut party_future = Either::Left(futures::future::ok::<Option<Box<Party>>, Error>(None));
+    let mut party_future = Either::Left(futures::future::ok::<Option<Party>, Error>(None));
 
     if event == EventCode::MemberJoined {
         party_future = Either::Right(async {
             crate::ctrl::party::get::get_party_inner(state.clone(), db, user_id, party_id)
                 .await
-                .map(|party| Some(Box::new(party)))
+                .map(|party| Some(party))
         });
     }
 
     let (member, party): (PartyMember, _) = tokio::try_join!(member_future, party_future)?;
 
-    let inner = Box::new(PartyMemberInner { party_id, member });
+    let inner = PartyMemberInner { party_id, member };
 
     let msg = match event {
         EventCode::MemberUpdated => ServerMsg::new_memberupdate(inner),
@@ -149,7 +149,7 @@ pub async fn member_event(
             ServerMsg::new_memberadd(inner)
         }
         EventCode::MemberLeft | EventCode::MemberBan => {
-            let inner: Arc<PartyMemberInner> = Arc::from(inner);
+            let inner: Arc<PartyMemberInner> = Arc::new(inner);
 
             state
                 .gateway

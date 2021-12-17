@@ -13,6 +13,28 @@ pub async fn message_create(
     id: Snowflake,
     party_id: Option<Snowflake>,
 ) -> Result<(), Error> {
+    let msg = get_message(state, db, id, party_id).await?;
+
+    if let Some(party_id) = msg.party_id {
+        let room_id = msg.room_id;
+
+        let event = ServerMsg::new_messagecreate(msg);
+
+        state
+            .gateway
+            .broadcast_event(Event::new(event, Some(room_id))?, party_id)
+            .await;
+    }
+
+    Ok(())
+}
+
+pub async fn get_message(
+    state: &ServerState,
+    db: &db::pool::Client,
+    id: Snowflake,
+    party_id: Option<Snowflake>,
+) -> Result<Message, Error> {
     let row = db
         .query_one_cached_typed(
             || {
@@ -37,6 +59,7 @@ pub async fn message_create(
                         /*12*/ AggMessages::AttachmentMeta,
                         /*13*/ AggMessages::AttachmentPreview,
                         /*14*/ AggMessages::AvatarId,
+                        /*15*/ AggMessages::EditedAt,
                     ])
             },
             &[&id],
@@ -57,7 +80,7 @@ pub async fn message_create(
         created_at: id.timestamp(),
         room_id,
         flags: MessageFlags::from_bits_truncate(row.try_get(9)?),
-        edited_at: None, // new message, not edited
+        edited_at: row.try_get(15)?,
         content: row.try_get(10)?,
         author: User {
             id: row.try_get(0)?,
@@ -144,14 +167,5 @@ pub async fn message_create(
         }
     }
 
-    if let Some(party_id) = msg.party_id {
-        let event = ServerMsg::new_messagecreate(msg);
-
-        state
-            .gateway
-            .broadcast_event(Event::new(event, Some(room_id))?, party_id)
-            .await;
-    }
-
-    Ok(())
+    Ok(msg)
 }
