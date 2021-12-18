@@ -63,3 +63,33 @@ $$;
 DROP TRIGGER IF EXISTS role_member_event ON lantern.role_members CASCADE;
 CREATE TRIGGER role_member_event AFTER UPDATE OR INSERT OR DELETE ON lantern.role_members
 FOR EACH ROW EXECUTE FUNCTION lantern.role_member_trigger();
+
+CREATE OR REPLACE FUNCTION lantern.role_trigger()
+RETURNS trigger
+LANGUAGE plpgsql AS
+$$
+BEGIN
+
+    IF TG_OP = 'DELETE' THEN
+        INSERT INTO lantern.event_log (code, id, party_id)
+        VALUES ('role_deleted'::lantern.event_code, OLD.id, OLD.party_id);
+    ELSE
+        INSERT INTO lantern.event_log(code, id, party_id)
+        SELECT
+            CASE
+                WHEN TG_OP = 'INSERT'
+                    THEN 'role_created'::lantern.event_code
+                    ELSE 'role_updated'::lantern.event_code
+            END,
+            NEW.id,
+            NEW.party_id;
+
+    END IF;
+
+    RETURN NEW;
+END
+$$;
+
+DROP TRIGGER IF EXISTS role_event ON lantern.roles CASCADE;
+CREATE TRIGGER role_event AFTER UPDATE OR INSERT OR DELETE ON lantern.roles
+FOR EACH ROW EXECUTE FUNCTION lantern.role_trigger();

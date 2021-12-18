@@ -20,6 +20,8 @@ pub mod processors {
     pub mod message_delete;
     pub mod message_update;
 
+    pub mod role_event;
+
     pub mod presence_update;
 }
 
@@ -52,6 +54,9 @@ pub async fn process(
         | EventCode::MemberBan
         | EventCode::MemberUnban => {
             processors::member_event::member_event(state, code, db, id, party_id).await
+        }
+        EventCode::RoleCreated | EventCode::RoleUpdated | EventCode::RoleDeleted => {
+            processors::role_event::role_event(state, code, db, id, party_id).await
         }
         _ => Err(Error::Unimplemented),
     }

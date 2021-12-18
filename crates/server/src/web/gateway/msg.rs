@@ -124,7 +124,7 @@ pub mod server {
 
     use models::{
         events::{Hello, Ready, TypingStart},
-        Intent, Message as RoomMessage, Party, PartyMember, User, UserPresence,
+        Intent, Message as RoomMessage, Party, PartyMember, Role, User, UserPresence,
     };
 
     type Room = (); // TODO
@@ -139,6 +139,20 @@ pub mod server {
     pub struct MessageDeleteInner {
         pub id: Snowflake,
         pub room_id: Snowflake,
+
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub party_id: Option<Snowflake>,
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct RoleDeleteInner {
+        pub id: Snowflake,
+        pub party_id: Snowflake,
+    }
+
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct RoomDeleteInner {
+        pub id: Snowflake,
 
         #[serde(default, skip_serializing_if = "Option::is_none")]
         pub party_id: Option<Snowflake>,
@@ -164,9 +178,9 @@ pub mod server {
         5 => PartyUpdate { #[serde(flatten)] inner: Box<Party> },
         6 => PartyDelete { id: Snowflake },
 
-        7 => RoleCreate {},
-        8 => RoleUpdate {},
-        9 => RoleDelete {},
+        7 => RoleCreate { #[serde(flatten)] inner: Box<Role> },
+        8 => RoleUpdate { #[serde(flatten)] inner: Box<Role> },
+        9 => RoleDelete { #[serde(flatten)] inner: Box<RoleDeleteInner> },
 
         10 => MemberAdd     { #[serde(flatten)] inner: Box<PartyMemberInner> },
         11 => MemberUpdate  { #[serde(flatten)] inner: Box<PartyMemberInner> },
@@ -176,7 +190,7 @@ pub mod server {
 
         15 => RoomCreate { #[serde(flatten)] room: Box<Room> },
         16 => RoomUpdate { #[serde(flatten)] room: Box<Room> },
-        17 => RoomDelete { id: Snowflake },
+        17 => RoomDelete { #[serde(flatten)] room: Box<RoomDeleteInner> },
         18 => RoomPinsUpdate {},
 
         19 => MessageCreate { #[serde(flatten)] msg: Box<RoomMessage> },
