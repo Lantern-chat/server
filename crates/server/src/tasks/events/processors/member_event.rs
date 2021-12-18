@@ -58,7 +58,7 @@ pub async fn member_event(
                 )
                 .await?;
 
-            Ok::<_, Error>(PartyMember {
+            Ok::<Option<_>, Error>(Some(PartyMember {
                 user: Some(User {
                     id: user_id,
                     username: row.try_get(0)?,
@@ -73,12 +73,12 @@ pub async fn member_event(
                 nick: None,
                 roles: None,
                 presence: None,
-            })
+            }))
         })
     } else {
         Either::Right(async {
             let row = db
-                .query_one_cached_typed(
+                .query_opt_cached_typed(
                     || {
                         use schema::*;
                         use thorn::*;
@@ -90,7 +90,12 @@ pub async fn member_event(
                 )
                 .await?;
 
-            Ok::<_, Error>(PartyMember {
+            let row = match row {
+                Some(row) => row,
+                None => return Ok(None),
+            };
+
+            Ok::<Option<_>, Error>(Some(PartyMember {
                 user: Some(User {
                     id: row.try_get(0)?,
                     username: row.try_get(2)?,
@@ -115,7 +120,7 @@ pub async fn member_event(
                     }),
                 },
                 roles: row.try_get(12)?,
-            })
+            }))
         })
     };
 
@@ -129,7 +134,14 @@ pub async fn member_event(
         });
     }
 
-    let (member, party): (PartyMember, _) = tokio::try_join!(member_future, party_future)?;
+    let (member, party): (Option<PartyMember>, _) = tokio::try_join!(member_future, party_future)?;
+
+    // If no member was found, odds are it was just a side-effect
+    // event from triggers after the member left
+    let member = match member {
+        Some(member) => member,
+        None => return Ok(()),
+    };
 
     let inner = PartyMemberInner { party_id, member };
 
