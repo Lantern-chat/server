@@ -123,7 +123,7 @@ pub mod server {
     use std::sync::Arc;
 
     use models::{
-        events::{Hello, Ready, TypingStart},
+        events::{Hello, PartyPositionUpdate, Ready, TypingStart},
         Intent, Message as RoomMessage, Party, PartyMember, Role, User, UserPresence,
     };
 
@@ -166,6 +166,13 @@ pub mod server {
         pub member: PartyMember,
     }
 
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(untagged)]
+    pub enum PartyUpdateInner {
+        Position(PartyPositionUpdate),
+        Full(Party),
+    }
+
     // TODO: Check that this enum doesn't grow too large, allocate large payloads like Ready
     decl_msgs! {
         0 => Hello { #[serde(flatten)] inner: Hello },
@@ -175,7 +182,7 @@ pub mod server {
         3 => InvalidSession: Default {},
 
         4 => PartyCreate { #[serde(flatten)] inner: Box<Party> },
-        5 => PartyUpdate { #[serde(flatten)] inner: Box<Party> },
+        5 => PartyUpdate { #[serde(flatten)] inner: Box<PartyUpdateInner> },
         6 => PartyDelete { id: Snowflake },
 
         7 => RoleCreate { #[serde(flatten)] inner: Box<Role> },

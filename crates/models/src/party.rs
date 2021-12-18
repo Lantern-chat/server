@@ -47,7 +47,6 @@ pub struct Party {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub emotes: Vec<Emote>,
 
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub avatar: Option<SmolStr>,
 
     pub position: i16,
@@ -61,7 +60,6 @@ pub struct PartialParty {
     pub name: SmolStr,
 
     /// Discription of the party, if publicly listed
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<SmolStr>,
 }
 

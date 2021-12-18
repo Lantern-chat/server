@@ -15,10 +15,7 @@ BEGIN
         INSERT INTO lantern.event_log(code, id, party_id)
         VALUES('self_updated'::lantern.event_code, OLD.user_id, OLD.party_id);
 
-        RETURN NEW;
-    END IF;
-
-    IF TG_OP = 'DELETE' THEN
+    ELSIF TG_OP = 'DELETE' THEN
         INSERT INTO lantern.event_log (code, id, party_id)
         SELECT
             CASE
@@ -101,3 +98,38 @@ $$;
 DROP TRIGGER IF EXISTS role_event ON lantern.roles CASCADE;
 CREATE TRIGGER role_event AFTER UPDATE OR INSERT OR DELETE ON lantern.roles
 FOR EACH ROW EXECUTE FUNCTION lantern.role_trigger();
+
+CREATE OR REPLACE FUNCTION lantern.user_trigger()
+RETURNS trigger
+LANGUAGE plpgsql AS
+$$
+BEGIN
+    IF
+        OLD.mfa_secret != NEW.mfa_secret OR
+        OLD.mfa_backup != NEW.mfa_backup OR
+        OLD.passhash != NEW.passhash
+    THEN
+        -- don't emit events on authorization changes
+        RETURN NEW;
+    ELSIF
+        OLD.dob != NEW.dob OR
+        OLD.email != NEW.email OR
+        OLD.preferences != NEW.preferences OR
+        OLD.flags != NEW.flags -- only compare public fields?
+    THEN
+        -- self event when changing private fields
+        INSERT INTO lantern.event_log(code, id)
+        VALUES ('self_updated'::lantern.event_code, NEW.id);
+    ELSE
+        -- user event
+        INSERT INTO lantern.event_log(code, id)
+        VALUES ('user_updated'::lantern.event_code, NEW.id);
+    END IF;
+
+    RETURN NEW;
+END
+$$;
+
+DROP TRIGGER IF EXISTS user_event ON lantern.users CASCADE;
+CREATE TRIGGER user_event AFTER UPDATE ON lantern.users
+FOR EACH ROW EXECUTE FUNCTION lantern.user_trigger();

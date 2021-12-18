@@ -132,6 +132,12 @@ pub mod events {
         //ts: u32,
     }
 
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct PartyPositionUpdate {
+        pub id: Snowflake,
+        pub position: i16,
+    }
+
     //#[derive(Debug, Clone, Serialize, Deserialize)]
     //pub struct PresenceUpdate {
     //    pub user_id: Snowflake,

@@ -14,6 +14,8 @@ pub mod processors {
 
     use crate::{ctrl::Error, ServerState};
 
+    pub mod user_event;
+
     pub mod member_event;
 
     pub mod message_create;
@@ -58,6 +60,8 @@ pub async fn process(
         EventCode::RoleCreated | EventCode::RoleUpdated | EventCode::RoleDeleted => {
             processors::role_event::role_event(state, code, db, id, party_id).await
         }
+        EventCode::SelfUpdated => processors::user_event::self_update(state, db, id, party_id).await,
+        EventCode::UserUpdated => processors::user_event::user_update(state, db, id).await,
         _ => Err(Error::Unimplemented),
     }
 }
