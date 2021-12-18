@@ -43,3 +43,23 @@ $$;
 DROP TRIGGER IF EXISTS member_event ON lantern.party_member CASCADE;
 CREATE TRIGGER member_event AFTER UPDATE OR INSERT OR DELETE ON lantern.party_member
 FOR EACH ROW EXECUTE FUNCTION lantern.member_trigger();
+
+-- Updating role_members should trigger a member_updated event
+CREATE OR REPLACE FUNCTION lantern.role_member_trigger()
+RETURNS trigger
+LANGUAGE plpgsql AS
+$$
+BEGIN
+    INSERT INTO lantern.event_log (code, id, party_id)
+    SELECT 'member_updated'::lantern.event_code,
+        COALESCE(OLD.user_id, NEW.user_id),
+        roles.party_id
+    FROM lantern.roles WHERE roles.id = COALESCE(OLD.role_id, NEW.role_id);
+
+    RETURN NEW;
+END
+$$;
+
+DROP TRIGGER IF EXISTS role_member_event ON lantern.role_members CASCADE;
+CREATE TRIGGER role_member_event AFTER UPDATE OR INSERT OR DELETE ON lantern.role_members
+FOR EACH ROW EXECUTE FUNCTION lantern.role_member_trigger();
