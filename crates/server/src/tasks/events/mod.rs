@@ -32,34 +32,27 @@ pub struct RawEvent {
 
 use schema::codes::EventCode;
 
+#[allow(unused_variables)]
 pub async fn process(
     state: &ServerState,
     db: &Client,
     event: RawEvent,
     party_id: Option<Snowflake>,
 ) -> Result<(), Error> {
-    //let party_id_res = party_id.ok_or_else(|| Error::InternalErrorStatic("Missing PartyId"));
+    let RawEvent { id, code, room_id } = event;
 
-    match event.code {
-        EventCode::MessageCreate => {
-            processors::message_create::message_create(state, db, event.id, party_id).await
-        }
-        EventCode::MessageDelete => {
-            processors::message_delete::message_delete(state, db, event.id, party_id).await
-        }
-        EventCode::MessageUpdate => {
-            processors::message_update::message_update(state, db, event.id, party_id).await
-        }
-        EventCode::PresenceUpdated => {
-            processors::presence_update::presence_updated(state, db, event.id).await
-        }
+    match code {
+        EventCode::MessageCreate => processors::message_create::message_create(state, db, id, party_id).await,
+        EventCode::MessageDelete => processors::message_delete::message_delete(state, db, id, party_id).await,
+        EventCode::MessageUpdate => processors::message_update::message_update(state, db, id, party_id).await,
+        EventCode::PresenceUpdated => processors::presence_update::presence_updated(state, db, id).await,
         EventCode::MemberJoined
         | EventCode::MemberLeft
         | EventCode::MemberUpdated
         | EventCode::MemberBan
         | EventCode::MemberUnban => {
-            processors::member_event::member_event(state, event.code, db, event.id, party_id).await
+            processors::member_event::member_event(state, code, db, id, party_id).await
         }
-        _ => unimplemented!(),
+        _ => Err(Error::Unimplemented),
     }
 }

@@ -43,6 +43,8 @@ pub enum Error {
     InternalErrorStatic(&'static str),
     #[error("Request Error: {0}")]
     RequestError(#[from] reqwest::Error),
+    #[error("Unimplemented")]
+    Unimplemented,
 
     #[error("UTF8 Parse Error: {0}")]
     Utf8ParseError(#[from] FromUtf8Error),
@@ -192,6 +194,7 @@ impl Error {
                 | Error::InternalErrorStatic(_)
                 | Error::InvalidHeaderValue(_)
                 | Error::RequestError(_)
+                | Error::Unimplemented
         )
     }
 
@@ -239,6 +242,7 @@ impl Error {
             Error::InvalidHeaderValue(_)    => 50011,
             Error::XMLError(_)              => 50012,
             Error::RequestError(_)          => 50013,
+            Error::Unimplemented            => 50014,
 
             Error::AlreadyExists            => 40001,
             Error::UsernameUnavailable      => 40002,
