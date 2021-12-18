@@ -10,6 +10,14 @@ RETURNS trigger
 LANGUAGE plpgsql AS
 $$
 BEGIN
+    IF TG_OP = 'UPDATE' AND OLD.position != NEW.position THEN
+        -- Force a self-update to refresh party positions
+        INSERT INTO lantern.event_log(code, id, party_id)
+        VALUES('self_updated'::lantern.event_code, OLD.user_id, OLD.party_id);
+
+        RETURN NEW;
+    END IF;
+
     IF TG_OP = 'DELETE' THEN
         INSERT INTO lantern.event_log (code, id, party_id)
         SELECT
