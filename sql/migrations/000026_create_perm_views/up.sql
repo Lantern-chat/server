@@ -7,8 +7,8 @@ SELECT
     overwrites.role_id,
     overwrites.allow,
     overwrites.deny, 0, 0
-FROM lantern.overwrites
-WHERE user_id IS NOT NULL
+
+FROM lantern.overwrites WHERE user_id IS NOT NULL
 
 UNION ALL
 
@@ -46,7 +46,7 @@ SELECT
     party_member.user_id,
 --    roles.permissions, deny, allow, user_deny, user_allow
 --    bit_or(roles.permissions), COALESCE(bit_or(deny), 0), COALESCE(bit_or(allow), 0), COALESCE(bit_or(user_deny), 0), COALESCE(bit_or(user_allow), 0)
-    (((bit_or(permissions) & ~COALESCE(bit_or(deny), 0)) | COALESCE(bit_or(allow), 0)) & ~COALESCE(bit_or(user_deny), 0)) | COALESCE(bit_or(user_allow), 0) |
+    (((bit_or(roles.permissions) & ~COALESCE(bit_or(deny), 0)) | COALESCE(bit_or(allow), 0)) & ~COALESCE(bit_or(user_deny), 0)) | COALESCE(bit_or(user_allow), 0) |
        bit_or(CASE WHEN party.owner_id = party_member.user_id THEN -1 ELSE 0 END) AS perms
 
 FROM
@@ -58,3 +58,23 @@ FROM
         ON roles.id = party.id
     ON agg_overwrites.room_id = rooms.id AND agg_overwrites.user_id = party_member.user_id
 GROUP BY party_member.user_id, rooms.id;
+
+DROP VIEW IF EXISTS agg_room_perms_full;
+CREATE OR REPLACE VIEW lantern.agg_room_perms_full(party_id, owner_id, room_id, user_id, base_perms, deny, allow, user_deny, user_allow) AS
+SELECT
+    party.id as party_id,
+    party.owner_id,
+    rooms.id AS room_id,
+    party_member.user_id,
+
+    roles.permissions AS base_perms,
+    deny AS deny,
+    allow AS allow,
+    user_deny AS user_deny,
+    user_allow AS user_allow
+
+FROM
+    lantern.party INNER JOIN lantern.party_member ON party_member.party_id = party.id
+    INNER JOIN lantern.rooms ON rooms.party_id = party.id
+    INNER JOIN lantern.roles ON roles.id = party.id
+    LEFT JOIN lantern.agg_overwrites ON agg_overwrites.room_id = rooms.id AND agg_overwrites.user_id = party_member.user_id;
