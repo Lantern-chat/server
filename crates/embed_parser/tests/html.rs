@@ -8,3 +8,12 @@ fn test_meta() {
 
     println!("{:#?}", metas);
 }
+
+//#[test]
+//fn test_find_head() {
+//    let mut finder = HeadEndFinder::new();
+//
+//    finder.increment(FIXTURE.as_bytes());
+//
+//    assert!(finder.found().is_some());
+//}

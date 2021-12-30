@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 smol_str = { path = "../../deps/smol_str" }
 timestamp = { path = "../timestamp" }
+models = { path = "../models" }
 
 serde = { version = "1", features = ["derive"] }
 serde_repr = "0.1.7"

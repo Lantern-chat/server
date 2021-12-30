@@ -1,38 +1,23 @@
 pub mod embed;
+pub mod queue;
 pub mod strip;
 
-use std::sync::Arc;
-use tokio::{
-    sync::{
-        mpsc::{channel, Receiver, Sender},
-        OwnedSemaphorePermit, Semaphore, SemaphorePermit,
-    },
-    task::JoinHandle,
-};
+pub use queue::{Queue, WorkFunction, WorkItem};
 
-pub trait WorkItem: Send + 'static {
-    fn run(self) -> JoinHandle<()>;
+pub struct Queues {
+    pub embed_processing: Queue,
 }
 
-pub struct Queue<W> {
-    pub tx: Sender<(W, OwnedSemaphorePermit)>,
-    pub limit: Arc<Semaphore>,
+impl Default for Queues {
+    fn default() -> Self {
+        Queues {
+            embed_processing: Queue::start(16),
+        }
+    }
 }
 
-impl<W: WorkItem> Queue<W> {
-    pub fn start(buffer: usize) -> Self {
-        let len = buffer * num_cpus::get();
-
-        let (tx, mut rx) = channel(len);
-        let limit = Arc::new(Semaphore::new(len));
-
-        tokio::spawn(async move {
-            while let Some((work, permit)) = rx.recv().await {
-
-                // do stuff
-            }
-        });
-
-        Queue { tx, limit }
+impl Queues {
+    pub fn stop(&self) {
+        self.embed_processing.stop();
     }
 }

@@ -74,7 +74,8 @@ impl FromStr for Snowflake {
 impl fmt::Display for Snowflake {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        itoa::fmt(f, self.0.get())
+        let mut buf = itoa::Buffer::new();
+        f.write_str(buf.format(self.0.get()))
     }
 }
 

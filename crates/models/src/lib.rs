@@ -8,6 +8,7 @@ use timestamp::Timestamp;
 
 pub type SmolToken = arrayvec::ArrayString<28>;
 
+pub mod embed;
 pub mod emote;
 pub mod file;
 pub mod gateway;
@@ -24,8 +25,8 @@ pub mod sf;
 pub mod user;
 
 pub use self::{
-    emote::*, file::*, gateway::*, invite::*, message::*, party::*, permission::*, prefs::*, presence::*,
-    role::*, room::*, session::*, sf::*, user::*,
+    embed::*, emote::*, file::*, gateway::*, invite::*, message::*, party::*, permission::*, prefs::*,
+    presence::*, role::*, room::*, session::*, sf::*, user::*,
 };
 
 #[allow(unused)]

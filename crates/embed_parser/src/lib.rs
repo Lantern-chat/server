@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate serde;
+
 pub mod embed;
 pub mod html;
 pub mod msg;

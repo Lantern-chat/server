@@ -48,9 +48,7 @@ pub fn parse_link_header<'a>(header: &'a str) -> LinkList<'a> {
             let right = crate::trim_quotes(right);
 
             match left {
-                "title" => {
-                    link.title = Some(right);
-                }
+                "title" => link.title = Some(right),
                 "rel" if right != "alternate" => continue 'links,
                 _ => continue,
             }
@@ -60,4 +58,65 @@ pub fn parse_link_header<'a>(header: &'a str) -> LinkList<'a> {
     }
 
     res
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum OEmbedType {
+    Photo,
+    Video,
+    Link,
+    Rich,
+
+    #[serde(other)]
+    Unknown,
+}
+
+use smol_str::SmolStr;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct OEmbed {
+    #[serde(rename = "type")]
+    pub kind: OEmbedType,
+    pub version: SmolStr,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<SmolStr>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author_name: Option<SmolStr>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author_url: Option<SmolStr>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_name: Option<SmolStr>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_url: Option<SmolStr>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_age: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thumbnail_url: Option<SmolStr>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thumbnail_width: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thumbnail_height: Option<i32>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<SmolStr>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub html: Option<SmolStr>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<i32>,
+}
+
+impl OEmbed {
+    pub const fn is_valid(&self) -> bool {
+        let has_dimensions = self.width.is_some() && self.height.is_some();
+
+        match self.kind {
+            OEmbedType::Video | OEmbedType::Rich => self.html.is_some() && has_dimensions,
+            OEmbedType::Photo => self.url.is_some() && has_dimensions,
+            _ => true,
+        }
+    }
 }

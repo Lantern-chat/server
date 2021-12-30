@@ -4,9 +4,6 @@ thorn::enums! {
         MessageUpdate,
         MessageDelete,
 
-        /// User started typing in channel
-        TypingStarted,
-
         /// If any user updated with public fields
         UserUpdated,
         /// If self updated with private fields

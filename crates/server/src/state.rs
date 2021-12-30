@@ -14,7 +14,7 @@ use tokio::sync::{oneshot, Mutex, Notify, OwnedMutexGuard, Semaphore};
 use util::cmap::CHashMap;
 
 use crate::{
-    config::LanternConfig, filesystem::store::FileStore, permission_cache::PermissionCache,
+    config::LanternConfig, filesystem::store::FileStore, permission_cache::PermissionCache, queues::Queues,
     services::Services, session_cache::SessionCache, web::file_cache::MainFileCache, DatabasePools,
 };
 use crate::{
@@ -44,6 +44,7 @@ pub struct InnerServerState {
     pub file_cache: MainFileCache,
     pub totp_tokens: TokenStorage,
     pub services: Services,
+    pub queues: Queues,
 }
 
 #[derive(Clone)]
@@ -81,6 +82,7 @@ impl ServerState {
             file_cache: MainFileCache::default(),
             totp_tokens: TokenStorage::default(),
             services: Services::start().expect("Services failed to start correctly"),
+            queues: Queues::default(),
         }))
     }
 
@@ -96,6 +98,7 @@ impl ServerState {
 
                 self.is_alive.store(false, Ordering::Relaxed);
                 self.notify_shutdown.notify_waiters();
+                self.queues.stop();
 
                 self.db.read.close().await;
                 self.db.write.close().await;

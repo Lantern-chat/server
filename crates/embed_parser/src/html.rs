@@ -33,6 +33,7 @@ pub struct Link<'a> {
     pub href: &'a str,
     pub rel: LinkType,
     pub ty: Option<&'a str>,
+    pub title: Option<&'a str>,
 }
 
 impl Meta<'_> {
@@ -96,6 +97,7 @@ pub fn parse_meta<'a>(mut input: &'a str) -> Option<HeaderList<'a>> {
                 href: "",
                 rel: LinkType::None,
                 ty: None,
+                title: None,
             }),
             Some(_) => continue,
             None => return None,
@@ -131,6 +133,7 @@ pub fn parse_meta<'a>(mut input: &'a str) -> Option<HeaderList<'a>> {
                     Header::Link(ref mut link) => match left {
                         "href" => link.href = value,
                         "type" => link.ty = Some(value),
+                        "title" => link.title = Some(value),
                         "rel" => {
                             link.rel = match value {
                                 "alternate" => LinkType::Alternate,
@@ -154,4 +157,41 @@ pub fn parse_meta<'a>(mut input: &'a str) -> Option<HeaderList<'a>> {
     }
 
     Some(res)
+}
+
+// NOT NEEDED, XML/HTML specification requires there be no whitespace between opening/closing symbols and tag name
+
+pub struct HeadEndFinder {
+    pos: usize,
+    needle: usize,
+}
+
+const NEEDLE: [u8; 6] = *b"</head";
+
+impl HeadEndFinder {
+    pub const fn new() -> Self {
+        HeadEndFinder { pos: 0, needle: 0 }
+    }
+
+    pub fn found(&self) -> Option<usize> {
+        (self.needle == NEEDLE.len()).then(|| self.pos)
+    }
+
+    pub fn increment(&mut self, input: &[u8]) {
+        while self.pos < input.len() && self.needle != NEEDLE.len() {
+            let c = input[self.pos];
+
+            // skip whitespace
+            if !c.is_ascii_whitespace() {
+                if c == NEEDLE[self.needle] {
+                    self.needle += 1;
+                } else {
+                    // set back to 0 or 1 if matched first byte
+                    self.needle = (c == NEEDLE[0]) as usize;
+                }
+            }
+
+            self.pos += 1;
+        }
+    }
 }
