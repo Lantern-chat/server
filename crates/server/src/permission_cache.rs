@@ -61,10 +61,14 @@ impl PermissionCache {
     }
 
     pub async fn get(&self, user_id: Snowflake, room_id: Snowflake) -> Option<PermMute> {
-        self.map
-            .get(&user_id)
-            .await
-            .and_then(|rooms| rooms.room.get(&room_id).copied())
+        self.map.get(&user_id).await.and_then(|cache| {
+            // double-check if not stale
+            if cache.rc.load(Ordering::Acquire) > 0 {
+                cache.room.get(&room_id).copied()
+            } else {
+                None
+            }
+        })
     }
 
     #[inline]
@@ -76,7 +80,7 @@ impl PermissionCache {
         self.map
             .get_mut_or_insert(&user_id, || UserCache {
                 room: HashMap::with_hasher(self.map.hash_builder().clone()),
-                rc: AtomicIsize::new(1),
+                rc: AtomicIsize::new(1), // initialize with one reference
             })
             .await
     }
@@ -89,26 +93,32 @@ impl PermissionCache {
         self.get_cache_mut(user_id).await.room.extend(iter);
     }
 
+    /// Increments the reference count if exists,
+    /// returns true if and only if the cache was not stale or empty.
+    ///
+    /// NOTE: May return false AND increment the reference count, so `remove_reference`
+    /// must always be called after this.
     pub async fn add_reference(&self, user_id: Snowflake) -> bool {
         match self.get_cache(user_id).await {
             None => false,
             Some(cache) => {
-                cache.rc.fetch_add(1, Ordering::SeqCst);
-                true
+                // only return true when there was an existing reference,
+                // don't allow stale results
+                0 < cache.rc.fetch_add(1, Ordering::AcqRel)
             }
         }
     }
 
     pub async fn remove_reference(&self, user_id: Snowflake) {
         if let Some(cache) = self.get_cache(user_id).await {
-            cache.rc.fetch_sub(1, Ordering::SeqCst);
+            cache.rc.fetch_sub(1, Ordering::AcqRel);
         }
     }
 
     /// Cleanup any cache entries with no active users
     pub async fn cleanup(&self) {
         self.map
-            .retain(|_, cache| cache.rc.load(Ordering::SeqCst) > 0)
+            .retain(|_, cache| cache.rc.load(Ordering::Acquire) > 0)
             .await
     }
 }

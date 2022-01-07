@@ -23,5 +23,16 @@ fn test_parse_link_header() {
             title: None,
             format: OEmbedFormat::JSON,
         }]
-    )
+    );
+
+    assert_eq!(
+        parse_link_header(r#"<https://lantern.chat/api/v1/json/oembed?url=%2Fimages%2F1234>; rel="alternate"; type="application/json+oembed""#).as_slice(),
+        &[
+            OEmbedLink {
+                url: "https://lantern.chat/api/v1/json/oembed?url=%2Fimages%2F1234",
+                title: None,
+                format: OEmbedFormat::JSON
+            }
+        ]
+    );
 }

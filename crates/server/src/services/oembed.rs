@@ -48,7 +48,7 @@ impl OEmbedClient {
 
                     drop(html); // ensure it lives long enough
                 }
-                (mime::IMAGE | mime::VIDEO, _) => { /* TODO */ }
+                (mime::IMAGE | mime::VIDEO | mime::AUDIO, _) => { /* TODO */ }
                 _ => {}
             }
         }

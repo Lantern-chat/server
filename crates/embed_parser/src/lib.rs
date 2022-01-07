@@ -3,6 +3,7 @@ extern crate serde;
 
 pub mod embed;
 pub mod html;
+//pub mod iter;
 pub mod msg;
 pub mod oembed;
 //pub mod req;

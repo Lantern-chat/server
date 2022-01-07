@@ -3,6 +3,7 @@ pub enum MetaProperty {
     Name,
     Property,
     Description,
+    ItemProp,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,6 +68,16 @@ pub type HeaderList<'a> = smallvec::SmallVec<[Header<'a>; 32]>;
 
 use memchr::memmem::find;
 
+use regex_automata::{DenseDFA, Regex, RegexBuilder};
+
+lazy_static::lazy_static! {
+    static ref ATTRIBUTE_RE: Regex<DenseDFA<Vec<u16>, u16>> = RegexBuilder::new()
+        .minimize(true)
+        // r#"(\w+)\s*=\s*"((?:\\"|[^"])*[^\\])""# original with captures + unicode
+        .build_with_size::<u16>(r#"[a-zA-Z_][0-9a-zA-Z\\-_]+\s*=\s*"(?:\\"|[^"])*[^\\]""#)
+        .unwrap();
+}
+
 /// Returns `None` on invalid HTML
 pub fn parse_meta<'a>(mut input: &'a str) -> Option<HeaderList<'a>> {
     let mut res = HeaderList::default();
@@ -110,7 +121,9 @@ pub fn parse_meta<'a>(mut input: &'a str) -> Option<HeaderList<'a>> {
         let meta_inner = &input[start..end];
 
         // name="" content=""
-        for part in meta_inner.split_ascii_whitespace() {
+        for (m0, m1) in ATTRIBUTE_RE.find_iter(meta_inner.as_bytes()) {
+            let part = &meta_inner[m0..m1];
+
             // name=""
             if let Some((left, right)) = part.split_once('=') {
                 let value = crate::trim_quotes(right);
@@ -125,6 +138,7 @@ pub fn parse_meta<'a>(mut input: &'a str) -> Option<HeaderList<'a>> {
                             "name" => MetaProperty::Name,
                             "property" => MetaProperty::Property,
                             "description" => MetaProperty::Description,
+                            "itemprop" => MetaProperty::ItemProp,
                             _ => continue,
                         };
 
@@ -155,6 +169,12 @@ pub fn parse_meta<'a>(mut input: &'a str) -> Option<HeaderList<'a>> {
             res.push(header);
         }
     }
+
+    // ensure properties are sorted lexicongraphically (href doesn't matter but needs a value anyway)
+    res.sort_by_key(|h| match h {
+        Header::Meta(meta) => meta.property,
+        Header::Link(link) => link.href,
+    });
 
     Some(res)
 }
@@ -193,5 +213,18 @@ impl HeadEndFinder {
 
             self.pos += 1;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_attribute_regex_size() {
+        println!(
+            "{}",
+            ATTRIBUTE_RE.forward().memory_usage() + ATTRIBUTE_RE.reverse().memory_usage()
+        );
     }
 }

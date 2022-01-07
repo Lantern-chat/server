@@ -21,6 +21,7 @@ itoa = "1"
 time = { version = "0.3", features = ["macros"] }
 smol_str = { path = "../../deps/smol_str", features = ["serde"] }
 arrayvec = { version = "0.7.1", features = ["serde"] }
+hashbrown = "0.11.2"
 # typescript-definitions = { git = "https://github.com/storyscript/typescript-definitions" }
 
 [features]
