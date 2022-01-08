@@ -1,17 +1,20 @@
 CREATE TABLE lantern.report (
     -- Snowflake ID
     id          bigint      NOT NULL,
-    reason      text,
     message_id  bigint      NOT NULL,
     reporter_id bigint      NOT NULL,
-    priority    smallint    NOT NULL DEFAULT 9999,
 
-    -- If NULL, then not resolved. if not NULL, then the action taken
-    resolved    text,
 
     -- User ID of moderation staff
     resolver    bigint,
     resolved_at timestamp,
+
+    priority    smallint    NOT NULL DEFAULT 9999,
+
+    reason      text,
+
+    -- If NULL, then not resolved. if not NULL, then the action taken
+    resolved    text,
 
     CONSTRAINT report_pk PRIMARY KEY (id)
 );
