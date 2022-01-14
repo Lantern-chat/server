@@ -1,8 +1,16 @@
+#![allow(deprecated)]
+
 thorn::enums! {
+    /// **NOTE**: This must match `lantern.event_code` in the database **EXACTLY**, or it will fail.
+    ///
+    /// It will check for names and variant count.
     pub enum EventCode in Lantern {
         MessageCreate,
         MessageUpdate,
         MessageDelete,
+
+        #[deprecated]
+        TypingStarted,
 
         /// If any user updated with public fields
         UserUpdated,
