@@ -34,9 +34,9 @@ impl ReplyError for Error {
 impl ApiError {
     fn real_err(kind: Error) -> WithStatus<Json> {
         if kind.is_fatal() {
-            log::error!("Error {}", kind);
+            log::error!("Fatal error: {kind}");
         } else if cfg!(debug_assertions) {
-            log::warn!("Non-fatal error: {}", kind);
+            log::warn!("Non-fatal error: {kind}");
         }
 
         reply::json(&ApiError {

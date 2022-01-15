@@ -120,7 +120,7 @@ impl FileStore {
             OpenMode::Write => options.write(true).create(true),
         };
 
-        log::trace!("Opening file: {} in mode: {:?}", path.display(), mode);
+        log::trace!("Opening file: {} in mode: {mode:?}", path.display());
 
         options.open(path).await
     }

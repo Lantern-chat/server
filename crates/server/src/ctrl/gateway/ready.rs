@@ -165,7 +165,7 @@ pub async fn ready(
     let (user, parties) = match tokio::join!(user_future, parties_future, perms_future) {
         (Ok(user), Ok(parties), Ok(())) => (user, parties),
         (Err(e), _, _) | (_, Err(e), _) | (_, _, Err(e)) => {
-            log::warn!("Error during ready event: {}", e);
+            log::warn!("Error during ready event: {e}");
 
             //if failed, make sure the cache reference is cleaned up
             state.perm_cache.remove_reference(auth.user_id).await;

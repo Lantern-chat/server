@@ -106,7 +106,7 @@ impl HCaptchaClient {
 
         if cfg!(debug_assertions) {
             match std::str::from_utf8(&full) {
-                Ok(full) => log::trace!("hCaptcha response: {}", full),
+                Ok(full) => log::trace!("hCaptcha response: {full}"),
                 Err(_) => log::warn!("Invalid UTF8 in hCaptcha response"),
             }
         }

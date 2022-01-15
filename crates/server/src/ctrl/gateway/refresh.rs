@@ -44,7 +44,7 @@ pub async fn refresh_room_perms(
         ));
     }
 
-    log::trace!("Setting {} room permissions on user {}", cache.len(), user_id);
+    log::trace!("Setting {} room permissions on user {user_id}", cache.len());
     state.perm_cache.batch_set(user_id, cache.into_iter()).await;
 
     Ok(())

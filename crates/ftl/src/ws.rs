@@ -162,7 +162,7 @@ where
 
             tokio::spawn(async move {
                 match on_upgrade.await {
-                    Err(e) => log::error!("ws upgrade error: {}", e),
+                    Err(e) => log::error!("ws upgrade error: {e}"),
                     Ok(upgraded) => {
                         log::trace!("websocket upgrade complete");
                         let socket =

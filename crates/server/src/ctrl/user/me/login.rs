@@ -72,7 +72,7 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: LoginForm) -> Res
 
     // don't allow staff to login without 2FA
     if elevation == ElevationLevel::Staff && secret.is_none() {
-        log::error!("Staff user {} tried to login without 2FA enabled", user_id);
+        log::error!("Staff user {user_id} tried to login without 2FA enabled");
 
         return Err(Error::NotFound);
     }

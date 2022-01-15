@@ -36,7 +36,7 @@ pub async fn start(state: ServerState) {
         {
             Ok(db) => db,
             Err(Reject::Inner(e)) => {
-                log::error!("Error running event loop: {}", e);
+                log::error!("Error running event loop: {e}");
                 continue;
             }
             Err(Reject::Rejected) => {
@@ -111,11 +111,11 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
                     event_notify2.notify_one();
                 }
                 Some(Ok(AsyncMessage::Notice(notice))) => {
-                    log::info!("Database notice: {}", notice);
+                    log::info!("Database notice: {notice}");
                 }
                 Some(Ok(_)) => unreachable!("AsyncMessage is non-exhaustive"),
                 Some(Err(e)) => {
-                    log::error!("Database connection error: {}", e);
+                    log::error!("Database connection error: {e}");
 
                     // if there is an error, it can't be recovered from, so drop the connection
                     return;
@@ -249,7 +249,7 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
                     .for_each_concurrent(state.config.num_parallel_tasks, |(party_id, events)| async move {
                         for event in events {
                             if let Err(e) = super::process(&state, db, event, Some(party_id)).await {
-                                log::error!("Error processing party event: {:?} {}", event, e);
+                                log::error!("Error processing party event: {event:?} {e}");
                                 // TODO: Disconnect party
                             }
                         }
@@ -268,7 +268,7 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
                     .for_each_concurrent(state.config.num_parallel_tasks, |(_room_id, events)| async move {
                         for event in events {
                             if let Err(e) = super::process(state, db, event, None).await {
-                                log::error!("Error processing direct event: {:?} {}", event, e);
+                                log::error!("Error processing direct event: {event:?} {e}");
                                 // TODO: Disconnect users
                             }
                         }
@@ -285,7 +285,7 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
                 futures::stream::iter(events.drain(..))
                     .for_each_concurrent(state.config.num_parallel_tasks, |event| async move {
                         if let Err(e) = super::process(state, db, event, None).await {
-                            log::error!("Error processing user event: {:?} {}", event, e);
+                            log::error!("Error processing user event: {event:?} {e}");
                             // TODO: Disconnect users
                         }
                     })

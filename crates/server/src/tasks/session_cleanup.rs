@@ -21,10 +21,10 @@ pub async fn cleanup_sessions(state: ServerState) {
             match state.db.write.get().await {
                 Ok(db) => {
                     if let Err(e) = db.execute_cached_typed(|| query(), &[&now]).await {
-                        log::error!("Error during session cleanup: {}", e);
+                        log::error!("Error during session cleanup: {e}");
                     }
                 }
-                Err(e) => log::error!("Database connection error during session cleanup: {}", e),
+                Err(e) => log::error!("Database connection error during session cleanup: {e}"),
             }
         };
 

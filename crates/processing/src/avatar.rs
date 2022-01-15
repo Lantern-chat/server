@@ -67,13 +67,7 @@ pub fn process_avatar(
             new_height = width;
         }
 
-        log::trace!(
-            "Cropping avatar image from {}x{} to {}x{}",
-            width,
-            height,
-            new_width,
-            new_height
-        );
+        log::trace!("Cropping avatar image from {width}x{height} to {new_width}x{new_height}");
 
         image = image.crop_imm(x, y, new_width, new_height);
 
@@ -82,7 +76,7 @@ pub fn process_avatar(
 
     // shrink if necessary
     if width > max_width {
-        log::trace!("Resizing avatar image from {}^2 to {}^2", width, max_width);
+        log::trace!("Resizing avatar image from {width}^2 to {max_width}^2");
 
         image = image.resize(max_width, max_width, FilterType::Lanczos3);
     }
@@ -216,7 +210,7 @@ fn encode_png_best(
 
         match hash {
             Err(e) => {
-                log::error!("Error computing blurhash for avatar: {}", e)
+                log::error!("Error computing blurhash for avatar: {e}")
             }
             Ok(hash) => {
                 preview = Some(hash);
@@ -225,8 +219,7 @@ fn encode_png_best(
     }
 
     log::trace!(
-        "PNG Encoder expected {} bytes, got {} bytes",
-        expected_bytes,
+        "PNG Encoder expected {expected_bytes} bytes, got {} bytes",
         out.len()
     );
 

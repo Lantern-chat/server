@@ -106,7 +106,7 @@ impl ServerState {
                 if let Some(all_tasks) = self.all_tasks.lock().await.take() {
                     match all_tasks.await {
                         Ok(Ok(_)) => log::info!("Tasks ended successfully!"),
-                        Err(e) | Ok(Err(e)) => log::error!("Tasks errored on shutdown: {}", e),
+                        Err(e) | Ok(Err(e)) => log::error!("Tasks errored on shutdown: {e}"),
                     }
                 }
 

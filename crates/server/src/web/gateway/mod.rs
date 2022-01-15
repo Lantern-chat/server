@@ -117,14 +117,14 @@ impl Gateway {
 
     pub async fn broadcast_event(&self, event: Event, party_id: Snowflake) {
         if let Some(party) = self.parties.get(&party_id).await {
-            log::debug!("Sending event to party tx: {}", party_id);
+            log::debug!("Sending event to party tx: {party_id}");
             if let Err(e) = party.tx.send(event) {
                 crate::metric::API_METRICS.load().errs.add(1);
 
-                return log::error!("Could not broadcast to party: {}", e);
+                return log::error!("Could not broadcast to party: {e}");
             }
         } else {
-            log::warn!("Could not find party {}!", party_id);
+            log::warn!("Could not find party {party_id}!");
         }
 
         crate::metric::API_METRICS.load().events.add(1);

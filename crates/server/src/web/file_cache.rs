@@ -115,7 +115,7 @@ impl Drop for CacheEntry {
             + Arc::strong_count(&self.gzip)
             + Arc::strong_count(&self.deflate);
 
-        log::debug!("Dropping cached file! References: {}", count);
+        log::debug!("Dropping cached file! References: {count}");
     }
 }
 
@@ -190,8 +190,7 @@ impl FileCache for MainFileCache {
                     };
 
                     log::trace!(
-                        "Serving cached {:?} ({}) encoded file: {}",
-                        encoding,
+                        "Serving cached {encoding:?} ({}) encoded file: {}",
                         file.buf.len(),
                         path.display()
                     );
@@ -249,11 +248,7 @@ impl FileCache for MainFileCache {
                     Level,
                 };
 
-                let level = if cfg!(debug_assertions) {
-                    Level::Fastest
-                } else {
-                    Level::Best
-                };
+                let level = if cfg!(debug_assertions) { Level::Fastest } else { Level::Best };
 
                 let mut brotli_buffer = Vec::new();
                 let mut deflate_buffer = Vec::new();

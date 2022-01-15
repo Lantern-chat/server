@@ -32,7 +32,7 @@ pub async fn post_room(
         Ok(ref room) => reply::json(room).into_response(),
         Err(e) => match e {
             RoomCreateError::ClientError(e) => {
-                log::error!("Room Create Error: {}", e);
+                log::error!("Room Create Error: {e}");
                 StatusCode::INTERNAL_SERVER_ERROR.into_response()
             }
             _ => ApiError::err(e).into_response(),

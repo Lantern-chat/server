@@ -32,7 +32,7 @@ impl Queue {
 
         Ok(tokio::spawn(async move {
             if let Err(e) = work.run().await {
-                log::error!("Error running queue work item: {}", e);
+                log::error!("Error running queue work item: {e}");
             }
 
             drop(permit);
@@ -46,7 +46,7 @@ impl Queue {
             match limit.clone().acquire_owned().await {
                 Ok(permit) => {
                     if let Err(e) = work.run().await {
-                        log::error!("Error running queue work item: {}", e);
+                        log::error!("Error running queue work item: {e}");
                     }
 
                     drop(permit);

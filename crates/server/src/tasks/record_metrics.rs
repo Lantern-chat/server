@@ -40,7 +40,7 @@ pub async fn record_metrics(state: ServerState) {
         };
 
         if let Err(e) = task.await {
-            log::error!("Error collecting metrics! {}", e);
+            log::error!("Error collecting metrics! {e}");
         }
     }
 }

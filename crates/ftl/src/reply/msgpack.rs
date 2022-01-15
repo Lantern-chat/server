@@ -25,7 +25,7 @@ pub fn msgpack<T: serde::Serialize>(value: &T, named: bool) -> MsgPack {
     match try_msgpack(value, named) {
         Ok(resp) => resp,
         Err(e) => {
-            log::error!("MsgPack Reply error: {}", e);
+            log::error!("MsgPack Reply error: {e}");
             MsgPack { inner: Err(()) }
         }
     }
@@ -84,19 +84,19 @@ where
             if buffer.len() >= (1024 * 8) {
                 let chunk = Bytes::from(std::mem::take(&mut buffer));
                 if let Err(e) = sender.send_data(chunk).await {
-                    log::error!("Error sending MessagePack chunk: {}", e);
+                    log::error!("Error sending MessagePack chunk: {e}");
                     return sender.abort();
                 }
             }
         };
 
         if let Err(e) = sender.send_data(buffer.into()).await {
-            log::error!("Error sending MessagePack chunk: {}", e);
+            log::error!("Error sending MessagePack chunk: {e}");
             return sender.abort();
         }
 
         if let Err(e) = error {
-            log::error!("Error serializing MessagePack stream: {}", e);
+            log::error!("Error serializing MessagePack stream: {e}");
         }
     });
 

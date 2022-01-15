@@ -127,11 +127,11 @@ impl Connection {
                                 }
                             }
                         }
-                        AsyncMessage::Notice(notice) => log::info!("Database notice: {}", notice),
+                        AsyncMessage::Notice(notice) => log::info!("Database notice: {notice}"),
                         _ => unreachable!("AsyncMessage is non-exhaustive"),
                     },
                     Some(Err(e)) => {
-                        log::error!("Database connection error: {}", e);
+                        log::error!("Database connection error: {e}");
                         break false;
                     }
                     None => break false,
@@ -142,12 +142,11 @@ impl Connection {
 
             if released {
                 log::info!(
-                    "Released {} connection loop to database {}",
+                    "Released {} connection loop to database {name_hint}",
                     ro(this.readonly),
-                    name_hint
                 );
             } else {
-                log::info!("Disconnected from {} database {}", ro(this.readonly), name_hint);
+                log::info!("Disconnected from {} database {name_hint}", ro(this.readonly));
             }
         });
 
@@ -187,10 +186,8 @@ where
             // a future for rate-limiting, it is not polled, therefore this doesn't run on rejection.
             let connecting = async {
                 log::info!(
-                    "Connecting ({}) to {} database {} at {:?}:{:?}...",
-                    attempt,
+                    "Connecting ({attempt}) to {} database {name} at {:?}:{:?}...",
                     ro(config.readonly),
-                    name,
                     config.pg_config.get_hosts(),
                     config.pg_config.get_ports(),
                 );
@@ -201,7 +198,7 @@ where
             match circuit_breaker.call(connecting).await {
                 Ok(res) => break res,
                 Err(failsafe::Error::Inner(e)) => {
-                    log::error!("Error connecting to database {}: {}", name, e);
+                    log::error!("Error connecting to database {name}: {e}");
 
                     attempt += 1;
 
@@ -210,7 +207,7 @@ where
                     }
                 }
                 Err(failsafe::Error::Rejected) => {
-                    log::warn!("Connecting to database {} rate-limited", name);
+                    log::warn!("Connecting to database {name} rate-limited");
                     tokio::time::sleep(Duration::from_secs(1)).await;
                 }
             }
@@ -289,7 +286,7 @@ impl Pool {
 
         if let Some(sql) = self.config.recycling_method.query() {
             if let Err(e) = client.client.simple_query(sql).await {
-                log::warn!("Connection could not be recycled: {}", e);
+                log::warn!("Connection could not be recycled: {e}");
                 return Err(Error::RecyclingError);
             }
         }
@@ -739,7 +736,7 @@ impl Client {
         let (query, collector) = query().to_string();
         let types = collector.types();
 
-        log::debug!("Preparing {} query: \"{}\"", self.conn.id, query);
+        log::debug!("Preparing {} query: \"{query}\"", self.conn.id);
 
         // this future is boxed to avoid extra growth on the stack of async functions calling this
         // and since it's rare for this to be reached (only on startup), the allocation cost is trivial
@@ -1020,7 +1017,7 @@ impl Transaction<'_> {
         let (query, collector) = query().to_string();
         let types = collector.types();
 
-        log::debug!("Preparing query: \"{}\"", query);
+        log::debug!("Preparing query: \"{query}\"");
 
         let stmt = self
             .t

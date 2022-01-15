@@ -11,7 +11,7 @@ use crate::web::gateway::msg::{server::*, ServerMsg};
 
 pub async fn identify(state: ServerState, conn: GatewayConnection, auth: SmolToken, intent: Intent) {
     if let Err(e) = do_identify(state, &conn, auth, intent).await {
-        log::error!("Error identifying and sending ready event: {}", e);
+        log::error!("Error identifying and sending ready event: {e}");
         let _ = conn.tx.send(super::INVALID_SESSION.clone()).await;
     }
 }

@@ -44,7 +44,7 @@ pub async fn migrate<P: AsRef<Path>>(pool: Pool, path: P) -> Result<(), Migratio
         last_migration = newest_migration.get(0);
     }
 
-    log::info!("Last migration: {}", last_migration);
+    log::info!("Last migration: {last_migration}");
 
     let mut available_migrations = std::fs::read_dir(path)?
         .map(|res| {
@@ -66,9 +66,9 @@ pub async fn migrate<P: AsRef<Path>>(pool: Pool, path: P) -> Result<(), Migratio
     for (idx, migration_path) in available_migrations {
         let name = migration_path.file_stem().unwrap().to_string_lossy();
         if idx <= last_migration {
-            log::info!("Skipping migration {}: {}", idx, name);
+            log::info!("Skipping migration {idx}: {name}");
         } else {
-            log::info!("Running migration {}: {}", idx, name);
+            log::info!("Running migration {idx}: {name}");
 
             let migration = load_migration(migration_path).await?;
 
@@ -81,8 +81,8 @@ pub async fn migrate<P: AsRef<Path>>(pool: Pool, path: P) -> Result<(), Migratio
             }
 
             if let Err(e) = run_batch(&client, &migration.up).await {
-                log::error!("Migration error: {}", e);
-                log::warn!("Rolling back migration {}...", idx);
+                log::error!("Migration error: {e}");
+                log::warn!("Rolling back migration {idx}...");
 
                 run_batch(&client, &migration.down).await?;
 

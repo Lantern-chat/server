@@ -159,9 +159,9 @@ pub async fn patch_file(
     if let Err(e) = file.flush().await {
         match res {
             Some(Error::IOError(_)) => {
-                log::error!("Error flushing file: {}, probably due to previous IO error", e)
+                log::error!("Error flushing file: {e}, probably due to previous IO error")
             }
-            Some(_) => log::error!("Error flushing file after non-io error: {}", e),
+            Some(_) => log::error!("Error flushing file after non-io error: {e}"),
             None => res = Some(e.into()),
         }
     }

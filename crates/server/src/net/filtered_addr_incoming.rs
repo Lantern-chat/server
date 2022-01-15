@@ -116,12 +116,12 @@ impl<F: AddrFilter> FilteredAddrIncoming<F> {
                         let conf = socket2::TcpKeepalive::new().with_time(dur);
 
                         if let Err(e) = socket.set_tcp_keepalive(&conf) {
-                            log::trace!("error trying to set TCP keepalive: {}", e);
+                            log::trace!("error trying to set TCP keepalive: {e}");
                         }
                     }
 
                     if let Err(e) = socket.set_nodelay(self.tcp_nodelay) {
-                        log::trace!("error trying to set TCP nodelay: {}", e);
+                        log::trace!("error trying to set TCP nodelay: {e}");
                     }
 
                     return Poll::Ready(Ok(AddrStream::new(socket, addr)));
@@ -130,12 +130,12 @@ impl<F: AddrFilter> FilteredAddrIncoming<F> {
                     // Connection errors can be ignored directly, continue by
                     // accepting the next request.
                     if is_connection_error(&e) {
-                        log::debug!("accepted connection already errored: {}", e);
+                        log::debug!("accepted connection already errored: {e}");
                         continue;
                     }
 
                     if self.sleep_on_errors {
-                        log::error!("accept error: {}", e);
+                        log::error!("accept error: {e}");
 
                         // Sleep 1s.
                         let mut timeout = Box::pin(tokio::time::sleep(Duration::from_secs(1)));

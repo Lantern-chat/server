@@ -121,7 +121,7 @@ pub async fn start_server(
                         match tokio::spawn(web::service::service(remote_addr, req, state)).await {
                             Ok(resp) => resp,
                             Err(err) => {
-                                log::error!("Internal Server Error: {}", err);
+                                log::error!("Internal Server Error: {err}");
 
                                 Ok(StatusCode::INTERNAL_SERVER_ERROR.into_response())
                             }

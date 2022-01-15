@@ -143,7 +143,7 @@ pub async fn get_file(
         tokio::spawn(async move {
             if start != 0 {
                 if let Err(e) = file.seek(SeekFrom::Start(start)).await {
-                    log::error!("Error seeking file: {}", e);
+                    log::error!("Error seeking file: {e}");
                     return sender.abort();
                 }
             }
@@ -164,13 +164,13 @@ pub async fn get_file(
                 let n = match file.read_buf(&mut buf).await {
                     Ok(n) => n as u64,
                     Err(err) => {
-                        log::error!("File read error: {}", err);
+                        log::error!("File read error: {err}");
                         return sender.abort();
                     }
                 };
 
                 if n == 0 {
-                    log::warn!("File read found EOF before expected length: {}", len);
+                    log::warn!("File read found EOF before expected length: {len}");
                     break;
                 }
 
@@ -184,7 +184,7 @@ pub async fn get_file(
                 }
 
                 if let Err(e) = sender.send_data(chunk).await {
-                    log::trace!("Error sending file chunk: {}", e);
+                    log::trace!("Error sending file chunk: {e}");
                     return sender.abort();
                 }
             }
@@ -198,7 +198,7 @@ pub async fn get_file(
                 trailers.insert("Server-Timing", value);
 
                 if let Err(e) = sender.send_trailers(trailers).await {
-                    log::trace!("Error sending trailers: {}", e);
+                    log::trace!("Error sending trailers: {e}");
                 }
             } else {
                 log::trace!("Unable to create trailer value");

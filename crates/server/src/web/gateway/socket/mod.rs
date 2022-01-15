@@ -253,7 +253,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                         Ok(event) // forward event directly to tx
                     }
                     Err(e) => {
-                        log::warn!("Event error: {}", e);
+                        log::warn!("Event error: {e}");
                         Err(MessageOutgoingError::SocketClosed) // kick for lag?
                     }
                 },
@@ -293,7 +293,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                         }
                         // TODO: Send code with it
                         _ => {
-                            log::error!("Misc err: {}", e);
+                            log::error!("Misc err: {e}");
                             Err(MessageOutgoingError::SocketClosed)
                         }
                     },
@@ -311,7 +311,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                     println!("Message sent!");
                 }
                 Ok(Err(e)) => {
-                    log::error!("Handle errors from websocket: {}", e);
+                    log::error!("Handle errors from websocket: {e}");
                     break 'event_loop;
                 }
                 Err(_timeout_error) => {
@@ -338,7 +338,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                 tokio::time::sleep(Duration::from_secs(5)).await;
 
                 if let Err(e) = clear_presence(state2, conn_id).await {
-                    log::error!("Error clearing connection presence: {}", e);
+                    log::error!("Error clearing connection presence: {e}");
                 }
             });
         }

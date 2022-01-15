@@ -14,7 +14,7 @@ pub async fn refresh_ip_bans(state: ServerState) {
 
         log::trace!("Refreshing IP Bans");
         if let Err(e) = state.ip_bans.refresh(&state.db.read).await {
-            log::error!("Error refreshing IP Bans! {}", e);
+            log::error!("Error refreshing IP Bans! {e}");
         }
     }
 }

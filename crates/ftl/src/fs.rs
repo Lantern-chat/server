@@ -139,12 +139,7 @@ impl Conditionals {
                 .map(|time| since.precondition_passes(time.into()))
                 .unwrap_or(false);
 
-            log::trace!(
-                "if-unmodified-since? {:?} vs {:?} = {}",
-                since,
-                last_modified,
-                precondition
-            );
+            log::trace!("if-unmodified-since? {since:?} vs {last_modified:?} = {precondition}",);
 
             if !precondition {
                 return Cond::NoBody(StatusCode::PRECONDITION_FAILED.into_response());
@@ -152,11 +147,7 @@ impl Conditionals {
         }
 
         if let Some(since) = self.if_modified_since {
-            log::trace!(
-                "if-modified-since? header = {:?}, file = {:?}",
-                since,
-                last_modified
-            );
+            log::trace!("if-modified-since? header = {since:?}, file = {last_modified:?}",);
 
             let unmodified = last_modified
                 .map(|time| !since.is_modified(time.into()))
@@ -264,7 +255,7 @@ async fn file_reply<S>(route: &Route<S>, path: impl AsRef<Path>, cache: &impl Fi
     let metadata = match cache.file_metadata(&file).await {
         Ok(m) => m,
         Err(e) => {
-            log::error!("Error retreiving file metadata: {}", e);
+            log::error!("Error retreiving file metadata: {e}");
             return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     };
@@ -355,7 +346,7 @@ pub fn bytes_range(range: Option<Range>, max_len: u64) -> Result<(u64, u64), Bad
             if start < end && end <= max_len {
                 Ok((start, end))
             } else {
-                log::trace!("unsatisfiable byte range: {}-{}/{}", start, end, max_len);
+                log::trace!("unsatisfiable byte range: {start}-{end}/{max_len}");
                 Err(BadRange)
             }
         }
@@ -381,7 +372,7 @@ fn file_body(
     tokio::spawn(async move {
         if start != 0 {
             if let Err(e) = file.seek(SeekFrom::Start(start)).await {
-                log::error!("Error seeking file: {}", e);
+                log::error!("Error seeking file: {e}");
                 return sender.abort();
             }
         }
@@ -398,13 +389,13 @@ fn file_body(
             let n = match file.read_buf(&mut buf).await {
                 Ok(n) => n as u64,
                 Err(err) => {
-                    log::debug!("file read error: {}", err);
+                    log::debug!("file read error: {err}");
                     return sender.abort();
                 }
             };
 
             if n == 0 {
-                log::warn!("file read found EOF before expected length: {}", len);
+                log::warn!("file read found EOF before expected length: {len}");
                 break;
             }
 
@@ -417,7 +408,7 @@ fn file_body(
             }
 
             if let Err(e) = sender.send_data(chunk).await {
-                log::trace!("Error sending file chunk: {}", e);
+                log::trace!("Error sending file chunk: {e}");
                 return sender.abort();
             }
         }
@@ -431,7 +422,7 @@ fn file_body(
             trailers.insert("Server-Timing", value);
 
             if let Err(e) = sender.send_trailers(trailers).await {
-                log::trace!("Error sending trailers: {}", e);
+                log::trace!("Error sending trailers: {e}");
             }
         } else {
             log::trace!("Unable to create trailer value");
@@ -471,7 +462,7 @@ fn file_stream(
             let n = match file.read_buf(&mut buf).await {
                 Ok(n) => n as u64,
                 Err(err) => {
-                    log::debug!("file read error: {}", err);
+                    log::debug!("file read error: {err}");
                     yield Err(err);
                     break;
                 }

@@ -21,7 +21,7 @@ pub fn json<T: serde::Serialize>(value: &T) -> Json {
     match try_json(value) {
         Ok(resp) => resp,
         Err(e) => {
-            log::error!("JSON Reply error: {}", e);
+            log::error!("JSON Reply error: {e}");
             Json { inner: Err(()) }
         }
     }
@@ -95,7 +95,7 @@ where
             if buffer.len() >= (1024 * 8) {
                 let chunk = Bytes::from(std::mem::take(&mut buffer));
                 if let Err(e) = sender.send_data(chunk).await {
-                    log::error!("Error sending JSON map chunk: {}", e);
+                    log::error!("Error sending JSON map chunk: {e}");
                     return sender.abort();
                 }
             }
@@ -103,12 +103,12 @@ where
 
         buffer.push('}');
         if let Err(e) = sender.send_data(buffer.into()).await {
-            log::error!("Error sending JSON map chunk: {}", e);
+            log::error!("Error sending JSON map chunk: {e}");
             return sender.abort();
         }
 
         if let Err(e) = error {
-            log::error!("Error serializing json map: {}", e);
+            log::error!("Error serializing json map: {e}");
         }
     });
 
@@ -153,7 +153,7 @@ where
             if buffer.len() >= (1024 * 8) {
                 let chunk = Bytes::from(std::mem::take(&mut buffer));
                 if let Err(e) = sender.send_data(chunk).await {
-                    log::error!("Error sending JSON array chunk: {}", e);
+                    log::error!("Error sending JSON array chunk: {e}");
                     return sender.abort();
                 }
             }
@@ -161,12 +161,12 @@ where
 
         buffer.push(b']');
         if let Err(e) = sender.send_data(buffer.into()).await {
-            log::error!("Error sending JSON array chunk: {}", e);
+            log::error!("Error sending JSON array chunk: {e}");
             return sender.abort();
         }
 
         if let Err(e) = error {
-            log::error!("Error serializing json array: {}", e);
+            log::error!("Error serializing json array: {e}");
         }
     });
 
