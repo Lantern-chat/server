@@ -90,10 +90,7 @@ impl<'a, const DIGITS: usize> TOTP<'a, DIGITS> {
     pub fn url(&self, label: &str, issuer: &str) -> String {
         let secret = base32::encode(base32::Alphabet::RFC4648 { padding: false }, self.key);
 
-        format!(
-            "otpauth://totp/{}?secret={}&issuer={}&digits={}&algorithm=SHA256",
-            label, secret, issuer, DIGITS,
-        )
+        format!("otpauth://totp/{label}?secret={secret}&issuer={issuer}&digits={DIGITS}&algorithm=SHA256")
     }
 }
 

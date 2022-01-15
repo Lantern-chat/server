@@ -127,7 +127,7 @@ pub fn encode(
             }
         }
 
-        println!("Actual max: {}", actual_max);
+        //println!("Actual max: {actual_max}");
 
         let q_max_value = ((actual_max * 166.0 - 0.5) as u8).min(82);
         max_value = (q_max_value as f32 + 1.0) / 166.0;

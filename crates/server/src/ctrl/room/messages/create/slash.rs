@@ -77,8 +77,8 @@ pub fn process_slash(content: &str) -> Result<Option<Cow<str>>, Error> {
             Pattern::TableFlip => (Align::Right, "(╯°□°）╯︵ ┻━┻"),
             Pattern::Unflip => (Align::Right, "┬─┬ ノ( ゜-゜ノ)"),
             Pattern::Disapprove => (Align::Right, "ಠ_ಠ"),
-            Pattern::Me => return Ok(Some(format!("_{}_", content).into())),
-            Pattern::Spoiler => return Ok(Some(format!("||{}||", content).into())),
+            Pattern::Me => return Ok(Some(format!("_{content}_").into())),
+            Pattern::Spoiler => return Ok(Some(format!("||{content}||").into())),
         };
 
         // nothing to pad
@@ -94,7 +94,7 @@ pub fn process_slash(content: &str) -> Result<Option<Cow<str>>, Error> {
             std::mem::swap(&mut left, &mut right);
         }
 
-        return Ok(Some(format!("{} {}", left, right).into()));
+        return Ok(Some(format!("{left} {right}").into()));
     }
 
     return unchanged;

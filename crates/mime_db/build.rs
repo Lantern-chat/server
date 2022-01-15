@@ -57,7 +57,7 @@ fn main() -> io::Result<()> {
         );
 
         for ext in &entry.extensions {
-            buf += &format!("\"{}\", ", ext);
+            buf += &format!("\"{ext}\", ");
 
             ext_map.entry(ext).or_default().insert(mime, entry.source);
         }
@@ -75,7 +75,7 @@ fn main() -> io::Result<()> {
         let mut buf = "ExtEntry { types: &[".to_owned();
 
         for (mime, _) in mappings.iter() {
-            buf += &format!("\"{}\", ", mime);
+            buf += &format!("\"{mime}\", ");
         }
 
         buf += "]}";

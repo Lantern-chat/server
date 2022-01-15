@@ -27,8 +27,7 @@ pub async fn member_event(
         Some(party_id) => party_id,
         None => {
             return Err(Error::InternalError(format!(
-                "Member Event without a party id!: {:?} - {}",
-                event, user_id
+                "Member Event without a party id!: {event:?} - {user_id}"
             )));
         }
     };

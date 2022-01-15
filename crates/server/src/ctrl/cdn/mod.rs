@@ -223,9 +223,9 @@ pub async fn get_file(
     // ensure filename in HTTP header is urlencoded for Unicode and such.
     let name = urlencoding::encode(name);
     let cd = if download {
-        format!("attachment; filename=\"{}\"", name)
+        format!("attachment; filename=\"{name}\"")
     } else {
-        format!("inline; filename=\"{}\"", name)
+        format!("inline; filename=\"{name}\"")
     };
 
     headers.insert("Content-Disposition", HeaderValue::from_str(&cd)?);

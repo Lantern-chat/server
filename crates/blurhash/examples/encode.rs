@@ -27,13 +27,13 @@ fn main() {
         cy = (c as f32 / ratio).round() as usize;
     }
 
-    println!("{}x{}", cx, cy);
+    println!("{cx}x{cy}");
 
     let buf = blurhash::encode::encode(cx, cy, w as usize, h as usize, &mut bytes, 3).unwrap();
 
     let encoded = buf.to_z85().unwrap();
 
-    println!("{}x{}={}\n{}", w, h, buf.len(), encoded);
+    println!("{w}x{h}={}\n{encoded}", buf.len());
 
     let decoded = encoded.from_z85().unwrap();
 
@@ -49,7 +49,7 @@ fn main() {
 
     let blurred_img = image::RgbImage::from_raw(ox, oy, blurred).unwrap();
 
-    let path = format!("deps/blurhash/e-{}.png", c);
-    println!("Saving to {}...", path);
+    let path = format!("deps/blurhash/e-{c}.png");
+    println!("Saving to {path}...");
     blurred_img.save(path).unwrap();
 }

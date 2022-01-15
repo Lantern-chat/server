@@ -122,7 +122,7 @@ pub async fn process_avatar(state: ServerState, user_id: Snowflake, file_id: Sno
             state.clone(),
             user_id,
             encoded_image.buffer.len() as i32,
-            format!("{}_avatar.png", user_id).into(),
+            format!("{user_id}_avatar.png").into(),
             Some(SmolStr::new_inline("image/png")),
             None,
             Some(encoded_image.width as i32),

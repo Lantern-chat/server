@@ -25,8 +25,7 @@ pub async fn role_event(
             Some(party_id) => party_id,
             None => {
                 return Err(Error::InternalError(format!(
-                    "Role event without a party id!: {:?} - {}",
-                    event, role_id,
+                    "Role event without a party id!: {event:?} - {role_id}"
                 )));
             }
         };
