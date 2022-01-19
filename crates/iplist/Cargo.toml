@@ -8,4 +8,4 @@ publish = false
 
 [dependencies]
 ipnet = "2.3.1"
-hashbrown = { version = "0.11", features = ["raw", "inline-more"] }
+hashbrown = { version = "0.12", features = ["raw", "inline-more"] }

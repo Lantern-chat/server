@@ -9,12 +9,13 @@ publish = false
 
 [dependencies]
 smol_str = { path = "../../deps/smol_str" }
-timestamp = { path = "../timestamp" }
+
+timestamp = { package = "iso8061-timestamp", version = "0.1" }
 
 rand = "0.8"
 rand_chacha = "0.3.0"
 tokio = { version = "1.4", features = ["sync"] }
-hashbrown = { version = "0.11", features = ["inline-more"] }
+hashbrown = { version = "0.12", features = ["inline-more"] }
 num_cpus = "1.13.0"
 lazy_static = "1.4.0"
 futures = "0.3.14"

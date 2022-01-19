@@ -8,7 +8,8 @@ edition = "2021"
 
 [dependencies]
 util = { path = "../util" }
-timestamp = { path = "../timestamp" }
+
+timestamp = { package = "iso8061-timestamp", version = "0.1" }
 
 postgres-types = { version = "0.2.1", optional = true }
 bytes = { version = "1", optional = true }
@@ -21,7 +22,7 @@ itoa = "1"
 time = { version = "0.3", features = ["macros"] }
 smol_str = { path = "../../deps/smol_str", features = ["serde"] }
 arrayvec = { version = "0.7.1", features = ["serde"] }
-hashbrown = "0.11.2"
+hashbrown = "0.12"
 # typescript-definitions = { git = "https://github.com/storyscript/typescript-definitions" }
 
 [features]

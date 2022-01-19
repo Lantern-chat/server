@@ -54,7 +54,7 @@ impl Metrics {
 
 use futures::{Stream, StreamExt};
 use smol_str::SmolStr;
-use timestamp::{Short, Timestamp, TimestampStr};
+use timestamp::{formats::Short, Timestamp, TimestampStr};
 
 use crate::ctrl::Error;
 

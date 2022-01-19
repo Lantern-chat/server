@@ -212,7 +212,7 @@ impl IpSet {
                 }
             };
 
-            self.set.insert_no_grow(hasher.finish(), idx);
+            unsafe { self.set.insert_no_grow(hasher.finish(), idx) };
         }
     }
 

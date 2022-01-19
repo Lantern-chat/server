@@ -23,7 +23,7 @@ thiserror = "1.0.24"
 parking_lot = "0.11.1"
 tracing = "0.1.25"
 time = { version = "0.3", features = ["serde"] }
-hashbrown = { version = "0.11", features = ["inline-more"] }
+hashbrown = { version = "0.12", features = ["inline-more"] }
 # parking_lot = "0.11.1"
 serde_shims = { version = "0.2", features = ["std", "mime", "bitflags", "enum_primitive"] }
 bitflags = "1.2"

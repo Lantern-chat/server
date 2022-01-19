@@ -12,7 +12,6 @@ ftl = { path = "../ftl" }
 models = { path = "../models" }
 db = { path = "../db" }
 util = { path = "../util" }
-timestamp = { path = "../timestamp" }
 schema = { path = "../schema" }
 mime_db = { path = "../mime_db" }
 totp = { path = "../totp" }
@@ -27,6 +26,8 @@ smol_str = { path = "../../deps/smol_str", features = ["serde", "pg"] }
 thorn = { git = "https://github.com/novacrazy/thorn" }
 async-chashmap = { git = "https://github.com/novacrazy/async-chashmap" }
 
+timestamp = { package = "iso8061-timestamp", version = "0.1", features = ["pg"] }
+
 serde = { version = "1", features = ["derive", "rc"] }
 serde_urlencoded = "0.7"
 tokio = { version = "1.4", features = ["full", "parking_lot"] }
@@ -37,7 +38,7 @@ tokio-rustls = "0.23.0"
 async-stream = "0.3"
 async-trait = "0.1.50"
 async-compression = { version = "0.3.8", features = ["brotli", "deflate", "gzip", "tokio"] }
-hashbrown = { version = "0.11", features = ["inline-more"] }
+hashbrown = { version = "0.12", features = ["inline-more"] }
 futures = "0.3"
 hyper = { version = "0.14.4", features = ["http1", "http2", "server", "stream", "runtime"] }
 mime = "0.3.16"
@@ -49,7 +50,7 @@ hex = "0.4.2"
 bytes = "1.0.1"
 bytecount = "0.6.2"
 lazy_static = "1.4.0"
-rust-argon2 = "0.8.3"
+rust-argon2 = "1"
 aes = { version = "0.7", features = ["ctr"] }
 aes-gcm-siv = "0.10.3"
 # sha3 = "0.9.1"
@@ -59,7 +60,7 @@ thiserror = "1.0.24"
 serde_repr = "0.1.6"
 paste = "1.0.5"
 serde_json = "1.0.64"
-rmp-serde = "0.15.4"
+rmp-serde = "1"
 rand = "0.8.3"
 time = { version = "0.3", features = ["macros"] }
 regex = "1.4.6"
