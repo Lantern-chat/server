@@ -26,6 +26,6 @@ hashbrown = "0.12"
 # typescript-definitions = { git = "https://github.com/storyscript/typescript-definitions" }
 
 [features]
-tokio-pg = ["postgres-types", "bytes"]
+pg = ["postgres-types", "bytes"]
 
 [dev-dependencies]

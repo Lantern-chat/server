@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-models = { path = "../models", features = ["tokio-pg"] }
+models = { path = "../models", features = ["pg"] }
 
 thorn = { git = "https://github.com/novacrazy/thorn" }
 

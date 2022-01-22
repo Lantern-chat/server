@@ -79,7 +79,7 @@ impl fmt::Display for Snowflake {
     }
 }
 
-#[cfg(feature = "tokio-pg")]
+#[cfg(feature = "pg")]
 mod pg_impl {
     use super::*;
 
