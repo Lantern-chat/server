@@ -20,7 +20,7 @@ bitflags = "1.2"
 serde_repr = "0.1"
 itoa = "1"
 time = { version = "0.3", features = ["macros"] }
-smol_str = { path = "../../deps/smol_str", features = ["serde"] }
+smol_str = { version = "0.1", features = ["serde"] }
 arrayvec = { version = "0.7.1", features = ["serde"] }
 hashbrown = "0.12"
 # typescript-definitions = { git = "https://github.com/storyscript/typescript-definitions" }

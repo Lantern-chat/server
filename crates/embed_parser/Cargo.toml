@@ -6,11 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-smol_str = { path = "../../deps/smol_str" }
 models = { path = "../models" }
 
 timestamp = { package = "iso8061-timestamp", version = "0.1" }
 
+smol_str = "0.1"
 serde = { version = "1", features = ["derive"] }
 serde_repr = "0.1.7"
 aho-corasick = "0.7.18"

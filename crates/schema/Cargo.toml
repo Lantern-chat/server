@@ -8,10 +8,9 @@ edition = "2021"
 [dependencies]
 models = { path = "../models", features = ["tokio-pg"] }
 
-smol_str = { path = "../../deps/smol_str" }
-
 thorn = { git = "https://github.com/novacrazy/thorn" }
 
+smol_str = "0.1"
 serde = { version = "1", features = ["derive"] }
 postgres-types = "0.2.1"
 enum_primitive = "0.1.1"

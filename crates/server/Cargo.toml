@@ -8,12 +8,10 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ftl = { path = "../ftl" }
 models = { path = "../models" }
 db = { path = "../db" }
 util = { path = "../util" }
 schema = { path = "../schema" }
-mime_db = { path = "../mime_db" }
 totp = { path = "../totp" }
 processing = { path = "../processing" }
 iplist = { path = "../iplist" }
@@ -21,8 +19,10 @@ embed_parser = { path = "../embed_parser" }
 
 blurhash = { path = "../blurhash" }
 
-smol_str = { path = "../../deps/smol_str", features = ["serde", "pg"] }
+smol_str = { version = "0.1", features = ["serde", "pg"] }
 
+ftl = { git = "https://github.com/Lantern-chat/ftl" }
+mime_db = { git = "https://github.com/Lantern-chat/mime_db" }
 thorn = { git = "https://github.com/novacrazy/thorn" }
 async-chashmap = { git = "https://github.com/novacrazy/async-chashmap" }
 
