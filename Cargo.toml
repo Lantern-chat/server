@@ -1,0 +1,22 @@
+[patch.crates-io]
+headers = { git = "https://github.com/novacrazy/headers" }
+smol_str = { git = "https://github.com/novacrazy/smol_str" }
+# postgres-inet = { git = "https://github.com/novacrazy/postgres-inet" }
+
+[workspace]
+members = ["crates/*"]
+
+[profile.dev]
+opt-level = 1
+lto = false
+
+[profile.release]
+opt-level = 3
+lto = 'fat'
+codegen-units = 1
+
+[profile.dev.build-override]
+opt-level = 3
+
+[profile.dev.package."*"]
+opt-level = 3
