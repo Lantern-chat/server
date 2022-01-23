@@ -2,7 +2,7 @@ use ftl::*;
 
 use smol_str::SmolStr;
 
-use models::Snowflake;
+use sdk::models::Snowflake;
 use schema::SnowflakeExt;
 
 use crate::ctrl::util::encrypted_asset::decrypt_snowflake;

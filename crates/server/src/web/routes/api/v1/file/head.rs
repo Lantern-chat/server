@@ -1,6 +1,6 @@
 use ftl::*;
 use headers::{CacheControl, HeaderMapExt, HeaderValue};
-use models::Snowflake;
+use sdk::models::Snowflake;
 
 use crate::{
     ctrl::{file::head::UploadHead, Error},

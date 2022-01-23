@@ -4,7 +4,7 @@ use db::pool::Client;
 
 use crate::ServerState;
 
-use models::*;
+use sdk::models::*;
 
 use super::*;
 

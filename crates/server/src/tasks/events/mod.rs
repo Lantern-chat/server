@@ -9,7 +9,7 @@ pub mod task;
 pub mod processors {
     use thorn::*;
 
-    use models::*;
+    use sdk::models::*;
     use schema::Snowflake;
 
     use crate::{ctrl::Error, ServerState};

@@ -1,7 +1,7 @@
 use schema::{Snowflake, SnowflakeExt};
 
 use futures::{Stream, StreamExt};
-use models::*;
+use sdk::models::*;
 use thorn::pg::{Json, ToSql};
 
 use crate::{

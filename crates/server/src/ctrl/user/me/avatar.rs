@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use models::Snowflake;
+use sdk::models::Snowflake;
 use schema::{flags::FileFlags, SnowflakeExt};
 use smol_str::SmolStr;
 

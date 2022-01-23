@@ -7,7 +7,7 @@ use crate::{
     ServerState,
 };
 
-use models::*;
+use sdk::models::*;
 pub async fn get_party(state: ServerState, auth: Authorization, party_id: Snowflake) -> Result<Party, Error> {
     let db = state.db.read.get().await?;
 

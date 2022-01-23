@@ -1,4 +1,4 @@
-use models::*;
+use sdk::models::*;
 use schema::{Snowflake, SnowflakeExt};
 
 use crate::{

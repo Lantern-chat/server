@@ -1,6 +1,6 @@
 use ftl::*;
 use headers::HeaderValue;
-use models::Snowflake;
+use sdk::models::Snowflake;
 
 use crate::{
     ctrl::{file::patch::FilePatchParams, Error},

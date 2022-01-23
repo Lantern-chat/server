@@ -19,7 +19,7 @@ pub struct LoginForm {
     pub totp: Option<SmolStr>,
 }
 
-use models::{ElevationLevel, Session, UserFlags};
+use sdk::models::{ElevationLevel, Session, UserFlags};
 
 use crate::ctrl::user::register::hash_config;
 

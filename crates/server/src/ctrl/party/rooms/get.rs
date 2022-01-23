@@ -4,7 +4,7 @@ use hashbrown::HashMap;
 
 use schema::Snowflake;
 
-use models::*;
+use sdk::models::*;
 
 use crate::{
     ctrl::{auth::Authorization, util::encrypted_asset::encrypt_snowflake_opt, Error},

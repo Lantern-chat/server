@@ -122,7 +122,7 @@ pub mod server {
 
     use std::sync::Arc;
 
-    use models::{
+    use sdk::models::{
         events::{Hello, PartyPositionUpdate, Ready, TypingStart},
         Intent, Message as RoomMessage, Party, PartyMember, Role, User, UserPresence,
     };
@@ -263,7 +263,7 @@ pub mod server {
 pub mod client {
     use super::*;
 
-    use models::{
+    use sdk::models::{
         commands::{Identify, SetPresence},
         Intent,
     };

@@ -2,7 +2,7 @@ use std::time::SystemTime;
 
 use schema::SnowflakeExt;
 
-use models::*;
+use sdk::models::*;
 use smol_str::SmolStr;
 
 use crate::{

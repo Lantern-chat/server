@@ -19,8 +19,8 @@ pub async fn ready(
     state: ServerState,
     conn_id: Snowflake,
     auth: Authorization,
-) -> Result<models::events::Ready, Error> {
-    use models::*;
+) -> Result<sdk::models::events::Ready, Error> {
+    use sdk::models::*;
 
     log::trace!("Processing Ready Event for {}", auth.user_id);
 

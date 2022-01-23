@@ -5,8 +5,8 @@ use std::{
 
 use std::num::NonZeroU64;
 
-pub use models::sf::{Snowflake, LANTERN_EPOCH};
-use models::LANTERN_EPOCH_PDT;
+pub use sdk::models::sf::{Snowflake, LANTERN_EPOCH};
+use sdk::models::LANTERN_EPOCH_PDT;
 
 /// Incremenent counter to ensure unique snowflakes
 pub static INCR: AtomicU16 = AtomicU16::new(0);

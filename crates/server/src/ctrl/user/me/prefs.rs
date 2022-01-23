@@ -1,7 +1,7 @@
 use crate::ctrl::{auth, Error};
 use crate::ServerState;
 
-use models::UserPreferences;
+use sdk::models::UserPreferences;
 use thorn::pg::Json;
 
 pub async fn update_prefs(

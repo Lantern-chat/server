@@ -1,6 +1,6 @@
 use std::time::SystemTime;
 
-use models::UserFlags;
+use sdk::models::UserFlags;
 use util::cmap::CHashMap;
 
 use schema::Snowflake;

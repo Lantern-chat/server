@@ -1,4 +1,4 @@
-use models::{Snowflake, UserPresence};
+use sdk::models::{Snowflake, UserPresence};
 
 use crate::{ctrl::Error, ServerState};
 

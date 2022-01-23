@@ -9,7 +9,7 @@ use crate::{
     ServerState,
 };
 
-use models::*;
+use sdk::models::*;
 
 pub mod embed;
 pub mod slash;

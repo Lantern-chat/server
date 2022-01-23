@@ -16,7 +16,7 @@ use smol_str::SmolStr;
 use thorn::pg::ToSql;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
-use models::Snowflake;
+use sdk::models::Snowflake;
 use schema::flags::FileFlags;
 
 use crate::{

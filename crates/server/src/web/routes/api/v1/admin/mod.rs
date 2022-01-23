@@ -1,5 +1,5 @@
 use ftl::*;
-use models::{ElevationLevel, UserFlags};
+use sdk::models::{ElevationLevel, UserFlags};
 use schema::Snowflake;
 
 use crate::web::{

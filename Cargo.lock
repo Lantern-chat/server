@@ -466,6 +466,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "client-sdk"
+version = "0.1.0"
+source = "git+https://github.com/Lantern-chat/client-sdk-rs#301b81540d0cee1eb6dec6034c4c81515cfbe262"
+dependencies = [
+ "arrayvec",
+ "bitflags",
+ "bytes",
+ "hashbrown 0.12.0",
+ "iso8061-timestamp",
+ "itoa 1.0.1",
+ "postgres-types",
+ "serde",
+ "serde_json",
+ "serde_repr",
+ "serde_shims",
+ "smol_str",
+ "time 0.3.6",
+]
+
+[[package]]
 name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -716,11 +736,11 @@ version = "0.1.0"
 dependencies = [
  "aho-corasick",
  "bitflags",
+ "client-sdk",
  "criterion",
  "iso8061-timestamp",
  "lazy_static",
  "memchr",
- "models",
  "regex-automata",
  "serde",
  "serde_json",
@@ -1620,26 +1640,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "models"
-version = "0.1.0"
-dependencies = [
- "arrayvec",
- "bitflags",
- "bytes",
- "hashbrown 0.12.0",
- "iso8061-timestamp",
- "itoa 1.0.1",
- "postgres-types",
- "serde",
- "serde_json",
- "serde_repr",
- "serde_shims",
- "smol_str",
- "time 0.3.6",
- "util",
-]
-
-[[package]]
 name = "multipart"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2439,8 +2439,8 @@ version = "0.1.0"
 dependencies = [
  "aes",
  "bitflags",
+ "client-sdk",
  "enum_primitive",
- "models",
  "postgres-types",
  "serde",
  "serde_json",
@@ -2602,6 +2602,7 @@ dependencies = [
  "bytecount",
  "bytes",
  "cache-padded",
+ "client-sdk",
  "crc32fast",
  "db",
  "either",
@@ -2623,7 +2624,6 @@ dependencies = [
  "mime",
  "mime_db",
  "miniz_oxide 0.5.1",
- "models",
  "num_cpus",
  "parking_lot",
  "paste",

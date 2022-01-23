@@ -1,4 +1,4 @@
-use models::Snowflake;
+use sdk::models::Snowflake;
 use smol_str::SmolStr;
 
 #[derive(Deserialize)]

@@ -1,7 +1,7 @@
 use http::{HeaderMap, HeaderValue, Method, StatusCode};
 
 use ftl::*;
-use models::Snowflake;
+use sdk::models::Snowflake;
 
 // https://tus.io/protocols/resumable-upload.html
 

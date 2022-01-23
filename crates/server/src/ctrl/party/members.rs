@@ -10,7 +10,7 @@ use crate::{
 
 use futures::{Stream, StreamExt};
 
-use models::{AnyActivity, PartyMember, User, UserFlags, UserPresence, UserPresenceFlags};
+use sdk::models::{AnyActivity, PartyMember, User, UserFlags, UserPresence, UserPresenceFlags};
 
 pub async fn get_members(
     state: ServerState,

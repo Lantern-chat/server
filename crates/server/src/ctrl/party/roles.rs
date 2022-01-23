@@ -8,7 +8,7 @@ use crate::{
     ServerState,
 };
 
-use models::*;
+use sdk::models::*;
 
 fn base_query() -> thorn::query::SelectQuery {
     use schema::*;

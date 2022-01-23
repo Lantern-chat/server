@@ -3,7 +3,7 @@ use std::{borrow::Cow, string::FromUtf8Error};
 use db::pool::Error as DbError;
 use ftl::{body::BodyDeserializeError, StatusCode};
 use http::header::InvalidHeaderValue;
-use models::UserPreferenceError;
+use sdk::models::UserPreferenceError;
 
 use crate::web::gateway::event::EventEncodingError;
 

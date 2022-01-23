@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use futures::future::Either;
-use models::events::PartyPositionUpdate;
+use sdk::models::events::PartyPositionUpdate;
 use schema::EventCode;
 use thorn::pg::Json;
 

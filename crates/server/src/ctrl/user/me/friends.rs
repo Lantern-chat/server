@@ -3,7 +3,7 @@ use futures::{Stream, StreamExt};
 use crate::ctrl::{auth::Authorization, Error};
 use crate::ServerState;
 
-use models::*;
+use sdk::models::*;
 
 pub async fn friends(
     state: ServerState,

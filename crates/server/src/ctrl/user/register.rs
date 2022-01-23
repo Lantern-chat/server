@@ -20,7 +20,7 @@ pub struct RegisterForm {
     pub token: String, // TODO: Don't allocate?
 }
 
-use models::Session;
+use sdk::models::Session;
 
 pub async fn register_user(
     state: ServerState,

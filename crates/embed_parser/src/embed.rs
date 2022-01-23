@@ -2,7 +2,7 @@ use smol_str::SmolStr;
 
 use timestamp::Timestamp;
 
-use models::{Embed, EmbedMedia, EmbedType};
+use sdk::models::{Embed, EmbedMedia, EmbedType};
 
 use crate::html::{Header, LinkType};
 use crate::oembed::{OEmbed, OEmbedFormat, OEmbedLink, OEmbedType};

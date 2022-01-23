@@ -1,4 +1,4 @@
-use models::{Snowflake, UserFlags};
+use sdk::models::{Snowflake, UserFlags};
 use schema::SnowflakeExt;
 use timestamp::Timestamp;
 

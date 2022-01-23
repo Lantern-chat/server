@@ -1,7 +1,7 @@
 use aes_gcm_siv::aead::{Aead, NewAead};
 use aes_gcm_siv::{Aes256GcmSiv, Key, Nonce};
 
-use models::Snowflake;
+use sdk::models::Snowflake;
 
 #[inline]
 fn nonce_from_user_id(user_id: Snowflake) -> Nonce {

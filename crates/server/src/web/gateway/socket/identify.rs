@@ -1,4 +1,4 @@
-use models::{Intent, SmolToken};
+use sdk::models::{Intent, SmolToken};
 
 use super::{Event, EventError, GatewayConnection, ServerState};
 

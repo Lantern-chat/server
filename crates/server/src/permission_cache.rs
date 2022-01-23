@@ -23,7 +23,7 @@ impl<S: BuildHasher> BuildHasher for SharedBuildHasher<S> {
 
 use schema::Snowflake;
 
-use models::Permission;
+use sdk::models::Permission;
 
 type UserId = Snowflake;
 type RoomId = Snowflake;

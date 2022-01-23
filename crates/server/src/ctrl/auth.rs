@@ -95,7 +95,7 @@ impl AuthToken {
     }
 }
 
-use models::UserFlags;
+use sdk::models::UserFlags;
 use schema::Snowflake;
 
 use crate::ServerState;

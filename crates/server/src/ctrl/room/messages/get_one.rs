@@ -1,6 +1,6 @@
 use schema::Snowflake;
 
-use models::*;
+use sdk::models::*;
 use thorn::pg::Json;
 
 use crate::{

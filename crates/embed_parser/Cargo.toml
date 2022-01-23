@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-models = { path = "../models" }
+sdk = { git = "https://github.com/Lantern-chat/client-sdk-rs", features = ["pg"], package = "client-sdk" }
 
 timestamp = { package = "iso8061-timestamp", version = "0.1" }
 

@@ -11,7 +11,7 @@ use crate::{
     ServerState,
 };
 
-use models::*;
+use sdk::models::*;
 
 pub async fn get_room(state: ServerState, auth: Authorization, room_id: Snowflake) -> Result<Room, Error> {
     // TODO: Ensure the room permissions are cached after this

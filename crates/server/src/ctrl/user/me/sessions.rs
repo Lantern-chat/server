@@ -5,7 +5,7 @@ use crate::{
     ServerState,
 };
 
-use models::AnonymousSession;
+use sdk::models::AnonymousSession;
 
 pub async fn list_sessions(
     state: ServerState,

@@ -6,7 +6,7 @@ use crate::{
     ServerState,
 };
 
-use models::*;
+use sdk::models::*;
 
 pub async fn delete_msg(
     state: ServerState,

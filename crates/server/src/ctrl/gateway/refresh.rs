@@ -1,6 +1,6 @@
 use futures::StreamExt;
 
-use models::{Permission, Snowflake};
+use sdk::models::{Permission, Snowflake};
 
 use crate::ctrl::Error;
 use crate::permission_cache::PermMute;

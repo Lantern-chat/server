@@ -1,6 +1,6 @@
 use ftl::*;
 
-use models::Snowflake;
+use sdk::models::Snowflake;
 
 use crate::{
     ctrl::user::me::account::ModifyAccountForm,
