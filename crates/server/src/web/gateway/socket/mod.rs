@@ -396,13 +396,18 @@ fn decompress_if(cond: bool, msg: &[u8]) -> Result<Cow<[u8]>, std::io::Error> {
         return Ok(Cow::Borrowed(msg));
     }
 
-    use flate2::bufread::ZlibDecoder;
-    use std::io::Read;
+    use miniz_oxide::inflate::{self, TINFLStatus};
 
-    let mut reader = ZlibDecoder::new(&*msg);
-    let mut decoded = Vec::with_capacity(128);
+    let err = match inflate::decompress_to_vec_zlib(msg) {
+        Ok(decompressed) => return Ok(Cow::Owned(decompressed)),
+        Err(err) => match err {
+            TINFLStatus::Done => unreachable!("TINFLStatus::Done"),
+            TINFLStatus::FailedCannotMakeProgress => "Truncated Stream",
+            TINFLStatus::BadParam => "Bad Param",
+            TINFLStatus::Adler32Mismatch => "Adler32 Mismatch",
+            _ => "Corrupt Stream",
+        }
+    };
 
-    reader.read_to_end(&mut decoded)?;
-
-    Ok(Cow::Owned(decoded))
+    return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, err));
 }

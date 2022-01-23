@@ -76,16 +76,6 @@ impl CompressedEvent {
     pub fn new(value: Vec<u8>) -> Result<Self, EventEncodingError> {
         let compressed = miniz_oxide::deflate::compress_to_vec_zlib(&value, 7);
 
-        //use flate2::{write::ZlibEncoder, Compression};
-        //use std::io::Write;
-        //
-        //let mut encoder = ZlibEncoder::new(
-        //    Vec::with_capacity((value.len() * 2) / 3),
-        //    Compression::new(6),
-        //);
-        //encoder.write(&value)?;
-        //let compressed = encoder.finish()?;
-
         Ok(CompressedEvent {
             uncompressed: value,
             compressed,
