@@ -1,9 +1,8 @@
 use std::sync::Arc;
 
-use crate::web::gateway::{
-    msg::{server::UserPresenceInner, ServerMsg},
-    Event,
-};
+use crate::web::gateway::Event;
+
+use sdk::models::gateway::{events::UserPresenceEvent, message::ServerMsg};
 
 use super::*;
 
@@ -100,7 +99,7 @@ pub async fn presence_updated(
         avatar: None,
     };
 
-    let inner = Arc::new(UserPresenceInner { user, presence });
+    let inner = Arc::new(UserPresenceEvent { user, presence });
 
     for party_id in party_ids {
         state

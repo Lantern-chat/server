@@ -3,13 +3,9 @@ use std::sync::Arc;
 use futures::future::Either;
 use schema::EventCode;
 
-use crate::{
-    ctrl::util::encrypted_asset::encrypt_snowflake_opt,
-    web::gateway::{
-        msg::{server::RoleDeleteInner, ServerMsg},
-        Event,
-    },
-};
+use crate::{ctrl::util::encrypted_asset::encrypt_snowflake_opt, web::gateway::Event};
+
+use sdk::models::gateway::{events::RoleDeleteEvent, message::ServerMsg};
 
 use super::*;
 
@@ -34,7 +30,7 @@ pub async fn role_event(
             .gateway
             .broadcast_event(
                 Event::new(
-                    ServerMsg::new_roledelete(RoleDeleteInner {
+                    ServerMsg::new_roledelete(RoleDeleteEvent {
                         id: role_id,
                         party_id,
                     }),

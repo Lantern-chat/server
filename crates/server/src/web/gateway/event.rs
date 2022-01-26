@@ -7,7 +7,9 @@ use schema::Snowflake;
 
 use crate::web::encoding::Encoding;
 
-use super::{msg::ServerMsg, socket::GatewayQueryParams};
+use super::socket::GatewayQueryParams;
+
+use sdk::models::gateway::message::ServerMsg;
 
 #[derive(Debug)]
 pub struct CompressedEvent {

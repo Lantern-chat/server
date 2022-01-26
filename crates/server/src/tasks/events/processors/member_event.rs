@@ -3,15 +3,11 @@ use std::sync::Arc;
 use futures::future::Either;
 use schema::EventCode;
 
-use crate::{
-    ctrl::util::encrypted_asset::encrypt_snowflake_opt,
-    web::gateway::{
-        msg::{
-            server::{PartyMemberInner, UserPresenceInner},
-            ServerMsg,
-        },
-        Event,
-    },
+use crate::{ctrl::util::encrypted_asset::encrypt_snowflake_opt, web::gateway::Event};
+
+use sdk::models::gateway::{
+    events::{PartyMemberEvent, UserPresenceEvent},
+    message::ServerMsg,
 };
 
 use super::*;
@@ -142,7 +138,7 @@ pub async fn member_event(
         None => return Ok(()),
     };
 
-    let inner = PartyMemberInner { party_id, member };
+    let inner = PartyMemberEvent { party_id, member };
 
     let msg = match event {
         EventCode::MemberUpdated => ServerMsg::new_memberupdate(inner),
@@ -160,7 +156,7 @@ pub async fn member_event(
             ServerMsg::new_memberadd(inner)
         }
         EventCode::MemberLeft | EventCode::MemberBan => {
-            let inner: Arc<PartyMemberInner> = Arc::new(inner);
+            let inner: Arc<PartyMemberEvent> = Arc::new(inner);
 
             state
                 .gateway

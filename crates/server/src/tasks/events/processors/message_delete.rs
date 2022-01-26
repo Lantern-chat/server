@@ -1,12 +1,8 @@
 use thorn::pg::Json;
 
-use crate::{
-    ctrl::util::encrypted_asset::encrypt_snowflake,
-    web::gateway::{
-        msg::{server::MessageDeleteInner, ServerMsg},
-        Event,
-    },
-};
+use crate::{ctrl::util::encrypted_asset::encrypt_snowflake, web::gateway::Event};
+
+use sdk::models::gateway::{events::MessageDeleteEvent, message::ServerMsg};
 
 use super::*;
 
@@ -36,7 +32,7 @@ pub async fn message_delete(
         None => return Ok(()),
     };
 
-    let event = ServerMsg::new_messagedelete(MessageDeleteInner {
+    let event = ServerMsg::new_messagedelete(MessageDeleteEvent {
         id,
         room_id,
         party_id,

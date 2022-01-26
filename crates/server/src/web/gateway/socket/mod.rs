@@ -35,8 +35,9 @@ use crate::{
 use super::{
     conn::GatewayConnection,
     event::{EncodedEvent, Event},
-    msg::{ClientMsg, ServerMsg},
 };
+
+use sdk::models::gateway::message::{ClientMsg, ServerMsg};
 
 pub mod params;
 pub use params::GatewayQueryParams;
@@ -139,7 +140,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
 
                 Item::Event(event) => match event {
                     Ok(event) => {
-                        use super::msg::server::payloads::*;
+                        use sdk::models::gateway::message::server::payloads::*;
 
                         // if this message corresponds to an intent, filter it
                         if let Some(matching_intent) = event.msg.matching_intent() {
@@ -406,7 +407,7 @@ fn decompress_if(cond: bool, msg: &[u8]) -> Result<Cow<[u8]>, std::io::Error> {
             TINFLStatus::BadParam => "Bad Param",
             TINFLStatus::Adler32Mismatch => "Adler32 Mismatch",
             _ => "Corrupt Stream",
-        }
+        },
     };
 
     return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, err));

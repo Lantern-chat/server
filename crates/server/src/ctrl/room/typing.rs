@@ -1,11 +1,13 @@
-use sdk::models::*;
 use schema::{Snowflake, SnowflakeExt};
+use sdk::models::*;
 
 use crate::{
     ctrl::{auth::Authorization, perm::get_cached_room_permissions, Error, SearchMode},
-    web::gateway::{msg::ServerMsg, Event},
+    web::gateway::Event,
     ServerState,
 };
+
+use sdk::models::gateway::message::ServerMsg;
 
 pub async fn trigger_typing(
     state: ServerState,

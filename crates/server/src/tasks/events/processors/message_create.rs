@@ -1,9 +1,8 @@
 use thorn::pg::Json;
 
-use crate::{
-    ctrl::util::encrypted_asset::encrypt_snowflake,
-    web::gateway::{msg::ServerMsg, Event},
-};
+use crate::{ctrl::util::encrypted_asset::encrypt_snowflake, web::gateway::Event};
+
+use sdk::models::gateway::message::ServerMsg;
 
 use super::*;
 

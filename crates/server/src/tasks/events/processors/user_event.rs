@@ -1,19 +1,14 @@
 use std::sync::Arc;
 
 use futures::future::Either;
-use sdk::models::events::PartyPositionUpdate;
 use schema::EventCode;
 use thorn::pg::Json;
 
-use crate::{
-    ctrl::util::encrypted_asset::encrypt_snowflake_opt,
-    web::gateway::{
-        msg::{
-            server::{PartyUpdateInner, RoleDeleteInner},
-            ServerMsg,
-        },
-        Event,
-    },
+use crate::{ctrl::util::encrypted_asset::encrypt_snowflake_opt, web::gateway::Event};
+
+use sdk::models::gateway::{
+    events::{PartyPositionUpdate, PartyUpdateEvent, RoleDeleteEvent},
+    message::ServerMsg,
 };
 
 use super::*;
@@ -149,7 +144,7 @@ pub async fn self_update(
             .gateway
             .broadcast_user_event(
                 Event::new(
-                    ServerMsg::new_partyupdate(PartyUpdateInner::Position(PartyPositionUpdate {
+                    ServerMsg::new_partyupdate(PartyUpdateEvent::Position(PartyPositionUpdate {
                         position,
                         id: party_id,
                     })),

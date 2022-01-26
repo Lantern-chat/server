@@ -7,7 +7,8 @@ use crate::ctrl::{
     gateway::ready::ready,
     Error,
 };
-use crate::web::gateway::msg::{server::*, ServerMsg};
+
+use sdk::models::gateway::message::{server::*, ServerMsg};
 
 pub async fn identify(state: ServerState, conn: GatewayConnection, auth: SmolToken, intent: Intent) {
     if let Err(e) = do_identify(state, &conn, auth, intent).await {
@@ -16,17 +17,9 @@ pub async fn identify(state: ServerState, conn: GatewayConnection, auth: SmolTok
     }
 }
 
-async fn do_identify(
-    state: ServerState,
-    conn: &GatewayConnection,
-    auth: SmolToken,
-    _intent: Intent,
-) -> Result<(), Error> {
+async fn do_identify(state: ServerState, conn: &GatewayConnection, auth: SmolToken, _intent: Intent) -> Result<(), Error> {
     let auth = do_auth(&state, auth.as_bytes()).await?;
     let ready = ready(state, conn.id, auth).await?;
-    let _ = conn
-        .tx
-        .send(Event::new(ServerMsg::new_ready(Box::new(ready)), None)?)
-        .await;
+    let _ = conn.tx.send(Event::new(ServerMsg::new_ready(Box::new(ready)), None)?).await;
     Ok(())
 }
