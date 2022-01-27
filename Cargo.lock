@@ -136,9 +136,9 @@ dependencies = [
 
 [[package]]
 name = "async-compression"
-version = "0.3.8"
+version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5443ccbb270374a2b1055fc72da40e1f237809cd6bb0e97e66d264cd138473a6"
+checksum = "795814bc6dce6c2e6af7e6aa5a96d99543c88808596300dbfb56372b4456f689"
 dependencies = [
  "brotli",
  "flate2",
@@ -196,25 +196,6 @@ name = "autocfg"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
-
-[[package]]
-name = "b2"
-version = "0.1.0"
-dependencies = [
- "base64",
- "bytes",
- "dotenv",
- "futures",
- "headers",
- "hyper",
- "hyper-tls",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "thiserror",
- "tokio",
- "urlencoding",
-]
 
 [[package]]
 name = "bae"
@@ -2608,7 +2589,6 @@ dependencies = [
  "either",
  "embed_parser",
  "failsafe",
- "flate2",
  "ftl",
  "futures",
  "hashbrown 0.12.0",

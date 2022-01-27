@@ -37,7 +37,7 @@ tokio-rustls = "0.23.0"
 # tls-listener = { version = "0.2.1", features = ["hyper-h1", "hyper-h2", "tokio-net"] }
 async-stream = "0.3"
 async-trait = "0.1.50"
-async-compression = { version = "0.3.8", features = ["brotli", "deflate", "gzip", "tokio"] }
+async-compression = { version = "0.3.11", features = ["brotli", "deflate", "gzip", "tokio"] }
 hashbrown = { version = "0.12", features = ["inline-more"] }
 futures = "0.3"
 hyper = { version = "0.14.4", features = ["http1", "http2", "server", "stream", "runtime"] }
