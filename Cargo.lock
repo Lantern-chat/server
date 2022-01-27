@@ -198,25 +198,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
-name = "b2"
-version = "0.1.0"
-dependencies = [
- "base64",
- "bytes",
- "dotenv",
- "futures",
- "headers",
- "hyper",
- "hyper-tls",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "thiserror",
- "tokio",
- "urlencoding",
-]
-
-[[package]]
 name = "bae"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1553,7 +1534,7 @@ checksum = "2a60c7ce501c71e03a9c9c0d35b861413ae925bd979cc7a4e30d060069aaac8d"
 [[package]]
 name = "mime_db"
 version = "0.1.0"
-source = "git+https://github.com/Lantern-chat/mime_db#e35b831d6ce8a6c9bae0793dae1f243255f08fe0"
+source = "git+https://github.com/Lantern-chat/mime_db#a197b8e9e608872b8a042a254d4e86fa6cf21ce0"
 dependencies = [
  "phf",
  "phf_codegen",
@@ -2608,7 +2589,6 @@ dependencies = [
  "either",
  "embed_parser",
  "failsafe",
- "flate2",
  "ftl",
  "futures",
  "hashbrown 0.12.0",
