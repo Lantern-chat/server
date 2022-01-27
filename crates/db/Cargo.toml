@@ -35,4 +35,4 @@ num_cpus = "1.13.0"
 # sea-query = { version = "0.10", features = ["with-json", "with-chrono", "with-uuid"] }
 
 [dev-dependencies]
-serde_json = "1.0.64"
+serde_json = "1.0.78"

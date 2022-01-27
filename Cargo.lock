@@ -198,25 +198,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
-name = "b2"
-version = "0.1.0"
-dependencies = [
- "base64",
- "bytes",
- "dotenv",
- "futures",
- "headers",
- "hyper",
- "hyper-tls",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "thiserror",
- "tokio",
- "urlencoding",
-]
-
-[[package]]
 name = "bae"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2535,9 +2516,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.75"
+version = "1.0.78"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c059c05b48c5c0067d4b4b2b4f0732dd65feb52daf7e0ea09cd87e7dadc1af79"
+checksum = "d23c1ba4cf0efd44be32017709280b32d1cea5c3f1275c3b6d9e8bc54f758085"
 dependencies = [
  "itoa 1.0.1",
  "ryu",
@@ -2608,7 +2589,6 @@ dependencies = [
  "either",
  "embed_parser",
  "failsafe",
- "flate2",
  "ftl",
  "futures",
  "hashbrown 0.12.0",
