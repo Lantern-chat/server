@@ -198,25 +198,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
-name = "b2"
-version = "0.1.0"
-dependencies = [
- "base64",
- "bytes",
- "dotenv",
- "futures",
- "headers",
- "hyper",
- "hyper-tls",
- "serde",
- "serde_json",
- "serde_urlencoded",
- "thiserror",
- "tokio",
- "urlencoding",
-]
-
-[[package]]
 name = "bae"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -482,7 +463,7 @@ dependencies = [
  "serde_repr",
  "serde_shims",
  "smol_str",
- "time 0.3.6",
+ "time 0.3.7",
 ]
 
 [[package]]
@@ -671,7 +652,7 @@ dependencies = [
  "serde_shims",
  "thiserror",
  "thorn",
- "time 0.3.6",
+ "time 0.3.7",
  "tokio",
  "tokio-postgres",
  "tracing",
@@ -1331,7 +1312,7 @@ dependencies = [
  "generic-array",
  "postgres-types",
  "serde",
- "time 0.3.6",
+ "time 0.3.7",
 ]
 
 [[package]]
@@ -2035,7 +2016,7 @@ dependencies = [
  "postgres-protocol",
  "serde",
  "serde_json",
- "time 0.3.6",
+ "time 0.3.7",
  "uuid",
 ]
 
@@ -2446,7 +2427,7 @@ dependencies = [
  "serde_json",
  "smol_str",
  "thorn",
- "time 0.3.6",
+ "time 0.3.7",
 ]
 
 [[package]]
@@ -2608,7 +2589,6 @@ dependencies = [
  "either",
  "embed_parser",
  "failsafe",
- "flate2",
  "ftl",
  "futures",
  "hashbrown 0.12.0",
@@ -2646,7 +2626,7 @@ dependencies = [
  "socket2",
  "thiserror",
  "thorn",
- "time 0.3.6",
+ "time 0.3.7",
  "tokio",
  "tokio-rustls",
  "tokio-stream",
@@ -2917,9 +2897,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.6"
+version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8d54b9298e05179c335de2b9645d061255bcd5155f843b3e328d2cfe0a5b413"
+checksum = "004cbc98f30fa233c61a38bc77e96a9106e65c88f2d3bef182ae952027e5753d"
 dependencies = [
  "libc",
  "num_threads",
@@ -3327,7 +3307,7 @@ dependencies = [
  "serde",
  "smol_str",
  "thiserror",
- "time 0.3.6",
+ "time 0.3.7",
  "tokio",
 ]
 
