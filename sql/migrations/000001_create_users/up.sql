@@ -71,3 +71,8 @@ CREATE INDEX user_tokens_token_idx ON lantern.user_tokens
 
 CREATE INDEX user_tokens_expires_idx ON lantern.user_tokens
     USING btree (expires);
+
+
+-- Create SYSTEM user for sending system messages
+
+INSERT INTO lantern.users (id, dob, flags, username, discriminator, email, passhash) VALUES (1, date '1970-01-01', 256, 'SYSTEM', 0, '', '') ON CONFLICT DO NOTHING;
