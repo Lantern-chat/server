@@ -20,6 +20,9 @@ pub struct CreateMessageForm {
 
     #[serde(default)]
     attachments: Vec<Snowflake>,
+
+    #[serde(default)]
+    parent: Option<Snowflake>,
 }
 
 pub async fn create_message(
@@ -141,7 +144,7 @@ pub async fn create_message(
         None => state.db.write.get().await?,
     };
 
-    let res = if !form.attachments.is_empty() {
+    let res = if !form.attachments.is_empty() || form.parent.is_some() {
         create_message_full(db, state, auth, room_id, msg_id, &form, &modified_content)
             .boxed()
             .await
@@ -282,6 +285,75 @@ pub async fn create_message_full(
     let t = db.transaction().await?;
 
     let msg_future = async {
+        // space case that requires looking up thread id
+        if let Some(parent_msg_id) = form.parent {
+            let thread_id = Snowflake::now();
+
+            t.execute_cached_typed(
+                || {
+                    use schema::*;
+                    use thorn::*;
+
+                    tables! {
+                        struct AggThread {
+                            Id: Threads::Id,
+                        }
+                    }
+
+                    let msg_id_var = Var::at(Messages::Id, 1);
+                    let user_id_var = Var::at(Users::Id, 2);
+                    let room_id_var = Var::at(Rooms::Id, 3);
+                    let parent_msg_id_var = Var::at(Messages::Id, 4);
+                    let thread_id_var = Var::at(Threads::Id, 5);
+                    let content_var = Var::at(Messages::Content, 6);
+
+                    // TODO: If the desired parent is itself in a thread, use that message's parent instead
+                    let try_insert_thread = AggThread::as_query(
+                        Query::insert()
+                            .into::<Threads>()
+                            .cols(&[Threads::Id, Threads::ParentId])
+                            .values([thread_id_var, parent_msg_id_var.clone()])
+                            .on_conflict([Threads::ParentId], DoNothing)
+                            .returning(Threads::Id),
+                    );
+
+                    Query::insert()
+                        .with(try_insert_thread.exclude())
+                        .into::<Messages>()
+                        .cols(&[
+                            Messages::ThreadId,
+                            Messages::Id,
+                            Messages::UserId,
+                            Messages::RoomId,
+                            Messages::Content,
+                        ])
+                        .value(Builtin::coalesce((
+                            Query::select()
+                                .col(AggThread::Id)
+                                .from_table::<AggThread>()
+                                .as_value(),
+                            Query::select()
+                                .col(Threads::Id)
+                                .from_table::<Threads>()
+                                .and_where(Threads::ParentId.equals(parent_msg_id_var))
+                                .as_value(),
+                        )))
+                        .values([msg_id_var, user_id_var, room_id_var, content_var])
+                },
+                &[
+                    &msg_id,
+                    &auth.user_id,
+                    &room_id,
+                    &parent_msg_id,
+                    &thread_id,
+                    &trimmed,
+                ],
+            )
+            .await?;
+
+            return Ok(());
+        }
+
         t.execute_cached_typed(
             || {
                 use schema::*;
