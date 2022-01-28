@@ -36,25 +36,22 @@ pub async fn get_one(
     };
 
     match row {
-        Some(row) => parse_msg(&state, room_id, msg_id, row),
+        Some(row) => parse_msg(&state, &row),
         None => Err(Error::NotFound),
     }
 }
 
-pub(crate) fn parse_msg(
-    state: &ServerState,
-    room_id: Snowflake,
-    msg_id: Snowflake,
-    row: db::Row,
-) -> Result<Message, Error> {
+pub(crate) fn parse_msg(state: &ServerState, row: &db::Row) -> Result<Message, Error> {
     let flags = MessageFlags::from_bits_truncate(row.try_get(9)?);
 
-    // doing this here results in a simpler query
+    // doing this in the application layer results in simpler queries
     if flags.contains(MessageFlags::DELETED) {
         return Err(Error::NotFound);
     }
 
-    let party_id: Option<Snowflake> = row.try_get(1)?;
+    let msg_id = row.try_get(0)?;
+    let room_id = row.try_get(1)?;
+    let party_id = row.try_get(2)?;
 
     let mut msg = Message {
         id: msg_id,
@@ -62,39 +59,39 @@ pub(crate) fn parse_msg(
         created_at: msg_id.timestamp(),
         room_id,
         flags,
-        edited_at: row.try_get::<_, Option<_>>(8)?,
-        content: row.try_get(10)?,
+        edited_at: row.try_get::<_, Option<_>>(6)?,
+        content: row.try_get(12)?,
         author: User {
-            id: row.try_get(0)?,
-            username: row.try_get(3)?,
+            id: row.try_get(3)?,
+            username: row.try_get(10)?,
             discriminator: row.try_get(4)?,
             flags: UserFlags::from_bits_truncate(row.try_get(5)?).publicize(),
             status: None,
             bio: None,
             email: None,
             preferences: None,
-            avatar: encrypt_snowflake_opt(&state, row.try_get(12)?),
+            avatar: encrypt_snowflake_opt(&state, row.try_get(7)?),
         },
         member: match party_id {
             None => None,
             Some(_) => Some(PartyMember {
                 user: None,
-                nick: row.try_get(2)?,
-                roles: row.try_get(11)?,
+                nick: row.try_get(11)?,
+                roles: row.try_get(13)?,
                 presence: None,
             }),
         },
-        thread_id: None,
-        user_mentions: Vec::new(),
-        role_mentions: Vec::new(),
-        room_mentions: Vec::new(),
+        thread_id: row.try_get(8)?,
+        user_mentions: Vec::new(), // TODO
+        role_mentions: Vec::new(), // TODO
+        room_mentions: Vec::new(), // TODO
         attachments: {
             let mut attachments = Vec::new();
 
-            let meta: Option<Json<Vec<schema::AggAttachmentsMeta>>> = row.try_get(13)?;
+            let meta: Option<Json<Vec<schema::AggAttachmentsMeta>>> = row.try_get(16)?;
 
             if let Some(Json(meta)) = meta {
-                let previews: Vec<Option<&[u8]>> = row.try_get(14)?;
+                let previews: Vec<Option<&[u8]>> = row.try_get(17)?;
 
                 if meta.len() != previews.len() {
                     return Err(Error::InternalErrorStatic("Meta != Previews length"));
@@ -125,10 +122,10 @@ pub(crate) fn parse_msg(
         reactions: Vec::new(),
     };
 
-    let mention_kinds: Option<Vec<i32>> = row.try_get(7)?;
+    let mention_kinds: Option<Vec<i32>> = row.try_get(15)?;
     if let Some(mention_kinds) = mention_kinds {
         // lazily parse ids
-        let mention_ids: Vec<Snowflake> = row.try_get(6)?;
+        let mention_ids: Vec<Snowflake> = row.try_get(14)?;
 
         if mention_ids.len() != mention_kinds.len() {
             return Err(Error::InternalErrorStatic("Mismatched Mention aggregates!"));
@@ -151,25 +148,30 @@ pub(crate) fn parse_msg(
 
 use thorn::*;
 
-mod consts {
+pub(crate) mod consts {
     use schema::*;
 
+    // put fixed-size columns first, then variable-size last,
+    // in order of expected occurance.
     pub const COLUMNS: &[AggMessages] = &[
-        /* 0*/ AggMessages::UserId,
-        /* 1*/ AggMessages::PartyId,
-        /* 2*/ AggMessages::Nickname,
-        /* 3*/ AggMessages::Username,
+        /* 0*/ AggMessages::MsgId,
+        /* 1*/ AggMessages::RoomId,
+        /* 2*/ AggMessages::PartyId,
+        /* 3*/ AggMessages::UserId,
         /* 4*/ AggMessages::Discriminator,
         /* 5*/ AggMessages::UserFlags,
-        /* 6*/ AggMessages::MentionIds,
-        /* 7*/ AggMessages::MentionKinds,
-        /* 8*/ AggMessages::EditedAt,
+        /* 6*/ AggMessages::EditedAt,
+        /* 7*/ AggMessages::AvatarId,
+        /* 8*/ AggMessages::ThreadId,
         /* 9*/ AggMessages::MessageFlags,
-        /*10*/ AggMessages::Content,
-        /*11*/ AggMessages::RoleIds,
-        /*12*/ AggMessages::AvatarId,
-        /*13*/ AggMessages::AttachmentMeta,
-        /*14*/ AggMessages::AttachmentPreview,
+        /*10*/ AggMessages::Username,
+        /*11*/ AggMessages::Nickname,
+        /*12*/ AggMessages::Content,
+        /*13*/ AggMessages::RoleIds,
+        /*14*/ AggMessages::MentionIds,
+        /*15*/ AggMessages::MentionKinds,
+        /*16*/ AggMessages::AttachmentMeta,
+        /*17*/ AggMessages::AttachmentPreview,
     ];
 }
 
@@ -192,12 +194,7 @@ fn get_one_with_perms() -> impl AnyQuery {
         }
     }
 
-    const READ_MESSAGE: i64 = Permission {
-        party: PartyPermissions::empty(),
-        room: RoomPermissions::READ_MESSAGES,
-        stream: StreamPermissions::empty(),
-    }
-    .pack() as i64;
+    const READ_MESSAGES: i64 = Permission::PACKED_READ_MESSAGES as i64;
 
     let user_id_var = Var::at(Users::Id, 1);
     let room_id_var = Var::at(Rooms::Id, 2);
@@ -216,8 +213,8 @@ fn get_one_with_perms() -> impl AnyQuery {
         .select()
         .and_where(
             AggPerm::Perms
-                .bit_and(Literal::Int8(READ_MESSAGE))
-                .equals(Literal::Int8(READ_MESSAGE)),
+                .bit_and(Literal::Int8(READ_MESSAGES))
+                .equals(Literal::Int8(READ_MESSAGES)),
         )
         .from_table::<AggMessages>()
         .cols(consts::COLUMNS)

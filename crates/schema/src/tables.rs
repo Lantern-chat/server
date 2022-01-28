@@ -223,11 +223,17 @@ thorn::tables! {
         UserId: Users::Id,
     }
 
+    pub struct Threads in Lantern {
+        Id: SNOWFLAKE,
+        ParentId: Messages::Id,
+        Flags: Type::INT2,
+    }
+
     pub struct Messages in Lantern {
         Id: SNOWFLAKE,
         UserId: Users::Id,
         RoomId: Rooms::Id,
-        ThreadId: SNOWFLAKE,
+        ThreadId: Threads::Id,
         UpdatedAt: Type::TIMESTAMP,
         EditedAt: Type::TIMESTAMP,
         Flags: Type::INT2,

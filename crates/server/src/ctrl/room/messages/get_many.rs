@@ -105,8 +105,8 @@ pub async fn get_many(
                 party_id,
                 created_at: msg_id.timestamp(),
                 room_id,
-                flags: MessageFlags::from_bits_truncate(row.try_get(10)?),
-                edited_at: row.try_get::<_, Option<_>>(9)?,
+                flags: MessageFlags::from_bits_truncate(row.try_get(8)?),
+                edited_at: row.try_get::<_, Option<_>>(7)?,
                 content: row.try_get(11)?,
                 author: {
                     let id = row.try_get(1)?;
@@ -123,7 +123,7 @@ pub async fn get_many(
                                 bio: None,
                                 email: None,
                                 preferences: None,
-                                avatar: encrypt_snowflake_opt(&state, row.try_get(13)?),
+                                avatar: encrypt_snowflake_opt(&state, row.try_get(9)?),
                             };
 
                             last_user = Some(user.clone());
@@ -141,17 +141,17 @@ pub async fn get_many(
                         presence: None,
                     }),
                 },
-                thread_id: None,
+                thread_id: row.try_get(10)?,
                 user_mentions: Vec::new(),
                 role_mentions: Vec::new(),
                 room_mentions: Vec::new(),
                 attachments: {
                     let mut attachments = Vec::new();
 
-                    let meta: Option<Json<Vec<schema::AggAttachmentsMeta>>> = row.try_get(14)?;
+                    let meta: Option<Json<Vec<schema::AggAttachmentsMeta>>> = row.try_get(15)?;
 
                     if let Some(Json(meta)) = meta {
-                        let previews: Vec<Option<&[u8]>> = row.try_get(15)?;
+                        let previews: Vec<Option<&[u8]>> = row.try_get(16)?;
 
                         if meta.len() != previews.len() {
                             return Err(Error::InternalErrorStatic("Meta != Previews length"));
@@ -178,21 +178,17 @@ pub async fn get_many(
 
                     attachments
                 },
-                reactions: {
-                    let reactions: Option<Json<Vec<Reaction>>> = row.try_get(16)?;
-
-                    match reactions {
-                        Some(reactions) => reactions.0,
-                        None => Vec::new(),
-                    }
+                reactions: match row.try_get(17)? {
+                    Some(Json(reactions)) => reactions,
+                    None => Vec::new(),
                 },
                 embeds: Vec::new(),
             };
 
-            let mention_kinds: Option<Vec<i32>> = row.try_get(8)?;
+            let mention_kinds: Option<Vec<i32>> = row.try_get(14)?;
             if let Some(mention_kinds) = mention_kinds {
                 // lazily parse ids
-                let mention_ids: Vec<Snowflake> = row.try_get(7)?;
+                let mention_ids: Vec<Snowflake> = row.try_get(13)?;
 
                 if mention_ids.len() != mention_kinds.len() {
                     return Err(Error::InternalErrorStatic("Mismatched Mention aggregates!"));
@@ -274,21 +270,23 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
             /* 4*/ AggMessages::Username,
             /* 5*/ AggMessages::Discriminator,
             /* 6*/ AggMessages::UserFlags,
-            /* 7*/ AggMessages::MentionIds,
-            /* 8*/ AggMessages::MentionKinds,
-            /* 9*/ AggMessages::EditedAt,
-            /*10*/ AggMessages::MessageFlags,
+            /* 7*/ AggMessages::EditedAt,
+            /* 8*/ AggMessages::MessageFlags,
+            /* 9*/ AggMessages::AvatarId,
+            /*10*/ AggMessages::ThreadId,
             /*11*/ AggMessages::Content,
             /*12*/ AggMessages::RoleIds,
-            /*13*/ AggMessages::AvatarId,
-            /*14*/ AggMessages::AttachmentMeta,
-            /*15*/ AggMessages::AttachmentPreview,
+            /*13*/ AggMessages::MentionIds,
+            /*14*/ AggMessages::MentionKinds,
+            /*15*/ AggMessages::AttachmentMeta,
+            /*16*/ AggMessages::AttachmentPreview,
         ])
-        .col(/*16*/ TempReactions::Reactions)
+        .col(/*17*/ TempReactions::Reactions)
         .from(
             AggMessages::inner_join_table::<SelectedMessages>()
                 .on(AggMessages::MsgId.equals(SelectedMessages::Id))
                 .left_join(Lateral(TempReactions::as_query(
+                    // TODO: Move this into view
                     Query::select()
                         .expr(Reactions::MsgId.alias_to(TempReactions::MsgId))
                         .expr(

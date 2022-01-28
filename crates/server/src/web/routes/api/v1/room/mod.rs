@@ -5,13 +5,15 @@ use crate::web::{
     auth::{authorize, Authorization},
     routes::api::ApiError,
 };
+use crate::ServerState;
 
 pub mod get;
 pub mod messages;
-pub mod typing;
 pub mod patch;
+pub mod threads;
+pub mod typing;
 
-pub async fn room(mut route: Route<crate::ServerState>) -> Response {
+pub async fn room(mut route: Route<ServerState>) -> Response {
     let auth = match authorize(&route).await {
         Ok(auth) => auth,
         Err(e) => return ApiError::err(e).into_response(),
@@ -24,6 +26,7 @@ pub async fn room(mut route: Route<crate::ServerState>) -> Response {
             (&Method::POST, Exact("typing")) => typing::trigger_typing(route, auth, room_id).await,
 
             (_, Exact("messages")) => messages::messages(route, auth, room_id).await,
+            (_, Exact("threads")) => threads::threads(route, auth, room_id).await,
             _ => ApiError::not_found().into_response(),
         },
         _ => ApiError::bad_request().into_response(),

@@ -54,6 +54,10 @@ pub mod room {
         pub mod get_many;
         pub mod get_one;
     }
+
+    pub mod threads {
+        pub mod get;
+    }
 }
 
 pub mod invite {

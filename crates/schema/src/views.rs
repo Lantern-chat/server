@@ -16,6 +16,7 @@ thorn::tables! {
         Discriminator: Users::Discriminator,
         UserFlags: Users::Flags,
         AvatarId: UserAvatars::FileId,
+        ThreadId: Threads::Id,
         MentionKinds: AggMentions::Kinds,
         MentionIds: AggMentions::Ids,
         EditedAt: Messages::EditedAt,

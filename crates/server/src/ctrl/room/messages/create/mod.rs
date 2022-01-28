@@ -354,7 +354,7 @@ pub async fn create_message_full(
             .query_one_cached_typed(|| super::get_one::get_one_without_perms(), &[&room_id, &msg_id])
             .await?;
 
-        super::get_one::parse_msg(&state, room_id, msg_id, row)
+        super::get_one::parse_msg(&state, &row)
     };
 
     let (_, _, msg) = tokio::try_join!(msg_future, attachment_future, get_message_future)?;
