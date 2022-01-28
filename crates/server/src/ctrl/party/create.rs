@@ -114,7 +114,7 @@ fn insert_party() -> impl AnyQuery {
     Query::insert()
         .into::<Party>()
         .cols(&[Party::Id, Party::Name, Party::Description, Party::OwnerId])
-        .values(vec![
+        .values([
             Var::of(Party::Id),
             Var::of(Party::Name),
             Var::of(Party::Description),
@@ -137,7 +137,7 @@ fn insert_member() -> impl AnyQuery {
     Query::insert()
         .into::<PartyMember>()
         .cols(&[PartyMember::PartyId, PartyMember::UserId, PartyMember::Position])
-        .values(vec![
+        .values([
             Var::of(Party::Id),
             Var::of(Users::Id),
             Var::of(PartyMember::Position),
@@ -151,7 +151,7 @@ fn insert_role() -> impl AnyQuery {
     Query::insert()
         .into::<Roles>()
         .cols(&[Roles::Name, Roles::Id, Roles::PartyId, Roles::Permissions])
-        .values(vec![
+        .values([
             Var::of(Roles::Name),
             Var::of(Roles::Id),
             Var::of(Roles::PartyId),
@@ -171,7 +171,7 @@ fn insert_room() -> impl AnyQuery {
             Rooms::Position,
             Rooms::Flags,
         ])
-        .values(vec![
+        .values([
             Var::of(Rooms::Id),
             Var::of(Party::Id),
             Var::of(Rooms::Name),

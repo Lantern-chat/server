@@ -234,7 +234,7 @@ fn query() -> impl AnyQuery {
                 Messages::RoomId,
                 Messages::Content,
             ])
-            .values(vec![msg_id_var, user_id_var, room_id_var, content_var])
+            .values([msg_id_var, user_id_var, room_id_var, content_var])
             .returning(Messages::UserId.alias_to(AggMsg::UserId))
             .returning(Messages::RoomId.alias_to(AggMsg::RoomId)),
     );
@@ -295,7 +295,7 @@ pub async fn create_message_full(
                         Messages::RoomId,
                         Messages::Content,
                     ])
-                    .values(vec![
+                    .values([
                         Var::of(Messages::Id),
                         Var::of(Messages::UserId),
                         Var::of(Messages::RoomId),
@@ -310,6 +310,10 @@ pub async fn create_message_full(
     };
 
     let attachment_future = async {
+        if form.attachments.is_empty() {
+            return Ok(());
+        }
+
         t.execute_cached_typed(
             || {
                 use schema::*;

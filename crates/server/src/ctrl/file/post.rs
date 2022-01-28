@@ -109,7 +109,7 @@ pub async fn do_post_file(
                     Files::Mime,
                     Files::Preview,
                 ])
-                .values(vec![
+                .values([
                     Var::of(Files::Id),
                     Var::of(Files::UserId),
                     Var::of(Files::Nonce),

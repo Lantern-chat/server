@@ -147,7 +147,7 @@ pub async fn do_login(
                     Sessions::Expires,
                     Sessions::Addr,
                 ])
-                .values(vec![
+                .values([
                     Var::of(Sessions::Token),
                     Var::of(Sessions::UserId),
                     Var::of(Sessions::Expires),
