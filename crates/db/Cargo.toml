@@ -8,7 +8,7 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-thorn = { git = "https://github.com/novacrazy/thorn" }
+thorn = { git = "https://github.com/Lantern-chat/thorn" }
 
 tokio = { version = "1.4", features = ["sync", "rt", "fs", "macros"] }
 tokio-postgres = { version = "0.7.0", features = ["with-uuid-0_8", "with-serde_json-1", "with-time-0_3"] }

@@ -23,7 +23,7 @@ smol_str = { version = "0.1", features = ["serde", "pg"] }
 
 ftl = { git = "https://github.com/Lantern-chat/ftl" }
 mime_db = { git = "https://github.com/Lantern-chat/mime_db" }
-thorn = { git = "https://github.com/novacrazy/thorn" }
+thorn = { git = "https://github.com/Lantern-chat/thorn" }
 async-chashmap = { git = "https://github.com/novacrazy/async-chashmap" }
 
 timestamp = { package = "iso8061-timestamp", version = "0.1", features = ["pg"] }

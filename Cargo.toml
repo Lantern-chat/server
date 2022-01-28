@@ -1,7 +1,8 @@
 [patch.crates-io]
-headers = { git = "https://github.com/novacrazy/headers" }
-smol_str = { git = "https://github.com/novacrazy/smol_str" }
-# postgres-inet = { git = "https://github.com/novacrazy/postgres-inet" }
+headers = { git = "https://github.com/Lantern-chat/headers" }
+smol_str = { git = "https://github.com/Lantern-chat/smol_str" }
+# postgres-inet = { git = "https://github.com/Lantern-chat/postgres-inet" }
+
 
 [workspace]
 members = ["crates/*"]
