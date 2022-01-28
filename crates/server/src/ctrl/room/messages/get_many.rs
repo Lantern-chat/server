@@ -26,6 +26,9 @@ pub struct GetManyMessagesForm {
 
     #[serde(default = "default_limit")]
     limit: u8,
+
+    #[serde(default)]
+    thread: Option<Snowflake>,
 }
 
 #[rustfmt::skip]
@@ -36,6 +39,7 @@ impl Default for GetManyMessagesForm {
         GetManyMessagesForm {
             query: None,
             limit: default_limit(),
+            thread: None,
         }
     }
 }
@@ -65,7 +69,13 @@ pub async fn get_many(
     };
 
     let limit = 100.min(form.limit as i16);
-    let params: &[&(dyn ToSql + Sync)] = &[&room_id as _, &msg_id as _, &limit as _, &auth.user_id as _];
+    let params: &[&(dyn ToSql + Sync)] = &[
+        &room_id as _,
+        &msg_id as _,
+        &limit as _,
+        &auth.user_id as _,
+        &form.thread as _,
+    ];
 
     let query = if had_perms {
         use MessageSearch::*;
@@ -226,6 +236,7 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
     let msg_id_var = Var::at(Messages::Id, 2);
     let limit_var = Var::at(Type::INT2, 3);
     let user_id_var = Var::at(Users::Id, 4);
+    let thread_id_var = Var::at(Threads::Id, 5);
 
     tables! {
         struct SelectedMessages {
@@ -247,6 +258,12 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
             Messages::Flags
                 .bit_and(Literal::Int2(MessageFlags::DELETED.bits()))
                 .equals(Literal::Int2(0)),
+        )
+        .and_where(
+            thread_id_var
+                .clone()
+                .is_null()
+                .or(Messages::ThreadId.equals(thread_id_var)),
         )
         .limit(limit_var.clone());
 
@@ -319,12 +336,7 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
             }
         }
 
-        const READ_MESSAGE: i64 = Permission {
-            party: PartyPermissions::empty(),
-            room: RoomPermissions::READ_MESSAGES,
-            stream: StreamPermissions::empty(),
-        }
-        .pack() as i64;
+        const READ_MESSAGES: i64 = Permission::PACKED_READ_MESSAGES as i64;
 
         query = query
             .with(AggPerm::as_query(
@@ -336,8 +348,8 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
             ))
             .and_where(
                 AggPerm::Perms
-                    .bit_and(Literal::Int8(READ_MESSAGE))
-                    .equals(Literal::Int8(READ_MESSAGE)),
+                    .bit_and(Literal::Int8(READ_MESSAGES))
+                    .equals(Literal::Int8(READ_MESSAGES)),
             )
     }
 
