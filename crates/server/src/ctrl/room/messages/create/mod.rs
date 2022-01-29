@@ -285,7 +285,6 @@ pub async fn create_message_full(
     let t = db.transaction().await?;
 
     let msg_future = async {
-        // space case that requires looking up thread id
         if let Some(parent_msg_id) = form.parent {
             let thread_id = Snowflake::now();
 
@@ -294,31 +293,15 @@ pub async fn create_message_full(
                     use schema::*;
                     use thorn::*;
 
-                    tables! {
-                        struct AggThread {
-                            Id: Threads::Id,
-                        }
-                    }
-
                     let msg_id_var = Var::at(Messages::Id, 1);
                     let user_id_var = Var::at(Users::Id, 2);
                     let room_id_var = Var::at(Rooms::Id, 3);
                     let parent_msg_id_var = Var::at(Messages::Id, 4);
                     let thread_id_var = Var::at(Threads::Id, 5);
-                    let content_var = Var::at(Messages::Content, 6);
-
-                    // TODO: If the desired parent is itself in a thread, use that message's parent instead
-                    let try_insert_thread = AggThread::as_query(
-                        Query::insert()
-                            .into::<Threads>()
-                            .cols(&[Threads::Id, Threads::ParentId])
-                            .values([thread_id_var, parent_msg_id_var.clone()])
-                            .on_conflict([Threads::ParentId], DoNothing)
-                            .returning(Threads::Id),
-                    );
+                    let new_thread_flags_var = Var::at(Threads::Flags, 6);
+                    let content_var = Var::at(Messages::Content, 7);
 
                     Query::insert()
-                        .with(try_insert_thread.exclude())
                         .into::<Messages>()
                         .cols(&[
                             Messages::ThreadId,
@@ -327,17 +310,15 @@ pub async fn create_message_full(
                             Messages::RoomId,
                             Messages::Content,
                         ])
-                        .value(Builtin::coalesce((
+                        .value(
                             Query::select()
-                                .col(AggThread::Id)
-                                .from_table::<AggThread>()
+                                .expr(Call::custom("lantern.create_thread").args((
+                                    thread_id_var,
+                                    parent_msg_id_var,
+                                    new_thread_flags_var,
+                                )))
                                 .as_value(),
-                            Query::select()
-                                .col(Threads::Id)
-                                .from_table::<Threads>()
-                                .and_where(Threads::ParentId.equals(parent_msg_id_var))
-                                .as_value(),
-                        )))
+                        )
                         .values([msg_id_var, user_id_var, room_id_var, content_var])
                 },
                 &[
@@ -346,37 +327,36 @@ pub async fn create_message_full(
                     &room_id,
                     &parent_msg_id,
                     &thread_id,
+                    &ThreadFlags::empty().bits(), // TODO
                     &trimmed,
                 ],
             )
             .await?;
+        } else {
+            t.execute_cached_typed(
+                || {
+                    use schema::*;
+                    use thorn::*;
 
-            return Ok(());
+                    Query::insert()
+                        .into::<Messages>()
+                        .cols(&[
+                            Messages::Id,
+                            Messages::UserId,
+                            Messages::RoomId,
+                            Messages::Content,
+                        ])
+                        .values([
+                            Var::of(Messages::Id),
+                            Var::of(Messages::UserId),
+                            Var::of(Messages::RoomId),
+                            Var::of(Messages::Content),
+                        ])
+                },
+                &[&msg_id, &auth.user_id, &room_id, &trimmed],
+            )
+            .await?;
         }
-
-        t.execute_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
-
-                Query::insert()
-                    .into::<Messages>()
-                    .cols(&[
-                        Messages::Id,
-                        Messages::UserId,
-                        Messages::RoomId,
-                        Messages::Content,
-                    ])
-                    .values([
-                        Var::of(Messages::Id),
-                        Var::of(Messages::UserId),
-                        Var::of(Messages::RoomId),
-                        Var::of(Messages::Content),
-                    ])
-            },
-            &[&msg_id, &auth.user_id, &room_id, &trimmed],
-        )
-        .await?;
 
         Ok(())
     };
@@ -397,13 +377,13 @@ pub async fn create_message_full(
                     }
                 }
 
-                let msg_id = Var::at(Messages::Id, 1);
-                let att_id = Var::at(SNOWFLAKE_ARRAY, 2);
+                let msg_id_var = Var::at(Messages::Id, 1);
+                let att_id_var = Var::at(SNOWFLAKE_ARRAY, 2);
 
                 Query::with()
                     .with(
                         AggIds::as_query(
-                            Query::select().expr(Call::custom("UNNEST").arg(att_id).alias_to(AggIds::Id)),
+                            Query::select().expr(Call::custom("UNNEST").arg(att_id_var).alias_to(AggIds::Id)),
                         )
                         .exclude(),
                     )
@@ -413,7 +393,7 @@ pub async fn create_message_full(
                     .query(
                         Query::select()
                             .col(AggIds::Id)
-                            .expr(msg_id)
+                            .expr(msg_id_var)
                             .from_table::<AggIds>()
                             .as_value(),
                     )
