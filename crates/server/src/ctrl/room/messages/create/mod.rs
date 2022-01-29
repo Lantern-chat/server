@@ -6,6 +6,7 @@ use smol_str::SmolStr;
 
 use crate::{
     ctrl::{auth::Authorization, perm::get_cached_room_permissions, Error, SearchMode},
+    permission_cache::PermMute,
     ServerState,
 };
 
@@ -13,6 +14,7 @@ use sdk::models::*;
 
 pub mod embed;
 pub mod slash;
+pub mod trim;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateMessageForm {
@@ -25,6 +27,7 @@ pub struct CreateMessageForm {
     parent: Option<Snowflake>,
 }
 
+/// Returns an `Option<Message>` because slash-commands may not actually create a message
 pub async fn create_message(
     state: ServerState,
     auth: Authorization,
@@ -33,70 +36,17 @@ pub async fn create_message(
 ) -> Result<Option<Message>, Error> {
     // fast-path for if the perm_cache does contain a value, otherwise defer until content is checked
     let perm = match state.perm_cache.get(auth.user_id, room_id).await {
-        Some(perm) => {
-            if !perm.perm.room.contains(RoomPermissions::SEND_MESSAGES) {
+        Some(PermMute { perm, .. }) => {
+            if !perm.room.contains(RoomPermissions::SEND_MESSAGES) {
                 return Err(Error::Unauthorized);
             }
 
-            Some(perm.perm)
+            Some(perm)
         }
         None => None,
     };
 
-    let mut trimmed_content = Cow::Borrowed(form.content.trim());
-
-    // if empty but not containing attachments
-    if trimmed_content.is_empty() && form.attachments.is_empty() {
-        return Err(Error::BadRequest);
-    }
-
-    if !trimmed_content.is_empty() {
-        let mut trimming = false;
-        let mut new_content = String::new();
-        let mut count = 0;
-
-        // TODO: Don't strip newlines inside code blocks?
-        for (idx, &byte) in trimmed_content.as_bytes().iter().enumerate() {
-            // if we encounted a newline
-            if byte == b'\n' {
-                count += 1; // count up
-
-                // if over 2 consecutive newlines, begin trimming
-                if count > 2 {
-                    // if not already trimming, push everything tested up until this point
-                    // notably not including the third newline
-                    if !trimming {
-                        trimming = true;
-                        new_content.push_str(&trimmed_content[..idx]);
-                    }
-
-                    // skip any additional newlines
-                    continue;
-                }
-            } else {
-                // reset count if newline streak broken
-                count = 0;
-            }
-
-            // if trimming, push the new byte
-            if trimming {
-                unsafe { new_content.as_mut_vec().push(byte) };
-            }
-        }
-
-        if trimming {
-            trimmed_content = Cow::Owned(new_content);
-        }
-
-        let newlines = bytecount::count(trimmed_content.as_bytes(), b'\n');
-
-        let too_large = !state.config.message_len.contains(&trimmed_content.len());
-        let too_long = newlines > state.config.max_newlines;
-
-        if too_large || too_long {
-            return Err(Error::BadRequest);
-        }
-    }
+    let trimmed_content = trim::trim_message(&state, &form)?;
 
     // since acquiring the database connection may be expensive,
     // defer it until we need it, such as if the permissions cache didn't have a value
@@ -144,228 +94,99 @@ pub async fn create_message(
         None => state.db.write.get().await?,
     };
 
-    let res = if !form.attachments.is_empty() || form.parent.is_some() {
-        create_message_full(db, state, auth, room_id, msg_id, &form, &modified_content)
-            .boxed()
-            .await
-    } else {
-        do_send_simple_message(db, state, auth.user_id, room_id, msg_id, &modified_content).await
-    };
+    let res = insert_message(db, state, auth, room_id, msg_id, &form, &modified_content)
+        .boxed()
+        .await;
 
     res.map(Option::Some)
 }
 
-pub async fn do_send_simple_message(
-    db: db::pool::Object,
-    state: ServerState,
-    user_id: Snowflake,
-    room_id: Snowflake,
-    msg_id: Snowflake,
-    content: &str,
-) -> Result<Message, Error> {
-    let row = db
-        .query_opt_cached_typed(|| query(), &[&user_id, &room_id, &msg_id, &content])
-        .await?;
-
-    let row = match row {
-        None => return Err(Error::NotFound),
-        Some(row) => row,
-    };
-
-    let party_id: Option<Snowflake> = row.try_get(0)?;
-    let nickname: Option<SmolStr> = row.try_get(1)?;
-    let roles = row.try_get(2)?;
-
-    Ok(Message {
-        id: msg_id,
-        party_id,
-        room_id,
-        member: nickname.map(|nick| PartyMember {
-            user: None,
-            nick: Some(nick),
-            roles,
-            presence: None,
-        }),
-        author: User {
-            id: user_id,
-            username: row.try_get(3)?,
-            discriminator: row.try_get(4)?,
-            flags: UserFlags::from_bits_truncate(row.try_get(5)?).publicize(),
-            avatar: None,
-            status: row.try_get(6)?,
-            bio: row.try_get(7)?,
-            email: None,
-            preferences: None,
-        },
-        thread_id: None,
-        created_at: msg_id.timestamp(),
-        edited_at: None,
-        flags: MessageFlags::empty(),
-        content: content.into(),
-        user_mentions: Vec::new(),
-        role_mentions: Vec::new(),
-        room_mentions: Vec::new(),
-        reactions: Vec::new(),
-        attachments: Vec::new(),
-        embeds: Vec::new(),
-    })
-}
-
-use thorn::*;
-
-fn query() -> impl AnyQuery {
-    use schema::*;
-
-    tables! {
-        struct AggMsg {
-            UserId: Users::Id,
-            RoomId: Rooms::Id,
-        }
-    }
-
-    let user_id_var = Var::at(Users::Id, 1);
-    let room_id_var = Var::at(Rooms::Id, 2);
-    let msg_id_var = Var::at(Messages::Id, 3);
-    let content_var = Var::at(Messages::Content, 4);
-
-    let insert = AggMsg::as_query(
-        Query::insert()
-            .into::<Messages>()
-            .cols(&[
-                Messages::Id,
-                Messages::UserId,
-                Messages::RoomId,
-                Messages::Content,
-            ])
-            .values([msg_id_var, user_id_var, room_id_var, content_var])
-            .returning(Messages::UserId.alias_to(AggMsg::UserId))
-            .returning(Messages::RoomId.alias_to(AggMsg::RoomId)),
-    );
-
-    let roles = Query::select()
-        .expr(Builtin::array_agg(RoleMembers::RoleId))
-        .from(RoleMembers::inner_join_table::<Roles>().on(RoleMembers::RoleId.equals(Roles::Id)))
-        .and_where(RoleMembers::UserId.equals(AggMsg::UserId))
-        .and_where(Roles::PartyId.equals(Party::Id));
-
-    Query::with()
-        .with(insert)
-        .select()
-        .col(Party::Id)
-        .col(PartyMember::Nickname)
-        .expr(roles.as_value())
-        .cols(&[
-            Users::Username,
-            Users::Discriminator,
-            Users::Flags,
-            Users::CustomStatus,
-            Users::Biography,
-        ])
-        .from_table::<Users>()
-        .from(
-            Rooms::left_join_table::<Party>()
-                .on(Party::Id.equals(Rooms::PartyId))
-                .left_join_table::<PartyMember>()
-                .on(PartyMember::PartyId.equals(Party::Id)),
-        )
-        .and_where(Rooms::Id.equals(AggMsg::RoomId))
-        .and_where(Users::Id.equals(AggMsg::UserId))
-        .and_where(PartyMember::UserId.equals(AggMsg::UserId))
-}
-
-pub async fn create_message_full(
+pub(crate) async fn insert_message(
     mut db: db::pool::Object,
     state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,
     form: &CreateMessageForm,
-    trimmed: &str,
+    content: &str,
 ) -> Result<Message, Error> {
+    // TODO: Determine if repeatable-read is needed?
     let t = db.transaction().await?;
 
-    let msg_future = async {
-        if let Some(parent_msg_id) = form.parent {
-            let thread_id = Snowflake::now();
+    if let Some(parent_msg_id) = form.parent {
+        let thread_id = Snowflake::now();
 
-            t.execute_cached_typed(
-                || {
-                    use schema::*;
-                    use thorn::*;
+        t.execute_cached_typed(
+            || {
+                use schema::*;
+                use thorn::*;
 
-                    let msg_id_var = Var::at(Messages::Id, 1);
-                    let user_id_var = Var::at(Users::Id, 2);
-                    let room_id_var = Var::at(Rooms::Id, 3);
-                    let parent_msg_id_var = Var::at(Messages::Id, 4);
-                    let thread_id_var = Var::at(Threads::Id, 5);
-                    let new_thread_flags_var = Var::at(Threads::Flags, 6);
-                    let content_var = Var::at(Messages::Content, 7);
+                let msg_id_var = Var::at(Messages::Id, 1);
+                let user_id_var = Var::at(Users::Id, 2);
+                let room_id_var = Var::at(Rooms::Id, 3);
+                let parent_msg_id_var = Var::at(Messages::Id, 4);
+                let thread_id_var = Var::at(Threads::Id, 5);
+                let new_thread_flags_var = Var::at(Threads::Flags, 6);
+                let content_var = Var::at(Messages::Content, 7);
 
-                    Query::insert()
-                        .into::<Messages>()
-                        .cols(&[
-                            Messages::ThreadId,
-                            Messages::Id,
-                            Messages::UserId,
-                            Messages::RoomId,
-                            Messages::Content,
-                        ])
-                        .value(
-                            Query::select()
-                                .expr(Call::custom("lantern.create_thread").args((
-                                    thread_id_var,
-                                    parent_msg_id_var,
-                                    new_thread_flags_var,
-                                )))
-                                .as_value(),
-                        )
-                        .values([msg_id_var, user_id_var, room_id_var, content_var])
-                },
-                &[
-                    &msg_id,
-                    &auth.user_id,
-                    &room_id,
-                    &parent_msg_id,
-                    &thread_id,
-                    &ThreadFlags::empty().bits(), // TODO
-                    &trimmed,
-                ],
-            )
-            .await?;
-        } else {
-            t.execute_cached_typed(
-                || {
-                    use schema::*;
-                    use thorn::*;
+                Query::insert()
+                    .into::<Messages>()
+                    .cols(&[
+                        Messages::ThreadId,
+                        Messages::Id,
+                        Messages::UserId,
+                        Messages::RoomId,
+                        Messages::Content,
+                    ])
+                    .value(
+                        Query::select()
+                            .expr(Call::custom("lantern.create_thread").args((
+                                thread_id_var,
+                                parent_msg_id_var,
+                                new_thread_flags_var,
+                            )))
+                            .as_value(),
+                    )
+                    .values([msg_id_var, user_id_var, room_id_var, content_var])
+            },
+            &[
+                &msg_id,
+                &auth.user_id,
+                &room_id,
+                &parent_msg_id,
+                &thread_id,
+                &ThreadFlags::empty().bits(), // TODO
+                &content,
+            ],
+        )
+        .await?;
+    } else {
+        t.execute_cached_typed(
+            || {
+                use schema::*;
+                use thorn::*;
 
-                    Query::insert()
-                        .into::<Messages>()
-                        .cols(&[
-                            Messages::Id,
-                            Messages::UserId,
-                            Messages::RoomId,
-                            Messages::Content,
-                        ])
-                        .values([
-                            Var::of(Messages::Id),
-                            Var::of(Messages::UserId),
-                            Var::of(Messages::RoomId),
-                            Var::of(Messages::Content),
-                        ])
-                },
-                &[&msg_id, &auth.user_id, &room_id, &trimmed],
-            )
-            .await?;
-        }
+                Query::insert()
+                    .into::<Messages>()
+                    .cols(&[
+                        Messages::Id,
+                        Messages::UserId,
+                        Messages::RoomId,
+                        Messages::Content,
+                    ])
+                    .values([
+                        Var::of(Messages::Id),
+                        Var::of(Messages::UserId),
+                        Var::of(Messages::RoomId),
+                        Var::of(Messages::Content),
+                    ])
+            },
+            &[&msg_id, &auth.user_id, &room_id, &content],
+        )
+        .await?;
+    }
 
-        Ok(())
-    };
-
-    let attachment_future = async {
-        if form.attachments.is_empty() {
-            return Ok(());
-        }
-
+    if !form.attachments.is_empty() {
         t.execute_cached_typed(
             || {
                 use schema::*;
@@ -401,19 +222,15 @@ pub async fn create_message_full(
             &[&msg_id, &form.attachments],
         )
         .await?;
+    }
 
-        Ok(())
-    };
-
-    let get_message_future = async {
+    let msg = {
         let row = t
             .query_one_cached_typed(|| super::get_one::get_one_without_perms(), &[&room_id, &msg_id])
             .await?;
 
-        super::get_one::parse_msg(&state, &row)
+        super::get_one::parse_msg(&state, &row)?
     };
-
-    let (_, _, msg) = tokio::try_join!(msg_future, attachment_future, get_message_future)?;
 
     t.commit().await?;
 
