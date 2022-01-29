@@ -40,7 +40,7 @@ BEGIN
 
     -- edge case, replying to a reply to a thread, use the ancestor thread_id
     SELECT thread_id INTO _existing_thread_id FROM lantern.messages WHERE messages.id = _parent_id;
-    IF FOUND THEN
+    IF _existing_thread_id IS NOT NULL THEN
         RETURN _existing_thread_id;
     END IF;
 
