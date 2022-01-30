@@ -38,14 +38,17 @@ ALTER TABLE lantern.messages ADD CONSTRAINT user_fk FOREIGN KEY (user_id)
 
 -- Message attachments association map
 CREATE TABLE lantern.attachments (
-    message_id  bigint NOT NULL,
-    file_id     bigint NOT NULL,
+    message_id  bigint      NOT NULL,
+    file_id     bigint      NOT NULL,
+
+    -- Flags are nullable to save 2-bytes per row in *most* cases
+    flags       smallint,
 
     CONSTRAINT attachment_pk PRIMARY KEY (message_id, file_id)
 );
 ALTER TABLE lantern.attachments OWNER TO postgres;
 
-CREATE INDEX attachment_msg_idx ON lantern.attachments USING btree(message_id);
+CREATE INDEX attachment_msg_idx ON lantern.attachments USING btree(message_id); -- INCLUDE(flags) ?
 CREATE UNIQUE INDEX attachment_file_idx ON lantern.attachments USING btree(file_id);
 
 ALTER TABLE lantern.attachments ADD CONSTRAINT message_fk FOREIGN KEY (message_id)

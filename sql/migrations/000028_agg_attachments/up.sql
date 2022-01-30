@@ -18,6 +18,8 @@ SELECT
     array_agg(files.preview) AS preview
 FROM
     lantern.attachments INNER JOIN lantern.files ON files.id = attachments.file_id
+WHERE
+    attachments.flags & 1 = 0 -- where not orphaned
 GROUP BY
     msg_id
 ;

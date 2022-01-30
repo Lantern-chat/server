@@ -250,6 +250,7 @@ thorn::tables! {
     pub struct Attachments in Lantern {
         MessageId: Messages::Id,
         FileId: Files::Id,
+        Flags: Type::INT2,
     }
 
     pub struct Files in Lantern {
