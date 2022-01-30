@@ -1,11 +1,11 @@
 CREATE TABLE lantern.emotes (
-    id              bigint          NOT NULL,
+    id              bigint      NOT NULL,
     party_id        bigint,
-    file_id         bigint          NOT NULL,
-    aspect_ratio    real            NOT NULL,
-    flags           smallint        NOT NULL,
-    name            varchar(64)     NOT NULL,
-    alt             varchar(64),
+    file_id         bigint      NOT NULL,
+    aspect_ratio    real        NOT NULL,
+    flags           smallint    NOT NULL,
+    name            text        NOT NULL,
+    alt             text,
 
     CONSTRAINT emotes_pk PRIMARY KEY (id)
 );

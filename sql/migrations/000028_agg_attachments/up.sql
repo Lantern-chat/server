@@ -19,7 +19,7 @@ SELECT
 FROM
     lantern.attachments INNER JOIN lantern.files ON files.id = attachments.file_id
 WHERE
-    attachments.flags & 1 = 0 -- where not orphaned
+    attachments.flags & 1 = 0 IS NOT FALSE -- where not orphaned (flags may be null)
 GROUP BY
     msg_id
 ;

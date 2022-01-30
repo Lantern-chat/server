@@ -1,13 +1,13 @@
 CREATE TABLE lantern.rooms (
-    id          bigint              NOT NULL,
+    id          bigint      NOT NULL,
     party_id    bigint,
     avatar_id   bigint,
     parent_id   bigint,
     deleted_at  timestamp,
-    position    smallint            NOT NULL,
-    flags       smallint            NOT NULL    DEFAULT 0,
-    name        varchar(128)        NOT NULL,
-    topic       varchar(2048),
+    position    smallint    NOT NULL,
+    flags       smallint    NOT NULL    DEFAULT 0,
+    name        text        NOT NULL,
+    topic       text,
 
     CONSTRAINT room_pk PRIMARY KEY (id)
 );

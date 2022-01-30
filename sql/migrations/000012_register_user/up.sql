@@ -1,6 +1,6 @@
 CREATE OR REPLACE PROCEDURE lantern.register_user(
    _id bigint,
-   _username varchar(64),
+   _username text,
    _email text,
    _passhash text,
    _dob date
@@ -32,7 +32,7 @@ $$;
 
 CREATE OR REPLACE PROCEDURE lantern.update_user(
     _id bigint,
-    _username varchar(64),
+    _username text,
     _email text,
     _passhash text
 )

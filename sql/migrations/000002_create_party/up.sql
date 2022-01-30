@@ -3,13 +3,13 @@
 --
 
 CREATE TABLE lantern.party (
-    id          bigint          NOT NULL,
+    id          bigint      NOT NULL,
     avatar_id   bigint,
-    owner_id    bigint          NOT NULL,
+    owner_id    bigint      NOT NULL,
     -- packed party flags
-    flags       bigint          NOT NULL DEFAULT 0,
+    flags       bigint      NOT NULL DEFAULT 0,
     deleted_at  timestamp,
-    name        varchar(256)    NOT NULL,
+    name        text        NOT NULL,
     description text,
 
     CONSTRAINT party_pk PRIMARY KEY (id)
@@ -36,8 +36,8 @@ CREATE TABLE lantern.party_member (
     position    smallint    NOT NULL    DEFAULT 0,
 
     -- same as for user, but per-party
-    nickname        varchar(256),
-    custom_status   varchar(128),
+    nickname        text,
+    custom_status   text,
 
     -- Composite primary key
     CONSTRAINT party_member_pk PRIMARY KEY (party_id, user_id)

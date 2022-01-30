@@ -2,8 +2,8 @@ CREATE TABLE lantern.friendlist (
     user_a_id   bigint      NOT NULL,
     user_b_id   bigint      NOT NULL,
     flags       smallint    NOT NULL DEFAULT 0,
-    note_a      varchar(512),
-    note_b      varchar(512)
+    note_a      text,
+    note_b      text
 );
 ALTER TABLE lantern.friendlist OWNER TO postgres;
 

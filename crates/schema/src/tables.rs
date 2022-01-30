@@ -58,18 +58,18 @@ thorn::tables! {
         Dob: Type::DATE,
         Flags: Type::INT4,
         Discriminator: UINT2,
-        Username: Type::VARCHAR,
+        Username: Type::TEXT,
         Email: Type::TEXT,
         Passhash: Type::TEXT,
-        CustomStatus: Type::VARCHAR,
-        Biography: Type::VARCHAR,
+        CustomStatus: Type::TEXT,
+        Biography: Type::TEXT,
         Preferences: Type::JSONB,
         MfaSecret: Type::BYTEA,
         MfaBackup: Type::BYTEA,
     }
 
     pub struct UserFreelist in Lantern {
-        Username: Type::VARCHAR,
+        Username: Type::TEXT,
         Discriminator: UINT2,
     }
 
@@ -106,8 +106,8 @@ thorn::tables! {
         UserAId: Users::Id,
         UserBId: Users::Id,
         Flags: Type::INT2,
-        NoteA: Type::VARCHAR,
-        NoteB: Type::VARCHAR
+        NoteA: Type::TEXT,
+        NoteB: Type::TEXT
     }
 
     pub struct UserBlocks in Lantern {
@@ -122,7 +122,7 @@ thorn::tables! {
         OwnerId: Users::Id,
         Flags: Type::INT8,
         DeletedAt: Type::TIMESTAMP,
-        Name: Type::VARCHAR,
+        Name: Type::TEXT,
         Description: Type::TEXT,
     }
 
@@ -133,8 +133,8 @@ thorn::tables! {
         JoinedAt: Type::TIMESTAMP,
         Flags: Type::INT2,
         Position: Type::INT2,
-        Nickname: Type::VARCHAR,
-        CustomStatus: Type::VARCHAR,
+        Nickname: Type::TEXT,
+        CustomStatus: Type::TEXT,
     }
 
     pub struct Subscriptions in Lantern {
@@ -153,7 +153,7 @@ thorn::tables! {
         Color: Type::INT4,
         Position: Type::INT2,
         Flags: Type::INT2,
-        Name: Type::VARCHAR,
+        Name: Type::TEXT,
     }
 
     pub struct RoleMembers in Lantern {
@@ -167,8 +167,8 @@ thorn::tables! {
         FileId: Files::Id,
         AspectRatio: Type::FLOAT4,
         Flags: Type::INT2,
-        Name: Type::VARCHAR,
-        Alt: Type::VARCHAR,
+        Name: Type::TEXT,
+        Alt: Type::TEXT,
     }
 
     pub struct Reactions in Lantern {
@@ -196,7 +196,7 @@ thorn::tables! {
         Position: Type::INT2,
         Flags: Type::INT2,
         Name: Type::TEXT,
-        Topic: Type::VARCHAR,
+        Topic: Type::TEXT,
     }
 
     pub struct Overwrites in Lantern {

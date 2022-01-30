@@ -7,13 +7,13 @@ CREATE TABLE lantern.users (
     -- 2-byte integer that can be displayed as 4 hex digits,
     -- actually stored as a 4-byte signed integer because Postgres doesn't support unsigned...
     discriminator   uint2               NOT NULL,
-    username        varchar(64)         NOT NULL,
+    username        text                NOT NULL,
     email           text                NOT NULL,
     passhash        text                NOT NULL,
     -- custom_status tracks the little blurb that appears on users
-    custom_status   varchar(128),
+    custom_status   text,
     -- biography is an extended user description on their profile
-    biography       varchar(4096),
+    biography       text,
 
     -- 2FA Secret key
     mfa_secret      bytea,
@@ -39,7 +39,7 @@ CREATE UNIQUE INDEX user_email_idx ON lantern.users
 
 
 CREATE TABLE lantern.user_freelist (
-    username        varchar(64) NOT NULL,
+    username        text        NOT NULL,
     discriminator   uint2       NOT NULL
 );
 ALTER TABLE lantern.user_freelist OWNER TO postgres;
