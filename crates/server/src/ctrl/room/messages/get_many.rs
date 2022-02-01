@@ -1,6 +1,7 @@
-use schema::{Snowflake, SnowflakeExt};
+use arrayvec::ArrayVec;
+use futures::{FutureExt, Stream, StreamExt};
 
-use futures::{Stream, StreamExt};
+use schema::{flags::AttachmentFlags, Snowflake, SnowflakeExt};
 use sdk::models::*;
 use thorn::pg::{Json, ToSql};
 
@@ -69,37 +70,36 @@ pub async fn get_many(
     };
 
     let limit = 100.min(form.limit as i16);
-    let params: &[&(dyn ToSql + Sync)] = &[
+    let mut params: ArrayVec<&(dyn ToSql + Sync), 5> = ArrayVec::from([
         &room_id as _,
         &msg_id as _,
         &limit as _,
         &auth.user_id as _,
         &form.thread as _,
-    ];
+    ]);
 
-    let query = if had_perms {
+    if form.thread.is_none() {
+        params.pop();
+    }
+
+    #[rustfmt::skip]
+    let query = {
         use MessageSearch::*;
         const NULL: Snowflake = Snowflake::null();
 
-        match form.query {
-            None | Some(MessageSearch::Before(_)) => {
-                db.prepare_cached_typed(|| query(Before(NULL), false)).await
-            }
-            Some(MessageSearch::After(_)) => db.prepare_cached_typed(|| query(After(NULL), false)).await,
-        }
-    } else {
-        use MessageSearch::*;
-        const NULL: Snowflake = Snowflake::null();
-
-        match form.query {
-            None | Some(MessageSearch::Before(_)) => {
-                db.prepare_cached_typed(|| query(Before(NULL), true)).await
-            }
-            Some(MessageSearch::After(_)) => db.prepare_cached_typed(|| query(After(NULL), true)).await,
+        match (had_perms, form.thread, form.query) {
+            (true,  None,    None | Some(MessageSearch::Before(_))) => db.prepare_cached_typed(|| query(Before(NULL), false, false)).boxed(),
+            (true,  None,           Some(MessageSearch::After(_)))  => db.prepare_cached_typed(|| query(After(NULL), false, false)).boxed(),
+            (true,  Some(_), None | Some(MessageSearch::Before(_))) => db.prepare_cached_typed(|| query(Before(NULL), false, true)).boxed(),
+            (true,  Some(_),        Some(MessageSearch::After(_)))  => db.prepare_cached_typed(|| query(After(NULL), false, true)).boxed(),
+            (false, None,    None | Some(MessageSearch::Before(_))) => db.prepare_cached_typed(|| query(Before(NULL), true, false)).boxed(),
+            (false, None,           Some(MessageSearch::After(_)))  => db.prepare_cached_typed(|| query(After(NULL), true, false)).boxed(),
+            (false, Some(_), None | Some(MessageSearch::Before(_))) => db.prepare_cached_typed(|| query(Before(NULL), true, true)).boxed(),
+            (false, Some(_),        Some(MessageSearch::After(_)))  => db.prepare_cached_typed(|| query(After(NULL), true, true)).boxed(),
         }
     };
 
-    let stream = db.query_stream(&query?, params).await?;
+    let stream = db.query_stream(&query.await?, &params).await?;
 
     // for many messages from the same user in a row, avoid duplicating work of encoding user things at the cost of cloning it
     let mut last_user: Option<User> = None;
@@ -172,6 +172,18 @@ pub async fn get_many(
                         for (meta, preview) in meta.into_iter().zip(previews) {
                             use blurhash::base85::ToZ85;
 
+                            // NOTE: This filtering is done in the application layer because it
+                            // produces sub-optimal query-plans in Postgres.
+                            //
+                            // Perhaps more intelligent indexes could solve that later.
+                            if let Some(raw_flags) = meta.flags {
+                                if AttachmentFlags::from_bits_truncate(raw_flags)
+                                    .contains(AttachmentFlags::ORPHANED)
+                                {
+                                    continue; // skip
+                                }
+                            }
+
                             attachments.push(Attachment {
                                 file: File {
                                     id: meta.id,
@@ -221,7 +233,7 @@ pub async fn get_many(
     }))
 }
 
-fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
+fn query(mode: MessageSearch, check_perms: bool, thread: bool) -> impl thorn::AnyQuery {
     use schema::*;
     use thorn::*;
 
@@ -259,13 +271,16 @@ fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
                 .bit_and(Literal::Int2(MessageFlags::DELETED.bits()))
                 .equals(Literal::Int2(0)),
         )
-        .and_where(
+        .limit(limit_var.clone());
+
+    if thread {
+        selected = selected.and_where(
             thread_id_var
                 .clone()
                 .is_null()
                 .or(Messages::ThreadId.equals(thread_id_var)),
-        )
-        .limit(limit_var.clone());
+        );
+    }
 
     selected = match mode {
         MessageSearch::After(_) => selected
