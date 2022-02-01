@@ -113,6 +113,9 @@ pub(crate) async fn insert_message(
     // TODO: Determine if repeatable-read is needed?
     let t = db.transaction().await?;
 
+    // allow it to be null
+    let content = if content.is_empty() { None } else { Some(content) };
+
     if let Some(parent_msg_id) = form.parent {
         let thread_id = Snowflake::now();
 
