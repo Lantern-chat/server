@@ -43,7 +43,7 @@ enum Align {
     Right,
 }
 
-pub fn process_slash(content: &str) -> Result<Option<Cow<str>>, Error> {
+pub fn process_slash(content: &str, active: bool) -> Result<Option<Cow<str>>, Error> {
     let unchanged = Ok(Some(Cow::Borrowed(content)));
 
     if !content.starts_with('/') {
@@ -79,6 +79,7 @@ pub fn process_slash(content: &str) -> Result<Option<Cow<str>>, Error> {
             Pattern::Disapprove => (Align::Right, "ಠ_ಠ"),
             Pattern::Me => return Ok(Some(format!("_{content}_").into())),
             Pattern::Spoiler => return Ok(Some(format!("||{content}||").into())),
+            // TODO: If it's a slash command that actually does something, only do it when `active` is true
         };
 
         // nothing to pad

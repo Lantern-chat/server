@@ -18,6 +18,7 @@ pub mod trim;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateMessageForm {
+    #[serde(default)]
     content: SmolStr,
 
     #[serde(default)]
@@ -46,7 +47,15 @@ pub async fn create_message(
         None => None,
     };
 
-    let trimmed_content = trim::trim_message(&state, &form)?;
+    let trimmed_content = form.content.trim();
+
+    // if empty but not containing attachments
+    if trimmed_content.is_empty() && form.attachments.is_empty() {
+        return Err(Error::BadRequest);
+    }
+
+    // do full trimming
+    let trimmed_content = trim::trim_message(&state, &trimmed_content)?;
 
     // since acquiring the database connection may be expensive,
     // defer it until we need it, such as if the permissions cache didn't have a value
@@ -77,7 +86,10 @@ pub async fn create_message(
     }
 
     // modify content before inserting it into the database
-    let modified_content = match slash::process_slash(&trimmed_content) {
+    let modified_content = match slash::process_slash(
+        &trimmed_content,
+        perm.room.contains(RoomPermissions::USE_SLASH_COMMANDS),
+    ) {
         Ok(Some(content)) => content,
         Ok(None) => return Ok(None),
         Err(e) => return Err(e),

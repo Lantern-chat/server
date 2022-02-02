@@ -7,7 +7,7 @@ use crate::{ctrl::auth::Authorization, web::routes::api::ApiError};
 pub mod delete;
 pub mod get_many;
 pub mod get_one;
-//pub mod patch;
+pub mod patch;
 pub mod post;
 
 pub async fn messages(
@@ -29,7 +29,7 @@ pub async fn messages(
                 &Method::GET => get_one::get_one(route, auth, room_id, msg_id).await,
 
                 // PATCH /api/v1/room/1234/messages/5678
-                //&Method::PATCH => "Edit Message".into_response(),
+                &Method::PATCH => patch::patch(route, auth, room_id, msg_id).await,
 
                 // DELETE /api/v1/room/1234/messages/5678
                 &Method::DELETE => delete::delete(route, auth, room_id, msg_id).await,

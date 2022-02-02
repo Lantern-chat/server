@@ -4,13 +4,8 @@ use crate::{ctrl::Error, ServerState};
 
 use super::CreateMessageForm;
 
-pub fn trim_message<'a>(state: &ServerState, form: &'a CreateMessageForm) -> Result<Cow<'a, str>, Error> {
-    let mut trimmed_content = Cow::Borrowed(form.content.trim());
-
-    // if empty but not containing attachments
-    if trimmed_content.is_empty() && form.attachments.is_empty() {
-        return Err(Error::BadRequest);
-    }
+pub fn trim_message<'a>(state: &ServerState, content: &'a str) -> Result<Cow<'a, str>, Error> {
+    let mut trimmed_content = Cow::Borrowed(content);
 
     if !trimmed_content.is_empty() {
         let mut trimming = false;
