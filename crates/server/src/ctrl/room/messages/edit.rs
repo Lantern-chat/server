@@ -125,68 +125,18 @@ pub async fn edit_message(
             let t = &t; // hackery, can't take ownership of t within below async move blocks, so move a reference
 
             if !added.is_empty() {
-                add_attachments =
-                    Either::Right(async move {
-                        // TODO: Deduplicate this with query in message_create
-                        t.execute_cached_typed(
-                            || {
-                                use schema::*;
-                                use thorn::*;
-
-                                tables! {
-                                    struct AggIds {
-                                        Id: Files::Id,
-                                    }
-                                }
-
-                                let msg_id_var = Var::at(Messages::Id, 1);
-                                let att_id_var = Var::at(SNOWFLAKE_ARRAY, 2);
-
-                                Query::with()
-                                    .with(
-                                        AggIds::as_query(Query::select().expr(
-                                            Call::custom("UNNEST").arg(att_id_var).alias_to(AggIds::Id),
-                                        ))
-                                        .exclude(),
-                                    )
-                                    .insert()
-                                    .into::<Attachments>()
-                                    .cols(&[Attachments::FileId, Attachments::MessageId])
-                                    .query(
-                                        Query::select()
-                                            .col(AggIds::Id)
-                                            .expr(msg_id_var)
-                                            .from_table::<AggIds>()
-                                            .as_value(),
-                                    )
-                            },
-                            &[&msg_id, &added],
-                        )
+                add_attachments = Either::Right(async move {
+                    t.execute_cached_typed(|| add_attachments_query(), &[&msg_id, &added])
                         .await?;
 
-                        Ok(())
-                    });
+                    Ok(())
+                });
             }
 
             if !removed.is_empty() {
                 orphan_attachments = Either::Right(async move {
-                    t.execute_cached_typed(
-                        || {
-                            use schema::*;
-                            use thorn::*;
-
-                            Query::update()
-                                .table::<Attachments>()
-                                .set(
-                                    Attachments::Flags,
-                                    Attachments::Flags
-                                        .bit_or(Literal::Int2(flags::AttachmentFlags::ORPHANED.bits())),
-                                )
-                                .and_where(Attachments::FileId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))
-                        },
-                        &[&removed],
-                    )
-                    .await?;
+                    t.execute_cached_typed(|| orphan_attachments_query(), &[&removed])
+                        .await?;
 
                     Ok(())
                 });
@@ -203,23 +153,8 @@ pub async fn edit_message(
             let t = &t;
 
             update_message = Either::Right(async move {
-                t.execute_cached_typed(
-                    || {
-                        use schema::*;
-                        use thorn::*;
-
-                        let msg_id_var = Var::at(Messages::Id, 1);
-                        let msg_content_var = Var::at(Messages::Content, 2);
-
-                        Query::update()
-                            .table::<Messages>()
-                            .and_where(Messages::Id.equals(msg_id_var))
-                            .set(Messages::Content, msg_content_var)
-                            .set(Messages::EditedAt, Builtin::now(()))
-                    },
-                    &[&msg_id, &content],
-                )
-                .await?;
+                t.execute_cached_typed(|| update_message_query(), &[&msg_id, &content])
+                    .await?;
 
                 Ok(())
             })
@@ -271,4 +206,64 @@ fn query_existing_message() -> impl thorn::AnyQuery {
                 .bit_and(Literal::Int2(MessageFlags::DELETED.bits()))
                 .equals(Literal::Int2(0)),
         )
+}
+
+// TODO: Deduplicate this with query in message_create
+fn add_attachments_query() -> impl thorn::AnyQuery {
+    use schema::*;
+    use thorn::*;
+
+    tables! {
+        struct AggIds {
+            Id: Files::Id,
+        }
+    }
+
+    let msg_id_var = Var::at(Messages::Id, 1);
+    let att_id_var = Var::at(SNOWFLAKE_ARRAY, 2);
+
+    Query::with()
+        .with(
+            AggIds::as_query(
+                Query::select().expr(Call::custom("UNNEST").arg(att_id_var).alias_to(AggIds::Id)),
+            )
+            .exclude(),
+        )
+        .insert()
+        .into::<Attachments>()
+        .cols(&[Attachments::FileId, Attachments::MessageId])
+        .query(
+            Query::select()
+                .col(AggIds::Id)
+                .expr(msg_id_var)
+                .from_table::<AggIds>()
+                .as_value(),
+        )
+}
+
+fn orphan_attachments_query() -> impl thorn::AnyQuery {
+    use schema::*;
+    use thorn::*;
+
+    Query::update()
+        .table::<Attachments>()
+        .set(
+            Attachments::Flags,
+            Attachments::Flags.bit_or(Literal::Int2(flags::AttachmentFlags::ORPHANED.bits())),
+        )
+        .and_where(Attachments::FileId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))
+}
+
+fn update_message_query() -> impl thorn::AnyQuery {
+    use schema::*;
+    use thorn::*;
+
+    let msg_id_var = Var::at(Messages::Id, 1);
+    let msg_content_var = Var::at(Messages::Content, 2);
+
+    Query::update()
+        .table::<Messages>()
+        .and_where(Messages::Id.equals(msg_id_var))
+        .set(Messages::Content, msg_content_var)
+        .set(Messages::EditedAt, Builtin::now(()))
 }
