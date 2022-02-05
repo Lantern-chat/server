@@ -2,7 +2,7 @@ use ftl::*;
 
 use sdk::models::Snowflake;
 
-use crate::{web::routes::api::ApiError, ServerState};
+use crate::{ctrl::cdn::FileKind, web::routes::api::ApiError, ServerState};
 
 pub async fn attachments(mut route: Route<ServerState>) -> Response {
     let room_id = match route.next().param::<Snowflake>() {
@@ -31,7 +31,7 @@ pub async fn attachments(mut route: Route<ServerState>) -> Response {
         route,
         room_id,
         attachment_id,
-        crate::ctrl::cdn::FileKind::Attachment,
+        FileKind::Attachment,
         Some(filename),
         is_head,
         download,
