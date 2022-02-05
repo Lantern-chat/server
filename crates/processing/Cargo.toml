@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 blurhash = { path = "../blurhash" }
 
-image = "0.24"
+image = { version = "0.24", default_features = false, features = ["gif", "jpeg", "ico", "png", "pnm", "tga", "tiff", "webp", "bmp"] }
 tracing = "0.1.26"
 png = "0.17"
 thiserror = "1.0.30"
