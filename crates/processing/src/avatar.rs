@@ -128,10 +128,8 @@ fn encode_png_best(
     };
 
     image = match image {
-        DynamicImage::ImageBgra8(_) | DynamicImage::ImageRgba16(_) => {
-            DynamicImage::ImageRgba8(image.to_rgba8())
-        }
-        DynamicImage::ImageBgr8(_) | DynamicImage::ImageRgb16(_) => DynamicImage::ImageRgb8(image.to_rgb8()),
+        DynamicImage::ImageRgba16(_) => DynamicImage::ImageRgba8(image.to_rgba8()),
+        DynamicImage::ImageRgb16(_) => DynamicImage::ImageRgb8(image.to_rgb8()),
         DynamicImage::ImageLuma16(_) => DynamicImage::ImageLuma8(image.to_luma8()),
         DynamicImage::ImageLumaA16(_) => DynamicImage::ImageLumaA8(image.to_luma_alpha8()),
         _ => image,
