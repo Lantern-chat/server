@@ -8,16 +8,14 @@ use tracing_subscriber::{
 pub mod allocator;
 pub mod cli;
 
-use std::{net::SocketAddr, str::FromStr};
-
 use futures::FutureExt;
-use structopt::StructOpt;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
 
-    let mut args = cli::CliOptions::from_args();
+    let args = cli::CliOptions::parse()?;
+    log::debug!("Arguments: {:?}", args);
 
     let mut extreme_trace = false;
 
@@ -50,15 +48,6 @@ async fn main() -> anyhow::Result<()> {
         .finish(); // completes the builder.
 
     log::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
-    log::debug!("Arguments: {:?}", args);
-
-    args.prepare()?;
-
-    log::trace!("Parsing bind address...");
-    let addr = match args.bind {
-        Some(addr) => SocketAddr::from_str(&addr)?,
-        None => SocketAddr::from(([127, 0, 0, 1], 3030)),
-    };
 
     let db = {
         use db::pool::{Pool, PoolConfig};
@@ -85,7 +74,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     log::info!("Starting server...");
-    let (server, state) = server::start_server(addr, db).await?;
+    let (server, state) = server::start_server(args.bind, db).await?;
 
     log::trace!("Setting up shutdown signal for Ctrl+C");
     tokio::spawn(tokio::signal::ctrl_c().then(move |_| async move { state.shutdown().await }));

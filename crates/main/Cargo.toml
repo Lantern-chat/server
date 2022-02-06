@@ -17,9 +17,9 @@ futures = "0.3"
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
 tracing-futures = { version = "0.2.4", default-features = false, features = ["std-future"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-structopt = "0.3.21"
 dotenv = "0.15.0"
 anyhow = "1"
+pico-args = "0.4.2"
 
 [target.'cfg(unix)'.dependencies]
 tikv-jemallocator = "0.4.1"
