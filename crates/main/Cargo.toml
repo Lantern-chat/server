@@ -7,6 +7,10 @@ publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+nightly = ["server/nightly"]
+armv8 = ["nightly", "server/armv8"]
+
 [dependencies]
 db = { path = "../db" }
 server = { path = "../server" }

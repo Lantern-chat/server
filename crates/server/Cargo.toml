@@ -7,6 +7,10 @@ publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+nightly = ["crc32fast/nightly", "parking_lot/nightly", "rand/nightly", "hashbrown/nightly"]
+armv8 = ["nightly", "aes/armv8", "aes-gcm-siv/armv8"]
+
 [dependencies]
 db = { path = "../db" }
 util = { path = "../util" }
