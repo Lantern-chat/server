@@ -29,7 +29,7 @@ SELECT
     messages.flags as message_flags,
     messages.content,
     (SELECT array_agg(role_members.role_id)
-        FROM role_members JOIN roles ON role_members.role_id = roles.id
+        FROM lantern.role_members JOIN lantern.roles ON role_members.role_id = roles.id
         WHERE role_members.user_id = messages.user_id AND roles.party_id = party_member.party_id
     ) AS roles
 FROM

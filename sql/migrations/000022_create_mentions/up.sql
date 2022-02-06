@@ -41,4 +41,4 @@ SELECT mentions.msg_id,
                       WHEN mentions.room_id IS NOT NULL THEN 3
                  END) AS kinds,
        array_agg(COALESCE(mentions.user_id, mentions.role_id, mentions.room_id)) AS ids
-FROM mentions GROUP BY msg_id;
+FROM lantern.mentions GROUP BY msg_id;

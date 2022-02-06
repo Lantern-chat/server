@@ -38,7 +38,7 @@ CREATE TABLE lantern.event_log (
     -- May be NULL even when the event
     room_id     bigint,
 
-    code        event_code  NOT NULL
+    code        lantern.event_code  NOT NULL
 );
 ALTER TABLE lantern.event_log OWNER TO postgres;
 
