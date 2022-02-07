@@ -3,6 +3,18 @@ headers = { git = "https://github.com/Lantern-chat/headers" }
 smol_str = { git = "https://github.com/Lantern-chat/smol_str" }
 failsafe = { git = "https://github.com/Lantern-chat/failsafe-rs" }
 crc32fast = { git = "https://github.com/Lantern-chat/rust-crc32fast" }
+
+# Contains fixes for nightly
+rand = { git = "https://github.com/rust-random/rand" }
+rand_core = { git = "https://github.com/rust-random/rand" }
+rand_chacha = { git = "https://github.com/rust-random/rand" }
+
+# contains unpublished dependency bumps
+postgres-protocol = { git = "https://github.com/sfackler/rust-postgres" }
+postgres-types = { git = "https://github.com/sfackler/rust-postgres" }
+tokio-postgres = { git = "https://github.com/sfackler/rust-postgres" }
+postgres-derive = { git = "https://github.com/sfackler/rust-postgres" }
+
 # postgres-inet = { git = "https://github.com/Lantern-chat/postgres-inet" }
 
 

@@ -8,12 +8,14 @@ use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::net::TcpStream;
 
 /// A transport returned yieled by `AddrIncoming`.
-#[pin_project::pin_project]
-#[derive(Debug)]
-pub struct AddrStream {
-    #[pin]
-    inner: TcpStream,
-    pub(super) remote_addr: SocketAddr,
+pin_project_lite::pin_project! {
+    #[derive(Debug)]
+    pub struct AddrStream {
+        #[pin]
+        inner: TcpStream,
+
+        pub(super) remote_addr: SocketAddr,
+    }
 }
 
 impl AddrStream {

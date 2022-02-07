@@ -5,12 +5,13 @@ use aes::{
 
 use tokio::io::{AsyncRead, AsyncSeek, AsyncWrite, BufWriter, ReadBuf};
 
-#[pin_project::pin_project]
-pub struct EncryptedFile<F> {
-    #[pin]
-    inner: F,
+pin_project_lite::pin_project! {
+    pub struct EncryptedFile<F> {
+        #[pin]
+        inner: F,
 
-    cipher: Aes256Ctr,
+        cipher: Aes256Ctr,
+    }
 }
 
 use std::io::{self, Result as IoResult, SeekFrom};
