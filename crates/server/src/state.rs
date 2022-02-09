@@ -19,7 +19,7 @@ use crate::{
 };
 use crate::{
     tasks::events::cache::EventItemCache,
-    web::{gateway::Gateway, ip_bans::IpBans, rate_limit::RateLimitTable},
+    web::{gateway::Gateway, rate_limit::RateLimitTable},
 };
 
 pub struct InnerServerState {
@@ -38,7 +38,6 @@ pub struct InnerServerState {
     pub all_tasks:
         Mutex<Option<BoxFuture<'static, Result<Result<(), tokio::task::JoinError>, tokio::task::JoinError>>>>,
     pub item_cache: EventItemCache,
-    pub ip_bans: IpBans,
     pub perm_cache: PermissionCache,
     pub session_cache: SessionCache,
     pub file_cache: MainFileCache,
@@ -76,7 +75,6 @@ impl ServerState {
             processing_semaphore: Semaphore::new(num_cpus::get() * 2),
             all_tasks: Mutex::new(None),
             item_cache: EventItemCache::default(),
-            ip_bans: IpBans::new(),
             perm_cache: PermissionCache::new(),
             session_cache: SessionCache::default(),
             file_cache: MainFileCache::default(),

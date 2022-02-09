@@ -40,7 +40,6 @@ pub mod tasks {
     pub mod item_cache_cleanup;
     pub mod perm_cache_cleanup;
     pub mod record_metrics;
-    pub mod refresh_ip_bans;
     pub mod rl_cleanup;
     pub mod session_cleanup;
     pub mod totp_cleanup;

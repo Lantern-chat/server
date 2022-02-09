@@ -11,21 +11,7 @@ pub async fn service(
     req: Request<Body>,
     state: ServerState,
 ) -> Result<Response<Body>, Infallible> {
-    //if state.ip_bans.is_probably_banned(addr.ip()) {
-    //    let check = async {};
-    //
-    //    match check.await {
-    //        Ok(false) => {}
-    //        Ok(true) => return Ok(StatusCode::FORBIDDEN.into_response()),
-    //        Err(e) => {
-    //            log::error!("Error checking if IP is banned")
-    //        }
-    //    };
-    //}
-
     let route = Route::new(addr, req, state);
-
-    let host = route.host();
 
     let mut info = String::new();
     if log::level_enabled!(log::Level::DEBUG) {
@@ -33,7 +19,7 @@ pub async fn service(
             "{:?}: {} http://{}{}",
             route.real_addr.ip(),
             route.req.method(),
-            match host {
+            match route.host() {
                 Some(ref h) => h.as_str(),
                 None => "unknown",
             },
