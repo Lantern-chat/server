@@ -1,9 +1,10 @@
 use std::borrow::Cow;
 
 use hashbrown::HashSet;
-use sdk::models::*;
 use smol_str::SmolStr;
 use thorn::pg::Json;
+
+use sdk::models::*;
 
 use crate::{
     ctrl::{util::encrypted_asset::encrypt_snowflake_opt, Error},
@@ -12,21 +13,14 @@ use crate::{
     ServerState,
 };
 
-#[derive(Deserialize)]
-pub struct EditMessageForm {
-    #[serde(default)]
-    content: SmolStr,
-
-    #[serde(default)]
-    attachments: Vec<Snowflake>,
-}
+use sdk::api::commands::room::EditMessageBody;
 
 pub async fn edit_message(
     state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,
-    form: EditMessageForm,
+    body: EditMessageBody,
 ) -> Result<Option<Message>, Error> {
     // fast-path for if the perm_cache does contain a value
     let perm = match state.perm_cache.get(auth.user_id, room_id).await {
@@ -41,10 +35,10 @@ pub async fn edit_message(
         None => None,
     };
 
-    let trimmed_content = form.content.trim();
+    let trimmed_content = body.content.trim();
 
     // early reject if empty but not containing attachments
-    if trimmed_content.is_empty() && form.attachments.is_empty() {
+    if trimmed_content.is_empty() && body.attachments.is_empty() {
         // TODO: Edit a mesage to have zero anything, should it be deleted instead?
         return Err(Error::BadRequest);
     }
@@ -108,10 +102,10 @@ pub async fn edit_message(
     let mut update_message = Either::Left(ok::<(), Error>(()));
 
     // if there are old or new attachments
-    if !prev_files.is_none() || !form.attachments.is_empty() {
+    if !prev_files.is_none() || !body.attachments.is_empty() {
         // attachments may be unordered, so a Set is required
         let pre_set: HashSet<Snowflake> = HashSet::from_iter(prev_files.unwrap_or_default());
-        let new_set: HashSet<Snowflake> = HashSet::from_iter(form.attachments);
+        let new_set: HashSet<Snowflake> = HashSet::from_iter(body.attachments);
 
         if pre_set != new_set {
             let added = new_set.difference(&pre_set).copied().collect::<Vec<_>>();

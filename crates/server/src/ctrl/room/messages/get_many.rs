@@ -13,43 +13,13 @@ use crate::{
     ServerState,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum MessageSearch {
-    After(Snowflake),
-    Before(Snowflake),
-}
-
-#[derive(Deserialize)]
-pub struct GetManyMessagesForm {
-    #[serde(flatten)]
-    query: Option<MessageSearch>,
-
-    #[serde(default = "default_limit")]
-    limit: u8,
-
-    #[serde(default)]
-    thread: Option<Snowflake>,
-}
-
-#[rustfmt::skip]
-const fn default_limit() -> u8 { 50 }
-
-impl Default for GetManyMessagesForm {
-    fn default() -> Self {
-        GetManyMessagesForm {
-            query: None,
-            limit: default_limit(),
-            thread: None,
-        }
-    }
-}
+use sdk::api::commands::room::{GetMessagesQuery, MessageSearch};
 
 pub async fn get_many(
     state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
-    form: GetManyMessagesForm,
+    form: GetMessagesQuery,
 ) -> Result<impl Stream<Item = Result<Message, Error>>, Error> {
     let had_perms = if let Some(perm) = state.perm_cache.get(auth.user_id, room_id).await {
         if !perm.perm.room.contains(RoomPermissions::READ_MESSAGES) {
@@ -69,7 +39,11 @@ pub async fn get_many(
         None => Snowflake::max_value(),
     };
 
-    let limit = 100.min(form.limit as i16);
+    let limit = match form.limit {
+        Some(limit) => 100.min(limit as i16),
+        None => 50,
+    };
+
     let mut params: ArrayVec<&(dyn ToSql + Sync), 5> = ArrayVec::from([
         &room_id as _,
         &msg_id as _,

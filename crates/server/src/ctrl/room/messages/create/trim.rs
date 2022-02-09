@@ -2,8 +2,6 @@ use std::borrow::Cow;
 
 use crate::{ctrl::Error, ServerState};
 
-use super::CreateMessageForm;
-
 pub fn trim_message<'a>(state: &ServerState, content: &'a str) -> Result<Cow<'a, str>, Error> {
     let mut trimmed_content = Cow::Borrowed(content);
 

@@ -16,24 +16,14 @@ pub mod embed;
 pub mod slash;
 pub mod trim;
 
-#[derive(Debug, Deserialize)]
-pub struct CreateMessageForm {
-    #[serde(default)]
-    content: SmolStr,
-
-    #[serde(default)]
-    attachments: Vec<Snowflake>,
-
-    #[serde(default)]
-    parent: Option<Snowflake>,
-}
+use sdk::api::commands::room::CreateMessageBody;
 
 /// Returns an `Option<Message>` because slash-commands may not actually create a message
 pub async fn create_message(
     state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
-    form: CreateMessageForm,
+    body: CreateMessageBody,
 ) -> Result<Option<Message>, Error> {
     // fast-path for if the perm_cache does contain a value, otherwise defer until content is checked
     let perm = match state.perm_cache.get(auth.user_id, room_id).await {
@@ -47,10 +37,10 @@ pub async fn create_message(
         None => None,
     };
 
-    let trimmed_content = form.content.trim();
+    let trimmed_content = body.content.trim();
 
     // if empty but not containing attachments
-    if trimmed_content.is_empty() && form.attachments.is_empty() {
+    if trimmed_content.is_empty() && body.attachments.is_empty() {
         return Err(Error::BadRequest);
     }
 
@@ -81,7 +71,7 @@ pub async fn create_message(
     let msg_id = Snowflake::now();
 
     // check this before acquiring database connection
-    if !form.attachments.is_empty() && !perm.room.contains(RoomPermissions::ATTACH_FILES) {
+    if !body.attachments.is_empty() && !perm.room.contains(RoomPermissions::ATTACH_FILES) {
         return Err(Error::Unauthorized);
     }
 
@@ -106,7 +96,7 @@ pub async fn create_message(
         None => state.db.write.get().await?,
     };
 
-    let res = insert_message(db, state, auth, room_id, msg_id, &form, &modified_content)
+    let res = insert_message(db, state, auth, room_id, msg_id, &body, &modified_content)
         .boxed()
         .await;
 
@@ -119,7 +109,7 @@ pub(crate) async fn insert_message(
     auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,
-    form: &CreateMessageForm,
+    body: &CreateMessageBody,
     content: &str,
 ) -> Result<Message, Error> {
     // TODO: Determine if repeatable-read is needed?
@@ -128,7 +118,7 @@ pub(crate) async fn insert_message(
     // allow it to be null
     let content = if content.is_empty() { None } else { Some(content) };
 
-    if let Some(parent_msg_id) = form.parent {
+    if let Some(parent_msg_id) = body.parent {
         let thread_id = Snowflake::now();
 
         t.execute_cached_typed(
@@ -201,7 +191,7 @@ pub(crate) async fn insert_message(
         .await?;
     }
 
-    if !form.attachments.is_empty() {
+    if !body.attachments.is_empty() {
         t.execute_cached_typed(
             || {
                 use schema::*;
@@ -234,7 +224,7 @@ pub(crate) async fn insert_message(
                             .as_value(),
                     )
             },
-            &[&msg_id, &form.attachments],
+            &[&msg_id, &body.attachments],
         )
         .await?;
     }

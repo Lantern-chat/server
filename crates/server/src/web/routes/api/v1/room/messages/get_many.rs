@@ -4,11 +4,9 @@ use schema::Snowflake;
 
 use crate::{ctrl::auth::Authorization, web::routes::api::ApiError};
 
-use crate::ctrl::room::messages::get_many::{GetManyMessagesForm, MessageSearch};
-
 pub async fn get_many(route: Route<crate::ServerState>, auth: Authorization, room_id: Snowflake) -> Response {
-    let form = match route.query::<GetManyMessagesForm>() {
-        None => GetManyMessagesForm::default(),
+    let form = match route.query() {
+        None => Default::default(),
         Some(Ok(form)) => form,
         Some(Err(e)) => return ApiError::err(e.into()).into_response(),
     };
