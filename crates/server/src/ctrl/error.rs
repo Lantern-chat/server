@@ -3,7 +3,7 @@ use std::{borrow::Cow, string::FromUtf8Error};
 use db::pool::Error as DbError;
 use ftl::{body::BodyDeserializeError, StatusCode};
 use http::header::InvalidHeaderValue;
-use sdk::models::UserPreferenceError;
+use sdk::{api::error::ApiErrorCode, models::UserPreferenceError};
 
 use crate::web::gateway::event::EventEncodingError;
 
@@ -227,63 +227,69 @@ impl Error {
     }
 
     #[rustfmt::skip]
-    pub fn code(&self) -> u16 {
+    pub fn to_apierror(&self) -> ApiErrorCode {
         match *self {
-            Error::DbError(_)               => 50001,
-            Error::JoinError(_)             => 50002,
-            Error::SemaphoreError(_)        => 50003,
-            Error::HashError(_)             => 50004,
-            Error::JsonError(_)             => 50005,
-            Error::EventEncodingError(_)    => 50006,
-            Error::InternalError(_)         => 50007,
-            Error::InternalErrorStatic(_)   => 50008,
-            Error::Utf8ParseError(_)        => 50009,
-            Error::IOError(_)               => 50010,
-            Error::InvalidHeaderValue(_)    => 50011,
-            Error::XMLError(_)              => 50012,
-            Error::RequestError(_)          => 50013,
-            Error::Unimplemented            => 50014,
+            Error::DbError(_)               => ApiErrorCode::DbError,
+            Error::JoinError(_)             => ApiErrorCode::JoinError,
+            Error::SemaphoreError(_)        => ApiErrorCode::SemaphoreError,
+            Error::HashError(_)             => ApiErrorCode::HashError,
+            Error::JsonError(_)             => ApiErrorCode::JsonError,
+            Error::EventEncodingError(_)    => ApiErrorCode::EventEncodingError,
+            Error::InternalError(_)         => ApiErrorCode::InternalError,
+            Error::InternalErrorStatic(_)   => ApiErrorCode::InternalErrorStatic,
+            Error::Utf8ParseError(_)        => ApiErrorCode::Utf8ParseError,
+            Error::IOError(_)               => ApiErrorCode::IOError,
+            Error::InvalidHeaderValue(_)    => ApiErrorCode::InvalidHeaderValue,
+            Error::XMLError(_)              => ApiErrorCode::XMLError,
+            Error::RequestError(_)          => ApiErrorCode::RequestError,
+            Error::Unimplemented            => ApiErrorCode::Unimplemented,
 
-            Error::AlreadyExists            => 40001,
-            Error::UsernameUnavailable      => 40002,
-            Error::InvalidEmail             => 40003,
-            Error::InvalidUsername          => 40004,
-            Error::InvalidPassword          => 40005,
-            Error::InvalidCredentials       => 40006,
-            Error::InsufficientAge          => 40007,
-            Error::InvalidDate              => 40008,
-            Error::InvalidContent           => 40009,
-            Error::InvalidName              => 40010,
-            Error::InvalidTopic             => 40011,
-            Error::MissingUploadMetadataHeader  => 40012,
-            Error::MissingAuthorizationHeader   => 40013,
-            Error::NoSession                => 40014,
-            Error::InvalidAuthFormat        => 40015,
-            Error::HeaderParseError(_)      => 40016,
-            Error::MissingFilename          => 40017,
-            Error::MissingMime              => 40018,
-            Error::AuthTokenParseError(_)   => 40019,
-            Error::Base64DecodeError(_)     => 40020,
-            Error::BodyDeserializeError(_)  => 40021,
-            Error::QueryParseError(_)       => 40022,
-            Error::UploadError              => 40023,
-            Error::InvalidPreview           => 40024,
-            Error::MimeParseError(_)        => 40025,
-            Error::InvalidImageFormat       => 40026,
-            Error::TOTPRequired             => 40027,
-            Error::InvalidPreferences(_)    => 40028,
-            Error::TemporarilyDisabled      => 40029,
-            Error::InvalidCaptcha(_)        => 40030,
-            Error::Base85DecodeError(_)     => 40031,
+            Error::AlreadyExists            => ApiErrorCode::AlreadyExists,
+            Error::UsernameUnavailable      => ApiErrorCode::UsernameUnavailable,
+            Error::InvalidEmail             => ApiErrorCode::InvalidEmail,
+            Error::InvalidUsername          => ApiErrorCode::InvalidUsername,
+            Error::InvalidPassword          => ApiErrorCode::InvalidPassword,
+            Error::InvalidCredentials       => ApiErrorCode::InvalidCredentials,
+            Error::InsufficientAge          => ApiErrorCode::InsufficientAge,
+            Error::InvalidDate              => ApiErrorCode::InvalidDate,
+            Error::InvalidContent           => ApiErrorCode::InvalidContent,
+            Error::InvalidName              => ApiErrorCode::InvalidName,
+            Error::InvalidTopic             => ApiErrorCode::InvalidTopic,
+            Error::MissingUploadMetadataHeader  => ApiErrorCode::MissingUploadMetadataHeader,
+            Error::MissingAuthorizationHeader   => ApiErrorCode::MissingAuthorizationHeader,
+            Error::NoSession                => ApiErrorCode::NoSession,
+            Error::InvalidAuthFormat        => ApiErrorCode::InvalidAuthFormat,
+            Error::HeaderParseError(_)      => ApiErrorCode::HeaderParseError,
+            Error::MissingFilename          => ApiErrorCode::MissingFilename,
+            Error::MissingMime              => ApiErrorCode::MissingMime,
+            Error::AuthTokenParseError(_)   => ApiErrorCode::AuthTokenParseError,
+            Error::Base64DecodeError(_)     => ApiErrorCode::Base64DecodeError,
+            Error::BodyDeserializeError(_)  => ApiErrorCode::BodyDeserializeError,
+            Error::QueryParseError(_)       => ApiErrorCode::QueryParseError,
+            Error::UploadError              => ApiErrorCode::UploadError,
+            Error::InvalidPreview           => ApiErrorCode::InvalidPreview,
+            Error::MimeParseError(_)        => ApiErrorCode::MimeParseError,
+            Error::InvalidImageFormat       => ApiErrorCode::InvalidImageFormat,
+            Error::TOTPRequired             => ApiErrorCode::TOTPRequired,
+            Error::InvalidPreferences(_)    => ApiErrorCode::InvalidPreferences,
+            Error::TemporarilyDisabled      => ApiErrorCode::TemporarilyDisabled,
+            Error::InvalidCaptcha(_)        => ApiErrorCode::InvalidCaptcha,
+            Error::Base85DecodeError(_)     => ApiErrorCode::Base85DecodeError,
+
 
             // HTTP-like error codes
-            Error::BadRequest               => 40400,
-            Error::Unauthorized             => 40401,
-            Error::NotFound                 => 40404,
-            Error::Conflict                 => 40409,
-            Error::RequestEntityTooLarge    => 40413,
-            Error::ChecksumMismatch         => 40460,
+            Error::BadRequest               => ApiErrorCode::BadRequest,
+            Error::Unauthorized             => ApiErrorCode::Unauthorized,
+            Error::NotFound                 => ApiErrorCode::NotFound,
+            Error::Conflict                 => ApiErrorCode::Conflict,
+            Error::RequestEntityTooLarge    => ApiErrorCode::RequestEntityTooLarge,
+            Error::ChecksumMismatch         => ApiErrorCode::ChecksumMismatch,
         }
+    }
+
+    #[inline]
+    pub fn code(&self) -> u16 {
+        self.to_apierror() as u16
     }
 
     pub fn format(&self) -> Cow<'static, str> {
