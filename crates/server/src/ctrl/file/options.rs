@@ -1,16 +1,12 @@
-use sdk::models::{Snowflake, UserFlags};
 use schema::SnowflakeExt;
+use sdk::models::{Snowflake, UserFlags};
 use timestamp::Timestamp;
 
 use crate::{ctrl::Error, web::auth::Authorization, ServerState};
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-pub struct FileOptions {
-    pub quota_used: i64,
-    pub quota_total: i64,
-}
+use sdk::api::commands::file::FilesystemStatus;
 
-pub async fn file_options(state: ServerState, auth: Authorization) -> Result<FileOptions, Error> {
+pub async fn file_options(state: ServerState, auth: Authorization) -> Result<FilesystemStatus, Error> {
     let month_start = {
         let (year, month, _) = Timestamp::now_utc().date().to_calendar_date();
         Snowflake::at_date(time::Date::from_calendar_date(year, month, 1).unwrap())
@@ -42,7 +38,7 @@ pub async fn file_options(state: ServerState, auth: Authorization) -> Result<Fil
 
     let quota_used: Option<i64> = row.try_get(0)?;
 
-    Ok(FileOptions {
+    Ok(FilesystemStatus {
         quota_used: quota_used.unwrap_or(0),
         quota_total,
     })

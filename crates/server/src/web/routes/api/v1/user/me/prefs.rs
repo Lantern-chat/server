@@ -5,10 +5,8 @@ use crate::ctrl::user::me::prefs::update_prefs;
 use crate::web::routes::api::ApiError;
 use crate::ServerState;
 
-use sdk::models::UserPreferences;
-
 pub async fn prefs(mut route: Route<ServerState>, auth: auth::Authorization) -> Response {
-    let form = match body::any::<UserPreferences, _>(&mut route).await {
+    let form = match body::any(&mut route).await {
         Ok(form) => form,
         Err(e) => return e.into_response(),
     };

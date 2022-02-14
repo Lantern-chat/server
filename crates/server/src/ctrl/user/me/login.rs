@@ -10,22 +10,16 @@ use crate::{
     ServerState,
 };
 
-#[derive(Deserialize)]
-pub struct LoginForm {
-    pub email: SmolStr,
-    pub password: SmolStr,
-
-    #[serde(default)]
-    pub totp: Option<SmolStr>,
-}
-
-use sdk::models::{ElevationLevel, Session, UserFlags};
+use sdk::{
+    api::commands::user::UserLoginForm,
+    models::{ElevationLevel, Session, UserFlags},
+};
 
 use crate::ctrl::user::register::hash_config;
 
 // TODO: Determine if I should give any feedback at all or
 // just say catchall "invalid username/email/password"
-pub async fn login(state: ServerState, addr: SocketAddr, form: LoginForm) -> Result<Session, Error> {
+pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) -> Result<Session, Error> {
     validate_email(&form.email)?;
 
     let db = state.db.read.get().await?;

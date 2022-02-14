@@ -1,13 +1,9 @@
 use ftl::*;
 
-use crate::{
-    ctrl::user::me::login::{login as login_user, LoginForm},
-    web::routes::api::ApiError,
-    ServerState,
-};
+use crate::{ctrl::user::me::login::login as login_user, web::routes::api::ApiError, ServerState};
 
 pub async fn login(mut route: Route<ServerState>) -> Response {
-    let form = match body::any::<LoginForm, _>(&mut route).await {
+    let form = match body::any(&mut route).await {
         Ok(form) => form,
         Err(e) => return e.into_response(),
     };

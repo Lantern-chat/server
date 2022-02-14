@@ -39,6 +39,7 @@ pub async fn party(mut route: Route<crate::ServerState>) -> Response {
                 // ANY /api/v1/party/1234/rooms
                 (_, Exact("rooms")) => rooms::party_rooms(route, auth, party_id).await,
 
+                // GET /api/v1/party/1234/members
                 (&Method::GET, Exact("members")) => members::get_members(route, auth, party_id).await,
 
                 _ => ApiError::not_found().into_response(),

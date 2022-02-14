@@ -9,23 +9,12 @@ use crate::{
     ServerState,
 };
 
-#[derive(Clone, Deserialize)]
-pub struct RegisterForm {
-    pub email: SmolStr,
-    pub username: SmolStr,
-    pub password: SmolStr,
-    pub year: i32,
-    pub month: u8,
-    pub day: u8,
-    pub token: String, // TODO: Don't allocate?
-}
-
-use sdk::models::Session;
+use sdk::{api::commands::user::UserRegisterForm, models::Session};
 
 pub async fn register_user(
     state: ServerState,
     addr: SocketAddr,
-    mut form: RegisterForm,
+    mut form: UserRegisterForm,
 ) -> Result<Session, Error> {
     //if cfg!(debug_assertions) {
     //    return Err(Error::TemporarilyDisabled);
