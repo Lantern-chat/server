@@ -14,14 +14,14 @@ pub async fn logout_user(state: ServerState, auth: auth::Authorization) -> Resul
                     .from::<Sessions>()
                     .and_where(Sessions::Token.equals(Var::of(Sessions::Token)))
             },
-            &[&auth.token.bytes()],
+            &[&auth.token.as_ref()],
         )
         .await?;
 
     if res == 0 {
         log::warn!(
             "Attempted to delete nonexistent session: {}, user: {}",
-            auth.token.encode(),
+            auth.token,
             auth.user_id
         );
     }

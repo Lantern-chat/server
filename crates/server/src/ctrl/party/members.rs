@@ -4,7 +4,7 @@ use schema::{Snowflake, SnowflakeExt};
 use util::hex::HexidecimalInt;
 
 use crate::{
-    ctrl::{auth::AuthToken, util::encrypted_asset::encrypt_snowflake_opt, Error},
+    ctrl::{util::encrypted_asset::encrypt_snowflake_opt, Error},
     ServerState,
 };
 
