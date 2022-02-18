@@ -11,11 +11,11 @@ use crate::ServerState;
 
 pub async fn authorize(route: &Route<ServerState>) -> Result<Authorization, Error> {
     let header = match route.req.headers().get("Authorization") {
-        Some(header) => header.as_bytes(),
+        Some(header) => header.to_str()?,
         None => return Err(Error::MissingAuthorizationHeader),
     };
 
-    let token = RawAuthToken::try_from(header)?;
+    let token = RawAuthToken::from_header(header)?;
 
     auth::do_auth(&route.state, token).await
 }

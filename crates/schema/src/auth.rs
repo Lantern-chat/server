@@ -58,6 +58,10 @@ impl RawAuthToken {
         rng.fill_bytes(&mut bytes);
         RawAuthToken::Bot(bytes)
     }
+
+    pub fn from_header(value: &str) -> Result<Self, AuthTokenError> {
+        AuthToken::from_header(value)?.try_into()
+    }
 }
 
 impl From<RawAuthToken> for AuthToken {
