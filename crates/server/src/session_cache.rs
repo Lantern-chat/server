@@ -3,9 +3,9 @@ use std::time::SystemTime;
 use sdk::models::UserFlags;
 use util::cmap::CHashMap;
 
-use schema::Snowflake;
+use schema::{auth::RawAuthToken, Snowflake};
 
-use crate::ctrl::auth::{AuthToken, Authorization};
+use crate::ctrl::auth::Authorization;
 
 #[derive(Debug, Clone, Copy)]
 struct PartialAuthorization {
@@ -16,11 +16,11 @@ struct PartialAuthorization {
 
 #[derive(Default)]
 pub struct SessionCache {
-    map: CHashMap<AuthToken, PartialAuthorization>,
+    map: CHashMap<RawAuthToken, PartialAuthorization>,
 }
 
 impl SessionCache {
-    pub async fn get(&self, token: &AuthToken) -> Option<Authorization> {
+    pub async fn get(&self, token: &RawAuthToken) -> Option<Authorization> {
         match self.map.get(token).await {
             None => None,
             Some(part) => Some(Authorization {

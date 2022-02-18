@@ -1,108 +1,32 @@
 use std::fmt;
 use std::str::FromStr;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct AuthToken(pub [u8; Self::TOKEN_LEN]);
-
-impl fmt::Display for AuthToken {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.encode())
-    }
-}
-
-// (4 * bytes) / 4, rounded up to nearest multiple of 4 for padding
-const fn base64bytes(bytes: usize) -> usize {
-    ((4 * bytes / 3) + 3) & !3
-}
-
-impl AuthToken {
-    pub const TOKEN_LEN: usize = 21; // produces 28 characters of base64 exactly, no padding
-    pub const CHAR_LEN: usize = base64bytes(Self::TOKEN_LEN);
-}
-
-// TODO: Unify this with the type from `models` somehow
-pub type SmolToken = arrayvec::ArrayString<{ AuthToken::CHAR_LEN }>;
-
-impl AuthToken {
-    /// Generate a new random auth token using a cryptographically secure random number generator
-    pub fn new() -> AuthToken {
-        use rand::Rng;
-
-        AuthToken(util::rng::crypto_thread_rng().gen())
-    }
-
-    /// Get the raw bytes of the token
-    pub fn bytes(&self) -> &[u8] {
-        &self.0[..]
-    }
-
-    /// Encode the auth token as a base-64 string
-    pub fn encode(&self) -> SmolToken {
-        let mut bytes = [0; Self::CHAR_LEN];
-
-        // len is unneeded since we know it will encode to the exact number of bytes
-        base64::encode_config_slice(&self.0, base64::STANDARD, &mut bytes);
-
-        match SmolToken::from_byte_string(&bytes) {
-            Ok(s) => s,
-            Err(_) => unsafe { std::hint::unreachable_unchecked() },
-        }
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum AuthTokenFromStrError {
-    #[error("Length Error")]
-    LengthError,
-
-    #[error("Decode Error: {0}")]
-    DecodeError(#[from] base64::DecodeError),
-}
-
-use std::convert::TryInto;
 use std::time::SystemTime;
 
-impl FromStr for AuthToken {
-    type Err = AuthTokenFromStrError;
+use schema::auth::{AuthToken, RawAuthToken};
 
-    fn from_str(mut s: &str) -> Result<Self, Self::Err> {
-        // trim and check length
-        s = s.trim();
-        if s.len() < Self::CHAR_LEN {
-            return Err(AuthTokenFromStrError::LengthError);
-        }
+pub trait AuthTokenExt {
+    fn random_bearer() -> Self;
+    fn random_bot() -> Self;
+}
 
-        // decode
-        let decoded = base64::decode(&s[..Self::CHAR_LEN])?;
+impl AuthTokenExt for RawAuthToken {
+    fn random_bearer() -> Self {
+        RawAuthToken::bearer(util::rng::crypto_thread_rng())
+    }
 
-        // copy into fixed array
-        match decoded.try_into() {
-            Ok(inner) => Ok(AuthToken(inner)),
-            Err(_) => Err(AuthTokenFromStrError::LengthError),
-        }
+    fn random_bot() -> Self {
+        RawAuthToken::bot(util::rng::crypto_thread_rng())
     }
 }
 
-impl AuthToken {
-    /// Attempt to parse an auth token from raw bytes
-    pub fn from_bytes(b: &[u8]) -> Result<Self, AuthTokenFromStrError> {
-        let decoded = base64::decode(&b[..Self::CHAR_LEN])?;
-
-        match decoded.try_into() {
-            Ok(inner) => Ok(AuthToken(inner)),
-            Err(_) => Err(AuthTokenFromStrError::LengthError),
-        }
-    }
-}
-
-use sdk::models::UserFlags;
 use schema::Snowflake;
+use sdk::models::UserFlags;
 
 use crate::ServerState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Authorization {
-    pub token: AuthToken,
+    pub token: RawAuthToken,
     pub user_id: Snowflake,
     pub expires: SystemTime,
     pub flags: UserFlags,
@@ -110,9 +34,7 @@ pub struct Authorization {
 
 use super::Error;
 
-pub async fn do_auth(state: &ServerState, raw_token: &[u8]) -> Result<Authorization, Error> {
-    let token = AuthToken::from_bytes(raw_token)?;
-
+pub async fn do_auth(state: &ServerState, token: RawAuthToken) -> Result<Authorization, Error> {
     let auth = match state.session_cache.get(&token).await {
         Some(auth) => Some(auth),
         None => {
@@ -132,7 +54,7 @@ pub async fn do_auth(state: &ServerState, raw_token: &[u8]) -> Result<Authorizat
                             )
                             .and_where(Sessions::Token.equals(Var::of(Sessions::Token)))
                     },
-                    &[&&token.0[..]],
+                    &[&token.as_ref()],
                 )
                 .await?;
 

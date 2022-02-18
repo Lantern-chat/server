@@ -128,8 +128,8 @@ pub enum Error {
     #[error("Upload Conflict")]
     Conflict,
 
-    #[error("Auth Token Parse Error: {0}")]
-    AuthTokenParseError(#[from] super::auth::AuthTokenFromStrError),
+    #[error("Auth Token Error: {0}")]
+    AuthTokenError(#[from] schema::auth::AuthTokenError),
 
     #[error("Base-64 Decode Error: {0}")]
     Base64DecodeError(#[from] base64::DecodeError),
@@ -216,7 +216,7 @@ impl Error {
             Error::MissingAuthorizationHeader
             | Error::MissingUploadMetadataHeader
             | Error::HeaderParseError(_)
-            | Error::AuthTokenParseError(_)
+            | Error::AuthTokenError(_)
             | Error::Base64DecodeError(_)
             | Error::Base85DecodeError(_) => StatusCode::UNPROCESSABLE_ENTITY,
             Error::ChecksumMismatch => *CHECKSUM_MISMATCH,
@@ -262,7 +262,7 @@ impl Error {
             Error::HeaderParseError(_)      => ApiErrorCode::HeaderParseError,
             Error::MissingFilename          => ApiErrorCode::MissingFilename,
             Error::MissingMime              => ApiErrorCode::MissingMime,
-            Error::AuthTokenParseError(_)   => ApiErrorCode::AuthTokenParseError,
+            Error::AuthTokenError(_)        => ApiErrorCode::AuthTokenError,
             Error::Base64DecodeError(_)     => ApiErrorCode::Base64DecodeError,
             Error::BodyDeserializeError(_)  => ApiErrorCode::BodyDeserializeError,
             Error::QueryParseError(_)       => ApiErrorCode::QueryParseError,
@@ -296,7 +296,7 @@ impl Error {
         Cow::Borrowed(match self {
             // TODO: at least say if it's a database error, for now
             Error::DbError(_) => "Database Error",
-            Error::AuthTokenParseError(_) => "Auth Token Parse Error",
+            Error::AuthTokenError(_) => "Auth Token Parse Error",
             Error::Base64DecodeError(_) => "Base64 Decode Error",
             Error::Base85DecodeError(_) => "Base85 Decode Error",
             Error::IOError(_) => "IO Error",

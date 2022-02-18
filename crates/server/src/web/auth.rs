@@ -2,25 +2,20 @@ use futures::FutureExt;
 
 use ftl::Route;
 
+use schema::auth::RawAuthToken;
+
 pub use crate::ctrl::auth::Authorization;
 
-use crate::ctrl::{
-    auth::{self, AuthToken},
-    Error,
-};
+use crate::ctrl::{auth, Error};
 use crate::ServerState;
 
 pub async fn authorize(route: &Route<ServerState>) -> Result<Authorization, Error> {
-    const BEARER: &[u8] = b"Bearer ";
-
     let header = match route.req.headers().get("Authorization") {
         Some(header) => header.as_bytes(),
         None => return Err(Error::MissingAuthorizationHeader),
     };
 
-    if !header.starts_with(BEARER) {
-        return Err(Error::InvalidAuthFormat);
-    }
+    let token = RawAuthToken::try_from(header)?;
 
-    auth::do_auth(&route.state, &header[BEARER.len()..]).await
+    auth::do_auth(&route.state, token).await
 }

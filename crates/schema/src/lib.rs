@@ -23,3 +23,5 @@ pub mod sf;
 pub use sf::{Snowflake, SnowflakeExt};
 
 pub mod flags;
+
+pub mod auth;
