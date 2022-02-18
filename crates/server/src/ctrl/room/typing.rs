@@ -108,7 +108,7 @@ pub async fn trigger_typing(
                 presence: None,
             };
 
-            let event = ServerMsg::new_typingstart(Box::new(events::TypingStart {
+            let event = ServerMsg::new_typing_start(Box::new(events::TypingStart {
                 room: room_id,
                 user: auth.user_id,
                 party: Some(party_id),

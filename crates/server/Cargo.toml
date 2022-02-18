@@ -35,7 +35,7 @@ timestamp = { package = "iso8061-timestamp", version = "0.1", features = ["pg"] 
 serde = { version = "1", features = ["derive", "rc"] }
 serde_urlencoded = "0.7"
 tokio = { version = "1.4", features = ["full", "parking_lot"] }
-tokio-util = { version = "0.6", features = ["io"] }
+tokio-util = { version = "0.7", features = ["io"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 tokio-rustls = "0.23.0"
 # tls-listener = { version = "0.2.1", features = ["hyper-h1", "hyper-h2", "tokio-net"] }
@@ -67,7 +67,7 @@ rmp-serde = "1"
 rand = "0.8.3"
 time = { version = "0.3", features = ["macros"] }
 regex = "1.4.6"
-tokio-tungstenite = "0.16.0"
+tokio-tungstenite = "0.17"
 ahash = "0.7.2"
 either = "1.6.0"
 failsafe = "1.0.0"
