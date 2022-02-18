@@ -141,7 +141,7 @@ pub async fn member_event(
     let inner = PartyMemberEvent { party_id, member };
 
     let msg = match event {
-        EventCode::MemberUpdated => ServerMsg::new_memberupdate(inner),
+        EventCode::MemberUpdated => ServerMsg::new_member_update(inner),
         EventCode::MemberJoined => {
             let party = match party {
                 Some(party) => party,
@@ -150,32 +150,32 @@ pub async fn member_event(
 
             state
                 .gateway
-                .broadcast_user_event(Event::new(ServerMsg::new_partycreate(party), None)?, user_id)
+                .broadcast_user_event(Event::new(ServerMsg::new_party_create(party), None)?, user_id)
                 .await;
 
-            ServerMsg::new_memberadd(inner)
+            ServerMsg::new_member_add(inner)
         }
         EventCode::MemberLeft | EventCode::MemberBan => {
             let inner: Arc<PartyMemberEvent> = Arc::new(inner);
 
             state
                 .gateway
-                .broadcast_user_event(Event::new(ServerMsg::new_partydelete(party_id), None)?, user_id)
+                .broadcast_user_event(Event::new(ServerMsg::new_party_delete(party_id), None)?, user_id)
                 .await;
 
             if event == EventCode::MemberBan {
                 state
                     .gateway
                     .broadcast_event(
-                        Event::new(ServerMsg::new_memberban(inner.clone()), None)?,
+                        Event::new(ServerMsg::new_member_ban(inner.clone()), None)?,
                         party_id,
                     )
                     .await;
             }
 
-            ServerMsg::new_memberremove(inner)
+            ServerMsg::new_member_remove(inner)
         }
-        EventCode::MemberUnban => ServerMsg::new_memberunban(inner),
+        EventCode::MemberUnban => ServerMsg::new_member_unban(inner),
         _ => unreachable!(),
     };
 

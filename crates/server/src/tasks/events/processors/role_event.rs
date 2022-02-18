@@ -30,7 +30,7 @@ pub async fn role_event(
             .gateway
             .broadcast_event(
                 Event::new(
-                    ServerMsg::new_roledelete(RoleDeleteEvent {
+                    ServerMsg::new_role_delete(RoleDeleteEvent {
                         id: role_id,
                         party_id,
                     }),
@@ -79,8 +79,8 @@ pub async fn role_event(
     };
 
     let event = match event {
-        EventCode::RoleCreated => ServerMsg::new_rolecreate(role),
-        EventCode::RoleUpdated => ServerMsg::new_roleupdate(role),
+        EventCode::RoleCreated => ServerMsg::new_role_create(role),
+        EventCode::RoleUpdated => ServerMsg::new_role_update(role),
         _ => unreachable!(),
     };
 

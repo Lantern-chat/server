@@ -140,7 +140,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
 
                 Item::Event(event) => match event {
                     Ok(event) => {
-                        use sdk::models::gateway::message::server::payloads::*;
+                        use sdk::models::gateway::message::server_msg_payloads::*;
 
                         // if this message corresponds to an intent, filter it
                         if let Some(matching_intent) = event.msg.matching_intent() {

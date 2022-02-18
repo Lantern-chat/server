@@ -105,7 +105,7 @@ pub async fn presence_updated(
         state
             .gateway
             .broadcast_event(
-                Event::new(ServerMsg::new_presenceupdate(Some(party_id), inner.clone()), None)?,
+                Event::new(ServerMsg::new_presence_update(Some(party_id), inner.clone()), None)?,
                 party_id,
             )
             .await;

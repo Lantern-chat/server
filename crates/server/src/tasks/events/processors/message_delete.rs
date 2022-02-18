@@ -32,7 +32,7 @@ pub async fn message_delete(
         None => return Ok(()),
     };
 
-    let event = ServerMsg::new_messagedelete(MessageDeleteEvent {
+    let event = ServerMsg::new_message_delete(MessageDeleteEvent {
         id,
         room_id,
         party_id,

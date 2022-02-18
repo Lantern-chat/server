@@ -98,7 +98,7 @@ pub async fn user_update(
 
     let (user, friend_ids, party_ids) = tokio::try_join!(user_future, friends_future, parties_future)?;
 
-    let event = Event::new(ServerMsg::new_userupdate(user), None)?;
+    let event = Event::new(ServerMsg::new_user_update(user), None)?;
 
     // shotgun the event to every relevant part
 
@@ -144,7 +144,7 @@ pub async fn self_update(
             .gateway
             .broadcast_user_event(
                 Event::new(
-                    ServerMsg::new_partyupdate(PartyUpdateEvent::Position(PartyPositionUpdate {
+                    ServerMsg::new_party_update(PartyUpdateEvent::Position(PartyPositionUpdate {
                         position,
                         id: party_id,
                     })),
@@ -198,7 +198,7 @@ pub async fn self_update(
 
     state
         .gateway
-        .broadcast_user_event(Event::new(ServerMsg::new_userupdate(user), None)?, user_id)
+        .broadcast_user_event(Event::new(ServerMsg::new_user_update(user), None)?, user_id)
         .await;
 
     Ok(())
