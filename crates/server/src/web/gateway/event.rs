@@ -56,7 +56,7 @@ impl Event {
 
 impl EncodedEvent {
     pub fn new<S: serde::Serialize>(value: &S) -> Result<Self, EventEncodingError> {
-        let as_msgpack = rmp_serde::to_vec(value)?;
+        let as_msgpack = rmp_serde::to_vec_named(value)?; // TODO: Remove the names when bugs are fixed
         let as_json = serde_json::to_vec(value)?;
 
         Ok(EncodedEvent {
