@@ -71,7 +71,8 @@ pub async fn user_update(
             )
             .await?;
 
-        let friend_ids: Vec<Snowflake> = row.try_get(0)?;
+        // aggregates can be NULL
+        let friend_ids: Option<Vec<Snowflake>> = row.try_get(0)?;
 
         Ok::<_, Error>(friend_ids)
     };
@@ -91,7 +92,8 @@ pub async fn user_update(
             )
             .await?;
 
-        let party_ids: Vec<Snowflake> = row.try_get(0)?;
+        // aggregates can be NULL
+        let party_ids: Option<Vec<Snowflake>> = row.try_get(0)?;
 
         Ok::<_, Error>(party_ids)
     };
@@ -102,12 +104,16 @@ pub async fn user_update(
 
     // shotgun the event to every relevant part
 
-    for friend_id in friend_ids {
-        state.gateway.broadcast_user_event(event.clone(), friend_id).await;
+    if let Some(friend_ids) = friend_ids {
+        for friend_id in friend_ids {
+            state.gateway.broadcast_user_event(event.clone(), friend_id).await;
+        }
     }
 
-    for party_id in party_ids {
-        state.gateway.broadcast_event(event.clone(), party_id).await;
+    if let Some(party_ids) = party_ids {
+        for party_id in party_ids {
+            state.gateway.broadcast_event(event.clone(), party_id).await;
+        }
     }
 
     // TODO: Also include open DMs
