@@ -242,8 +242,8 @@ fn query(mode: MessageSearch, check_perms: bool, thread: bool) -> impl thorn::An
         .and_where(
             // test if message is deleted
             Messages::Flags
-                .bit_and(Literal::Int2(MessageFlags::DELETED.bits()))
-                .equals(Literal::Int2(0)),
+                .bit_and(MessageFlags::DELETED.bits().lit())
+                .equals(0i16.lit()),
         )
         .limit(limit_var.clone());
 
@@ -299,15 +299,15 @@ fn query(mode: MessageSearch, check_perms: bool, thread: bool) -> impl thorn::An
                             Call::custom("jsonb_agg")
                                 .arg(
                                     Call::custom("jsonb_build_object")
-                                        .arg(Literal::TextStr("emote"))
+                                        .arg("emote".lit())
                                         .arg(Reactions::EmoteId)
-                                        .arg(Literal::TextStr("own"))
+                                        .arg("own".lit())
                                         .arg(user_id_var.clone().equals(Builtin::any(Reactions::UserIds)))
-                                        .arg(Literal::TextStr("count"))
+                                        .arg("count".lit())
                                         .arg(
                                             Call::custom("array_length")
                                                 .arg(Reactions::UserIds)
-                                                .arg(Literal::Int2(1)),
+                                                .arg(1i16.lit()),
                                         ),
                                 )
                                 .alias_to(TempReactions::Reactions),
@@ -337,8 +337,8 @@ fn query(mode: MessageSearch, check_perms: bool, thread: bool) -> impl thorn::An
             ))
             .and_where(
                 AggPerm::Perms
-                    .bit_and(Literal::Int8(READ_MESSAGES))
-                    .equals(Literal::Int8(READ_MESSAGES)),
+                    .bit_and(READ_MESSAGES.lit())
+                    .equals(READ_MESSAGES.lit()),
             )
     }
 

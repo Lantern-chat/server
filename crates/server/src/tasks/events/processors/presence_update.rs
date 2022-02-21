@@ -30,7 +30,8 @@ pub async fn presence_updated(
                                 .from_table::<PartyMember>()
                                 .expr(PartyMember::UserId.alias_to(UserParties::UserId))
                                 .expr(
-                                    Builtin::array_agg(PartyMember::PartyId).alias_to(UserParties::PartyIds),
+                                    Builtin::array_agg_nonnull(PartyMember::PartyId)
+                                        .alias_to(UserParties::PartyIds),
                                 )
                                 .group_by(PartyMember::UserId),
                         )
@@ -105,7 +106,10 @@ pub async fn presence_updated(
         state
             .gateway
             .broadcast_event(
-                Event::new(ServerMsg::new_presence_update(Some(party_id), inner.clone()), None)?,
+                Event::new(
+                    ServerMsg::new_presence_update(Some(party_id), inner.clone()),
+                    None,
+                )?,
                 party_id,
             )
             .await;

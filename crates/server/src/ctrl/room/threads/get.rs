@@ -95,8 +95,8 @@ fn get_thread_with_perms() -> impl thorn::AnyQuery {
         .and_where(Threads::Id.equals(thread_id_var))
         .and_where(
             AggPerm::Perms
-                .bit_and(Literal::Int8(READ_MESSAGES))
-                .equals(Literal::Int8(READ_MESSAGES)),
+                .bit_and(READ_MESSAGES.lit())
+                .equals(READ_MESSAGES.lit()),
         )
         .cols(crate::ctrl::room::messages::get_one::consts::COLUMNS)
         .col(/*18*/ Threads::Flags) // see test below

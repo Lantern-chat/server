@@ -102,9 +102,7 @@ pub(crate) fn select_members2() -> query::SelectQuery {
         .and_where(AggMembers::PartyId.equals(Var::of(Party::Id)))
         .and_where(
             // not banned
-            AggMembers::Flags
-                .bit_and(Literal::Int2(1))
-                .equals(Literal::Int2(0)),
+            AggMembers::Flags.bit_and(1i16.lit()).equals(0i16.lit()),
         )
 
     /*

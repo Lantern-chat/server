@@ -107,7 +107,7 @@ async fn get_room_full(
 
                     Query::select()
                         .col(Party::OwnerId)
-                        .expr(Builtin::array_agg(Roles::Id))
+                        .expr(Builtin::array_agg_nonnull(Roles::Id))
                         .expr(Builtin::bit_or(Roles::Permissions))
                         .from(
                             // select rooms and everything else dervied

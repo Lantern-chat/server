@@ -63,7 +63,7 @@ pub async fn user_update(
                     use schema::*;
 
                     Query::select()
-                        .expr(Builtin::array_agg(AggFriends::FriendId))
+                        .expr(Builtin::array_agg_nonnull(AggFriends::FriendId))
                         .from_table::<AggFriends>()
                         .and_where(AggFriends::UserId.equals(Var::of(Users::Id)))
                 },
@@ -71,8 +71,7 @@ pub async fn user_update(
             )
             .await?;
 
-        // aggregates can be NULL
-        let friend_ids: Option<Vec<Snowflake>> = row.try_get(0)?;
+        let friend_ids: Vec<Snowflake> = row.try_get(0)?;
 
         Ok::<_, Error>(friend_ids)
     };
@@ -84,7 +83,7 @@ pub async fn user_update(
                     use schema::*;
 
                     Query::select()
-                        .expr(Builtin::array_agg(PartyMember::PartyId))
+                        .expr(Builtin::array_agg_nonnull(PartyMember::PartyId))
                         .from_table::<PartyMember>()
                         .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
                 },
@@ -92,8 +91,7 @@ pub async fn user_update(
             )
             .await?;
 
-        // aggregates can be NULL
-        let party_ids: Option<Vec<Snowflake>> = row.try_get(0)?;
+        let party_ids: Vec<Snowflake> = row.try_get(0)?;
 
         Ok::<_, Error>(party_ids)
     };
@@ -104,16 +102,12 @@ pub async fn user_update(
 
     // shotgun the event to every relevant part
 
-    if let Some(friend_ids) = friend_ids {
-        for friend_id in friend_ids {
-            state.gateway.broadcast_user_event(event.clone(), friend_id).await;
-        }
+    for friend_id in friend_ids {
+        state.gateway.broadcast_user_event(event.clone(), friend_id).await;
     }
 
-    if let Some(party_ids) = party_ids {
-        for party_id in party_ids {
-            state.gateway.broadcast_event(event.clone(), party_id).await;
-        }
+    for party_id in party_ids {
+        state.gateway.broadcast_event(event.clone(), party_id).await;
     }
 
     // TODO: Also include open DMs

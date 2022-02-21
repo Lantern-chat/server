@@ -213,8 +213,8 @@ fn get_one_with_perms() -> impl AnyQuery {
         .select()
         .and_where(
             AggPerm::Perms
-                .bit_and(Literal::Int8(READ_MESSAGES))
-                .equals(Literal::Int8(READ_MESSAGES)),
+                .bit_and(READ_MESSAGES.lit())
+                .equals(READ_MESSAGES.lit()),
         )
         .from_table::<AggMessages>()
         .cols(consts::COLUMNS)

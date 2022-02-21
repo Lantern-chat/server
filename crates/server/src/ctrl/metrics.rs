@@ -169,7 +169,7 @@ fn query(start: bool, end: bool) -> impl AnyQuery {
 
     let rounded_ts = Builtin::round(
         Call::custom("date_part")
-            .args((Literal::TextStr("epoch"), Metrics::Ts))
+            .args(("epoch".lit(), Metrics::Ts))
             .div(resolution.clone()),
     )
     .cast(Type::INT8) // ensures integer rounding

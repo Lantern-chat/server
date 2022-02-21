@@ -193,12 +193,12 @@ fn query_existing_message() -> impl thorn::AnyQuery {
                     .expr(Builtin::array_agg(Attachments::FileId).alias_to(AggFileIds::FileIds))
                     .and_where(Attachments::MessageId.equals(Messages::Id)),
             )))
-            .on(Literal::TRUE),
+            .on(true.lit()),
         )
         .and_where(
             Messages::Flags
-                .bit_and(Literal::Int2(MessageFlags::DELETED.bits()))
-                .equals(Literal::Int2(0)),
+                .bit_and(MessageFlags::DELETED.bits().lit())
+                .equals(0i16.lit()),
         )
 }
 
@@ -243,7 +243,7 @@ fn orphan_attachments_query() -> impl thorn::AnyQuery {
         .table::<Attachments>()
         .set(
             Attachments::Flags,
-            Attachments::Flags.bit_or(Literal::Int2(flags::AttachmentFlags::ORPHANED.bits())),
+            Attachments::Flags.bit_or(flags::AttachmentFlags::ORPHANED.bits().lit()),
         )
         .and_where(Attachments::FileId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))
 }

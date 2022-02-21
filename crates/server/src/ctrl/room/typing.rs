@@ -72,7 +72,7 @@ pub async fn trigger_typing(
                                 )
                                 .and_where(RoleMembers::UserId.equals(Users::Id)),
                         )))
-                        .on(Literal::TRUE),
+                        .on(true.lit()),
                     )
                     .and_where(Users::Id.equals(user_id_var))
             },

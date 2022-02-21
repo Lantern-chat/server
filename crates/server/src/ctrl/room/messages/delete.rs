@@ -66,9 +66,7 @@ fn delete_without_perms() -> impl AnyQuery {
         .and_where(Messages::Id.equals(Var::of(Messages::Id)))
         .and_where(
             // prevent double-updates
-            Messages::Flags
-                .bit_and(DELETED_FLAG.clone())
-                .equals(Literal::Int2(0)),
+            Messages::Flags.bit_and(DELETED_FLAG.clone()).equals(0i16.lit()),
         )
 }
 
@@ -82,9 +80,7 @@ fn delete_if_own() -> impl AnyQuery {
         .and_where(Messages::UserId.equals(Var::of(Users::Id)))
         .and_where(
             // prevent double-updates
-            Messages::Flags
-                .bit_and(DELETED_FLAG.clone())
-                .equals(Literal::Int2(0)),
+            Messages::Flags.bit_and(DELETED_FLAG.clone()).equals(0i16.lit()),
         )
 }
 
@@ -122,16 +118,14 @@ fn delete_with_perms() -> impl AnyQuery {
         .table::<Messages>()
         .and_where(
             AggPerm::Perms
-                .bit_and(Literal::Int8(MANAGE_MESSAGE))
-                .equals(Literal::Int8(MANAGE_MESSAGE))
+                .bit_and(MANAGE_MESSAGE.lit())
+                .equals(MANAGE_MESSAGE.lit())
                 .or(Messages::UserId.equals(user_id_var)),
         )
         .set(Messages::Flags, Messages::Flags.bit_or(DELETED_FLAG.clone()))
         .and_where(Messages::Id.equals(msg_id_var))
         .and_where(
             // prevent double-updates
-            Messages::Flags
-                .bit_and(DELETED_FLAG.clone())
-                .equals(Literal::Int2(0)),
+            Messages::Flags.bit_and(DELETED_FLAG.clone()).equals(0i16.lit()),
         )
 }

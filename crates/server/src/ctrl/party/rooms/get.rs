@@ -46,7 +46,7 @@ pub async fn get_rooms(
 
                     Query::select()
                         .col(Party::OwnerId)
-                        .expr(Builtin::array_agg(Roles::Id))
+                        .expr(Builtin::array_agg_nonnull(Roles::Id))
                         .expr(Builtin::bit_or(Roles::Permissions))
                         .from(
                             Roles::left_join_table::<Party>()
