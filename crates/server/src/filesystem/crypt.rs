@@ -27,7 +27,8 @@ impl<F> EncryptedFile<F> {
     where
         F: AsyncWrite,
     {
-        EncryptedFile::new(BufWriter::new(inner), cipher)
+        // buffer with 1MiB to avoid rewinding the cipher as often
+        EncryptedFile::new(BufWriter::with_capacity(1024 * 1024, inner), cipher)
     }
 
     pub fn get_ref(&self) -> &F {

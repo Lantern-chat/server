@@ -110,16 +110,19 @@ pub async fn patch_file(
     }
 
     let mut res = loop {
-        match body.next().await {
+        // flush file to disk and get next chunk at the same time
+        let (chunk, flush_result) = tokio::join!(body.next(), file.flush());
+
+        if let Err(e) = flush_result {
+            break Some(e.into());
+        }
+
+        match chunk {
             None => break None,
             Some(Err(e)) => {
                 let is_fatal = e.is_parse() || e.is_parse_status() || e.is_parse_too_large() || e.is_user();
 
-                break Some(if is_fatal {
-                    Error::InternalError(e.to_string())
-                } else {
-                    Error::UploadError
-                });
+                break Some(if is_fatal { Error::InternalError(e.to_string()) } else { Error::UploadError });
             }
             Some(Ok(mut bytes)) => {
                 let num_bytes = bytes.len() as u64;
