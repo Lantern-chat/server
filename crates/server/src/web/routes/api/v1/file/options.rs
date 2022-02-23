@@ -13,8 +13,7 @@ pub async fn options(route: Route<ServerState>, auth: Authorization) -> Response
         Err(e) => return ApiError::err(e).into_response(),
     };
 
-    let mut res = Response::default();
-    *res.status_mut() = StatusCode::NO_CONTENT;
+    let mut res = reply::json(&options).into_response();
 
     let headers = res.headers_mut();
 
