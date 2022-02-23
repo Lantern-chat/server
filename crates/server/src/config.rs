@@ -3,7 +3,7 @@ use std::{env, time::Duration};
 
 use std::ops::Range;
 
-use aes::{cipher::BlockCipherKey, Aes256};
+use aes::{cipher::BlockCipherKey, Aes128, Aes256};
 
 // TODO: Construct a set of "limitations" for each tier of user, which will be combined based on which premium plans they have
 pub struct Limitations {
@@ -34,9 +34,7 @@ pub struct LanternConfig {
     pub max_avatar_width: u32,
     pub file_key: BlockCipherKey<Aes256>,
     pub mfa_key: BlockCipherKey<Aes256>,
-
-    /// AES-128 key for encrypting snowflakes
-    pub sf_key: u128,
+    pub sf_key: BlockCipherKey<Aes128>,
 
     pub data_path: PathBuf,
 
@@ -72,30 +70,9 @@ impl Default for LanternConfig {
             monthly_premium_upload_quota: GIBIBYTE * 6, // 6 GiB
             max_avatar_pixels: 1024 * 1024,             // 32-bit color * 1024^2 = 2.56 MiB RAM usage
             max_avatar_width: 256,
-            file_key: {
-                let mut key: BlockCipherKey<Aes256> = BlockCipherKey::<Aes256>::default();
-
-                hex::decode_to_slice(env::var("FS_KEY").unwrap(), key.as_mut_slice())
-                    .expect("Invalid hexidecimal AES256 Key: FS_KEY");
-
-                key
-            },
-            mfa_key: {
-                let mut key: BlockCipherKey<Aes256> = BlockCipherKey::<Aes256>::default();
-
-                hex::decode_to_slice(env::var("MFA_KEY").unwrap(), key.as_mut_slice())
-                    .expect("Invalid hexidecimal AES256 Key: MFA_KEY");
-
-                key
-            },
-            sf_key: {
-                let mut key = [0u8; 16];
-
-                hex::decode_to_slice(env::var("SF_KEY").unwrap(), &mut key)
-                    .expect("Invalid hexidecimal AES128 Key: SF_KEY");
-
-                u128::from_le_bytes(key)
-            },
+            file_key: read_key("FS_KEY").into(),
+            mfa_key: read_key("MFA_KEY").into(),
+            sf_key: read_key("SF_KEY").into(),
             data_path: { PathBuf::from(env::var("DATA_DIR").unwrap()) },
             cert_path: { PathBuf::from(env::var("CERT_PATH").unwrap()) },
             key_path: { PathBuf::from(env::var("KEY_PATH").unwrap()) },
@@ -103,4 +80,13 @@ impl Default for LanternConfig {
             hcaptcha_sitekey: { env::var("HCAPTCHA_SITEKEY").unwrap() },
         }
     }
+}
+
+fn read_key<const N: usize>(name: &'static str) -> [u8; N] {
+    let mut key = [0; N];
+
+    hex::decode_to_slice(env::var(name).unwrap(), &mut key)
+        .unwrap_or_else(|_| panic!("Invalid hexidecimal {}-bit encryption key: {}", N * 8, name));
+
+    key
 }
