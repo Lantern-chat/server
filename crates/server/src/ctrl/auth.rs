@@ -2,7 +2,8 @@ use std::fmt;
 use std::str::FromStr;
 use std::time::SystemTime;
 
-use schema::auth::{AuthToken, RawAuthToken};
+use schema::auth::{AuthToken, RawAuthToken, SplitBotTokenExt};
+use sdk::models::SplitBotToken;
 
 pub trait AuthTokenExt {
     fn random_bearer() -> Self;
@@ -38,7 +39,10 @@ pub async fn do_auth(state: &ServerState, token: RawAuthToken) -> Result<Authori
         Some(auth) => Some(auth),
         None => match token {
             RawAuthToken::Bearer(bytes) => do_user_auth(state, &bytes, token).await?,
-            RawAuthToken::Bot(token) => return Err(Error::Unimplemented),
+            RawAuthToken::Bot(token) => match token.verify(&state.config.bt_key) {
+                false => return Err(Error::Unauthorized),
+                true => do_bot_auth(state, token).await?,
+            },
         },
     };
 
@@ -86,4 +90,8 @@ pub async fn do_user_auth(
         }),
         None => None,
     })
+}
+
+pub async fn do_bot_auth(state: &ServerState, token: SplitBotToken) -> Result<Option<Authorization>, Error> {
+    unimplemented!()
 }

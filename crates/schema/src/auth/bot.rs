@@ -9,6 +9,7 @@ use sdk::models::SplitBotToken;
 
 pub trait SplitBotTokenExt {
     fn verify(&self, key: &BotTokenKey) -> bool;
+    fn compute_hmac(&self, key: &BotTokenKey) -> [u8; 20];
 }
 
 impl SplitBotTokenExt for SplitBotToken {
@@ -16,5 +17,11 @@ impl SplitBotTokenExt for SplitBotToken {
         let mut mac = Sha1Hmac::new(key);
         mac.update(&self.to_bytes()[0..16]);
         mac.verify_slice(&self.hmac).is_ok()
+    }
+
+    fn compute_hmac(&self, key: &BotTokenKey) -> [u8; 20] {
+        let mut mac = Sha1Hmac::new(key);
+        mac.update(&self.to_bytes()[0..16]);
+        mac.finalize().into_bytes().into()
     }
 }

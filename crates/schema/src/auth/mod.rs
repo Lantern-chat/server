@@ -1,4 +1,4 @@
-use std::{fmt, mem::size_of};
+use std::fmt;
 
 use sdk::models::{BearerToken, BotToken, InvalidAuthToken, SplitBotToken};
 
@@ -11,7 +11,7 @@ const fn base64bytes(bytes: usize) -> usize {
 }
 
 const BEARER_BYTES_LEN: usize = 21;
-const BOT_BYTES_LEN: usize = size_of::<SplitBotToken>(); // should be 32
+const BOT_BYTES_LEN: usize = SplitBotToken::SPLIT_BOT_TOKEN_SIZE; // should be 36
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RawAuthToken {
