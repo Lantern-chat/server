@@ -15,7 +15,5 @@ pub async fn authorize(route: &Route<ServerState>) -> Result<Authorization, Erro
         None => return Err(Error::MissingAuthorizationHeader),
     };
 
-    let token = RawAuthToken::from_header(header)?;
-
-    auth::do_auth(&route.state, token).await
+    auth::do_auth(&route.state, RawAuthToken::from_header(header)?).await
 }

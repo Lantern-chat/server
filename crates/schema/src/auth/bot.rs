@@ -5,23 +5,33 @@ type Sha1Hmac = SimpleHmac<Sha1>;
 
 pub type BotTokenKey = Key<Sha1Hmac>;
 
-use sdk::models::SplitBotToken;
+use sdk::models::{Snowflake, SplitBotToken};
 
 pub trait SplitBotTokenExt {
+    fn new(key: &BotTokenKey, id: Snowflake, ts: u64) -> Self;
     fn verify(&self, key: &BotTokenKey) -> bool;
-    fn compute_hmac(&self, key: &BotTokenKey) -> [u8; 20];
 }
 
 impl SplitBotTokenExt for SplitBotToken {
+    fn new(key: &BotTokenKey, id: Snowflake, ts: u64) -> Self {
+        let mut t = SplitBotToken {
+            id,
+            ts,
+            hmac: [0; 20],
+        };
+
+        t.hmac = {
+            let mut mac = Sha1Hmac::new(key);
+            mac.update(&t.to_bytes()[0..16]);
+            mac.finalize().into_bytes().into()
+        };
+
+        t
+    }
+
     fn verify(&self, key: &BotTokenKey) -> bool {
         let mut mac = Sha1Hmac::new(key);
         mac.update(&self.to_bytes()[0..16]);
         mac.verify_slice(&self.hmac).is_ok()
-    }
-
-    fn compute_hmac(&self, key: &BotTokenKey) -> [u8; 20] {
-        let mut mac = Sha1Hmac::new(key);
-        mac.update(&self.to_bytes()[0..16]);
-        mac.finalize().into_bytes().into()
     }
 }
