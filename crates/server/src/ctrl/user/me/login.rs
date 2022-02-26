@@ -123,6 +123,10 @@ pub async fn do_login(
     now: std::time::SystemTime,
 ) -> Result<Session, Error> {
     let token = RawAuthToken::random_bearer();
+    let bytes = match token {
+        RawAuthToken::Bearer(ref bytes) => &bytes[..],
+        _ => unreachable!(),
+    };
 
     let expires = now + state.config.login_session_duration;
 
@@ -148,7 +152,7 @@ pub async fn do_login(
                     Var::of(Sessions::Addr),
                 ])
         },
-        &[&token.as_ref(), &user_id, &expires, &addr.ip()],
+        &[&bytes, &user_id, &expires, &addr.ip()],
     )
     .await?;
 

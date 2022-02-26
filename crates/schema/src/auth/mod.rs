@@ -1,6 +1,6 @@
-use std::fmt;
+use std::{fmt, mem::size_of};
 
-use sdk::models::{BearerToken, BotToken, InvalidAuthToken};
+use sdk::models::{BearerToken, BotToken, InvalidAuthToken, SplitBotToken};
 
 pub use sdk::models::AuthToken;
 
@@ -11,26 +11,29 @@ const fn base64bytes(bytes: usize) -> usize {
 }
 
 const BEARER_BYTES_LEN: usize = 21;
-const BOT_BYTES_LEN: usize = 48;
+const BOT_BYTES_LEN: usize = size_of::<SplitBotToken>(); // should be 32
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RawAuthToken {
     Bearer([u8; BEARER_BYTES_LEN]),
-    Bot([u8; BOT_BYTES_LEN]),
+    Bot(SplitBotToken),
 }
 
 static_assertions::const_assert_eq!(base64bytes(BEARER_BYTES_LEN), BearerToken::LEN);
 static_assertions::const_assert_eq!(base64bytes(BOT_BYTES_LEN), BotToken::LEN);
 
-impl AsRef<[u8]> for RawAuthToken {
-    #[inline]
-    fn as_ref(&self) -> &[u8] {
-        match *self {
-            RawAuthToken::Bearer(ref bytes) => bytes,
-            RawAuthToken::Bot(ref bytes) => bytes,
-        }
-    }
-}
+//impl AsRef<[u8]> for RawAuthToken {
+//    #[inline]
+//    fn as_ref(&self) -> &[u8] {
+//        match *self {
+//            RawAuthToken::Bearer(ref bytes) => bytes,
+//            RawAuthToken::Bot(ref bytes) => bytes.as_ref(),
+//        }
+//    }
+//}
+
+mod bot;
+pub use bot::{BotTokenKey, SplitBotTokenExt};
 
 #[derive(Debug, thiserror::Error)]
 pub enum AuthTokenError {
@@ -53,11 +56,11 @@ impl RawAuthToken {
         RawAuthToken::Bearer(bytes)
     }
 
-    pub fn bot(mut rng: impl RngCore) -> Self {
-        let mut bytes = [0; BOT_BYTES_LEN];
-        rng.fill_bytes(&mut bytes);
-        RawAuthToken::Bot(bytes)
-    }
+    //pub fn bot(mut rng: impl RngCore) -> Self {
+    //    let mut bytes = [0; BOT_BYTES_LEN];
+    //    rng.fill_bytes(&mut bytes);
+    //    RawAuthToken::Bot(bytes)
+    //}
 
     pub fn from_header(value: &str) -> Result<Self, AuthTokenError> {
         AuthToken::from_header(value)?.try_into()
@@ -74,12 +77,7 @@ impl From<RawAuthToken> for AuthToken {
                 debug_assert!(n == BearerToken::LEN);
                 AuthToken::Bearer(s)
             },
-            RawAuthToken::Bot(bytes) => unsafe {
-                let mut s = BotToken::zeroized();
-                let n = base64::encode_config_slice(bytes, base64::STANDARD_NO_PAD, s.as_bytes_mut());
-                debug_assert!(n == BotToken::LEN);
-                AuthToken::Bot(s)
-            },
+            RawAuthToken::Bot(token) => AuthToken::Bot(token.format()),
         }
     }
 }
@@ -94,11 +92,7 @@ impl TryFrom<AuthToken> for RawAuthToken {
                 base64::decode_config_slice(token, base64::STANDARD_NO_PAD, &mut bytes)?;
                 RawAuthToken::Bearer(bytes)
             }
-            AuthToken::Bot(token) => {
-                let mut bytes = [0; BOT_BYTES_LEN];
-                base64::decode_config_slice(token, base64::STANDARD_NO_PAD, &mut bytes)?;
-                RawAuthToken::Bot(bytes)
-            }
+            AuthToken::Bot(token) => RawAuthToken::Bot(token.parse()?),
         })
     }
 }
@@ -116,11 +110,7 @@ impl TryFrom<&[u8]> for RawAuthToken {
         }
 
         if bytes.len() == BOT_BYTES_LEN {
-            return Ok(RawAuthToken::Bot({
-                let mut buf = [0; BOT_BYTES_LEN];
-                buf.copy_from_slice(bytes);
-                buf
-            }));
+            return Ok(RawAuthToken::Bot(SplitBotToken::try_from(bytes)?));
         }
 
         Err(InvalidAuthToken.into())

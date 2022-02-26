@@ -1,7 +1,14 @@
+use schema::auth::RawAuthToken;
+
 use crate::ctrl::{auth, Error};
 use crate::ServerState;
 
 pub async fn logout_user(state: ServerState, auth: auth::Authorization) -> Result<(), Error> {
+    let bytes = match auth.token {
+        RawAuthToken::Bearer(ref bytes) => &bytes[..],
+        _ => return Err(Error::BadRequest),
+    };
+
     let db = state.db.write.get().await?;
 
     let res = db
@@ -14,7 +21,7 @@ pub async fn logout_user(state: ServerState, auth: auth::Authorization) -> Resul
                     .from::<Sessions>()
                     .and_where(Sessions::Token.equals(Var::of(Sessions::Token)))
             },
-            &[&auth.token.as_ref()],
+            &[&bytes],
         )
         .await?;
 
