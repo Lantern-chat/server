@@ -4,6 +4,7 @@ use std::{env, time::Duration};
 use std::ops::Range;
 
 use aes::{cipher::BlockCipherKey, Aes128, Aes256};
+use schema::auth::BotTokenKey;
 
 // TODO: Construct a set of "limitations" for each tier of user, which will be combined based on which premium plans they have
 pub struct Limitations {
@@ -35,6 +36,7 @@ pub struct LanternConfig {
     pub file_key: BlockCipherKey<Aes256>,
     pub mfa_key: BlockCipherKey<Aes256>,
     pub sf_key: BlockCipherKey<Aes128>,
+    pub bt_key: BotTokenKey,
 
     pub data_path: PathBuf,
 
@@ -73,6 +75,7 @@ impl Default for LanternConfig {
             file_key: read_key("FS_KEY").into(),
             mfa_key: read_key("MFA_KEY").into(),
             sf_key: read_key("SF_KEY").into(),
+            bt_key: read_key("BT_KEY").into(),
             data_path: { PathBuf::from(env::var("DATA_DIR").unwrap()) },
             cert_path: { PathBuf::from(env::var("CERT_PATH").unwrap()) },
             key_path: { PathBuf::from(env::var("KEY_PATH").unwrap()) },
@@ -85,8 +88,11 @@ impl Default for LanternConfig {
 fn read_key<const N: usize>(name: &'static str) -> [u8; N] {
     let mut key = [0; N];
 
-    hex::decode_to_slice(env::var(name).unwrap(), &mut key)
-        .unwrap_or_else(|_| panic!("Invalid hexidecimal {}-bit encryption key: {}", N * 8, name));
+    hex::decode_to_slice(
+        env::var(name).unwrap_or_else(|_| panic!("Missing environment variable \"{}\"", name)),
+        &mut key,
+    )
+    .unwrap_or_else(|_| panic!("Invalid hexidecimal {}-bit encryption key: \"{}\"", N * 8, name));
 
     key
 }
