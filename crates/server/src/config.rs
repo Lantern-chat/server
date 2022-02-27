@@ -72,10 +72,10 @@ impl Default for LanternConfig {
             monthly_premium_upload_quota: GIBIBYTE * 6, // 6 GiB
             max_avatar_pixels: 1024 * 1024,             // 32-bit color * 1024^2 = 2.56 MiB RAM usage
             max_avatar_width: 256,
-            file_key: read_key("FS_KEY").into(),
-            mfa_key: read_key("MFA_KEY").into(),
-            sf_key: read_key("SF_KEY").into(),
-            bt_key: read_key("BT_KEY").into(),
+            file_key: read_hex_key("FS_KEY", true).into(),
+            mfa_key: read_hex_key("MFA_KEY", true).into(),
+            sf_key: read_hex_key("SF_KEY", true).into(),
+            bt_key: read_hex_key("BT_KEY", false).into(),
             data_path: { PathBuf::from(env::var("DATA_DIR").unwrap()) },
             cert_path: { PathBuf::from(env::var("CERT_PATH").unwrap()) },
             key_path: { PathBuf::from(env::var("KEY_PATH").unwrap()) },
@@ -85,14 +85,21 @@ impl Default for LanternConfig {
     }
 }
 
-fn read_key<const N: usize>(name: &'static str) -> [u8; N] {
-    let mut key = [0; N];
+fn read_hex_key<const N: usize>(name: &'static str, strict: bool) -> [u8; N] {
+    let value = env::var(name).unwrap_or_else(|_| panic!("Missing environment variable \"{}\"", name));
+    let hex_len = value.len();
 
-    hex::decode_to_slice(
-        env::var(name).unwrap_or_else(|_| panic!("Missing environment variable \"{}\"", name)),
-        &mut key,
-    )
-    .unwrap_or_else(|_| panic!("Invalid hexidecimal {}-bit encryption key: \"{}\"", N * 8, name));
+    if hex_len < 32 {
+        panic!("Don't use key sizes under 128-bits for key: \"{}\"", name);
+    }
+
+    let mut key = [0; N];
+    if strict && key.len() * 2 != hex_len {
+        panic!("Length mismatch for {}-bit key: \"{}\"", N * 8, name);
+    }
+
+    hex::decode_to_slice(value, &mut key[..hex_len / 2])
+        .unwrap_or_else(|_| panic!("Invalid hexidecimal {}-bit encryption key: \"{}\"", N * 8, name));
 
     key
 }

@@ -26,3 +26,4 @@ hmac = "0.12"
 
 [dev-dependencies]
 serde_json = "1.0.64"
+hex = "0.4.3"

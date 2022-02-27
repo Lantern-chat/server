@@ -43,3 +43,27 @@ impl SplitBotTokenExt for SplitBotToken {
         token_mac(self, key).verify_slice(&self.hmac).is_ok()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::SnowflakeExt;
+
+    use super::*;
+
+    #[test]
+    fn test_new_bot_token() {
+        fn parse_key<const N: usize>(key: &str) -> [u8; N] {
+            let mut out = [0; N];
+            hex::decode_to_slice(key, &mut out[..key.len() / 2]).unwrap();
+            out
+        }
+
+        let key: BotTokenKey = parse_key("5f38e06b42428527d49db9513b251651").into();
+
+        let token = SplitBotToken::new(&key, Snowflake::now());
+
+        println!("{}", token.format());
+
+        assert!(token.verify(&key));
+    }
+}
