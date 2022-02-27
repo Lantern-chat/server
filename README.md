@@ -20,7 +20,7 @@ MFA_KEY=44fdf0178a056a9c036b650a20524c18a22d624cae2263605e4004e9124502a3
 # File encryption key (64 hex digits exact)
 FS_KEY=177413173be53067be07bfd967c772db40febb53b27c7ccac94744535df200ab
 DATA_DIR="./data" # Location that files will be stored
-# Snowflake encryption key (used to obscure IDs in a reversable way) (32 hex digit exacts)
+# Snowflake encryption key (used to obscure IDs in a reversable way) (32 hex digits exact)
 SF_KEY=66908925cc6b22855aca27c8995ca4c3
 # 128-512 -bit key used for computing bot token HMACs (min 32 hex digits, max 128 hex digits)
 BT_KEY=5f38e06b42428527d49db9513b251651
