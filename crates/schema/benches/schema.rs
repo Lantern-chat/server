@@ -1,11 +1,9 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use schema::{
-    auth::{BotTokenKey, SplitBotTokenExt},
+    auth::{BotTokenKey, SplitBotToken},
     Snowflake, SnowflakeExt,
 };
-use sdk::models::SplitBotToken;
-
 fn parse_key<const N: usize>(key: &str) -> [u8; N] {
     let mut out = [0; N];
     hex::decode_to_slice(key, &mut out[..key.len() / 2]).unwrap();

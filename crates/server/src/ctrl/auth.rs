@@ -2,8 +2,7 @@ use std::fmt;
 use std::str::FromStr;
 use std::time::SystemTime;
 
-use schema::auth::{AuthToken, RawAuthToken, SplitBotTokenExt};
-use sdk::models::SplitBotToken;
+use schema::auth::{AuthToken, RawAuthToken, SplitBotToken};
 
 pub trait AuthTokenExt {
     fn random_bearer() -> Self;

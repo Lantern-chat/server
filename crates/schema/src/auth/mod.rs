@@ -1,8 +1,11 @@
 use std::fmt;
 
-use sdk::models::{BearerToken, BotToken, InvalidAuthToken, SplitBotToken};
+use sdk::models::{BearerToken, BotToken, InvalidAuthToken};
 
 pub use sdk::models::AuthToken;
+
+mod bot;
+pub use bot::{BotTokenKey, SplitBotToken};
 
 // (4 * bytes) / 3, rounded up to nearest multiple of 4 for padding
 #[allow(dead_code)]
@@ -21,19 +24,6 @@ pub enum RawAuthToken {
 
 static_assertions::const_assert_eq!(base64bytes(BEARER_BYTES_LEN), BearerToken::LEN);
 static_assertions::const_assert_eq!(base64bytes(BOT_BYTES_LEN), BotToken::LEN);
-
-//impl AsRef<[u8]> for RawAuthToken {
-//    #[inline]
-//    fn as_ref(&self) -> &[u8] {
-//        match *self {
-//            RawAuthToken::Bearer(ref bytes) => bytes,
-//            RawAuthToken::Bot(ref bytes) => bytes.as_ref(),
-//        }
-//    }
-//}
-
-mod bot;
-pub use bot::{BotTokenKey, SplitBotTokenExt};
 
 #[derive(Debug, thiserror::Error)]
 pub enum AuthTokenError {
