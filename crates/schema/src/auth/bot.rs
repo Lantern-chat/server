@@ -40,7 +40,8 @@ impl SplitBotTokenExt for SplitBotToken {
     }
 
     fn verify(&self, key: &BotTokenKey) -> bool {
-        token_mac(self, key).verify_slice(&self.hmac).is_ok()
+        //token_mac(self, key).verify_slice(&self.hmac).is_ok()
+        self.hmac == token_mac(self, key).finalize_fixed().as_slice()
     }
 }
 
