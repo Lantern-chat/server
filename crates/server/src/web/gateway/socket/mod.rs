@@ -286,6 +286,10 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
 
                             continue 'event_loop; // no reply, so continue event loop
                         }
+                        ClientMsg::Subscribe { .. } | ClientMsg::Unsubscribe { .. } => {
+                            log::error!("Unimplemented sub");
+                            break 'event_loop;
+                        }
                     },
                     Err(e) => match e {
                         _ if e.is_close() => {
