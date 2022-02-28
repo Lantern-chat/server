@@ -2,7 +2,6 @@
 headers = { git = "https://github.com/Lantern-chat/headers" }
 smol_str = { git = "https://github.com/Lantern-chat/smol_str" }
 failsafe = { git = "https://github.com/Lantern-chat/failsafe-rs" }
-crc32fast = { git = "https://github.com/Lantern-chat/rust-crc32fast" }
 
 # Contains fixes for nightly
 rand = { git = "https://github.com/rust-random/rand" }
