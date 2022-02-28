@@ -18,7 +18,7 @@ pub async fn delete_msg(
 
     if let Some(ref perm) = perm {
         // user cannot view channel at all
-        if !perm.perm.room.contains(RoomPermissions::READ_MESSAGES) {
+        if !perm.perm.room.contains(RoomPermissions::READ_MESSAGE_HISTORY) {
             return Err(Error::Unauthorized);
         }
     }

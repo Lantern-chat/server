@@ -36,6 +36,15 @@ pub struct PermMute {
     pub muted: bool,
 }
 
+impl std::ops::Deref for PermMute {
+    type Target = Permission;
+
+    #[inline]
+    fn deref(&self) -> &Permission {
+        &self.perm
+    }
+}
+
 // TODO: Maybe add per-party caching as well?
 struct UserCache {
     room: HashMap<RoomId, PermMute, SHB>,

@@ -9,7 +9,7 @@ use std::{
 
 use futures::{
     future::{self, Either},
-    stream::{self, AbortHandle, Abortable},
+    stream::{self, AbortHandle, Abortable, BoxStream, SelectAll},
     Future, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
 };
 
@@ -35,6 +35,7 @@ use crate::{
 use super::{
     conn::GatewayConnection,
     event::{EncodedEvent, Event},
+    PartySubscription,
 };
 
 use sdk::models::gateway::message::{ClientMsg, ServerMsg};
@@ -72,6 +73,8 @@ lazy_static::lazy_static! {
     pub static ref HEARTBEAT_ACK: Event = Event::new(ServerMsg::new_heartbeat_ack(), None).unwrap();
     pub static ref INVALID_SESSION: Event = Event::new(ServerMsg::new_invalid_session(), None).unwrap();
 }
+
+type ListenerTable = HashMap<Snowflake, AbortHandle>;
 
 pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr, state: ServerState) {
     tokio::spawn(async move {
@@ -119,14 +122,12 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
         let mut listener_table = HashMap::new();
 
         // aggregates all event streams into one
-        let mut events = stream::SelectAll::<stream::BoxStream<Item>>::new();
+        let mut events: SelectAll<BoxStream<Item>> = SelectAll::<BoxStream<Item>>::new();
 
         // Push Hello event to begin stream and forward ws_rx/conn_rx into events
         events.push(stream::once(future::ready(Item::Event(Ok(HELLO_EVENT.clone())))).boxed());
         events.push(ws_rx.map(|msg| Item::Msg(msg)).boxed());
         events.push(conn_rx.map(|msg| Item::Event(Ok(msg))).boxed());
-
-        //let _ = conn.tx.send(HELLO_EVENT.clone()).await;
 
         // Make the new connection known to the gateway
         state.gateway.add_connection(conn.clone()).await;
@@ -155,37 +156,27 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                                 // this will ensure the stream ends after this event
                                 events.clear();
                             }
-                            // TODO: Make this non-blocking for the event-loop?
                             ServerMsg::Ready {
                                 payload: ReadyPayload { inner: ref ready },
                                 ..
                             } => {
                                 user_id = Some(ready.user.id);
 
-                                // subscribe to all relevant party broadcasts
-                                // and activate the connection for per-user events
-                                let subs = state
-                                    .gateway
-                                    .sub_and_activate_connection(
-                                        ready.user.id,
-                                        conn.clone(),
-                                        // NOTE: https://github.com/rust-lang/rust/issues/70263
-                                        ready.parties.iter().map(crate::util::passthrough(|p: &sdk::models::Party| &p.id)),
-                                    )
-                                    .await;
-
-                                // iterate through subscribed parties
-                                events.extend(subs.into_iter().map(|sub| {
-                                    // take their broadcast stream and wrap it in an abort signal
-                                    // this is so we can unsubscribe later if needed
-                                    let (stream, handle) = stream::abortable(BroadcastStream::new(sub.rx));
-
-                                    listener_table.insert(sub.party_id, handle);
-
-                                    // map the stream to the `Item` type
-                                    stream.map(|event| Item::Event(event.map_err(Into::into))).boxed()
-                                }));
+                                register_subs(
+                                    &mut events,
+                                    &mut listener_table,
+                                    state
+                                        .gateway
+                                        .sub_and_activate_connection(
+                                            ready.user.id,
+                                            conn.clone(),
+                                            // NOTE: https://github.com/rust-lang/rust/issues/70263
+                                            ready.parties.iter().map(crate::util::passthrough(|p: &sdk::models::Party| &p.id)),
+                                        )
+                                        .await,
+                                )
                             }
+                            // for other events, session must be authenticated and have permission to view such events
                             _ => match user_id {
                                 None => {
                                     log::warn!("Attempted to receive events before user_id was set");
@@ -194,51 +185,24 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                                 Some(user_id) => {
                                     if let Some(room_id) = event.room_id {
                                         match state.perm_cache.get(user_id, room_id).await {
-                                            // if no permission cache was found, refresh it
-                                            // takes ownership of the event and will retry when done
                                             None => {
-                                                let state = state.clone();
-                                                let conn = conn.clone();
-                                                tokio::spawn(async move {
-                                                    if let Ok(db) = state.db.read.get().await {
-                                                        if let Ok(_) = crate::ctrl::gateway::refresh::refresh_room_perms(&state, &db, user_id).await {
-                                                            // double-check once refreshed. Only if it really exists should it continue.
-                                                            if state.perm_cache.get(user_id, room_id).await.is_some() {
-                                                                // we don't care about the result of this
-                                                                let _ = conn.tx.send(event).await;
-
-                                                                return;
-                                                            }
-                                                        }
-                                                    }
-
-                                                    // if we *still* don't have the permissions or an error occured, kick.
-                                                    let _ = conn.tx.send(INVALID_SESSION.clone()).await;
-                                                });
-
+                                                // if no permission cache was found, refresh it.
+                                                // takes ownership of the event and will retry when done
+                                                tokio::spawn(refresh_and_retry(state.clone(), conn.clone(), event, user_id, room_id));
                                                 continue 'event_loop;
                                             }
-                                            Some(PermMute { perm, .. }) => {
-                                                if !perm.room.contains(RoomPermissions::READ_MESSAGES) {
-                                                    continue 'event_loop;
-                                                }
-                                            }
+                                            // skip event if user can't view room
+                                            Some(perms) if !perms.room.contains(RoomPermissions::VIEW_ROOM) => continue 'event_loop,
+                                            _ => { /* send message as normal*/ }
                                         }
                                     }
 
                                     match event.msg {
-                                        ServerMsg::PartyCreate { ref payload, .. } => {
-                                            // this follows the same pattern as ServerMsg::Ready
-                                            let subs = state.gateway.sub_and_activate_connection(user_id, conn.clone(), &[payload.inner.id]).await;
-
-                                            events.extend(subs.into_iter().map(|sub| {
-                                                let (stream, handle) = stream::abortable(BroadcastStream::new(sub.rx));
-
-                                                listener_table.insert(sub.party_id, handle);
-
-                                                stream.map(|event| Item::Event(event.map_err(Into::into))).boxed()
-                                            }));
-                                        }
+                                        ServerMsg::PartyCreate { ref payload, .. } => register_subs(
+                                            &mut events,
+                                            &mut listener_table,
+                                            state.gateway.sub_and_activate_connection(user_id, conn.clone(), &[payload.inner.id]).await,
+                                        ),
                                         ServerMsg::PartyDelete { ref payload, .. } => {
                                             // by cancelling a stream, it will be removed from the SelectStream automatically
                                             if let Some(event_stream) = listener_table.get(&payload.id) {
@@ -276,7 +240,6 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                             match user_id {
                                 None => {
                                     log::warn!("Attempted to set presence before identification");
-
                                     break 'event_loop;
                                 }
                                 Some(user_id) => {
@@ -287,8 +250,8 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                             continue 'event_loop; // no reply, so continue event loop
                         }
                         ClientMsg::Subscribe { .. } | ClientMsg::Unsubscribe { .. } => {
-                            log::error!("Unimplemented sub");
-                            break 'event_loop;
+                            log::error!("Unimplemented sub/unsub");
+                            continue 'event_loop; // no reply
                         }
                     },
                     Err(e) => match e {
@@ -415,4 +378,37 @@ fn decompress_if(cond: bool, msg: &[u8]) -> Result<Cow<[u8]>, std::io::Error> {
     };
 
     return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, err));
+}
+
+async fn refresh_and_retry(state: ServerState, conn: GatewayConnection, event: Event, user_id: Snowflake, room_id: Snowflake) {
+    if let Ok(db) = state.db.read.get().await {
+        if let Ok(_) = crate::ctrl::gateway::refresh::refresh_room_perms(&state, &db, user_id).await {
+            // double-check once refreshed. Only if it really exists should it continue.
+            if state.perm_cache.get(user_id, room_id).await.is_some() {
+                // we don't care about the result of this
+                let _ = conn.tx.send(event).await;
+
+                return;
+            }
+        }
+    }
+
+    // if we *still* don't have the permissions or an error occured, kick.
+    let _ = conn.tx.send(INVALID_SESSION.clone()).await;
+}
+
+// TODO: to implement sub/unsub low-bandwidth modes, the abort handles will
+// probably need to be replaced with something that pauses them instead
+fn register_subs(events: &mut SelectAll<BoxStream<Item>>, listener_table: &mut ListenerTable, subs: Vec<PartySubscription>) {
+    // iterate through subscribed parties
+    events.extend(subs.into_iter().map(|sub| {
+        // take their broadcast stream and wrap it in an abort signal
+        // this is so we can unsubscribe later if needed
+        let (stream, handle) = stream::abortable(BroadcastStream::new(sub.rx));
+
+        listener_table.insert(sub.party_id, handle);
+
+        // map the stream to the `Item` type
+        stream.map(|event| Item::Event(event.map_err(Into::into))).boxed()
+    }));
 }

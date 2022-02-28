@@ -22,7 +22,7 @@ pub async fn get_many(
     form: GetMessagesQuery,
 ) -> Result<impl Stream<Item = Result<Message, Error>>, Error> {
     let had_perms = if let Some(perm) = state.perm_cache.get(auth.user_id, room_id).await {
-        if !perm.perm.room.contains(RoomPermissions::READ_MESSAGES) {
+        if !perm.perm.room.contains(RoomPermissions::READ_MESSAGE_HISTORY) {
             return Err(Error::NotFound);
         }
 
@@ -325,7 +325,7 @@ fn query(mode: MessageSearch, check_perms: bool, thread: bool) -> impl thorn::An
             }
         }
 
-        const READ_MESSAGES: i64 = Permission::PACKED_READ_MESSAGES as i64;
+        const READ_MESSAGES: i64 = Permission::PACKED_READ_MESSAGE_HISTORY as i64;
 
         query = query
             .with(AggPerm::as_query(
