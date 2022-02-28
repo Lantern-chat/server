@@ -21,6 +21,7 @@ pub struct CompressedEvent {
 pub struct EncodedEvent {
     pub json: CompressedEvent,
     pub msgpack: CompressedEvent,
+    pub cbor: CompressedEvent,
 }
 
 #[derive(Debug)]
@@ -58,10 +59,16 @@ impl EncodedEvent {
     pub fn new<S: serde::Serialize>(value: &S) -> Result<Self, EventEncodingError> {
         let as_msgpack = rmp_serde::to_vec_named(value)?; // TODO: Remove the names when bugs are fixed
         let as_json = serde_json::to_vec(value)?;
+        let as_cbor = {
+            let mut buf = Vec::with_capacity(std::mem::size_of_val(value));
+            ciborium::ser::into_writer(value, &mut buf)?;
+            buf
+        };
 
         Ok(EncodedEvent {
             json: CompressedEvent::new(as_json)?,
             msgpack: CompressedEvent::new(as_msgpack)?,
+            cbor: CompressedEvent::new(as_cbor)?,
         })
     }
 
@@ -69,6 +76,7 @@ impl EncodedEvent {
         match params.encoding {
             Encoding::Json => self.json.get(params.compress),
             Encoding::MsgPack => self.msgpack.get(params.compress),
+            Encoding::CBOR => self.cbor.get(params.compress),
         }
     }
 }
@@ -99,6 +107,9 @@ pub enum EventEncodingError {
 
     #[error("Json Encoding Error: {0}")]
     JsonEncodingError(#[from] serde_json::Error),
+
+    #[error("Cbor Encoding Error: {0}")]
+    CborEncodingError(#[from] ciborium::ser::Error<std::io::Error>),
 
     #[error("IO Error: {0}")]
     IoError(#[from] std::io::Error),

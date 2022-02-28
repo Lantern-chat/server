@@ -98,6 +98,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                         Ok(match query.encoding {
                             Encoding::Json => serde_json::from_slice(&msg)?,
                             Encoding::MsgPack => rmp_serde::from_slice(&msg)?,
+                            Encoding::CBOR => ciborium::de::from_reader(&msg[..])?,
                         })
                     });
 
@@ -335,6 +336,9 @@ pub enum MessageIncomingError {
 
     #[error("JSON Parse Error: {0}")]
     JsonParseError(#[from] serde_json::Error),
+
+    #[error("Cbor Parse Error: {0}")]
+    CborParseError(#[from] ciborium::de::Error<std::io::Error>),
 
     #[error("MsgPack Parse Error: {0}")]
     MsgParseError(#[from] rmp_serde::decode::Error),

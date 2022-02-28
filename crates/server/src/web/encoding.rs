@@ -12,6 +12,9 @@ pub enum Encoding {
     ///
     /// This is recommended when you have access to natively compiled MsgPack libraries
     MsgPack,
+
+    /// Concise Binary Object Representation
+    CBOR,
 }
 
 impl Default for Encoding {

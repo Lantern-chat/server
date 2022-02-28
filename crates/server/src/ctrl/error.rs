@@ -218,7 +218,9 @@ impl Error {
             | Error::HeaderParseError(_)
             | Error::AuthTokenError(_)
             | Error::Base64DecodeError(_)
-            | Error::Base85DecodeError(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            | Error::Base85DecodeError(_)
+            | Error::BodyDeserializeError(_)
+            | Error::JsonError(_) => StatusCode::UNPROCESSABLE_ENTITY,
             Error::ChecksumMismatch => *CHECKSUM_MISMATCH,
             Error::RequestEntityTooLarge => *REQUEST_ENTITY_TOO_LARGE,
             Error::Conflict => StatusCode::CONFLICT,
