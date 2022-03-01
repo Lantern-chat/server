@@ -20,7 +20,6 @@ pub struct CompressedEvent {
 #[derive(Debug)]
 pub struct EncodedEvent {
     pub json: CompressedEvent,
-    pub msgpack: CompressedEvent,
     pub cbor: CompressedEvent,
 }
 
@@ -57,7 +56,6 @@ impl Event {
 
 impl EncodedEvent {
     pub fn new<S: serde::Serialize>(value: &S) -> Result<Self, EventEncodingError> {
-        let as_msgpack = rmp_serde::to_vec_named(value)?; // TODO: Remove the names when bugs are fixed
         let as_json = serde_json::to_vec(value)?;
         let as_cbor = {
             let mut buf = Vec::with_capacity(std::mem::size_of_val(value));
@@ -67,7 +65,6 @@ impl EncodedEvent {
 
         Ok(EncodedEvent {
             json: CompressedEvent::new(as_json)?,
-            msgpack: CompressedEvent::new(as_msgpack)?,
             cbor: CompressedEvent::new(as_cbor)?,
         })
     }
@@ -75,7 +72,6 @@ impl EncodedEvent {
     pub fn get(&self, params: GatewayQueryParams) -> &Vec<u8> {
         match params.encoding {
             Encoding::Json => self.json.get(params.compress),
-            Encoding::MsgPack => self.msgpack.get(params.compress),
             Encoding::CBOR => self.cbor.get(params.compress),
         }
     }
@@ -102,9 +98,6 @@ impl CompressedEvent {
 
 #[derive(Debug, thiserror::Error)]
 pub enum EventEncodingError {
-    #[error("MsgPack Encoding Error: {0}")]
-    MsgPackEncodingError(#[from] rmp_serde::encode::Error),
-
     #[error("Json Encoding Error: {0}")]
     JsonEncodingError(#[from] serde_json::Error),
 

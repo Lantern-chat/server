@@ -23,21 +23,20 @@ use headers::ContentType;
 use ftl::*;
 
 use crate::{
-    web::encoding::{bytes_as_msgpack, Encoding, EncodingQuery},
+    web::encoding::{Encoding, EncodingQuery},
     ServerState,
 };
 
 pub fn build(route: Route<ServerState>) -> Response {
     lazy_static::lazy_static! {
         static ref JSON_BUILD_INFO: String = serde_json::to_string(&BUILD_INFO).unwrap();
-        static ref MSGPACK_BUILD_INFO: Bytes = rmp_serde::to_vec(&BUILD_INFO).unwrap().into();
+        //static ref MSGPACK_BUILD_INFO: Bytes = rmp_serde::to_vec(&BUILD_INFO).unwrap().into();
     }
 
     match route.query::<EncodingQuery>() {
-        Some(Ok(EncodingQuery {
-            encoding: Encoding::MsgPack,
-        })) => bytes_as_msgpack(MSGPACK_BUILD_INFO.clone()),
-
+        //Some(Ok(EncodingQuery {
+        //    encoding: Encoding::MsgPack,
+        //})) => bytes_as_msgpack(MSGPACK_BUILD_INFO.clone()),
         _ => JSON_BUILD_INFO
             .as_str()
             .with_header(ContentType::json())
