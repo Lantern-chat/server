@@ -93,12 +93,7 @@ fn delete_with_perms() -> impl AnyQuery {
         }
     }
 
-    const MANAGE_MESSAGE: i64 = Permission {
-        party: PartyPermissions::empty(),
-        room: RoomPermissions::MANAGE_MESSAGES,
-        stream: StreamPermissions::empty(),
-    }
-    .pack() as i64;
+    const MANAGE_MESSAGE: i64 = sdk::perms!(Room::MANAGE_MESSAGES).pack() as i64;
 
     let msg_id_var = Var::at(Messages::Id, 1);
     let user_id_var = Var::at(Users::Id, 2);
