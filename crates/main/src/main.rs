@@ -37,7 +37,8 @@ async fn main() -> anyhow::Result<()> {
             let filter = EnvFilter::from_default_env()
                 .add_directive(level_filter.into())
                 .add_directive("hyper::client::pool=info".parse()?)
-                .add_directive("hyper::proto=info".parse()?);
+                .add_directive("hyper::proto=info".parse()?)
+                .add_directive("tokio_util::codec=info".parse()?);
 
             if !extreme_trace {
                 filter.add_directive("server::tasks=debug".parse()?)
