@@ -8,7 +8,7 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-timestamp = { package = "iso8061-timestamp", version = "0.1" }
+timestamp = { package = "iso8601-timestamp", version = "0.1" }
 
 smol_str = "0.1"
 rand = "0.8"
