@@ -26,7 +26,7 @@ pub async fn create_party(
     auth: Authorization,
     form: PartyCreateForm,
 ) -> Result<Party, Error> {
-    if !state.config.partyname_len.contains(&form.name.len()) {
+    if !state.config.party.partyname_len.contains(&form.name.len()) {
         return Err(Error::InvalidName);
     }
 

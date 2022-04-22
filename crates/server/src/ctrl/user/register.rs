@@ -36,7 +36,7 @@ pub async fn register_user(
 
     let now = SystemTime::now();
 
-    if !util::time::is_of_age(state.config.min_user_age_in_years as i32, now, dob) {
+    if !util::time::is_of_age(state.config.account.min_age as i32, now, dob) {
         return Err(Error::InsufficientAge);
     }
 
@@ -44,8 +44,8 @@ pub async fn register_user(
         .services
         .hcaptcha
         .verify(HCaptchaParameters {
-            secret: &state.config.hcaptcha_secret,
-            sitekey: Some(&state.config.hcaptcha_sitekey),
+            secret: &state.config.services.hcaptcha_secret,
+            sitekey: Some(&state.config.services.hcaptcha_sitekey),
             response: &form.token,
             ..HCaptchaParameters::default()
         })

@@ -128,7 +128,7 @@ pub async fn do_login(
         _ => unreachable!(),
     };
 
-    let expires = now + state.config.login_session_duration;
+    let expires = now + state.config.account.session_duration;
 
     let db = state.db.write.get().await?;
 
@@ -174,7 +174,7 @@ pub async fn process_2fa(
         .unwrap()
         .as_secs();
 
-    let secret = match decrypt_user_message(&state.config.mfa_key, user_id, secret) {
+    let secret = match decrypt_user_message(&state.config.keys.mfa_key, user_id, secret) {
         Ok(secret) => secret,
         Err(_) => return Err(Error::InternalErrorStatic("Decrypt Error!")),
     };
@@ -187,7 +187,7 @@ pub async fn process_2fa(
             }
         }
         13 => {
-            let mut backup = match decrypt_user_message(&state.config.mfa_key, user_id, backup) {
+            let mut backup = match decrypt_user_message(&state.config.keys.mfa_key, user_id, backup) {
                 Ok(backup) if backup.len() % 8 == 0 => backup,
                 _ => return Err(Error::InternalErrorStatic("Decrypt Error!")),
             };
@@ -218,7 +218,7 @@ pub async fn process_2fa(
                     backup.drain(start..start + 8);
                 }
 
-                let backup = encrypt_user_message(&state.config.mfa_key, user_id, &backup);
+                let backup = encrypt_user_message(&state.config.keys.mfa_key, user_id, &backup);
 
                 log::debug!("MFA Backup token used, saving new backup array to database");
                 db.execute_cached_typed(

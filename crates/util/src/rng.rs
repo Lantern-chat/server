@@ -2,7 +2,7 @@ use std::cell::UnsafeCell;
 use std::rc::Rc;
 
 use rand::rngs::{adapter::ReseedingRng, OsRng};
-use rand::{RngCore, SeedableRng};
+use rand::{Rng, RngCore, SeedableRng};
 use rand_chacha::ChaCha20Core;
 
 #[derive(Clone, Debug)]
@@ -70,3 +70,9 @@ impl RngCore for CryptoThreadRng {
 }
 
 impl rand::CryptoRng for CryptoThreadRng {}
+
+pub fn gen_crypto_bytes<const N: usize>() -> [u8; N] {
+    let mut bytes = [0; N];
+    crypto_thread_rng().fill(bytes.as_mut_slice());
+    bytes
+}

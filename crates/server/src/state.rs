@@ -14,7 +14,7 @@ use tokio::sync::{oneshot, Mutex, Notify, OwnedMutexGuard, Semaphore};
 use util::cmap::CHashMap;
 
 use crate::{
-    config::LanternConfig, filesystem::store::FileStore, permission_cache::PermissionCache, queues::Queues,
+    config::Config, filesystem::store::FileStore, permission_cache::PermissionCache, queues::Queues,
     services::Services, session_cache::SessionCache, web::file_cache::MainFileCache, DatabasePools,
 };
 use crate::{
@@ -28,7 +28,7 @@ pub struct InnerServerState {
     pub shutdown: Mutex<Option<oneshot::Sender<()>>>,
     pub rate_limit: RateLimitTable,
     pub db: DatabasePools,
-    pub config: LanternConfig,
+    pub config: Config,
     pub id_lock: IdLockMap,
     pub fs: FileStore,
     pub gateway: Gateway,
@@ -58,15 +58,14 @@ impl Deref for ServerState {
 }
 
 impl ServerState {
-    pub fn new(shutdown: oneshot::Sender<()>, db: DatabasePools) -> Self {
-        let config = LanternConfig::default();
+    pub fn new(shutdown: oneshot::Sender<()>, config: Config, db: DatabasePools) -> Self {
         ServerState(Arc::new(InnerServerState {
             is_alive: AtomicBool::new(true),
             notify_shutdown: Arc::new(Notify::new()),
             shutdown: Mutex::new(Some(shutdown)),
             rate_limit: RateLimitTable::new(),
             db,
-            fs: FileStore::new(config.data_path.clone()),
+            fs: FileStore::new(config.paths.data_path.clone()),
             config,
             id_lock: IdLockMap::default(),
             gateway: Gateway::default(),

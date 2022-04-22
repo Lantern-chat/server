@@ -90,6 +90,8 @@ quick-xml = { version = "0.22.0", features = ["serialize"] }
 reqwest = { version = "0.11", default-features = false, features = ["gzip", "deflate", "brotli", "rustls-tls"] }
 smallvec = "1.7.0"
 memchr = "2.4.1"
+toml = { version = "0.5", features = ["preserve_order"] }
+# humantime = "2.1.0"
 
 [build-dependencies]
 built = { version = "0.5", features = ["chrono"] }

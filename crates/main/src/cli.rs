@@ -1,9 +1,10 @@
-use std::{net::SocketAddr, str::FromStr};
+use std::{net::SocketAddr, path::PathBuf, str::FromStr};
 
 #[derive(Debug)]
 pub struct CliOptions {
     pub verbose: Option<u8>,
     pub bind: SocketAddr,
+    pub config_path: PathBuf,
 }
 
 impl CliOptions {
@@ -38,7 +39,16 @@ impl CliOptions {
             None => SocketAddr::from(([127, 0, 0, 1], 3030)),
         };
 
-        Ok(CliOptions { verbose, bind })
+        let mut config_path = PathBuf::from("./config.toml");
+        if let Some(v) = pargs.opt_value_from_str::<_, String>(["-c", "--config"])? {
+            config_path = PathBuf::from(v);
+        }
+
+        Ok(CliOptions {
+            verbose,
+            bind,
+            config_path,
+        })
     }
 }
 

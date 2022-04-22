@@ -16,8 +16,8 @@ use smol_str::SmolStr;
 use thorn::pg::ToSql;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
-use sdk::models::Snowflake;
 use schema::flags::FileFlags;
+use sdk::models::Snowflake;
 
 use crate::{
     ctrl::Error,
@@ -93,7 +93,7 @@ pub async fn get_file(
     let mime: Option<&str> = row.try_get(5)?;
 
     let options = CipherOptions {
-        key: state.config.file_key,
+        key: state.config.keys.file_key,
         nonce: unsafe { std::mem::transmute([nonce, nonce]) },
     };
 

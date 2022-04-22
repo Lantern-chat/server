@@ -69,7 +69,7 @@ pub async fn patch_file(
     }
 
     let cipher_options = CipherOptions {
-        key: state.config.file_key,
+        key: state.config.keys.file_key,
         nonce: unsafe { std::mem::transmute([nonce, nonce]) },
     };
 

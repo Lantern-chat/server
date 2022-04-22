@@ -13,9 +13,9 @@ pub async fn file_options(state: ServerState, auth: Authorization) -> Result<Fil
     };
 
     let quota_total = if auth.flags.contains(UserFlags::PREMIUM) {
-        state.config.monthly_premium_upload_quota
+        state.config.upload.monthly_premium_upload_quota
     } else {
-        state.config.monthly_upload_quota
+        state.config.upload.monthly_upload_quota
     };
 
     let db = state.db.read.get().await?;

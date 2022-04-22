@@ -50,6 +50,12 @@ async fn main() -> anyhow::Result<()> {
 
     log::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
+    // Load save, allow it to fill in defaults, then save it back
+    log::info!("Loading config from: {}", args.config_path.display());
+    let config = server::config::load(&args.config_path).await?;
+    log::info!("Saving config to: {}", args.config_path.display());
+    server::config::save(&args.config_path, &config).await?;
+
     let db = {
         use db::pool::{Pool, PoolConfig};
 
@@ -75,7 +81,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     log::info!("Starting server...");
-    let (server, state) = server::start_server(args.bind, db).await?;
+    let (server, state) = server::start_server(args.bind, config, db).await?;
 
     log::trace!("Setting up shutdown signal for Ctrl+C");
     tokio::spawn(tokio::signal::ctrl_c().then(move |_| async move { state.shutdown().await }));

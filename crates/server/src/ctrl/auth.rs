@@ -38,7 +38,7 @@ pub async fn do_auth(state: &ServerState, token: RawAuthToken) -> Result<Authori
         Some(auth) => Some(auth),
         None => match token {
             RawAuthToken::Bearer(bytes) => do_user_auth(state, &bytes, token).await?,
-            RawAuthToken::Bot(token) => match token.verify(&state.config.bt_key) {
+            RawAuthToken::Bot(token) => match token.verify(&state.config.keys.bt_key) {
                 false => return Err(Error::Unauthorized),
                 true => do_bot_auth(state, token).await?,
             },

@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
-use sdk::models::Snowflake;
 use schema::{flags::FileFlags, SnowflakeExt};
+use sdk::models::Snowflake;
 use smol_str::SmolStr;
 
 use crate::{
@@ -45,7 +45,7 @@ pub async fn process_avatar(state: ServerState, user_id: Snowflake, file_id: Sno
 
     let size: i32 = row.try_get(0)?;
 
-    if size > state.config.max_avatar_size {
+    if size > state.config.upload.max_avatar_size {
         return Err(Error::RequestEntityTooLarge);
     }
 
@@ -62,7 +62,7 @@ pub async fn process_avatar(state: ServerState, user_id: Snowflake, file_id: Sno
     let preview: Option<Vec<u8>> = row.try_get(4)?;
 
     let cipher_options = CipherOptions {
-        key: state.config.file_key,
+        key: state.config.keys.file_key,
         nonce: unsafe { std::mem::transmute([nonce, nonce]) },
     };
 
@@ -89,8 +89,8 @@ pub async fn process_avatar(state: ServerState, user_id: Snowflake, file_id: Sno
             buffer,
             preview,
             ProcessConfig {
-                max_width: encode_state.config.max_avatar_width,
-                max_pixels: encode_state.config.max_avatar_pixels,
+                max_width: encode_state.config.upload.max_avatar_width,
+                max_pixels: encode_state.config.upload.max_avatar_pixels,
             },
         )
         .map_err(|err| match err {
@@ -135,7 +135,7 @@ pub async fn process_avatar(state: ServerState, user_id: Snowflake, file_id: Sno
         let _fs_permit = state.fs_semaphore.acquire().await?;
 
         let cipher_options = CipherOptions {
-            key: state.config.file_key,
+            key: state.config.keys.file_key,
             nonce: unsafe { std::mem::transmute([nonce, nonce]) },
         };
 

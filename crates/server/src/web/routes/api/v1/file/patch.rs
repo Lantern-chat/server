@@ -33,7 +33,7 @@ pub async fn patch(
         _ => return Ok(StatusCode::BAD_REQUEST.into_response()),
     };
 
-    if content_length > (route.state.config.max_upload_chunk_size as u64) {
+    if content_length > (route.state.config.upload.max_upload_chunk_size as u64) {
         return Err(Error::RequestEntityTooLarge);
     }
 

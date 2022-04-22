@@ -45,8 +45,8 @@ pub fn trim_message<'a>(state: &ServerState, content: &'a str) -> Result<Cow<'a,
 
         let newlines = bytecount::count(trimmed_content.as_bytes(), b'\n');
 
-        let too_large = !state.config.message_len.contains(&trimmed_content.len());
-        let too_long = newlines > state.config.max_newlines;
+        let too_large = !state.config.message.message_len.contains(&trimmed_content.len());
+        let too_long = newlines > state.config.message.max_newlines;
 
         if too_large || too_long {
             return Err(Error::BadRequest);

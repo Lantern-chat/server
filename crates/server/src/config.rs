@@ -6,13 +6,6 @@ use std::ops::Range;
 use aes::{cipher::BlockCipherKey, Aes128, Aes256};
 use schema::auth::BotTokenKey;
 
-// TODO: Construct a set of "limitations" for each tier of user, which will be combined based on which premium plans they have
-pub struct Limitations {
-    pub max_message_len: usize,
-    pub max_upload_size: u64,
-    pub monthly_upload_quota: u64,
-}
-
 #[derive(Debug, Clone)]
 pub struct LanternConfig {
     pub num_parallel_tasks: usize,

@@ -20,7 +20,12 @@ pub mod built {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
+#[path = "./config.rs"]
+pub mod old_config;
+
+#[path = "./config/mod.rs"]
 pub mod config;
+
 pub mod ctrl;
 pub mod filesystem;
 pub mod metric;
@@ -64,10 +69,11 @@ use tokio::net::TcpListener;
 
 pub async fn start_server(
     addr: SocketAddr,
+    config: config::Config,
     db: DatabasePools,
 ) -> anyhow::Result<(impl Future<Output = Result<(), hyper::Error>>, ServerState)> {
     let (snd, rcv) = tokio::sync::oneshot::channel();
-    let state = ServerState::new(snd, db);
+    let state = ServerState::new(snd, config, db);
 
     log::info!("Starting interval tasks...");
 

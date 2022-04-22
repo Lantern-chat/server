@@ -1,5 +1,5 @@
-use sdk::models::Snowflake;
 use schema::SnowflakeExt;
+use sdk::models::Snowflake;
 use smol_str::SmolStr;
 
 use util::hex::HexidecimalInt;
@@ -8,7 +8,7 @@ use crate::ServerState;
 
 /// Encrypt a snowflake and encode is as a hexidecimal string
 pub fn encrypt_snowflake(state: &ServerState, id: Snowflake) -> SmolStr {
-    util::base64::encode_u128(id.encrypt(state.config.sf_key))
+    util::base64::encode_u128(id.encrypt(state.config.keys.sf_key))
 }
 
 pub fn decrypt_snowflake(state: &ServerState, s: &str) -> Option<Snowflake> {
@@ -17,7 +17,7 @@ pub fn decrypt_snowflake(state: &ServerState, s: &str) -> Option<Snowflake> {
         Err(_) => return None,
     };
 
-    Snowflake::decrypt(block, state.config.sf_key)
+    Snowflake::decrypt(block, state.config.keys.sf_key)
 }
 
 #[inline]
