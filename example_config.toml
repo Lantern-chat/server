@@ -1,0 +1,62 @@
+# NOTE: Certain configuration parameters can be overridden by environment variables
+
+[general]
+server_name = "Lantern Chat"
+bind = "localhost:8080" # Bind address, overridden by LANTERN_BIND
+
+[db]
+db_str = "postgresql://postgres:password@localhost:5432" # database string, overridden by DB_STR
+migrations = "./sql/migrations" # Migrations path, used to initialize/update database, overridden by MIGRATIONS
+
+[paths]
+data_path = "./data" # Path to where uploaded files will be stored, overridden by DATA_PATH
+cert_path = "/etc/letsencrypt/live/" # Overridden by CERT_PATH
+key_path = "/etc/letsencrypt/live/" # Overridden by KEY_PATH
+
+[account]
+session_duration = 7776000 # seconds or [seconds, nanoseconds], default is 90 days
+min_age = 13
+password_len = [8, 9999]
+username_len = [3, 64]
+
+[message]
+max_newlines = 80 # Maximum newlines to accept in messages
+message_len = [1, 2500] # Range of value message sizes, default is minimum 1 character, max 2500 characters
+premium_message_len = [1, 5000]
+
+[party]
+partyname_len = [3, 64]
+roomname_len = [3, 64]
+
+[upload]
+max_upload_size = 2147483647 # Max uploaded file size in bytes
+max_upload_chunk_size = 8388608 # Max file upload chunk size in bytes
+monthly_upload_quota = 1073741824 # Monthly file upload quota in bytes
+monthly_premium_upload_quota = 6442450944
+max_avatar_size = 2097152 # Max avatar image size in bytes
+max_avatar_pixels = 1048576 # Maximum number of pixels tolerable for avatar images
+max_avatar_width = 256 # in pixels
+
+[services]
+# hCaptcha Keys
+hcaptcha_secret = "0x0000000000000000000000000000000000000000" # Overridden by HCAPTCHA_SECRET
+hcaptcha_sitekey = "10000000-ffff-ffff-ffff-000000000001" # Overridden by HCAPTCHA_SITEKEY
+
+# Backblaze B2 app id and key
+b2_app = "" # Overridden by B2_APP
+b2_key = "" # Overridden by B2_KEY
+
+[keys]
+# NOTE: These are randomly generated keys for demonstration that MUST be replaced with your own.
+
+# File encryption key (64 hex digits exact), overridden by FS_KEY
+file_key = "ec141a53113c4a8c7b8985da0d7dea65adbfe1b9a860839a2c1070dcccd40605"
+# MFA encryption key (64 hex digits exact), overridden by MFA_KEY
+mfa_key = "88383626df32c24b85d7f9127b5fe6ffe6583433ab38129986b7b0c1abf55924"
+# Snowflake encryption key (used to obscure IDs in a reversable way) (32 hex digits exact), overridden by SF_KEY
+sf_key = "a97bae41ee36c0dd877cfaad53af9b3f"
+# 512-bit key used for computing bot token HMACs (128 hex digits), overridden by BT_KEY
+bt_key = "134c3c92b524183d695a429d6170139cfff60b7a1d0eb80668bac5500bb63a21d99077f4ec1e72e4c36844875c0997a454755357ad86bbb7b3f7a04290895fd3"
+
+[tasks]
+max_parallel_tasks = 4 # Comment out to default to number of hardware threads

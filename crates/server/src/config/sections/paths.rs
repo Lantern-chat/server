@@ -1,9 +1,11 @@
-use std::{env, path::PathBuf};
+use std::path::PathBuf;
 
-#[derive(Default, Debug, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Paths {
-    pub data_path: PathBuf,
-    pub cert_path: PathBuf,
-    pub key_path: PathBuf,
+section! {
+    #[derive(Debug, Serialize, Deserialize)]
+    #[serde(default)]
+    pub struct Paths {
+        pub data_path: PathBuf = PathBuf::default() => "DATA_DIR",
+        pub cert_path: PathBuf = PathBuf::default() => "CERT_PATH",
+        pub key_path: PathBuf = PathBuf::default() => "KEY_PATH",
+    }
 }

@@ -78,6 +78,8 @@ pub mod range {
 }
 
 pub mod duration {
+    use serde::de::SeqAccess;
+
     use super::*;
 
     use std::time::Duration;
@@ -86,9 +88,16 @@ pub mod duration {
     where
         S: Serializer,
     {
+        let s = value.as_secs();
+        let ns = value.subsec_nanos();
+
+        if ns == 0 {
+            return s.serialize(serializer);
+        }
+
         let mut seq = serializer.serialize_seq(Some(2))?;
-        seq.serialize_element(&value.as_secs())?;
-        seq.serialize_element(&value.subsec_nanos())?;
+        seq.serialize_element(&s)?;
+        seq.serialize_element(&ns)?;
         seq.end()
     }
 
@@ -96,7 +105,43 @@ pub mod duration {
     where
         D: Deserializer<'de>,
     {
-        <[u64; 2]>::deserialize(deserializer).map(|[secs, ns]| Duration::new(secs, ns as u32))
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = Duration;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("integer for whole seconds or two-element array for [seconds, nanoseconds]")
+            }
+
+            fn visit_u64<E: de::Error>(self, value: u64) -> Result<Duration, E> {
+                Ok(Duration::from_secs(value))
+            }
+
+            fn visit_i64<E: de::Error>(self, value: i64) -> Result<Duration, E> {
+                if value < 0 {
+                    Err(E::custom("Negative integer"))
+                } else {
+                    self.visit_u64(value as u64)
+                }
+            }
+
+            fn visit_seq<S: SeqAccess<'de>>(self, mut value: S) -> Result<Duration, S::Error> {
+                let seconds = match value.next_element::<u64>()? {
+                    Some(s) => s,
+                    None => return Err(de::Error::custom("Missing seconds value")),
+                };
+
+                let nanoseconds = match value.next_element::<u32>()? {
+                    Some(ns) => ns,
+                    None => 0,
+                };
+
+                Ok(Duration::new(seconds, nanoseconds))
+            }
+        }
+
+        deserializer.deserialize_any(Visitor)
     }
 }
 

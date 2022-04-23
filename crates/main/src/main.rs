@@ -52,27 +52,27 @@ async fn main() -> anyhow::Result<()> {
 
     // Load save, allow it to fill in defaults, then save it back
     log::info!("Loading config from: {}", args.config_path.display());
-    let config = server::config::load(&args.config_path).await?;
-    log::info!("Saving config to: {}", args.config_path.display());
-    server::config::save(&args.config_path, &config).await?;
+    let (first, mut config) = server::config::load(&args.config_path).await?;
+
+    log::info!("Applying environment overrides");
+    config.apply_overrides();
+
+    if first {
+        log::info!("Saving config to: {}", args.config_path.display());
+        server::config::save(&args.config_path, &config).await?;
+    }
 
     let db = {
         use db::pool::{Pool, PoolConfig};
 
-        let db_str =
-            std::env::var("DB_STR").unwrap_or_else(|_| "postgresql://user:password@db:5432".to_owned());
+        let mut db_config = config.db.db_str.parse::<db::pg::Config>()?;
+        db_config.dbname("lantern");
 
-        let migrations_path =
-            std::env::var("MIGRATIONS").unwrap_or_else(|_| "./backend/sql/migrations".to_owned());
-
-        let mut config = db_str.parse::<db::pg::Config>()?;
-        config.dbname("lantern");
-
-        let pool_config = PoolConfig::new(config);
+        let pool_config = PoolConfig::new(db_config);
 
         let write_pool = Pool::new(pool_config.clone(), NoTls);
 
-        db::migrate::migrate(write_pool.clone(), migrations_path).await?;
+        db::migrate::migrate(write_pool.clone(), &config.db.migrations).await?;
 
         server::DatabasePools {
             write: write_pool,
@@ -81,7 +81,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     log::info!("Starting server...");
-    let (server, state) = server::start_server(args.bind, config, db).await?;
+    let (server, state) = server::start_server(config, db).await?;
 
     log::trace!("Setting up shutdown signal for Ctrl+C");
     tokio::spawn(tokio::signal::ctrl_c().then(move |_| async move { state.shutdown().await }));

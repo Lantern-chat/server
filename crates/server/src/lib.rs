@@ -68,7 +68,6 @@ use tokio::net::TcpListener;
 //use crate::net::ip_filter::IpFilter;
 
 pub async fn start_server(
-    addr: SocketAddr,
     config: config::Config,
     db: DatabasePools,
 ) -> anyhow::Result<(impl Future<Output = Result<(), hyper::Error>>, ServerState)> {
@@ -109,7 +108,7 @@ pub async fn start_server(
     //type Connection = net::addr_stream::AddrStream;
 
     let inner_state = state.clone();
-    let server = Server::bind(&addr)
+    let server = Server::bind(&state.config.general.bind)
         .http2_adaptive_window(true)
         .tcp_nodelay(true)
         .serve(make_service_fn(move |socket: &AddrStream| {

@@ -1,9 +1,8 @@
-use std::{net::SocketAddr, path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct CliOptions {
     pub verbose: Option<u8>,
-    pub bind: SocketAddr,
     pub config_path: PathBuf,
 }
 
@@ -27,28 +26,12 @@ impl CliOptions {
             None => std::env::var("LANTERN_VERBOSE").ok().and_then(|s| s.parse().ok()),
         };
 
-        // parse bind address or fallback to environment variable
-        let bind: Option<String> = match pargs.opt_value_from_str("--bind")? {
-            Some(v) => Some(v),
-            None => std::env::var("LANTERN_BIND").ok(),
-        };
-
-        log::trace!("Parsing bind address...");
-        let bind = match bind {
-            Some(bind) => SocketAddr::from_str(&bind.replace("localhost", "127.0.0.1"))?,
-            None => SocketAddr::from(([127, 0, 0, 1], 3030)),
-        };
-
         let mut config_path = PathBuf::from("./config.toml");
         if let Some(v) = pargs.opt_value_from_str::<_, String>(["-c", "--config"])? {
             config_path = PathBuf::from(v);
         }
 
-        Ok(CliOptions {
-            verbose,
-            bind,
-            config_path,
-        })
+        Ok(CliOptions { verbose, config_path })
     }
 }
 
@@ -63,6 +46,6 @@ FLAGS:
     -V, --version   Prints version information
 
 OPTIONS:
-        --bind <address>    Server bind address/port [env LANTERN_BIND]
+        --config <path>     Lantern configuration file location
     -v, --verbose <level>   Logging level (0 = Info, 1 = Debug, 2 = Trace) [env LANTERN_VERBOSE]
 ";
