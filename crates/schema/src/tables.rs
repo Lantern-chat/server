@@ -179,12 +179,12 @@ thorn::tables! {
 
     pub struct Invite in Lantern {
         Id: SNOWFLAKE,
-        Code: Type::INT8,
         PartyId: Party::Id,
         UserId: Users::Id,
         Expires: Type::TIMESTAMP,
         Uses: Type::INT2,
         Description: Type::TEXT,
+        Vanity: Type::TEXT,
     }
 
     pub struct Rooms in Lantern {
@@ -236,6 +236,7 @@ thorn::tables! {
         ThreadId: Threads::Id,
         UpdatedAt: Type::TIMESTAMP,
         EditedAt: Type::TIMESTAMP,
+        Kind: Type::INT2,
         Flags: Type::INT2,
         Content: Type::TEXT,
     }

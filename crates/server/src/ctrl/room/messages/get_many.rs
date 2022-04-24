@@ -78,36 +78,46 @@ pub async fn get_many(
     // for many messages from the same user in a row, avoid duplicating work of encoding user things at the cost of cloning it
     let mut last_user: Option<User> = None;
 
+    use q::{Columns, ReactionColumns};
+
     Ok(stream.map(move |row| match row {
         Err(e) => Err(Error::from(e)),
         Ok(row) => {
-            let party_id: Option<Snowflake> = row.try_get(2)?;
-            let msg_id = row.try_get(0)?;
+            let party_id: Option<Snowflake> = row.try_get(Columns::PartyId as usize)?;
+            let msg_id = row.try_get(Columns::MsgId as usize)?;
 
             let mut msg = Message {
                 id: msg_id,
                 party_id,
                 created_at: msg_id.timestamp(),
                 room_id,
-                flags: MessageFlags::from_bits_truncate(row.try_get(8)?),
-                edited_at: row.try_get::<_, Option<_>>(7)?,
-                content: row.try_get(11)?,
+                flags: MessageFlags::from_bits_truncate(row.try_get(Columns::MessageFlags as usize)?),
+                kind: MessageKind::try_from(row.try_get::<_, i16>(Columns::Kind as usize)?)
+                    .unwrap_or_default(),
+                edited_at: row.try_get::<_, Option<_>>(Columns::EditedAt as usize)?,
+                content: row.try_get(Columns::Content as usize)?,
                 author: {
-                    let id = row.try_get(1)?;
+                    let id = row.try_get(Columns::UserId as usize)?;
 
                     match last_user {
                         Some(ref last_user) if last_user.id == id => last_user.clone(),
                         _ => {
                             let user = User {
                                 id,
-                                username: row.try_get(4)?,
-                                discriminator: row.try_get(5)?,
-                                flags: UserFlags::from_bits_truncate(row.try_get(6)?).publicize(),
+                                username: row.try_get(Columns::Username as usize)?,
+                                discriminator: row.try_get(Columns::Discriminator as usize)?,
+                                flags: UserFlags::from_bits_truncate(
+                                    row.try_get(Columns::UserFlags as usize)?,
+                                )
+                                .publicize(),
                                 status: None,
                                 bio: None,
                                 email: None,
                                 preferences: None,
-                                avatar: encrypt_snowflake_opt(&state, row.try_get(9)?),
+                                avatar: encrypt_snowflake_opt(
+                                    &state,
+                                    row.try_get(Columns::AvatarId as usize)?,
+                                ),
                             };
 
                             last_user = Some(user.clone());
@@ -120,22 +130,24 @@ pub async fn get_many(
                     None => None,
                     Some(_) => Some(PartyMember {
                         user: None,
-                        nick: row.try_get(3)?,
-                        roles: row.try_get(12)?,
+                        nick: row.try_get(Columns::Nickname as usize)?,
+                        roles: row.try_get(Columns::RoleIds as usize)?,
                         presence: None,
                     }),
                 },
-                thread_id: row.try_get(10)?,
+                thread_id: row.try_get(Columns::ThreadId as usize)?,
                 user_mentions: Vec::new(),
                 role_mentions: Vec::new(),
                 room_mentions: Vec::new(),
                 attachments: {
                     let mut attachments = Vec::new();
 
-                    let meta: Option<Json<Vec<schema::AggAttachmentsMeta>>> = row.try_get(15)?;
+                    let meta: Option<Json<Vec<schema::AggAttachmentsMeta>>> =
+                        row.try_get(Columns::AttachmentMeta as usize)?;
 
                     if let Some(Json(meta)) = meta {
-                        let previews: Vec<Option<&[u8]>> = row.try_get(16)?;
+                        let previews: Vec<Option<&[u8]>> =
+                            row.try_get(Columns::AttachmentPreview as usize)?;
 
                         if meta.len() != previews.len() {
                             return Err(Error::InternalErrorStatic("Meta != Previews length"));
@@ -174,17 +186,17 @@ pub async fn get_many(
 
                     attachments
                 },
-                reactions: match row.try_get(17)? {
+                reactions: match row.try_get(ReactionColumns::Reactions as usize)? {
                     Some(Json(reactions)) => reactions,
                     None => Vec::new(),
                 },
                 embeds: Vec::new(),
             };
 
-            let mention_kinds: Option<Vec<i32>> = row.try_get(14)?;
+            let mention_kinds: Option<Vec<i32>> = row.try_get(Columns::MentionKinds as usize)?;
             if let Some(mention_kinds) = mention_kinds {
                 // lazily parse ids
-                let mention_ids: Vec<Snowflake> = row.try_get(13)?;
+                let mention_ids: Vec<Snowflake> = row.try_get(Columns::MentionIds as usize)?;
 
                 if mention_ids.len() != mention_kinds.len() {
                     return Err(Error::InternalErrorStatic("Mismatched Mention aggregates!"));
@@ -207,7 +219,46 @@ pub async fn get_many(
     }))
 }
 
+mod q {
+    use schema::*;
+
+    thorn::tables! {
+        pub struct TempReactions {
+            MsgId: Reactions::MsgId,
+            Reactions: Type::JSONB,
+        }
+    }
+
+    thorn::indexed_columns! {
+        pub enum Columns {
+            AggMessages::MsgId,
+            AggMessages::UserId,
+            AggMessages::PartyId,
+            AggMessages::Kind,
+            AggMessages::Nickname,
+            AggMessages::Username,
+            AggMessages::Discriminator,
+            AggMessages::UserFlags,
+            AggMessages::EditedAt,
+            AggMessages::MessageFlags,
+            AggMessages::AvatarId,
+            AggMessages::ThreadId,
+            AggMessages::Content,
+            AggMessages::RoleIds,
+            AggMessages::MentionIds,
+            AggMessages::MentionKinds,
+            AggMessages::AttachmentMeta,
+            AggMessages::AttachmentPreview,
+        }
+
+        pub enum ReactionColumns {
+            TempReactions::Reactions = Columns::offset(),
+        }
+    }
+}
+
 fn query(mode: MessageSearch, check_perms: bool, thread: bool) -> impl thorn::AnyQuery {
+    use q::*;
     use schema::*;
     use thorn::*;
 
@@ -216,6 +267,14 @@ fn query(mode: MessageSearch, check_perms: bool, thread: bool) -> impl thorn::An
             MsgId: AggMessages::MsgId,
             RowNumber: Type::INT8,
         }
+
+        pub struct SelectedMessages {
+            Id: Messages::Id,
+        }
+
+        struct AggPerm {
+            Perms: AggRoomPerms::Perms,
+        }
     }
 
     let room_id_var = Var::at(Rooms::Id, 1);
@@ -223,17 +282,6 @@ fn query(mode: MessageSearch, check_perms: bool, thread: bool) -> impl thorn::An
     let limit_var = Var::at(Type::INT2, 3);
     let user_id_var = Var::at(Users::Id, 4);
     let thread_id_var = Var::at(Threads::Id, 5);
-
-    tables! {
-        struct SelectedMessages {
-            Id: Messages::Id,
-        }
-
-        struct TempReactions {
-            MsgId: Reactions::MsgId,
-            Reactions: Type::JSONB,
-        }
-    }
 
     let mut selected = Query::select()
         .expr(Messages::Id.alias_to(SelectedMessages::Id))
@@ -268,26 +316,8 @@ fn query(mode: MessageSearch, check_perms: bool, thread: bool) -> impl thorn::An
 
     let mut query = Query::select()
         .with(SelectedMessages::as_query(selected).exclude())
-        .cols(&[
-            /* 0*/ AggMessages::MsgId,
-            /* 1*/ AggMessages::UserId,
-            /* 2*/ AggMessages::PartyId,
-            /* 3*/ AggMessages::Nickname,
-            /* 4*/ AggMessages::Username,
-            /* 5*/ AggMessages::Discriminator,
-            /* 6*/ AggMessages::UserFlags,
-            /* 7*/ AggMessages::EditedAt,
-            /* 8*/ AggMessages::MessageFlags,
-            /* 9*/ AggMessages::AvatarId,
-            /*10*/ AggMessages::ThreadId,
-            /*11*/ AggMessages::Content,
-            /*12*/ AggMessages::RoleIds,
-            /*13*/ AggMessages::MentionIds,
-            /*14*/ AggMessages::MentionKinds,
-            /*15*/ AggMessages::AttachmentMeta,
-            /*16*/ AggMessages::AttachmentPreview,
-        ])
-        .col(/*17*/ TempReactions::Reactions)
+        .cols(Columns::default())
+        .cols(ReactionColumns::default())
         .from(
             AggMessages::inner_join_table::<SelectedMessages>()
                 .on(AggMessages::MsgId.equals(SelectedMessages::Id))
@@ -319,12 +349,6 @@ fn query(mode: MessageSearch, check_perms: bool, thread: bool) -> impl thorn::An
         );
 
     if check_perms {
-        tables! {
-            struct AggPerm {
-                Perms: AggRoomPerms::Perms,
-            }
-        }
-
         const READ_MESSAGES: i64 = Permission::PACKED_READ_MESSAGE_HISTORY as i64;
 
         query = query

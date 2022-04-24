@@ -42,16 +42,16 @@ pub async fn get_one(
 }
 
 pub(crate) fn parse_msg(state: &ServerState, row: &db::Row) -> Result<Message, Error> {
-    let flags = MessageFlags::from_bits_truncate(row.try_get(9)?);
+    let flags = MessageFlags::from_bits_truncate(row.try_get(Columns::MessageFlags as usize)?);
 
     // doing this in the application layer results in simpler queries
     if flags.contains(MessageFlags::DELETED) {
         return Err(Error::NotFound);
     }
 
-    let msg_id = row.try_get(0)?;
-    let room_id = row.try_get(1)?;
-    let party_id = row.try_get(2)?;
+    let msg_id = row.try_get(Columns::MsgId as usize)?;
+    let room_id = row.try_get(Columns::RoomId as usize)?;
+    let party_id = row.try_get(Columns::PartyId as usize)?;
 
     let mut msg = Message {
         id: msg_id,
@@ -59,39 +59,41 @@ pub(crate) fn parse_msg(state: &ServerState, row: &db::Row) -> Result<Message, E
         created_at: msg_id.timestamp(),
         room_id,
         flags,
-        edited_at: row.try_get::<_, Option<_>>(6)?,
-        content: row.try_get(12)?,
+        kind: MessageKind::try_from(row.try_get::<_, i16>(Columns::Kind as usize)?).unwrap_or_default(),
+        edited_at: row.try_get::<_, Option<_>>(Columns::EditedAt as usize)?,
+        content: row.try_get(Columns::Content as usize)?,
         author: User {
-            id: row.try_get(3)?,
-            username: row.try_get(10)?,
-            discriminator: row.try_get(4)?,
-            flags: UserFlags::from_bits_truncate(row.try_get(5)?).publicize(),
+            id: row.try_get(Columns::UserId as usize)?,
+            username: row.try_get(Columns::Username as usize)?,
+            discriminator: row.try_get(Columns::Discriminator as usize)?,
+            flags: UserFlags::from_bits_truncate(row.try_get(Columns::UserFlags as usize)?).publicize(),
             status: None,
             bio: None,
             email: None,
             preferences: None,
-            avatar: encrypt_snowflake_opt(&state, row.try_get(7)?),
+            avatar: encrypt_snowflake_opt(&state, row.try_get(Columns::AvatarId as usize)?),
         },
         member: match party_id {
             None => None,
             Some(_) => Some(PartyMember {
                 user: None,
-                nick: row.try_get(11)?,
-                roles: row.try_get(13)?,
+                nick: row.try_get(Columns::Nickname as usize)?,
+                roles: row.try_get(Columns::RoleIds as usize)?,
                 presence: None,
             }),
         },
-        thread_id: row.try_get(8)?,
+        thread_id: row.try_get(Columns::ThreadId as usize)?,
         user_mentions: Vec::new(), // TODO
         role_mentions: Vec::new(), // TODO
         room_mentions: Vec::new(), // TODO
         attachments: {
             let mut attachments = Vec::new();
 
-            let meta: Option<Json<Vec<schema::AggAttachmentsMeta>>> = row.try_get(16)?;
+            let meta: Option<Json<Vec<schema::AggAttachmentsMeta>>> =
+                row.try_get(Columns::AttachmentMeta as usize)?;
 
             if let Some(Json(meta)) = meta {
-                let previews: Vec<Option<&[u8]>> = row.try_get(17)?;
+                let previews: Vec<Option<&[u8]>> = row.try_get(Columns::AttachmentPreview as usize)?;
 
                 if meta.len() != previews.len() {
                     return Err(Error::InternalErrorStatic("Meta != Previews length"));
@@ -122,10 +124,10 @@ pub(crate) fn parse_msg(state: &ServerState, row: &db::Row) -> Result<Message, E
         reactions: Vec::new(),
     };
 
-    let mention_kinds: Option<Vec<i32>> = row.try_get(15)?;
+    let mention_kinds: Option<Vec<i32>> = row.try_get(Columns::MentionKinds as usize)?;
     if let Some(mention_kinds) = mention_kinds {
         // lazily parse ids
-        let mention_ids: Vec<Snowflake> = row.try_get(14)?;
+        let mention_ids: Vec<Snowflake> = row.try_get(Columns::MentionIds as usize)?;
 
         if mention_ids.len() != mention_kinds.len() {
             return Err(Error::InternalErrorStatic("Mismatched Mention aggregates!"));
@@ -146,47 +148,45 @@ pub(crate) fn parse_msg(state: &ServerState, row: &db::Row) -> Result<Message, E
     Ok(msg)
 }
 
-use thorn::*;
-
-pub(crate) mod consts {
-    use schema::*;
-
-    // put fixed-size columns first, then variable-size last,
-    // in order of expected occurance.
-    pub const COLUMNS: &[AggMessages] = &[
-        /* 0*/ AggMessages::MsgId,
-        /* 1*/ AggMessages::RoomId,
-        /* 2*/ AggMessages::PartyId,
-        /* 3*/ AggMessages::UserId,
-        /* 4*/ AggMessages::Discriminator,
-        /* 5*/ AggMessages::UserFlags,
-        /* 6*/ AggMessages::EditedAt,
-        /* 7*/ AggMessages::AvatarId,
-        /* 8*/ AggMessages::ThreadId,
-        /* 9*/ AggMessages::MessageFlags,
-        /*10*/ AggMessages::Username,
-        /*11*/ AggMessages::Nickname,
-        /*12*/ AggMessages::Content,
-        /*13*/ AggMessages::RoleIds,
-        /*14*/ AggMessages::MentionIds,
-        /*15*/ AggMessages::MentionKinds,
-        /*16*/ AggMessages::AttachmentMeta,
-        /*17*/ AggMessages::AttachmentPreview,
-    ];
+use schema::AggMessages;
+thorn::indexed_columns! {
+    pub enum Columns {
+        AggMessages::MsgId,
+        AggMessages::RoomId,
+        AggMessages::PartyId,
+        AggMessages::UserId,
+        AggMessages::Discriminator,
+        AggMessages::Kind,
+        AggMessages::UserFlags,
+        AggMessages::EditedAt,
+        AggMessages::AvatarId,
+        AggMessages::ThreadId,
+        AggMessages::MessageFlags,
+        AggMessages::Username,
+        AggMessages::Nickname,
+        AggMessages::Content,
+        AggMessages::RoleIds,
+        AggMessages::MentionIds,
+        AggMessages::MentionKinds,
+        AggMessages::AttachmentMeta,
+        AggMessages::AttachmentPreview,
+    }
 }
 
-pub(crate) fn get_one_without_perms() -> impl AnyQuery {
+pub(crate) fn get_one_without_perms() -> impl thorn::AnyQuery {
     use schema::*;
+    use thorn::*;
 
     Query::select()
         .from_table::<AggMessages>()
-        .cols(consts::COLUMNS)
+        .cols(Columns::default())
         .and_where(AggMessages::RoomId.equals(Var::of(Rooms::Id)))
         .and_where(AggMessages::MsgId.equals(Var::of(Messages::Id)))
 }
 
-fn get_one_with_perms() -> impl AnyQuery {
+fn get_one_with_perms() -> impl thorn::AnyQuery {
     use schema::*;
+    use thorn::*;
 
     tables! {
         struct AggPerm {
@@ -217,7 +217,7 @@ fn get_one_with_perms() -> impl AnyQuery {
                 .equals(READ_MESSAGES.lit()),
         )
         .from_table::<AggMessages>()
-        .cols(consts::COLUMNS)
+        .cols(Columns::default())
         .and_where(AggMessages::RoomId.equals(room_id_var))
         .and_where(AggMessages::MsgId.equals(msg_id_var))
 }

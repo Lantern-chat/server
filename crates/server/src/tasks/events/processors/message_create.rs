@@ -34,6 +34,30 @@ pub async fn get_message(
     id: Snowflake,
     party_id: Option<Snowflake>,
 ) -> Result<Message, Error> {
+    use schema::AggMessages;
+
+    thorn::indexed_columns! {
+        pub enum Columns {
+            AggMessages::UserId,
+            AggMessages::PartyId,
+            AggMessages::RoomId,
+            AggMessages::Kind,
+            AggMessages::Nickname,
+            AggMessages::Username,
+            AggMessages::Discriminator,
+            AggMessages::UserFlags,
+            AggMessages::MentionIds,
+            AggMessages::MentionKinds,
+            AggMessages::MessageFlags,
+            AggMessages::Content,
+            AggMessages::RoleIds,
+            AggMessages::AttachmentMeta,
+            AggMessages::AttachmentPreview,
+            AggMessages::AvatarId,
+            AggMessages::EditedAt
+        }
+    }
+
     let row = db
         .query_one_cached_typed(
             || {
@@ -42,55 +66,39 @@ pub async fn get_message(
                 Query::select()
                     .from_table::<AggMessages>()
                     .and_where(AggMessages::MsgId.equals(Var::of(AggMessages::MsgId)))
-                    .cols(&[
-                        /* 0*/ AggMessages::UserId,
-                        /* 1*/ AggMessages::PartyId,
-                        /* 2*/ AggMessages::RoomId,
-                        /* 3*/ AggMessages::Nickname,
-                        /* 4*/ AggMessages::Username,
-                        /* 5*/ AggMessages::Discriminator,
-                        /* 6*/ AggMessages::UserFlags,
-                        /* 7*/ AggMessages::MentionIds,
-                        /* 8*/ AggMessages::MentionKinds,
-                        /* 9*/ AggMessages::MessageFlags,
-                        /*10*/ AggMessages::Content,
-                        /*11*/ AggMessages::RoleIds,
-                        /*12*/ AggMessages::AttachmentMeta,
-                        /*13*/ AggMessages::AttachmentPreview,
-                        /*14*/ AggMessages::AvatarId,
-                        /*15*/ AggMessages::EditedAt,
-                    ])
+                    .cols(Columns::default())
             },
             &[&id],
         )
         .await?;
 
-    let ext_party_id = row.try_get(1)?;
+    let ext_party_id = row.try_get(Columns::PartyId as usize)?;
 
     if party_id != ext_party_id {
         log::warn!("Message PartyID from event-log and PartyID from Message differ!");
     }
 
-    let room_id = row.try_get(2)?;
+    let room_id = row.try_get(Columns::RoomId as usize)?;
 
     let mut msg = Message {
         id,
         party_id: ext_party_id,
         created_at: id.timestamp(),
         room_id,
-        flags: MessageFlags::from_bits_truncate(row.try_get(9)?),
-        edited_at: row.try_get(15)?,
-        content: row.try_get(10)?,
+        flags: MessageFlags::from_bits_truncate(row.try_get(Columns::MessageFlags as usize)?),
+        kind: MessageKind::try_from(row.try_get::<_, i16>(Columns::Kind as usize)?).unwrap_or_default(),
+        edited_at: row.try_get(Columns::EditedAt as usize)?,
+        content: row.try_get(Columns::Content as usize)?,
         author: User {
-            id: row.try_get(0)?,
-            username: row.try_get(4)?,
-            discriminator: row.try_get(5)?,
-            flags: UserFlags::from_bits_truncate(row.try_get(6)?).publicize(),
+            id: row.try_get(Columns::UserId as usize)?,
+            username: row.try_get(Columns::Username as usize)?,
+            discriminator: row.try_get(Columns::Discriminator as usize)?,
+            flags: UserFlags::from_bits_truncate(row.try_get(Columns::UserFlags as usize)?).publicize(),
             status: None,
             bio: None,
             email: None,
             preferences: None,
-            avatar: match row.try_get(14)? {
+            avatar: match row.try_get(Columns::AvatarId as usize)? {
                 Some(avatar_id) => Some(encrypt_snowflake(state, avatar_id)),
                 None => None,
             },
@@ -99,8 +107,8 @@ pub async fn get_message(
             None => None,
             Some(_) => Some(PartyMember {
                 user: None,
-                nick: row.try_get(3)?,
-                roles: row.try_get(11)?,
+                nick: row.try_get(Columns::Nickname as usize)?,
+                roles: row.try_get(Columns::RoleIds as usize)?,
                 presence: None,
             }),
         },
@@ -111,10 +119,11 @@ pub async fn get_message(
         attachments: {
             let mut attachments = Vec::new();
 
-            let meta: Option<Json<Vec<schema::AggAttachmentsMeta>>> = row.try_get(12)?;
+            let meta: Option<Json<Vec<schema::AggAttachmentsMeta>>> =
+                row.try_get(Columns::AttachmentMeta as usize)?;
 
             if let Some(Json(meta)) = meta {
-                let previews: Vec<Option<&[u8]>> = row.try_get(13)?;
+                let previews: Vec<Option<&[u8]>> = row.try_get(Columns::AttachmentPreview as usize)?;
 
                 if meta.len() != previews.len() {
                     return Err(Error::InternalErrorStatic("Meta != Previews length"));
@@ -145,10 +154,10 @@ pub async fn get_message(
         reactions: Vec::new(),
     };
 
-    let mention_kinds: Option<Vec<i32>> = row.try_get(8)?;
+    let mention_kinds: Option<Vec<i32>> = row.try_get(Columns::MentionKinds as usize)?;
     if let Some(mention_kinds) = mention_kinds {
         // lazily parse ids
-        let mention_ids: Vec<Snowflake> = row.try_get(7)?;
+        let mention_ids: Vec<Snowflake> = row.try_get(Columns::MentionIds as usize)?;
 
         if mention_ids.len() != mention_kinds.len() {
             return Err(Error::InternalErrorStatic("Mismatched Mention aggregates!"));

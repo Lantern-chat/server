@@ -47,9 +47,18 @@ pub async fn get_thread(
             Ok(Thread {
                 id: thread_id,
                 parent: msg,
-                flags: ThreadFlags::from_bits_truncate(row.try_get(18)?),
+                flags: ThreadFlags::from_bits_truncate(row.try_get(ThreadColumns::Flags as usize)?),
             })
         }
+    }
+}
+
+use crate::ctrl::room::messages::get_one::Columns;
+use schema::Threads;
+
+thorn::indexed_columns! {
+    pub enum ThreadColumns {
+        Threads::Flags = Columns::offset(),
     }
 }
 
@@ -60,8 +69,8 @@ fn get_thread_without_perms() -> impl thorn::AnyQuery {
     Query::select()
         .from(Threads::inner_join_table::<AggMessages>().on(AggMessages::MsgId.equals(Threads::ParentId)))
         .and_where(Threads::Id.equals(Var::of(Threads::Id)))
-        .cols(crate::ctrl::room::messages::get_one::consts::COLUMNS)
-        .col(/*18*/ Threads::Flags) // see test below
+        .cols(Columns::default())
+        .cols(ThreadColumns::default())
 }
 
 fn get_thread_with_perms() -> impl thorn::AnyQuery {
@@ -98,14 +107,6 @@ fn get_thread_with_perms() -> impl thorn::AnyQuery {
                 .bit_and(READ_MESSAGES.lit())
                 .equals(READ_MESSAGES.lit()),
         )
-        .cols(crate::ctrl::room::messages::get_one::consts::COLUMNS)
-        .col(/*18*/ Threads::Flags) // see test below
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn test_get_one_consts_length() {
-        assert_eq!(18, crate::ctrl::room::messages::get_one::consts::COLUMNS.len());
-    }
+        .cols(Columns::default())
+        .cols(ThreadColumns::default())
 }

@@ -6,6 +6,7 @@ CREATE TABLE lantern.messages (
     thread_id   bigint,
     updated_at  timestamp               DEFAULT now(),
     edited_at   timestamp,
+    kind        smallint    NOT NULL    DEFAULT 0,
     flags       smallint    NOT NULL    DEFAULT 0,
     content     text, -- NOTE: THIS MUST BE THE ONLY VARIABLE FIELD IN TABLE, due to TOAST stuff
 

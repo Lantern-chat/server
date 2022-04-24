@@ -11,6 +11,7 @@ thorn::tables! {
         UserId: Messages::UserId,
         RoomId: Messages::RoomId,
         PartyId: Rooms::PartyId,
+        Kind: Messages::Kind,
         Nickname: PartyMember::Nickname,
         Username: Users::Username,
         Discriminator: Users::Discriminator,
