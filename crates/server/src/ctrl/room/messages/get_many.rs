@@ -133,6 +133,7 @@ pub async fn get_many(
                         nick: row.try_get(Columns::Nickname as usize)?,
                         roles: row.try_get(Columns::RoleIds as usize)?,
                         presence: None,
+                        flags: None,
                     }),
                 },
                 thread_id: row.try_get(Columns::ThreadId as usize)?,

@@ -58,6 +58,7 @@ pub async fn create_party(
         emotes: Vec::new(),
         avatar: None,
         position: 0,
+        default_room: room_id,
     };
 
     let mut db = state.db.write.get().await?;
@@ -66,7 +67,13 @@ pub async fn create_party(
     // insert party first to avoid foreign key issues
     t.execute_cached_typed(
         || insert_party(),
-        &[&party.id, &party.name, &party.description, &party.owner],
+        &[
+            &party.id,
+            &party.name,
+            &party.description,
+            &party.owner,
+            &party.default_room,
+        ],
     )
     .await?;
 
@@ -113,12 +120,19 @@ fn insert_party() -> impl AnyQuery {
 
     Query::insert()
         .into::<Party>()
-        .cols(&[Party::Id, Party::Name, Party::Description, Party::OwnerId])
+        .cols(&[
+            Party::Id,
+            Party::Name,
+            Party::Description,
+            Party::OwnerId,
+            Party::DefaultRoom,
+        ])
         .values([
             Var::of(Party::Id),
             Var::of(Party::Name),
             Var::of(Party::Description),
             Var::of(Party::OwnerId),
+            Var::of(Party::DefaultRoom),
         ])
 }
 

@@ -110,6 +110,7 @@ pub async fn get_message(
                 nick: row.try_get(Columns::Nickname as usize)?,
                 roles: row.try_get(Columns::RoleIds as usize)?,
                 presence: None,
+                flags: None,
             }),
         },
         thread_id: None,

@@ -106,6 +106,7 @@ pub async fn trigger_typing(
                 user: Some(user),
                 roles: row.try_get(5)?,
                 presence: None,
+                flags: None,
             };
 
             let event = ServerMsg::new_typing_start(Box::new(events::TypingStart {

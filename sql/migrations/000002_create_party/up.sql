@@ -3,14 +3,16 @@
 --
 
 CREATE TABLE lantern.party (
-    id          bigint      NOT NULL,
-    avatar_id   bigint,
-    owner_id    bigint      NOT NULL,
+    id              bigint      NOT NULL,
+    avatar_id       bigint,
+    owner_id        bigint      NOT NULL,
+    -- NOTE: FK is added in later migration
+    default_room    bigint      NOT NULL,
     -- packed party flags
-    flags       bigint      NOT NULL DEFAULT 0,
-    deleted_at  timestamp,
-    name        text        NOT NULL,
-    description text,
+    flags           bigint      NOT NULL DEFAULT 0,
+    deleted_at      timestamp,
+    name            text        NOT NULL,
+    description     text,
 
     CONSTRAINT party_pk PRIMARY KEY (id)
 );
@@ -22,9 +24,6 @@ CREATE INDEX party_avatar_idx ON lantern.party USING hash(avatar_id);
 ALTER TABLE lantern.party ADD CONSTRAINT owner_fk FOREIGN KEY (owner_id)
     REFERENCES lantern.users (id) MATCH FULL
     ON DELETE RESTRICT ON UPDATE CASCADE; -- Don't allow users to delete accounts if they own parties
-
-
-
 
 -- Association map between parties and users
 CREATE TABLE lantern.party_member (

@@ -10,8 +10,8 @@ CREATE TABLE lantern.user_presence (
 );
 ALTER TABLE lantern.user_presence OWNER TO postgres;
 
-CREATE INDEX user_presence_conn_idx ON lantern.user_presence USING hash(conn_id);
-CREATE INDEX user_presence_idx ON lantern.user_presence USING btree(user_id, updated_at);
+CREATE INDEX IF NOT EXISTS user_presence_conn_idx ON lantern.user_presence USING hash(conn_id);
+CREATE INDEX IF NOT EXISTS user_presence_idx ON lantern.user_presence USING btree(user_id, updated_at);
 
 ALTER TABLE lantern.user_presence ADD CONSTRAINT user_fk FOREIGN KEY(user_id)
     REFERENCES lantern.users (id) MATCH FULL

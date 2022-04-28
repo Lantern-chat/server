@@ -68,6 +68,7 @@ pub async fn member_event(
                 nick: None,
                 roles: None,
                 presence: None,
+                flags: None,
             }))
         })
     } else {
@@ -115,6 +116,7 @@ pub async fn member_event(
                     }),
                 },
                 roles: row.try_get(12)?,
+                flags: None,
             }))
         })
     };

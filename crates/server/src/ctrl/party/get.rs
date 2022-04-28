@@ -27,8 +27,14 @@ pub async fn get_party_inner(
                 use thorn::*;
 
                 Query::select()
-                    .cols(&[Party::Name, Party::OwnerId, Party::AvatarId, Party::Description])
-                    .col(PartyMember::Position)
+                    .cols(&[
+                        /*0*/ Party::Name,
+                        /*1*/ Party::OwnerId,
+                        /*2*/ Party::AvatarId,
+                        /*3*/ Party::Description,
+                        /*4*/ Party::DefaultRoom,
+                    ])
+                    .col(/*5*/ PartyMember::Position)
                     .and_where(Party::Id.equals(Var::of(Party::Id)))
                     .from(Party::left_join_table::<PartyMember>().on(PartyMember::PartyId.equals(Party::Id)))
                     .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
@@ -51,7 +57,8 @@ pub async fn get_party_inner(
             roles: Vec::new(),
             emotes: Vec::new(),
             avatar: encrypt_snowflake_opt(&state, row.try_get(2)?),
-            position: row.try_get(4)?,
+            position: row.try_get(5)?,
+            default_room: row.try_get(4)?,
         },
     };
 

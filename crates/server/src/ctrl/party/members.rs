@@ -69,6 +69,7 @@ pub async fn get_members(
                 }),
             },
             roles: row.try_get(12)?,
+            flags: None,
         }),
     }))
 }

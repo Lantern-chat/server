@@ -120,6 +120,7 @@ thorn::tables! {
         Id: SNOWFLAKE,
         AvatarId: Files::Id,
         OwnerId: Users::Id,
+        DefaultRoom: Rooms::Id,
         Flags: Type::INT8,
         DeletedAt: Type::TIMESTAMP,
         Name: Type::TEXT,
@@ -135,6 +136,13 @@ thorn::tables! {
         Position: Type::INT2,
         Nickname: Type::TEXT,
         CustomStatus: Type::TEXT,
+    }
+
+    pub struct PartyBans in Lantern {
+        PartyId: Party::Id,
+        UserId: Users::Id,
+        BannedAt: Type::TIMESTAMP,
+        Reason: Type::TEXT,
     }
 
     pub struct Subscriptions in Lantern {

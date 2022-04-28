@@ -88,8 +88,9 @@ pub async fn ready(
                             /* 2*/ Party::Name,
                             /* 3*/ Party::AvatarId,
                             /* 4*/ Party::Description,
+                            /* 5*/ Party::DefaultRoom,
                         ])
-                        .col(PartyMember::Position)
+                        .col(/*6*/ PartyMember::Position)
                         .from(
                             Party::left_join_table::<PartyMember>()
                                 .on(PartyMember::PartyId.equals(Party::Id)),
@@ -121,7 +122,8 @@ pub async fn ready(
                     roles: Vec::new(),
                     emotes: Vec::new(),
                     avatar: encrypt_snowflake_opt(&state, row.try_get(3)?),
-                    position: row.try_get(5)?,
+                    position: row.try_get(6)?,
+                    default_room: row.try_get(5)?,
                 },
             );
         }

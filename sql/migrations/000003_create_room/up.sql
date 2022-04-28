@@ -26,6 +26,15 @@ ALTER TABLE lantern.rooms ADD CONSTRAINT parent_fk FOREIGN KEY (parent_id)
     REFERENCES lantern.rooms (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE; -- Delete rooms if whole category is deleted
 
+-- Party FK
+
+ALTER TABLE lantern.party ADD CONSTRAINT default_room_fk FOREIGN KEY (default_room)
+    REFERENCES lantern.rooms (id) MATCH FULL
+    ON DELETE RESTRICT ON UPDATE CASCADE; -- don't allow deleting default room
+
+ALTER TABLE lantern.party ALTER CONSTRAINT default_room_fk DEFERRABLE INITIALLY DEFERRED;
+
+--
 
 CREATE TABLE lantern.subscriptions (
     user_id         bigint      NOT NULL,
