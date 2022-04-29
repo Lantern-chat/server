@@ -6,6 +6,7 @@ section! {
     pub struct General {
         pub server_name: String = "Lantern Chat".to_owned(),
         pub bind: SocketAddr = SocketAddr::from(([127, 0, 0, 1], 8080)) => "LANTERN_BIND" | parse_address,
+        pub cdn_domain: String = "cdn.lanternchat.net".to_owned() => "LANTERN_CDN",
     }
 }
 

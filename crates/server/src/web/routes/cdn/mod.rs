@@ -7,7 +7,7 @@ pub mod avatar;
 
 pub async fn cdn(mut route: Route<ServerState>) -> Response {
     match route.host() {
-        Some(host) if host.as_str().starts_with("cdn") => {}
+        Some(host) if host.as_str() == route.state.config.general.cdn_domain => {}
         _ => return StatusCode::NOT_FOUND.into_response(),
     }
 

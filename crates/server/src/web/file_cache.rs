@@ -144,12 +144,23 @@ impl MainFileCache {
 use headers::AcceptEncoding;
 use util::cmap::EntryValue;
 
+use crate::ServerState;
+
 #[async_trait::async_trait]
-impl FileCache for MainFileCache {
+impl FileCache<ServerState> for MainFileCache {
     type File = CachedFile;
     type Meta = Metadata;
 
-    async fn open(&self, path: &Path, accepts: Option<AcceptEncoding>) -> io::Result<Self::File> {
+    async fn clear(&self, _state: &ServerState) {
+        self.map.retain(|_, _| false).await
+    }
+
+    async fn open(
+        &self,
+        path: &Path,
+        accepts: Option<AcceptEncoding>,
+        state: &ServerState,
+    ) -> io::Result<Self::File> {
         let mut last_modified = None;
 
         if let Some(file) = self.map.get_cloned(path).await {
@@ -242,6 +253,8 @@ impl FileCache for MainFileCache {
             let mut content = Vec::with_capacity(len as usize);
             file.read_to_end(&mut content).await?;
 
+            content = self.process(state, path, content).await;
+
             let (brotli, deflate, gzip, best) = {
                 use async_compression::{
                     tokio::bufread::{BrotliEncoder, DeflateEncoder, GzipEncoder},
@@ -316,10 +329,10 @@ impl FileCache for MainFileCache {
         // release lock
         drop(lock);
 
-        self.open(path, accepts).await
+        self.open(path, accepts, state).await
     }
 
-    async fn metadata(&self, path: &Path) -> io::Result<Self::Meta> {
+    async fn metadata(&self, path: &Path, _state: &ServerState) -> io::Result<Self::Meta> {
         match self.map.get(path).await {
             Some(file) => Ok(Metadata {
                 len: file.iden.len() as u64,
@@ -339,11 +352,47 @@ impl FileCache for MainFileCache {
     }
 
     #[inline]
-    async fn file_metadata(&self, file: &Self::File) -> io::Result<Self::Meta> {
+    async fn file_metadata(&self, file: &Self::File, _state: &ServerState) -> io::Result<Self::Meta> {
         Ok(Metadata {
             len: file.buf.len() as u64,
             last_modified: file.last_modified,
             is_dir: false,
         })
+    }
+}
+
+const NEEDLE: &[u8] = b"<script id=\"config\"></script>";
+
+impl MainFileCache {
+    pub async fn process(&self, state: &ServerState, path: &Path, mut file: Vec<u8>) -> Vec<u8> {
+        if let Some(ext) = path.extension() {
+            if ext == "html" {
+                if let Some(pos) = memchr::memmem::find(&file, NEEDLE) {
+                    let mut new_file = Vec::with_capacity(file.len() + NEEDLE.len() + 128);
+
+                    new_file.extend_from_slice(&file[..pos]);
+
+                    // TODO: Insert script
+                    new_file.extend_from_slice(b"<script>window.config=");
+
+                    serde_json::to_writer(
+                        &mut new_file,
+                        &sdk::api::commands::config::ServerConfig {
+                            hcaptcha_sitekey: state.config.services.hcaptcha_sitekey.clone(),
+                            cdn: state.config.general.cdn_domain.clone(),
+                            min_age: state.config.account.min_age,
+                        },
+                    )
+                    .unwrap();
+
+                    new_file.extend_from_slice(b"</script>");
+                    new_file.extend_from_slice(&file[(pos + NEEDLE.len())..]);
+
+                    file = new_file;
+                }
+            }
+        }
+
+        file
     }
 }
