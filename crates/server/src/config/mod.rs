@@ -8,7 +8,12 @@ pub mod sections {
             $(#[$meta:meta])*
             $vis:vis struct $name:ident {$(
                 $(#[$field_meta:meta])*
-                $field_vis:vis $field_name:ident : $field_ty:ty = $field_default:expr $(=> $field_env:literal $(| $func:path)?)?
+                $field_vis:vis $field_name:ident : $field_ty:ty = $field_default:expr
+                    $(=> $field_env:literal
+                        $(| $func:path
+                            $([  $($param:expr),* ])?
+                        )?
+                    )?
             ),*$(,)?}
         ) => {
             $(#[$meta])*
@@ -29,7 +34,7 @@ pub mod sections {
                 pub fn apply_overrides(&mut self) {$($(
                     if let Ok(value) = std::env::var($field_env) {
                         log::debug!("Applying environment overwrite for {}.{}=>{}", stringify!($name), stringify!($field_name), $field_env);
-                        self.$field_name = ($($func(&value),)? value , ).0.into();
+                        self.$field_name = ($($func(&value $( $(,$param)* )? ),)? value , ).0.into();
                     }
                 )?)*}
             }
@@ -103,34 +108,44 @@ fn get_format(path: &Path) -> Format {
     format
 }
 
-pub async fn load(path: impl AsRef<Path>) -> io::Result<(bool, Config)> {
-    let path = path.as_ref();
+impl Config {
+    pub async fn load(path: impl AsRef<Path>) -> io::Result<(bool, Config)> {
+        let path = path.as_ref();
 
-    let file = match tokio::fs::read_to_string(path).await {
-        Ok(file) => file,
-        Err(e) if e.kind() == ErrorKind::NotFound => {
-            log::warn!("{} not found, generating default config", path.display());
+        let file = match tokio::fs::read_to_string(path).await {
+            Ok(file) => file,
+            Err(e) if e.kind() == ErrorKind::NotFound => {
+                log::warn!("{} not found, generating default config", path.display());
 
-            return Ok((true, Config::default()));
-        }
-        Err(e) => return Err(e),
-    };
+                return Ok((true, Config::default()));
+            }
+            Err(e) => return Err(e),
+        };
 
-    let parsed = match get_format(path) {
-        Format::TOML => toml::from_str(&file).map_err(|e| io::Error::new(ErrorKind::InvalidData, e)),
-        Format::JSON => serde_json::from_str(&file).map_err(|e| io::Error::new(ErrorKind::InvalidData, e)),
-    };
+        let parsed = match get_format(path) {
+            Format::TOML => toml::from_str(&file).map_err(|e| io::Error::new(ErrorKind::InvalidData, e)),
+            Format::JSON => {
+                serde_json::from_str(&file).map_err(|e| io::Error::new(ErrorKind::InvalidData, e))
+            }
+        };
 
-    parsed.map(|config| (false, config))
-}
+        parsed.map(|config| (false, config))
+    }
 
-pub async fn save(path: impl AsRef<Path>, config: &Config) -> io::Result<()> {
-    let path = path.as_ref();
+    pub fn configure(&self) {
+        self.general.configure();
+    }
 
-    let file = match get_format(path) {
-        Format::TOML => toml::to_string(config).map_err(|e| io::Error::new(ErrorKind::InvalidData, e)),
-        Format::JSON => serde_json::to_string(config).map_err(|e| io::Error::new(ErrorKind::InvalidData, e)),
-    }?;
+    pub async fn save(&self, path: impl AsRef<Path>) -> io::Result<()> {
+        let path = path.as_ref();
 
-    tokio::fs::write(path, file).await
+        let file = match get_format(path) {
+            Format::TOML => toml::to_string(self).map_err(|e| io::Error::new(ErrorKind::InvalidData, e)),
+            Format::JSON => {
+                serde_json::to_string(self).map_err(|e| io::Error::new(ErrorKind::InvalidData, e))
+            }
+        }?;
+
+        tokio::fs::write(path, file).await
+    }
 }

@@ -2,9 +2,10 @@ use serde::de::{self, Deserialize, DeserializeOwned, Deserializer};
 use serde::ser::{Serialize, SerializeSeq, Serializer};
 use std::fmt;
 use std::marker::PhantomData;
+use std::str::FromStr;
 
-pub fn parse_bool(s: &str) -> bool {
-    s.parse().unwrap_or_default()
+pub fn parse<T: FromStr>(s: &str, default: T) -> T {
+    s.parse().unwrap_or(default)
 }
 
 pub mod hex_key {

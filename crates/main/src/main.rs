@@ -52,15 +52,17 @@ async fn main() -> anyhow::Result<()> {
 
     // Load save, allow it to fill in defaults, then save it back
     log::info!("Loading config from: {}", args.config_path.display());
-    let (first, mut config) = server::config::load(&args.config_path).await?;
+    let (first, mut config) = server::config::Config::load(&args.config_path).await?;
 
     log::info!("Applying environment overrides");
     config.apply_overrides();
 
     if first {
         log::info!("Saving config to: {}", args.config_path.display());
-        server::config::save(&args.config_path, &config).await?;
+        config.save(&args.config_path).await?;
     }
+
+    config.configure();
 
     let db = {
         use db::pool::{Pool, PoolConfig};

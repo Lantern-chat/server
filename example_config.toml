@@ -1,11 +1,13 @@
 # NOTE: Certain configuration parameters can be overridden by environment variables
 
 [general]
-server_name = "Lantern Chat"
+server_name = "Lantern Chat" # Server name, overridden by LANTERN_SERVER_NAME
 bind = "localhost:8080" # Bind address, overridden by LANTERN_BIND
 cdn_domain = "cdn.lanternchat.net" # CDN Domain, overridden by LANTERN_CDN_DOMAIN
 base_domain = "lantern.chat" # Base Domain, overridden by LANTERN_BASE_DOMAIN
 https = true # Whether HTTPS is used, overridden by LANTERN_HTTPS
+instance_id = 0 # Instance ID, used when generating identifiers, overridden by LANTERN_INSTANCE_ID
+worker_id = 0 # Worker ID, similar to instance_id but another layer, overridden by LANTERN_WORKER_ID
 
 [db]
 db_str = "postgresql://postgres:password@localhost:5432" # database string, overridden by DB_STR
