@@ -8,7 +8,7 @@ pub mod sections {
             $(#[$meta:meta])*
             $vis:vis struct $name:ident {$(
                 $(#[$field_meta:meta])*
-                $field_vis:vis $field_name:ident : $field_ty:ty = $field_default:expr $(=> $field_env:literal $(| $func:ident)?)?
+                $field_vis:vis $field_name:ident : $field_ty:ty = $field_default:expr $(=> $field_env:literal $(| $func:path)?)?
             ),*$(,)?}
         ) => {
             $(#[$meta])*

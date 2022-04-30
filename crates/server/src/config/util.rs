@@ -3,6 +3,10 @@ use serde::ser::{Serialize, SerializeSeq, Serializer};
 use std::fmt;
 use std::marker::PhantomData;
 
+pub fn parse_bool(s: &str) -> bool {
+    s.parse().unwrap_or_default()
+}
+
 pub mod hex_key {
     use super::*;
 

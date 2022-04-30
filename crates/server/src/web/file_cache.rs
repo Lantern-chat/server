@@ -361,36 +361,62 @@ impl FileCache<ServerState> for MainFileCache {
     }
 }
 
-const NEEDLE: &[u8] = b"<script id=\"config\"></script>";
+use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
+
+lazy_static::lazy_static! {
+    static ref VARIABLE_PATTERNS: AhoCorasick = AhoCorasickBuilder::new().dfa(true).build(&[
+        /*0*/ "__CONFIG__",
+        /*1*/ "__BASE_URL__",
+        /*2*/ "__SERVER_NAME__",
+    ]);
+}
 
 impl MainFileCache {
     pub async fn process(&self, state: &ServerState, path: &Path, mut file: Vec<u8>) -> Vec<u8> {
-        if let Some(ext) = path.extension() {
-            if ext == "html" {
-                if let Some(pos) = memchr::memmem::find(&file, NEEDLE) {
-                    let mut new_file = Vec::with_capacity(file.len() + NEEDLE.len() + 128);
+        let do_process = match (path.extension(), path.file_stem()) {
+            // if HTML file *or* manifest.json
+            (Some(ext), Some(stem)) => ext == "html" || (ext == "json" && stem == "manifest"),
+            _ => false,
+        };
 
-                    new_file.extend_from_slice(&file[..pos]);
+        if do_process {
+            file = self.do_process(state, file);
+        }
 
-                    // TODO: Insert script
-                    new_file.extend_from_slice(b"<script>window.config=");
+        file
+    }
 
+    pub fn do_process(&self, state: &ServerState, mut file: Vec<u8>) -> Vec<u8> {
+        let mut new_file = Vec::new();
+
+        let mut last_index = 0;
+        for m in VARIABLE_PATTERNS.find_iter(&file) {
+            new_file.extend_from_slice(&file[last_index..m.start()]);
+
+            last_index = m.end();
+
+            match m.pattern() {
+                0 => {
                     serde_json::to_writer(
                         &mut new_file,
-                        &sdk::api::commands::config::ServerConfig {
+                        &sdk::models::ServerConfig {
                             hcaptcha_sitekey: state.config.services.hcaptcha_sitekey.clone(),
                             cdn: state.config.general.cdn_domain.clone(),
                             min_age: state.config.account.min_age,
                         },
                     )
                     .unwrap();
-
-                    new_file.extend_from_slice(b"</script>");
-                    new_file.extend_from_slice(&file[(pos + NEEDLE.len())..]);
-
-                    file = new_file;
                 }
+                1 => new_file.extend_from_slice(state.config.general.base_url().as_bytes()),
+                2 => new_file.extend_from_slice(state.config.general.server_name.as_bytes()),
+                _ => log::error!("Unreachable replacement"),
             }
+        }
+
+        if last_index > 0 {
+            new_file.extend_from_slice(&file[last_index..]);
+
+            file = new_file;
         }
 
         file

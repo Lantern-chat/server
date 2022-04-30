@@ -3,7 +3,9 @@
 [general]
 server_name = "Lantern Chat"
 bind = "localhost:8080" # Bind address, overridden by LANTERN_BIND
-cdn_domain = "cdn.lanternchat.net" # CDN Domain, overridden by LANTERN_CDN
+cdn_domain = "cdn.lanternchat.net" # CDN Domain, overridden by LANTERN_CDN_DOMAIN
+base_domain = "lantern.chat" # Base Domain, overridden by LANTERN_BASE_DOMAIN
+https = true # Whether HTTPS is used, overridden by LANTERN_HTTPS
 
 [db]
 db_str = "postgresql://postgres:password@localhost:5432" # database string, overridden by DB_STR
