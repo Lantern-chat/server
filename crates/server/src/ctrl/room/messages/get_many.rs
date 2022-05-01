@@ -22,7 +22,7 @@ pub async fn get_many(
     form: GetMessagesQuery,
 ) -> Result<impl Stream<Item = Result<Message, Error>>, Error> {
     let had_perms = if let Some(perm) = state.perm_cache.get(auth.user_id, room_id).await {
-        if !perm.perm.room.contains(RoomPermissions::READ_MESSAGE_HISTORY) {
+        if !perm.contains(RoomPermissions::READ_MESSAGE_HISTORY) {
             return Err(Error::NotFound);
         }
 

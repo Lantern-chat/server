@@ -194,11 +194,11 @@ pub async fn get_rooms(
         rooms.retain(|_, room| {
             let room_perm = base_perm.compute_overwrites(&room.overwrites, &roles, auth.user_id);
 
-            let can_view = room_perm.room.contains(RoomPermissions::VIEW_ROOM);
+            let can_view = room_perm.contains(RoomPermissions::VIEW_ROOM);
 
             // TODO: Determine the usefulness of hiding stuff
             //// Do not display overwrites to users without the permission to manage permissions
-            //if can_view && !room_perm.party.contains(PartyPermissions::MANAGE_PERMS) {
+            //if can_view && !room_perm.contains(PartyPermissions::MANAGE_PERMS) {
             //    room.overwrites.clear();
             //}
 

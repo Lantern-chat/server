@@ -18,7 +18,7 @@ pub async fn delete_msg(
 
     if let Some(ref perm) = perm {
         // user cannot view channel at all
-        if !perm.perm.room.contains(RoomPermissions::READ_MESSAGE_HISTORY) {
+        if !perm.contains(RoomPermissions::READ_MESSAGE_HISTORY) {
             return Err(Error::Unauthorized);
         }
     }
@@ -32,7 +32,7 @@ pub async fn delete_msg(
 
     let query = match perm {
         Some(perm) => {
-            if perm.perm.room.contains(RoomPermissions::MANAGE_MESSAGES) {
+            if perm.contains(RoomPermissions::MANAGE_MESSAGES) {
                 params.truncate(1); // only needs msg_id
                 db.prepare_cached_typed(|| delete_without_perms()).await
             } else {

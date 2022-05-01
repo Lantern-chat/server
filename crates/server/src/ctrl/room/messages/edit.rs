@@ -26,7 +26,7 @@ pub async fn edit_message(
     let perm = match state.perm_cache.get(auth.user_id, room_id).await {
         Some(PermMute { perm, .. }) => {
             // Mostly same rules as creating messages, as they are sending new content
-            if !perm.room.contains(RoomPermissions::SEND_MESSAGES) {
+            if !perm.contains(RoomPermissions::SEND_MESSAGES) {
                 return Err(Error::Unauthorized);
             }
 
@@ -50,7 +50,7 @@ pub async fn edit_message(
         None => {
             let perm = crate::ctrl::perm::get_room_permissions(&db, auth.user_id, room_id).await?;
 
-            if !perm.room.contains(RoomPermissions::SEND_MESSAGES) {
+            if !perm.contains(RoomPermissions::SEND_MESSAGES) {
                 return Err(Error::Unauthorized);
             }
 
@@ -88,7 +88,7 @@ pub async fn edit_message(
         Err(e) => return Err(e),
     };
 
-    if !modified_content.is_empty() && perm.room.contains(RoomPermissions::EMBED_LINKS) {
+    if !modified_content.is_empty() && perm.contains(RoomPermissions::EMBED_LINKS) {
         // TODO: Reprocess embeds
     }
 
@@ -110,7 +110,7 @@ pub async fn edit_message(
         if pre_set != new_set {
             let added = new_set.difference(&pre_set).copied().collect::<Vec<_>>();
 
-            if !added.is_empty() && !perm.room.contains(RoomPermissions::EDIT_NEW_ATTACHMENT) {
+            if !added.is_empty() && !perm.contains(RoomPermissions::EDIT_NEW_ATTACHMENT) {
                 return Err(Error::Unauthorized);
             }
 

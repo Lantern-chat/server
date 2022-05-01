@@ -17,7 +17,7 @@ pub async fn get_room(state: ServerState, auth: Authorization, room_id: Snowflak
     // TODO: Ensure the room permissions are cached after this
     let perms = match state.perm_cache.get(auth.user_id, room_id).await {
         Some(PermMute { perm, .. }) => {
-            if !perm.room.contains(RoomPermissions::VIEW_ROOM) {
+            if !perm.contains(RoomPermissions::VIEW_ROOM) {
                 return Err(Error::NotFound);
             }
 
@@ -31,7 +31,7 @@ pub async fn get_room(state: ServerState, auth: Authorization, room_id: Snowflak
     if let Some(perms) = perms {
         // simple fast-path for cached permissions AND without needing overwrites, so most connected users
         // NOTE: Having a cached permission implies they are in the party/DM of where that room exists
-        if !perms.party.contains(PartyPermissions::MANAGE_PERMS) {
+        if !perms.contains(PartyPermissions::MANAGE_PERMS) {
             return get_room_simple(state, db, room_id).await;
         }
     }

@@ -16,7 +16,7 @@ pub async fn get_thread(
     thread_id: Snowflake,
 ) -> Result<Thread, Error> {
     let had_perms = if let Some(perm) = state.perm_cache.get(auth.user_id, room_id).await {
-        if !perm.perm.room.contains(RoomPermissions::READ_MESSAGE_HISTORY) {
+        if !perm.contains(RoomPermissions::READ_MESSAGE_HISTORY) {
             return Err(Error::NotFound);
         }
 

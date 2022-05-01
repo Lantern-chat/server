@@ -28,7 +28,7 @@ pub async fn create_message(
     // fast-path for if the perm_cache does contain a value, otherwise defer until content is checked
     let perm = match state.perm_cache.get(auth.user_id, room_id).await {
         Some(PermMute { perm, .. }) => {
-            if !perm.room.contains(RoomPermissions::SEND_MESSAGES) {
+            if !perm.contains(RoomPermissions::SEND_MESSAGES) {
                 return Err(Error::Unauthorized);
             }
 
@@ -58,7 +58,7 @@ pub async fn create_message(
 
             let perm = crate::ctrl::perm::get_room_permissions(&db, auth.user_id, room_id).await?;
 
-            if !perm.room.contains(RoomPermissions::SEND_MESSAGES) {
+            if !perm.contains(RoomPermissions::SEND_MESSAGES) {
                 return Err(Error::Unauthorized);
             }
 
@@ -71,7 +71,7 @@ pub async fn create_message(
     let msg_id = Snowflake::now();
 
     // check this before acquiring database connection
-    if !body.attachments.is_empty() && !perm.room.contains(RoomPermissions::ATTACH_FILES) {
+    if !body.attachments.is_empty() && !perm.contains(RoomPermissions::ATTACH_FILES) {
         return Err(Error::Unauthorized);
     }
 
@@ -86,7 +86,7 @@ pub async fn create_message(
     };
 
     // message is good to go, so fire off the embed processing
-    if !modified_content.is_empty() && perm.room.contains(RoomPermissions::EMBED_LINKS) {
+    if !modified_content.is_empty() && perm.contains(RoomPermissions::EMBED_LINKS) {
         embed::process_embeds(msg_id, &modified_content);
     }
 

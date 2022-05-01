@@ -16,7 +16,7 @@ pub async fn trigger_typing(
 ) -> Result<(), Error> {
     let permissions = get_cached_room_permissions(&state, auth.user_id, room_id).await?;
 
-    if !permissions.room.contains(RoomPermissions::SEND_MESSAGES) {
+    if !permissions.contains(RoomPermissions::SEND_MESSAGES) {
         return Err(Error::NotFound);
     }
 
