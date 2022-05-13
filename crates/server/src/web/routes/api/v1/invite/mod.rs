@@ -1,5 +1,4 @@
 pub mod get;
-pub mod post;
 pub mod redeem;
 pub mod revoke;
 
@@ -18,9 +17,8 @@ pub async fn invite(mut route: Route<ServerState>) -> Response {
         Err(e) => return ApiError::err(e).into_response(),
     };
 
-    match route.next().method_segment() {
-        (&Method::POST, End) => post::post(route, auth).await,
-        (_, Exact(_)) => match route.param::<SmolStr>() {
+    if let Exact(_) = route.next().segment() {
+        match route.param::<SmolStr>() {
             Some(Ok(code)) => match route.next().method_segment() {
                 (&Method::GET, End) => get::get_invite(route, auth, code).await,
                 (&Method::POST, Exact("redeem")) => redeem::redeem(route, auth, code).await,
@@ -30,7 +28,8 @@ pub async fn invite(mut route: Route<ServerState>) -> Response {
             },
             Some(Err(_)) => ApiError::bad_request().into_response(),
             None => ApiError::not_found().into_response(),
-        },
-        _ => StatusCode::METHOD_NOT_ALLOWED.into_response(),
+        }
+    } else {
+        ApiError::not_found().into_response()
     }
 }

@@ -9,6 +9,7 @@ pub mod get;
 //pub mod patch;
 pub mod post;
 
+pub mod invites;
 pub mod members;
 pub mod rooms;
 
