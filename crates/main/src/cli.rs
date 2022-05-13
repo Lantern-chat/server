@@ -32,7 +32,7 @@ impl CliOptions {
             config_path = PathBuf::from(v);
         }
 
-        let write_config = pargs.contains("write-config");
+        let write_config = pargs.contains("--write-config");
 
         Ok(CliOptions {
             verbose,
