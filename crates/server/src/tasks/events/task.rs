@@ -306,6 +306,8 @@ pub async fn event_loop(state: &ServerState, latest_event: &mut i64) -> Result<(
 
             *latest_event = next_latest_event;
 
+            state.last_events[0].store(next_latest_event, std::sync::atomic::Ordering::SeqCst);
+
             Ok(())
         };
 

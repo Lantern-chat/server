@@ -40,6 +40,7 @@ pub mod web;
 
 pub mod tasks {
     pub mod cn_cleanup;
+    pub mod event_cleanup;
     pub mod file_cache_cleanup;
     pub mod id_lock_cleanup;
     pub mod item_cache_cleanup;
@@ -91,6 +92,7 @@ pub async fn start_server(
                 tokio::spawn(tasks::totp_cleanup::totp_cleanup(ts.clone())),
                 tokio::spawn(tasks::events::task::start(ts.clone())),
                 tokio::spawn(tasks::record_metrics::record_metrics(ts.clone())),
+                tokio::spawn(tasks::event_cleanup::cleanup_events(ts.clone())),
                 //tokio::spawn(tasks::refresh_ip_bans::refresh_ip_bans(task_state.clone())),
             )
             .map(|_| {})

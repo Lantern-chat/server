@@ -2,7 +2,7 @@ use std::{
     any::Any,
     ops::Deref,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicI64, Ordering},
         Arc,
     },
     time::Instant,
@@ -44,6 +44,10 @@ pub struct InnerServerState {
     pub totp_tokens: TokenStorage,
     pub services: Services,
     pub queues: Queues,
+    /// First element stores the actual last event, updated frequently
+    ///
+    /// Second element stores the last event 60 seconds ago as determined by the `event_cleanup` task.
+    pub last_events: [AtomicI64; 2],
 }
 
 #[derive(Clone)]
@@ -80,6 +84,7 @@ impl ServerState {
             totp_tokens: TokenStorage::default(),
             services: Services::start().expect("Services failed to start correctly"),
             queues: Queues::default(),
+            last_events: [AtomicI64::new(0), AtomicI64::new(0)],
         }))
     }
 
