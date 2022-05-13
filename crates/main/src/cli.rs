@@ -4,6 +4,7 @@ use std::path::PathBuf;
 pub struct CliOptions {
     pub verbose: Option<u8>,
     pub config_path: PathBuf,
+    pub write_config: bool,
 }
 
 impl CliOptions {
@@ -31,7 +32,13 @@ impl CliOptions {
             config_path = PathBuf::from(v);
         }
 
-        Ok(CliOptions { verbose, config_path })
+        let write_config = pargs.contains("write-config");
+
+        Ok(CliOptions {
+            verbose,
+            config_path,
+            write_config,
+        })
     }
 }
 

@@ -15,7 +15,6 @@ async fn main() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
 
     let args = cli::CliOptions::parse()?;
-    log::debug!("Arguments: {:?}", args);
 
     let mut extreme_trace = false;
 
@@ -50,16 +49,26 @@ async fn main() -> anyhow::Result<()> {
 
     log::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
+    log::debug!("Arguments: {:?}", args);
+
     // Load save, allow it to fill in defaults, then save it back
     log::info!("Loading config from: {}", args.config_path.display());
-    let (first, mut config) = server::config::Config::load(&args.config_path).await?;
+    let (initialized, mut config) = server::config::Config::load(&args.config_path).await?;
 
     log::info!("Applying environment overrides");
     config.apply_overrides();
 
-    if first {
+    // if write-config requested, do this before saving
+    if args.write_config {
+        config.configure();
+    }
+
+    if initialized || args.write_config {
         log::info!("Saving config to: {}", args.config_path.display());
         config.save(&args.config_path).await?;
+
+        log::info!("Save complete, exiting.");
+        return Ok(());
     }
 
     config.configure();
