@@ -5,17 +5,10 @@ use crate::{
     ServerState,
 };
 
-#[derive(Debug, Deserialize)]
-pub struct PostInviteForm {
-    #[serde(default)]
-    max_uses: Option<u16>,
-
-    #[serde(default)]
-    expires: Option<String>,
-}
+use sdk::api::commands::invite::CreateInviteBody;
 
 pub async fn post(mut route: Route<ServerState>, auth: Authorization) -> Response {
-    let form = match body::any::<PostInviteForm, _>(&mut route).await {
+    let form = match body::any::<CreateInviteBody, _>(&mut route).await {
         Ok(form) => form,
         Err(e) => return ApiError::err(e.into()).into_response(),
     };
