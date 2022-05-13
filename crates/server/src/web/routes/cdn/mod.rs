@@ -6,9 +6,11 @@ pub mod attachments;
 pub mod avatar;
 
 pub async fn cdn(mut route: Route<ServerState>) -> Response {
-    match route.host() {
-        Some(host) if host.as_str() == route.state.config.general.cdn_domain => {}
-        _ => return StatusCode::NOT_FOUND.into_response(),
+    if route.state.config.general.strict_cdn {
+        match route.host() {
+            Some(host) if host.as_str() == route.state.config.general.cdn_domain => {}
+            _ => return StatusCode::NOT_FOUND.into_response(),
+        }
     }
 
     match route.next().segment() {

@@ -9,6 +9,7 @@ section! {
         pub server_name: String = "Lantern Chat".to_owned() => "LANTERN_SERVER_NAME",
         pub bind: SocketAddr = SocketAddr::from(([127, 0, 0, 1], 8080)) => "LANTERN_BIND" | parse_address,
         pub cdn_domain: String = "cdn.lanternchat.net".to_owned() => "LANTERN_CDN_DOMAIN",
+        pub strict_cdn: bool = true,
         pub base_domain: String = "lantern.chat".to_owned() => "LANTERN_BASE_DOMAIN",
         pub https: bool = true => "LANTERN_HTTPS" | util::parse[true],
         pub instance_id: u16 = 0 => "LANTERN_INSTANCE_ID" | util::parse[0u16],
