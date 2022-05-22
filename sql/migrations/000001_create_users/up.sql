@@ -6,7 +6,7 @@ CREATE TABLE lantern.users (
     flags           int                 NOT NULL    DEFAULT 0,
     -- 2-byte integer that can be displayed as 4 hex digits,
     -- actually stored as a 4-byte signed integer because Postgres doesn't support unsigned...
-    discriminator   uint2               NOT NULL,
+    discriminator   lantern.uint2       NOT NULL,
     username        text                NOT NULL,
     email           text                NOT NULL,
     passhash        text                NOT NULL,
@@ -39,8 +39,8 @@ CREATE UNIQUE INDEX user_email_idx ON lantern.users
 
 
 CREATE TABLE lantern.user_freelist (
-    username        text        NOT NULL,
-    discriminator   uint2       NOT NULL
+    username        text            NOT NULL,
+    discriminator   lantern.uint2   NOT NULL
 );
 ALTER TABLE lantern.user_freelist OWNER TO postgres;
 
