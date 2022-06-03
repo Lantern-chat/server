@@ -1,38 +1,33 @@
-use std::time::Duration;
 use std::time::SystemTime;
 
-use crate::ServerState;
+use super::*;
 
-pub async fn cleanup_sessions(state: ServerState) {
-    let mut interval = tokio::time::interval(Duration::from_secs(60 * 5));
+pub fn add_cleanup_sessions_task(state: &State, runner: &TaskRunner) {
+    runner.add(task_runner::interval_fn_task(
+        state.clone(),
+        Duration::from_secs(60 * 5),
+        |_, state| async {
+            log::trace!("Cleaning up old user sessions");
 
-    loop {
-        tokio::select! {
-            biased;
-            _ = interval.tick() => {},
-            _ = state.notify_shutdown.notified() => { break; }
-        }
+            let now = SystemTime::now();
 
-        log::trace!("Cleaning up old user sessions");
-
-        let now = SystemTime::now();
-
-        let db_task = async {
-            match state.db.write.get().await {
-                Ok(db) => {
-                    if let Err(e) = db.execute_cached_typed(|| query(), &[&now]).await {
-                        log::error!("Error during session cleanup: {e}");
+            let db_task = async {
+                match state.db.write.get().await {
+                    Ok(db) => {
+                        if let Err(e) = db.execute_cached_typed(|| query(), &[&now]).await {
+                            log::error!("Error during session cleanup: {e}");
+                        }
                     }
+                    Err(e) => log::error!("Database connection error during session cleanup: {e}"),
                 }
-                Err(e) => log::error!("Database connection error during session cleanup: {e}"),
-            }
-        };
+            };
 
-        tokio::join! {
-            state.session_cache.cleanup(now),
-            db_task,
-        };
-    }
+            tokio::join! {
+                state.session_cache.cleanup(now),
+                db_task,
+            };
+        },
+    ))
 }
 
 use thorn::*;

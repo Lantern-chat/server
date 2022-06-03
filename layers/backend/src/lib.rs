@@ -11,6 +11,7 @@ pub mod error;
 pub mod gateway;
 pub mod services;
 pub mod state;
+pub mod tasks;
 pub mod util;
 
 pub use api::auth::Authorization;

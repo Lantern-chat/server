@@ -1,0 +1,10 @@
+[package]
+name = "task_runner"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1", default_features = false, features = ["rt", "sync", "time", "macros"] }
+futures = "0.3"

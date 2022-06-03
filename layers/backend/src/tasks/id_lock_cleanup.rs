@@ -1,20 +1,12 @@
-use std::time::Duration;
+use super::*;
 
-use crate::ServerState;
-
-pub async fn id_lock_cleanup(state: ServerState) {
-    const CLEANUP_INTERVAL: Duration = Duration::from_secs(30);
-
-    let mut interval = tokio::time::interval(CLEANUP_INTERVAL);
-
-    while state.is_alive() {
-        tokio::select! {
-            biased;
-            _ = interval.tick() => {},
-            _ = state.notify_shutdown.notified() => { break; }
-        };
-
-        log::trace!("Cleaning up ID locks");
-        state.id_lock.cleanup().await;
-    }
+pub fn add_id_lock_cleanup_task(state: &State, runner: &TaskRunner) {
+    runner.add(task_runner::interval_fn_task(
+        state.clone(),
+        Duration::from_secs(30),
+        |_t, state| async {
+            log::trace!("Cleaning up ID locks");
+            state.id_lock.cleanup().await;
+        },
+    ))
 }

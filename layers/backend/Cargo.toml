@@ -14,6 +14,7 @@ processing = { path = "../../crates/processing" }
 iplist = { path = "../../crates/iplist" }
 embed_parser = { path = "../../crates/embed_parser" }
 blurhash = { path = "../../crates/blurhash" }
+task_runner = { path = "../../crates/task_runner" }
 
 schema = { path = "../schema" }
 config = { path = "../config" }

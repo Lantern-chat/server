@@ -1,6 +1,7 @@
 pub mod conn;
 pub mod event;
 
+use std::sync::atomic::AtomicI64;
 use std::{borrow::Cow, error::Error, pin::Pin, time::Duration};
 
 use futures::{future, Future, FutureExt, SinkExt, StreamExt, TryStreamExt};
@@ -91,6 +92,11 @@ pub struct Gateway {
 
     /// Identified gateway connections that can targetted by UserId
     pub users: CHashMap<UserId, HashMap<ConnectionId, GatewayConnection>>,
+
+    /// First element stores the actual last event, updated frequently
+    ///
+    /// Second element stores the last event 60 seconds ago as determined by the `event_cleanup` task.
+    pub last_events: [AtomicI64; 2],
 }
 
 impl Gateway {
@@ -103,21 +109,21 @@ impl Gateway {
                     conn.is_active.store(false, std::sync::atomic::Ordering::Relaxed);
                     conn.kill.notify_waiters();
 
-                    crate::metric::API_METRICS.load().errs.add(1);
+                    //crate::metric::API_METRICS.load().errs.add(1);
 
                     // TODO: Better handling of this
                 }
             }
         }
 
-        crate::metric::API_METRICS.load().events.add(1);
+        //crate::metric::API_METRICS.load().events.add(1);
     }
 
     pub async fn broadcast_event(&self, event: Event, party_id: Snowflake) {
         if let Some(party) = self.parties.get(&party_id).await {
             log::debug!("Sending event to party tx: {party_id}");
             if let Err(e) = party.tx.send(event) {
-                crate::metric::API_METRICS.load().errs.add(1);
+                //crate::metric::API_METRICS.load().errs.add(1);
 
                 return log::error!("Could not broadcast to party: {e}");
             }
@@ -125,7 +131,7 @@ impl Gateway {
             log::warn!("Could not find party {party_id}!");
         }
 
-        crate::metric::API_METRICS.load().events.add(1);
+        //crate::metric::API_METRICS.load().events.add(1);
     }
 
     /// After identifying, a connection can be added to active subscriptions
