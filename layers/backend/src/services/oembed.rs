@@ -1,8 +1,5 @@
-use bytes::Bytes;
 use embed_parser::html::HeaderList;
 use headers::{ContentType, HeaderMapExt};
-use std::future::Future;
-use tokio::sync::Semaphore;
 
 use crate::Error;
 use crate::State;
@@ -32,7 +29,9 @@ impl OEmbedClient {
 
         let mut links = smallvec::SmallVec::<[_; 2]>::new();
         for link in headers.get_all("link") {
-            links.extend(embed_parser::oembed::parse_link_header(link.to_str()?));
+            if let Ok(s) = link.to_str() {
+                links.extend(embed_parser::oembed::parse_link_header(s));
+            }
         }
         drop(links); // TODO: Process links instead
 
