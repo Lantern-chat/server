@@ -3,11 +3,7 @@ use schema::Snowflake;
 use sdk::models::*;
 use thorn::pg::Json;
 
-use crate::{
-    ctrl::{room::messages::get_one, Error},
-    web::auth::Authorization,
-    State,
-};
+use crate::{api::room::messages::get_one, Authorization, Error, State};
 
 pub async fn get_thread(
     state: State,
@@ -53,7 +49,7 @@ pub async fn get_thread(
     }
 }
 
-use crate::ctrl::room::messages::get_one::Columns;
+use crate::api::room::messages::get_one::Columns;
 use schema::Threads;
 
 thorn::indexed_columns! {

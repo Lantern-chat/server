@@ -5,9 +5,10 @@ use schema::{auth::RawAuthToken, Snowflake};
 use smol_str::SmolStr;
 
 use crate::{
-    ctrl::{auth::AuthTokenExt, util::validation::validate_email, Error},
+    api::auth::AuthTokenExt,
     util::encrypt::{decrypt_user_message, encrypt_user_message},
-    State,
+    util::validation::validate_email,
+    Error, State,
 };
 
 use sdk::{
@@ -15,7 +16,7 @@ use sdk::{
     models::{ElevationLevel, Session, UserFlags},
 };
 
-use crate::ctrl::user::register::hash_config;
+use crate::api::user::register::hash_config;
 
 // TODO: Determine if I should give any feedback at all or
 // just say catchall "invalid username/email/password"

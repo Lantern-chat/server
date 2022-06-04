@@ -3,11 +3,7 @@ use schema::Snowflake;
 use sdk::models::*;
 use thorn::pg::Json;
 
-use crate::{
-    ctrl::{util::encrypted_asset::encrypt_snowflake_opt, Error},
-    web::auth::Authorization,
-    State,
-};
+use crate::{util::encrypted_asset::encrypt_snowflake_opt, Authorization, Error, State};
 
 pub async fn get_one(
     state: State,

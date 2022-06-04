@@ -3,11 +3,7 @@ use std::{net::SocketAddr, sync::Arc, time::SystemTime};
 use schema::{Snowflake, SnowflakeExt};
 use smol_str::SmolStr;
 
-use crate::{
-    api::{util::validation::*, Error},
-    services::hcaptcha::HCaptchaParameters,
-    State,
-};
+use crate::{services::hcaptcha::HCaptchaParameters, util::validation::*, Error, State};
 
 use sdk::{api::commands::user::UserRegisterForm, models::Session};
 

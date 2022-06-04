@@ -1,12 +1,10 @@
-use futures::{FutureExt, StreamExt, TryStreamExt};
+use futures::FutureExt;
 
 use schema::Snowflake;
 
 use crate::{
-    api::{auth::Authorization, perm::get_cached_room_permissions_with_conn, SearchMode},
-    cache::permission_cache::PermMute,
-    util::encrypted_asset::encrypt_snowflake_opt,
-    Error, State,
+    api::auth::Authorization, cache::permission_cache::PermMute,
+    util::encrypted_asset::encrypt_snowflake_opt, Error, State,
 };
 
 use sdk::models::*;

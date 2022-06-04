@@ -4,15 +4,11 @@ use smol_str::SmolStr;
 use thorn::pg::ToSql;
 
 use crate::{
-    ctrl::{
-        util::validation::{validate_email, validate_password, validate_username, USERNAME_SANITIZE_REGEX},
-        Error,
-    },
-    web::auth::Authorization,
-    State,
+    util::validation::{validate_email, validate_password, validate_username, USERNAME_SANITIZE_REGEX},
+    Authorization, Error, State,
 };
 
-use crate::ctrl::user::{me::login::process_2fa, register::hash_config};
+use crate::api::user::{me::login::process_2fa, register::hash_config};
 
 #[derive(Deserialize)]
 pub struct ModifyAccountForm {

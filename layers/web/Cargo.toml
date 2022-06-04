@@ -8,7 +8,7 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-nightly = ["crc32fast/nightly", "parking_lot/nightly", "rand/nightly", "hashbrown/nightly"]
+# nightly = ["crc32fast/nightly", "parking_lot/nightly", "hashbrown/nightly"]
 # armv8 = ["nightly", "aes/armv8", "aes-gcm-siv/armv8"]
 
 [dependencies]
@@ -64,7 +64,6 @@ serde_repr = "0.1.6"
 paste = "1.0.5"
 serde_json = "1.0.64"
 ciborium = "0.2"
-rand = "0.8.3"
 time = { version = "0.3", features = ["macros"] }
 regex = "1.4.6"
 tokio-tungstenite = { version = "0.17", default-features = false, features = ["connect"] }
@@ -79,7 +78,6 @@ bitflags = "1.2"
 pin-project-lite = "0.2.8"
 crc32fast = "1.2.1"
 urlencoding = "2.1.0"
-base32 = "0.4.0"
 socket2 = "0.4.2"
 anyhow = "1.0.44"
 arrayvec = "0.7.1"

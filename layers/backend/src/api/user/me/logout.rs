@@ -1,7 +1,6 @@
 use schema::auth::RawAuthToken;
 
-use crate::ctrl::{auth, Error};
-use crate::State;
+use crate::{api::auth, Error, State};
 
 pub async fn logout_user(state: State, auth: auth::Authorization) -> Result<(), Error> {
     let bytes = match auth.token {

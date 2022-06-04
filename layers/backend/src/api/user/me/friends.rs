@@ -1,7 +1,6 @@
 use futures::{Stream, StreamExt};
 
-use crate::ctrl::{auth::Authorization, Error};
-use crate::State;
+use crate::{Authorization, Error, State};
 
 use sdk::models::*;
 
@@ -18,13 +17,17 @@ pub async fn friends(
                 use thorn::*;
 
                 Query::select()
-                    .cols(&[AggFriends::FriendId, AggFriends::Note, AggFriends::Flags])
                     .cols(&[
-                        Users::Username,
-                        Users::Flags,
-                        Users::Discriminator,
-                        Users::CustomStatus,
-                        Users::Biography,
+                        /*0*/ AggFriends::FriendId,
+                        /*1*/ AggFriends::Note,
+                        /*2*/ AggFriends::Flags,
+                    ])
+                    .cols(&[
+                        /*3*/ Users::Username,
+                        /*4*/ Users::Flags,
+                        /*5*/ Users::Discriminator,
+                        /*6*/ Users::CustomStatus,
+                        /*7*/ Users::Biography,
                     ])
                     .from(AggFriends::inner_join_table::<Users>().on(Users::Id.equals(AggFriends::FriendId)))
                     .and_where(AggFriends::UserId.equals(Var::of(Users::Id)))

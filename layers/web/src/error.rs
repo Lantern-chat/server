@@ -5,8 +5,6 @@ use ftl::{body::BodyDeserializeError, StatusCode};
 use http::header::InvalidHeaderValue;
 use sdk::{api::error::ApiErrorCode, models::UserPreferenceError};
 
-use crate::web::gateway::event::EventEncodingError;
-
 lazy_static::lazy_static! {
     // 460 Checksum Mismatch
     pub static ref CHECKSUM_MISMATCH: StatusCode = StatusCode::from_u16(460).unwrap();
@@ -16,23 +14,16 @@ lazy_static::lazy_static! {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum WebError {
     // FATAL ERRORS
-    // TODO: Add backtraces when https://github.com/dtolnay/thiserror/pull/131 lands
-    #[error("Database Error {0}")]
-    DbError(#[from] DbError),
-    #[error("Join Error {0}")]
-    JoinError(#[from] tokio::task::JoinError),
     #[error("Semaphore Error: {0}")]
     SemaphoreError(#[from] tokio::sync::AcquireError),
-    #[error("Password Hash Error {0}")]
-    HashError(#[from] argon2::Error),
+
     #[error("Parse Error {0}")]
     JsonError(#[from] serde_json::Error),
-    #[error("XML Serialize Error {0}")]
+    #[error("XML Deserialize Error {0}")]
     XMLError(#[from] quick_xml::de::DeError),
-    #[error("Encoding Error {0}")]
-    EventEncodingError(#[from] EventEncodingError),
+
     #[error("IO Error: {0}")]
     IOError(std::io::Error),
     #[error("Invalid Header Value: {0}")]
@@ -41,8 +32,6 @@ pub enum Error {
     InternalError(String),
     #[error("Internal Error: {0}")]
     InternalErrorStatic(&'static str),
-    #[error("Request Error: {0}")]
-    RequestError(#[from] reqwest::Error),
     #[error("Unimplemented")]
     Unimplemented,
 
@@ -50,71 +39,17 @@ pub enum Error {
     Utf8ParseError(#[from] FromUtf8Error),
 
     // NON-FATAL ERRORS
-    #[error("Already Exists")]
-    AlreadyExists,
-
-    #[error("Username Unavailable")]
-    UsernameUnavailable,
-
-    #[error("Invalid Email Address")]
-    InvalidEmail,
-
-    #[error("Invalid Username")]
-    InvalidUsername,
-
-    #[error("Invalid Password")]
-    InvalidPassword,
-
-    #[error("Invalid Credentials")]
-    InvalidCredentials,
-
-    #[error("TOTP Required")]
-    TOTPRequired,
-
-    #[error("Insufficient Age")]
-    InsufficientAge,
-
-    #[error("Invalid Date")]
-    InvalidDate,
-
-    #[error("Invalid Message Content")]
-    InvalidContent,
-
-    #[error("Invalid Name")]
-    InvalidName,
-
-    #[error("Invalid Room Topic")]
-    InvalidTopic,
-
-    #[error("Invalid file preview")]
-    InvalidPreview,
-
-    #[error("Invalid Image Format")]
-    InvalidImageFormat,
-
-    #[error("{0}")]
-    InvalidPreferences(UserPreferenceError),
-
     #[error("Missing Upload-Metadata Header")]
     MissingUploadMetadataHeader,
 
     #[error("Missing Authorization Header")]
     MissingAuthorizationHeader,
 
-    #[error("No Session")]
-    NoSession,
-
     #[error("Invalid Auth Format")]
     InvalidAuthFormat,
 
     #[error("Header Parse Error")]
     HeaderParseError(#[from] http::header::ToStrError),
-
-    #[error("Missing filename")]
-    MissingFilename,
-
-    #[error("Missing mime")]
-    MissingMime,
 
     #[error("Not Found")]
     NotFound,
@@ -134,9 +69,6 @@ pub enum Error {
     #[error("Base-64 Decode Error: {0}")]
     Base64DecodeError(#[from] base64::DecodeError),
 
-    #[error("Base-85 Decode Error: {0}")]
-    Base85DecodeError(#[from] blurhash::base85::FromZ85Error),
-
     #[error("Body Deserialization Error: {0}")]
     BodyDeserializeError(#[from] BodyDeserializeError),
 
@@ -152,28 +84,16 @@ pub enum Error {
     #[error("Mime Parse Error: {0}")]
     MimeParseError(#[from] mime::FromStrError),
 
-    #[error("Temporarily Disabled")]
-    TemporarilyDisabled,
-
     #[error("Unauthorized")]
     Unauthorized,
-
-    #[error("Captcha Error: {0}")]
-    InvalidCaptcha(#[from] crate::services::hcaptcha::HCaptchaError),
 }
 
-impl From<db::pg::Error> for Error {
-    fn from(err: db::pg::Error) -> Error {
-        Error::DbError(err.into())
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(err: std::io::Error) -> Error {
+impl From<std::io::Error> for WebError {
+    fn from(err: std::io::Error) -> WebError {
         if err.kind() == std::io::ErrorKind::NotFound {
-            Error::NotFound
+            WebError::NotFound
         } else {
-            Error::IOError(err)
+            WebError::IOError(err)
         }
     }
 }

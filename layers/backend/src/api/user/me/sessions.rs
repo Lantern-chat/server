@@ -1,9 +1,6 @@
 use futures::stream::{Stream, StreamExt};
 
-use crate::{
-    ctrl::{auth::Authorization, Error},
-    State,
-};
+use crate::{Authorization, Error, State};
 
 use sdk::models::AnonymousSession;
 

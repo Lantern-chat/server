@@ -1,8 +1,8 @@
-use schema::{Snowflake, SnowflakeExt};
+use schema::Snowflake;
 use sdk::models::*;
 
 use crate::{
-    api::{auth::Authorization, perm::get_cached_room_permissions, SearchMode},
+    api::{auth::Authorization, perm::get_cached_room_permissions},
     gateway::Event,
     Error, State,
 };

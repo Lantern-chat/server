@@ -1,5 +1,4 @@
-use crate::ctrl::{auth, Error};
-use crate::State;
+use crate::{api::auth, Error, State};
 
 use sdk::models::UserPreferences;
 use thorn::pg::Json;

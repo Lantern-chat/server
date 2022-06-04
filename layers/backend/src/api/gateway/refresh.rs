@@ -2,8 +2,8 @@ use futures::StreamExt;
 
 use sdk::models::{Permission, Snowflake};
 
+use crate::cache::permission_cache::PermMute;
 use crate::Error;
-use crate::permission_cache::PermMute;
 use crate::State;
 
 pub async fn refresh_room_perms(
