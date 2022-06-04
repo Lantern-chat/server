@@ -1,18 +1,12 @@
-use std::time::Duration;
+use super::*;
 
-use crate::ServerState;
-
-pub async fn cleanup_ratelimits(state: ServerState) {
-    let mut interval = tokio::time::interval(Duration::from_secs(10));
-
-    loop {
-        let now = tokio::select! {
-            biased;
-            now = interval.tick() => { now },
-            _ = state.notify_shutdown.notified() => { break; }
-        };
-
-        log::trace!("Cleaning old rate-limit entries");
-        state.rate_limit.cleanup_at(now.into_std()).await;
-    }
+pub fn add_cleanup_ratelimit_task(state: &ServerState, runner: &TaskRunner) {
+    runner.add(task_runner::interval_fn_task(
+        state.clone(),
+        Duration::from_secs(10),
+        |now, state| async {
+            log::trace!("Cleaning old rate-limit entries");
+            state.rate_limit.cleanup_at(now.into_std()).await;
+        },
+    ))
 }

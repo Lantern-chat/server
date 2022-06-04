@@ -1,19 +1,13 @@
-use std::time::Duration;
+use super::*;
 
-use crate::ServerState;
+pub fn add_cleanup_connections_task(state: &ServerState, runner: &TaskRunner) {
+    runner.add(task_runner::interval_fn_task(
+        state.clone(),
+        Duration::from_secs(5),
+        |_, state| async {
+            log::trace!("Cleaning up dead connections");
 
-pub async fn cleanup_connections(state: ServerState) {
-    let mut interval = tokio::time::interval(Duration::from_secs(5));
-
-    while state.is_alive() {
-        let _now = tokio::select! {
-            biased;
-            now = interval.tick() => { now },
-            _ = state.notify_shutdown.notified() => { break; }
-        };
-
-        log::trace!("Cleaning up dead connections");
-
-        // TODO: Cleanup dead connections by checking last-heartbeat
-    }
+            // TODO: Cleanup dead connections by checking last-heartbeat
+        },
+    ))
 }
