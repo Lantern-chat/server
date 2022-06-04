@@ -59,22 +59,6 @@ use timestamp::{formats::Short, Timestamp, TimestampStr};
 
 use crate::Error;
 
-// pub async fn read_metrics(state: State) -> Result<impl Stream<Item = Result<Metrics, Error>>, Error> {
-//     let db = state.db.read.get().await?;
-
-//     let stream = db
-//         .query_stream_cached_typed(
-//             || {
-//                 use schema::*;
-//                 use thorn::*;
-
-//                 Query::select().from_table::<Metrics>()
-//             },
-//             &[],
-//         )
-//         .await?;
-// }
-
 #[derive(Debug, Default, Clone, Deserialize)]
 pub struct MetricsOptions {
     #[serde(default)]
