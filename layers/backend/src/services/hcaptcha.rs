@@ -90,7 +90,7 @@ impl HCaptchaClient {
         })
     }
 
-    pub async fn verify<'a>(&self, params: HCaptchaParameters<'a>) -> Result<bool, HCaptchaError> {
+    pub async fn verify<'a>(&self, params: HCaptchaParameters<'a>) -> Result<bool, Error> {
         let _guard = self.limit.acquire().await?;
 
         log::debug!("Sending hCaptcha verification");

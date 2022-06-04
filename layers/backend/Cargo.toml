@@ -38,6 +38,7 @@ ciborium = "0.2"
 thiserror = "1"
 futures = "0.3"
 reqwest = { version = "0.11", default-features = false, features = ["gzip", "deflate", "brotli", "rustls-tls"] }
+headers = "0.3"
 rust-argon2 = "1"
 base64 = "0.13.0"
 memchr = "2.4.1"

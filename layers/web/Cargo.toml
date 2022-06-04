@@ -14,6 +14,7 @@ nightly = ["crc32fast/nightly", "parking_lot/nightly", "rand/nightly", "hashbrow
 [dependencies]
 schema = { path = "../schema" }
 config = { path = "../config" }
+backend = { path = "../backend" }
 
 db = { path = "../../crates/db" }
 util = { path = "../../crates/util" }
