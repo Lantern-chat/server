@@ -15,6 +15,7 @@ iplist = { path = "../../crates/iplist" }
 embed_parser = { path = "../../crates/embed_parser" }
 blurhash = { path = "../../crates/blurhash" }
 task_runner = { path = "../../crates/task_runner" }
+filesystem = { path = "../../crates/filesystem" }
 
 schema = { path = "../schema" }
 config = { path = "../config" }
@@ -53,3 +54,7 @@ aes-gcm-siv = "0.10.3"
 miniz_oxide = "0.5"
 rand = "0.8.3"
 base32 = "0.4.0"
+arrayvec = "0.7.1"
+aho-corasick = "0.7"
+paste = "1.0.5"
+bytecount = "0.6.2"

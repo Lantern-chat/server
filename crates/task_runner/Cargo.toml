@@ -7,4 +7,6 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1", default_features = false, features = ["rt", "sync", "time", "macros"] }
+tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
 futures = "0.3"
+failsafe = "1.0.0"

@@ -1,12 +1,11 @@
 use super::*;
 
-pub fn add_id_lock_cleanup_task(state: &State, runner: &TaskRunner) {
-    runner.add(task_runner::interval_fn_task(
-        state.clone(),
+pub fn add_id_lock_cleanup_task(state: State, runner: &TaskRunner) {
+    runner.add(RetryTask::new(IntervalFnTask::new(
         Duration::from_secs(30),
-        |_t, state| async {
+        move |_, _| async {
             log::trace!("Cleaning up ID locks");
             state.id_lock.cleanup().await;
         },
-    ))
+    )))
 }

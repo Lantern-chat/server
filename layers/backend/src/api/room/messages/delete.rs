@@ -1,10 +1,7 @@
 use schema::{Snowflake, SnowflakeExt};
 use smol_str::SmolStr;
 
-use crate::{
-    ctrl::{auth::Authorization, perm::get_cached_room_permissions, Error, SearchMode},
-    State,
-};
+use crate::{Authorization, Error, State};
 
 use sdk::models::*;
 

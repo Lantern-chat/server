@@ -6,11 +6,8 @@ use sdk::models::*;
 use thorn::pg::{Json, ToSql};
 
 use crate::{
-    ctrl::{
-        perm::get_cached_room_permissions_with_conn, util::encrypted_asset::encrypt_snowflake_opt, Error,
-    },
-    web::auth::Authorization,
-    State,
+    util::encrypted_asset::encrypt_snowflake_opt,
+    Authorization, Error, State,
 };
 
 use sdk::api::commands::room::{GetMessagesQuery, MessageSearch};

@@ -122,6 +122,9 @@ pub enum Error {
     #[error("Unauthorized")]
     Unauthorized,
 
+    #[error("Mime Parse Error: {0}")]
+    MimeParseError(#[from] mime::FromStrError),
+
     #[error("Captcha Error: {0}")]
     CaptchaError(#[from] crate::services::hcaptcha::HCaptchaError),
 }

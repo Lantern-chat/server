@@ -2,17 +2,16 @@ use crate::api::metrics::Metrics;
 
 use super::*;
 
-pub fn add_record_metrics_task(state: &State, runner: &TaskRunner) {
-    runner.add(task_runner::interval_fn_task(
-        state.clone(),
+pub fn add_record_metrics_task(state: State, runner: &TaskRunner) {
+    runner.add(RetryTask::new(IntervalFnTask::new(
         Duration::from_secs(60 * 5),
-        |_, state| async {
+        move |_, _| async {
             log::trace!("Collecting metrics");
 
             let task = async {
                 let db = state.db.write.get().await?;
 
-                let metrics = Metrics::acquire(state);
+                let metrics = Metrics::acquire(&state);
 
                 db.execute_cached_typed(
                     || {
@@ -57,5 +56,5 @@ pub fn add_record_metrics_task(state: &State, runner: &TaskRunner) {
                 log::error!("Error collecting metrics! {e}");
             }
         },
-    ))
+    )))
 }

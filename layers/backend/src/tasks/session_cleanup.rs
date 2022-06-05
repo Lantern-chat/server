@@ -2,11 +2,10 @@ use std::time::SystemTime;
 
 use super::*;
 
-pub fn add_cleanup_sessions_task(state: &State, runner: &TaskRunner) {
-    runner.add(task_runner::interval_fn_task(
-        state.clone(),
+pub fn add_cleanup_sessions_task(state: State, runner: &TaskRunner) {
+    runner.add(RetryTask::new(IntervalFnTask::new(
         Duration::from_secs(60 * 5),
-        |_, state| async {
+        move |_, _| async {
             log::trace!("Cleaning up old user sessions");
 
             let now = SystemTime::now();
@@ -27,7 +26,7 @@ pub fn add_cleanup_sessions_task(state: &State, runner: &TaskRunner) {
                 db_task,
             };
         },
-    ))
+    )))
 }
 
 use thorn::*;

@@ -389,6 +389,8 @@ impl MainFileCache {
     pub fn do_process(&self, state: &ServerState, mut file: Vec<u8>) -> Vec<u8> {
         let mut new_file = Vec::new();
 
+        let config = state.config();
+
         let mut last_index = 0;
         for m in VARIABLE_PATTERNS.find_iter(&file) {
             new_file.extend_from_slice(&file[last_index..m.start()]);
@@ -400,15 +402,15 @@ impl MainFileCache {
                     serde_json::to_writer(
                         &mut new_file,
                         &sdk::models::ServerConfig {
-                            hcaptcha_sitekey: state.config.services.hcaptcha_sitekey.clone(),
-                            cdn: state.config.general.cdn_domain.clone(),
-                            min_age: state.config.account.min_age,
+                            hcaptcha_sitekey: config.services.hcaptcha_sitekey.clone(),
+                            cdn: config.web.cdn_domain.clone(),
+                            min_age: config.account.min_age,
                         },
                     )
                     .unwrap();
                 }
-                1 => new_file.extend_from_slice(state.config.general.base_url().as_bytes()),
-                2 => new_file.extend_from_slice(state.config.general.server_name.as_bytes()),
+                1 => new_file.extend_from_slice(config.web.base_url().as_bytes()),
+                2 => new_file.extend_from_slice(config.general.server_name.as_bytes()),
                 _ => log::error!("Unreachable replacement"),
             }
         }

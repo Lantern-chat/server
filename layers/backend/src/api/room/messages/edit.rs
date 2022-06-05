@@ -6,12 +6,7 @@ use thorn::pg::Json;
 
 use sdk::models::*;
 
-use crate::{
-    ctrl::{util::encrypted_asset::encrypt_snowflake_opt, Error},
-    permission_cache::PermMute,
-    web::auth::Authorization,
-    State,
-};
+use crate::{cache::permission_cache::PermMute, Authorization, Error, State};
 
 use sdk::api::commands::room::EditMessageBody;
 
@@ -48,7 +43,7 @@ pub async fn edit_message(
     let perm = match perm {
         Some(perm) => perm,
         None => {
-            let perm = crate::ctrl::perm::get_room_permissions(&db, auth.user_id, room_id).await?;
+            let perm = crate::api::perm::get_room_permissions(&db, auth.user_id, room_id).await?;
 
             if !perm.contains(RoomPermissions::SEND_MESSAGES) {
                 return Err(Error::Unauthorized);

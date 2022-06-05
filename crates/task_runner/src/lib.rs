@@ -4,6 +4,8 @@
 //! defined as a high-level operations or loops that run independently of
 //! each other (albiet likely on shared state)
 
+extern crate tracing as log;
+
 use futures::TryStreamExt;
 use std::future::Future;
 use std::sync::Arc;
@@ -80,48 +82,108 @@ impl Stream for TaskRunner {
     }
 }
 
-pub fn fn_task<S, T, F>(state: S, f: T) -> impl Task
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AsyncFnTask<T>(pub T);
+
+impl<T, F> AsyncFnTask<T>
 where
-    T: FnOnce(watch::Receiver<bool>, S) -> F + Send + 'static,
+    T: FnOnce(watch::Receiver<bool>) -> F + Send + 'static,
     F: Future<Output = ()> + Send + 'static,
-    S: Send + 'static,
 {
-    struct AsyncTask<S, T>(S, T);
-
-    impl<S, T, F> Task for AsyncTask<S, T>
-    where
-        T: FnOnce(watch::Receiver<bool>, S) -> F + Send + 'static,
-        F: Future<Output = ()> + Send + 'static,
-        S: Send + 'static,
-    {
-        fn start(self, alive: watch::Receiver<bool>) -> JoinHandle<()> {
-            tokio::task::spawn(async move {
-                let AsyncTask(state, f) = self;
-                f(alive, state).await
-            })
-        }
+    pub const fn new(f: T) -> Self {
+        AsyncFnTask(f)
     }
-
-    AsyncTask(state, f)
 }
 
-use tokio::time::Duration;
-
-pub fn interval_fn_task<S, T, F>(state: S, interval: Duration, f: T) -> impl Task
+impl<T, F> Task for AsyncFnTask<T>
 where
-    T: Fn(tokio::time::Instant, &S) -> F + Send + Sync + 'static,
+    T: FnOnce(watch::Receiver<bool>) -> F + Send + 'static,
     F: Future<Output = ()> + Send + 'static,
-    S: Send + Sync + 'static,
 {
-    fn_task(state, move |mut alive, state| async move {
-        let mut interval = tokio::time::interval(interval);
+    fn start(self, alive: watch::Receiver<bool>) -> JoinHandle<()> {
+        tokio::task::spawn(async move { (self.0)(alive).await })
+    }
+}
 
-        while *alive.borrow_and_update() {
-            tokio::select! {
-                biased;
-                t = interval.tick() => f(t, &state).await,
-                _ = alive.changed() => break,
+use tokio::time::{Duration, Instant};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct IntervalFnTask<T>(pub Duration, pub T);
+
+impl<T, F> IntervalFnTask<T>
+where
+    T: Fn(&watch::Receiver<bool>, Instant) -> F + Send + Sync + 'static,
+    F: Future<Output = ()> + Send + 'static,
+{
+    pub const fn new(interval: Duration, f: T) -> Self {
+        IntervalFnTask(interval, f)
+    }
+}
+
+impl<T, F> Task for IntervalFnTask<T>
+where
+    T: Fn(&watch::Receiver<bool>, Instant) -> F + Send + Sync + 'static,
+    F: Future<Output = ()> + Send + 'static,
+{
+    fn start(self, alive: watch::Receiver<bool>) -> JoinHandle<()> {
+        AsyncFnTask(move |mut alive: watch::Receiver<bool>| async move {
+            let IntervalFnTask(interval, f) = self;
+
+            let mut interval = tokio::time::interval(interval);
+
+            while *alive.borrow_and_update() {
+                tokio::select! {
+                    biased;
+                    t = interval.tick() => f(&alive, t).await,
+                    _ = alive.changed() => break,
+                }
             }
-        }
-    })
+        })
+        .start(alive)
+    }
+}
+
+use failsafe::futures::CircuitBreaker;
+use failsafe::{Config, Error as Reject, FailurePolicy, Instrument};
+
+#[derive(Debug)]
+pub struct RetryTask<T, POLICY, INSTRUMENT>(pub Config<POLICY, INSTRUMENT>, pub T);
+
+impl<T: Task + Clone> RetryTask<T, (), ()>
+where
+    T: Send + Sync + 'static,
+{
+    pub fn new(task: T) -> impl Task {
+        RetryTask(Config::new(), task)
+    }
+}
+
+impl<T: Task + Clone, POLICY: FailurePolicy, INSTRUMENT: Instrument> Task for RetryTask<T, POLICY, INSTRUMENT>
+where
+    T: Send + Sync + 'static,
+    POLICY: Send + Sync + 'static,
+    INSTRUMENT: Send + Sync + 'static,
+{
+    fn start(self, mut alive: watch::Receiver<bool>) -> JoinHandle<()> {
+        tokio::spawn(async move {
+            let RetryTask(config, task) = self;
+
+            let cb = config.build();
+
+            while *alive.borrow_and_update() {
+                match cb.call(async { task.clone().start(alive.clone()).await }).await {
+                    Ok(()) => {}
+                    Err(Reject::Inner(e)) => {
+                        log::error!("Error running task: {e}");
+                        continue;
+                    }
+                    Err(Reject::Rejected) => {
+                        log::warn!("Task has been rate-limited");
+                        tokio::time::sleep(Duration::from_secs(1)).await;
+                        continue;
+                    }
+                }
+            }
+        })
+    }
 }

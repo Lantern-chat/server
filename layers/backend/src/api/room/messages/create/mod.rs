@@ -4,11 +4,7 @@ use futures::FutureExt;
 use schema::{Snowflake, SnowflakeExt};
 use smol_str::SmolStr;
 
-use crate::{
-    ctrl::{auth::Authorization, perm::get_cached_room_permissions, Error, SearchMode},
-    permission_cache::PermMute,
-    State,
-};
+use crate::{cache::permission_cache::PermMute, Authorization, Error, State};
 
 use sdk::models::*;
 
@@ -56,7 +52,7 @@ pub async fn create_message(
         None => {
             let db = state.db.write.get().await?;
 
-            let perm = crate::ctrl::perm::get_room_permissions(&db, auth.user_id, room_id).await?;
+            let perm = crate::api::perm::get_room_permissions(&db, auth.user_id, room_id).await?;
 
             if !perm.contains(RoomPermissions::SEND_MESSAGES) {
                 return Err(Error::Unauthorized);

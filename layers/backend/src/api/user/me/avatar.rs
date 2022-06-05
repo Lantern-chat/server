@@ -4,8 +4,9 @@ use schema::{flags::FileFlags, SnowflakeExt};
 use sdk::models::Snowflake;
 use smol_str::SmolStr;
 
+use filesystem::store::{CipherOptions, OpenMode};
+
 use crate::{
-    filesystem::store::{CipherOptions, OpenMode},
     Error, State,
 };
 
@@ -81,7 +82,7 @@ pub async fn process_avatar(state: State, user_id: Snowflake, file_id: Snowflake
 
     let encode_state = state.clone();
     let encode_task = tokio::task::spawn_blocking(move || -> Result<_, Error> {
-        use processing::avatar::{EncodedImage, ProcessConfig, ProcessingError};
+        use processing::avatar::{ProcessConfig, ProcessingError};
         use processing::read_image::ImageReadError;
 
         processing::avatar::process_avatar(
@@ -117,7 +118,7 @@ pub async fn process_avatar(state: State, user_id: Snowflake, file_id: Snowflake
     let mut avatar_file_id = file_id;
 
     if new_file {
-        let (new_file_id, nonce) = crate::ctrl::file::post::do_post_file(
+        let (new_file_id, nonce) = crate::api::file::post::do_post_file(
             state.clone(),
             user_id,
             encoded_image.buffer.len() as i32,

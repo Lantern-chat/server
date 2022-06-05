@@ -5,11 +5,10 @@ use crate::Error;
 
 use super::*;
 
-pub fn add_event_log_cleanup_task(state: &State, runner: &TaskRunner) {
-    runner.add(task_runner::interval_fn_task(
-        state.clone(),
+pub fn add_event_log_cleanup_task(state: State, runner: &TaskRunner) {
+    runner.add(RetryTask::new(IntervalFnTask::new(
         Duration::from_secs(60),
-        |_, state| async {
+        move |_, _| async {
             log::trace!("Cleaning up event_log");
 
             let task = async {
@@ -43,5 +42,5 @@ pub fn add_event_log_cleanup_task(state: &State, runner: &TaskRunner) {
                 log::error!("Error cleaning event_log: {e}");
             }
         },
-    ))
+    )))
 }

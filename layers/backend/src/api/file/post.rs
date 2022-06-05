@@ -2,7 +2,6 @@ use std::str::FromStr;
 
 use crate::{Error, State};
 
-use db::pool::Object;
 use schema::{flags::FileFlags, Snowflake, SnowflakeExt};
 
 use rand::Rng;
