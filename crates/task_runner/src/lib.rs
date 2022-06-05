@@ -101,6 +101,7 @@ where
     F: Future<Output = ()> + Send + 'static,
 {
     fn start(self, alive: watch::Receiver<bool>) -> JoinHandle<()> {
+        // NOTE: Call task within async block to defer initial execution
         tokio::task::spawn(async move { (self.0)(alive).await })
     }
 }
@@ -172,15 +173,11 @@ where
 
             while *alive.borrow_and_update() {
                 match cb.call(async { task.clone().start(alive.clone()).await }).await {
-                    Ok(()) => {}
-                    Err(Reject::Inner(e)) => {
-                        log::error!("Error running task: {e}");
-                        continue;
-                    }
+                    Ok(()) => log::trace!("Task ran successfully"),
+                    Err(Reject::Inner(e)) => log::error!("Error running task: {e}"),
                     Err(Reject::Rejected) => {
                         log::warn!("Task has been rate-limited");
                         tokio::time::sleep(Duration::from_secs(1)).await;
-                        continue;
                     }
                 }
             }
