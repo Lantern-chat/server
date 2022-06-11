@@ -99,7 +99,7 @@ pub(crate) fn parse_msg(state: &State, row: &db::Row) -> Result<Message, Error> 
                 attachments.reserve(meta.len());
 
                 for (meta, preview) in meta.into_iter().zip(previews) {
-                    use blurhash::base85::ToZ85;
+                    use z85::ToZ85;
 
                     attachments.push(Attachment {
                         file: File {

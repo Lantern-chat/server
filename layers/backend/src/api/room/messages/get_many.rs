@@ -154,7 +154,7 @@ pub async fn get_many(
                         attachments.reserve(meta.len());
 
                         for (meta, preview) in meta.into_iter().zip(previews) {
-                            use blurhash::base85::ToZ85;
+                            use z85::ToZ85;
 
                             // NOTE: This filtering is done in the application layer because it
                             // produces sub-optimal query-plans in Postgres.

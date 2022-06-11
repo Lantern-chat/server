@@ -40,7 +40,8 @@ pub async fn post_file(state: State, user_id: Snowflake, body: FilePostBody) -> 
     let preview = match body.preview {
         None => None,
         Some(preview) => Some({
-            use blurhash::{base85::*, decode};
+            use blurhash::decode;
+            use z85::FromZ85;
 
             let preview = preview.from_z85()?;
 

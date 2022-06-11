@@ -16,6 +16,7 @@ embed_parser = { path = "../../crates/embed_parser" }
 blurhash = { path = "../../crates/blurhash" }
 task_runner = { path = "../../crates/task_runner" }
 filesystem = { path = "../../crates/filesystem" }
+z85 = { path = "../../crates/z85" }
 
 schema = { path = "../schema" }
 config = { path = "../config" }

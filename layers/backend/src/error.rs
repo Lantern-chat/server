@@ -111,7 +111,7 @@ pub enum Error {
     Base64DecodeError(#[from] base64::DecodeError),
 
     #[error("Base-85 Decode Error: {0}")]
-    Base85DecodeError(#[from] blurhash::base85::FromZ85Error),
+    Base85DecodeError(#[from] z85::FromZ85Error),
 
     #[error("Request Entity Too Large")]
     RequestEntityTooLarge,

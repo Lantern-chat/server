@@ -1,10 +1,6 @@
 // Based on rustc_serialize::base64
 // and also ZeroMQ's reference implementation
 
-pub use self::FromZ85Error::*;
-pub use self::ToZ85Error::*;
-
-use std::error;
 use std::fmt;
 
 const CHARS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#";
@@ -18,7 +14,7 @@ const BYTE_OFFSETS: &[i8] = &[
     0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x4F, -0x01, 0x50, -0x01, -0x01,
 ];
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum FromZ85Error {
     /// The input contained a character not part of the Z85 format
     InvalidZ85Byte(u8, usize),
@@ -26,55 +22,34 @@ pub enum FromZ85Error {
     InvalidZ85Length(usize),
 }
 
-impl fmt::Debug for FromZ85Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            InvalidZ85Byte(ch, idx) => write!(f, "Invalid character '{}' at position {}.", ch, idx),
-            InvalidZ85Length(len) => write!(f, "Invalid length {}.", len),
-        }
-    }
-}
-
-impl error::Error for FromZ85Error {
-    fn description(&self) -> &str {
-        match *self {
-            InvalidZ85Byte(_, _) => "invalid character",
-            InvalidZ85Length(_) => "invalid length",
-        }
-    }
-}
-
-impl fmt::Display for FromZ85Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(&self, f)
-    }
-}
-
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum ToZ85Error {
     /// The input had an invalid length
     InvalidZ85InputSize(usize),
 }
 
-impl fmt::Display for ToZ85Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(&self, f)
-    }
-}
-
-impl error::Error for ToZ85Error {
-    fn description(&self) -> &str {
-        "invalid input size"
-    }
-}
-
-impl fmt::Debug for ToZ85Error {
+impl fmt::Display for FromZ85Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            InvalidZ85InputSize(len) => write!(f, "Invalid input size {}.", len),
+            FromZ85Error::InvalidZ85Byte(ch, idx) => {
+                write!(f, "Invalid character '0x{:x}' at position {}.", ch, idx)
+            }
+            FromZ85Error::InvalidZ85Length(len) => write!(f, "Invalid length {}.", len),
         }
     }
 }
+
+impl fmt::Display for ToZ85Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            ToZ85Error::InvalidZ85InputSize(len) => write!(f, "Invalid input size {}.", len),
+        }
+    }
+}
+
+impl std::error::Error for FromZ85Error {}
+impl std::error::Error for ToZ85Error {}
+
 /// A trait for converting from z85 encoded values.
 pub trait FromZ85 {
     /// Converts the value of `self`, interpreted as z85 encoded data,
@@ -103,7 +78,7 @@ impl FromZ85 for [u8] {
     fn from_z85(&self) -> Result<Vec<u8>, FromZ85Error> {
         let len = self.len();
         if len == 0 || len % 5 != 0 {
-            return Err(InvalidZ85Length(len));
+            return Err(FromZ85Error::InvalidZ85Length(len));
         }
 
         let mut out_vec: Vec<u8> = Vec::with_capacity(len / 5 * 4);
@@ -114,11 +89,11 @@ impl FromZ85 for [u8] {
             let next_pos = pos + 5;
             for c in &self[pos..next_pos] {
                 if *c <= 32 || *c > 127 {
-                    return Err(InvalidZ85Byte(*c, pos));
+                    return Err(FromZ85Error::InvalidZ85Byte(*c, pos));
                 }
                 let kar = BYTE_OFFSETS[(*c as usize) - 32];
                 if kar == -1 {
-                    return Err(InvalidZ85Byte(*c, pos));
+                    return Err(FromZ85Error::InvalidZ85Byte(*c, pos));
                 }
                 block_num = block_num * 85 + kar as u32;
             }
@@ -137,7 +112,7 @@ impl ToZ85 for [u8] {
         let len = self.len();
 
         if len == 0 || len % 4 != 0 {
-            return Err(InvalidZ85InputSize(len));
+            return Err(ToZ85Error::InvalidZ85InputSize(len));
         }
 
         let mut out_vec: Vec<u8> = Vec::with_capacity(len / 4 * 5);
@@ -148,7 +123,7 @@ impl ToZ85 for [u8] {
                 block_num = (block_num << 8) | (*byte as u32);
             }
             let mut out_chunk = [0_u8; 5];
-            for c in &mut out_chunk[..] {
+            for c in out_chunk.as_mut_slice() {
                 *c = CHARS[(block_num % 85) as usize];
                 block_num /= 85;
             }
