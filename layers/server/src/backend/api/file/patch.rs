@@ -252,10 +252,10 @@ pub async fn patch_file<E>(
 
     drop(_file_lock);
 
-    // crate::metric::API_METRICS
-    //     .load()
-    //     .upload
-    //     .add(params.content_length);
+    crate::metrics::API_METRICS
+        .load()
+        .upload
+        .add(params.content_length);
 
     Ok(file_patch)
 }

@@ -39,7 +39,7 @@ pub async fn service(
         resp.headers_mut().insert("Server-Timing", value);
     }
 
-    API_METRICS.load().add_req(resp.status(), elapsed);
+    API_METRICS.load().add_req(resp.status() as u16, elapsed);
 
     Ok(resp)
 }

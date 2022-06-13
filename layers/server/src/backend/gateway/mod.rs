@@ -109,21 +109,21 @@ impl Gateway {
                     conn.is_active.store(false, std::sync::atomic::Ordering::Relaxed);
                     conn.kill.notify_waiters();
 
-                    //crate::metric::API_METRICS.load().errs.add(1);
+                    crate::metrics::API_METRICS.load().errs.add(1);
 
                     // TODO: Better handling of this
                 }
             }
         }
 
-        //crate::metric::API_METRICS.load().events.add(1);
+        crate::metrics::API_METRICS.load().events.add(1);
     }
 
     pub async fn broadcast_event(&self, event: Event, party_id: Snowflake) {
         if let Some(party) = self.parties.get(&party_id).await {
             log::debug!("Sending event to party tx: {party_id}");
             if let Err(e) = party.tx.send(event) {
-                //crate::metric::API_METRICS.load().errs.add(1);
+                crate::metrics::API_METRICS.load().errs.add(1);
 
                 return log::error!("Could not broadcast to party: {e}");
             }
@@ -131,7 +131,7 @@ impl Gateway {
             log::warn!("Could not find party {party_id}!");
         }
 
-        //crate::metric::API_METRICS.load().events.add(1);
+        crate::metrics::API_METRICS.load().events.add(1);
     }
 
     /// After identifying, a connection can be added to active subscriptions
