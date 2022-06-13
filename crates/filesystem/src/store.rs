@@ -77,17 +77,21 @@ impl<F: FileExt + Sync> FileExt for EncryptedFile<F> {
 pub trait RWSeekStream: AsyncWrite + AsyncRead + AsyncSeek + FileExt + Send + Sync {}
 impl<T> RWSeekStream for T where T: AsyncWrite + AsyncRead + AsyncSeek + FileExt + Send + Sync {}
 
-pub struct FileStore;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct FileStore<'a> {
+    pub root: &'a Path,
+}
 
-impl FileStore {
+impl FileStore<'_> {
     pub async fn open_crypt(
-        root: &Path,
+        &self,
         id: Snowflake,
         mode: OpenMode,
         options: &CipherOptions,
     ) -> io::Result<Pin<Box<dyn RWSeekStream>>> {
         let cipher = options.create();
-        let file = FileStore::open(root, id, mode).await?;
+        let file = self.open(id, mode).await?;
 
         Ok(match mode {
             OpenMode::Read => Box::pin(EncryptedFile::new(file, cipher)),
@@ -96,8 +100,8 @@ impl FileStore {
         })
     }
 
-    pub async fn open(root: &Path, id: Snowflake, mode: OpenMode) -> io::Result<TkFile> {
-        let mut path = root.to_path_buf();
+    pub async fn open(&self, id: Snowflake, mode: OpenMode) -> io::Result<TkFile> {
+        let mut path = self.root.to_path_buf();
         id_to_path(id, &mut path);
 
         if mode == OpenMode::Write {
@@ -117,8 +121,8 @@ impl FileStore {
         options.open(path).await
     }
 
-    pub async fn metadata(root: &Path, id: Snowflake) -> io::Result<Metadata> {
-        let mut path = root.to_path_buf();
+    pub async fn metadata(&self, id: Snowflake) -> io::Result<Metadata> {
+        let mut path = self.root.to_path_buf();
         id_to_path(id, &mut path);
         id_to_name(id, &mut path);
 

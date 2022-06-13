@@ -6,13 +6,12 @@
 
 extern crate tracing as log;
 
-use futures::TryStreamExt;
 use std::future::Future;
 use std::sync::Arc;
 use tokio::task::JoinError;
 use tokio::{sync::watch, task::JoinHandle};
 
-use futures::stream::{FuturesUnordered, Stream, StreamExt};
+use futures::stream::{FuturesUnordered, Stream, StreamExt, TryStreamExt};
 
 pub trait Task {
     fn start(self, alive: watch::Receiver<bool>) -> JoinHandle<()>;
@@ -109,33 +108,35 @@ where
 use tokio::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct IntervalFnTask<T>(pub Duration, pub T);
+pub struct IntervalFnTask<T, S>(pub S, pub Duration, pub T);
 
-impl<T, F> IntervalFnTask<T>
+impl<T, F, S> IntervalFnTask<T, S>
 where
-    T: Fn(&watch::Receiver<bool>, Instant) -> F + Send + Sync + 'static,
+    T: Fn(S, Instant, &watch::Receiver<bool>) -> F + Send + Sync + 'static,
     F: Future<Output = ()> + Send + 'static,
+    S: Clone + Send + Sync + 'static,
 {
-    pub const fn new(interval: Duration, f: T) -> Self {
-        IntervalFnTask(interval, f)
+    pub const fn new(state: S, interval: Duration, f: T) -> Self {
+        IntervalFnTask(state, interval, f)
     }
 }
 
-impl<T, F> Task for IntervalFnTask<T>
+impl<T, F, S> Task for IntervalFnTask<T, S>
 where
-    T: Fn(&watch::Receiver<bool>, Instant) -> F + Send + Sync + 'static,
+    T: Fn(S, Instant, &watch::Receiver<bool>) -> F + Send + Sync + 'static,
     F: Future<Output = ()> + Send + 'static,
+    S: Clone + Send + Sync + 'static,
 {
     fn start(self, alive: watch::Receiver<bool>) -> JoinHandle<()> {
         AsyncFnTask(move |mut alive: watch::Receiver<bool>| async move {
-            let IntervalFnTask(interval, f) = self;
+            let IntervalFnTask(state, interval, f) = self;
 
             let mut interval = tokio::time::interval(interval);
 
             while *alive.borrow_and_update() {
                 tokio::select! {
                     biased;
-                    t = interval.tick() => f(&alive, t).await,
+                    t = interval.tick() => f(state.clone(), t, &alive).await,
                     _ = alive.changed() => break,
                 }
             }

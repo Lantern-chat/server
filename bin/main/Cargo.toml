@@ -14,7 +14,7 @@ memory_metrics = ["tikv-jemallocator"]
 default = ["memory_metrics"]
 
 [dependencies]
-web = { path = "../../layers/web" }
+server = { path = "../../layers/server" }
 
 task_runner = { path = "../../crates/task_runner" }
 db = { path = "../../crates/db" }

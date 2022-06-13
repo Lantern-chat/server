@@ -10,6 +10,8 @@ pub mod cli;
 
 use futures::FutureExt;
 
+use task_runner::TaskRunner;
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
