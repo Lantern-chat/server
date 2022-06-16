@@ -349,18 +349,30 @@ impl Error {
     fn into_cached_json(self) -> reply::Json {
         use reply::Json;
 
-        lazy_static::lazy_static! {
-            static ref NOT_FOUND: Json = Error::NotFound.into_json();
-            static ref BAD_REQUEST: Json = Error::BadRequest.into_json();
-            static ref UNAUTHORIZED: Json = Error::NoSession.into_json();
+        macro_rules! impl_cached {
+            ($($name:ident),*) => {{
+                lazy_static::lazy_static! {
+                    $(
+                        static ref $name: Json = Error::$name.into_json();
+                    )*
+                }
+
+                match self {
+                    $(
+                        Error::$name => $name.clone(),
+                    )*
+
+                    _ => self.into_json(),
+                }
+            }}
         }
 
-        // use cached responses where possible
-        match self {
-            Error::NoSession => UNAUTHORIZED.clone(),
-            Error::NotFound => NOT_FOUND.clone(),
-            Error::BadRequest => BAD_REQUEST.clone(),
-            _ => self.into_json(),
+        impl_cached! {
+            NotFound,
+            BadRequest,
+            NoSession,
+            InvalidCredentials,
+            AlreadyExists
         }
     }
 }
