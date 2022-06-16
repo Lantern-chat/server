@@ -7,7 +7,7 @@ use crate::{Authorization, Error, ServerState};
 
 use sdk::models::*;
 
-pub async fn get_room(state: &ServerState, auth: Authorization, room_id: Snowflake) -> Result<Room, Error> {
+pub async fn get_room(state: ServerState, auth: Authorization, room_id: Snowflake) -> Result<Room, Error> {
     // TODO: Ensure the room permissions are cached after this
     let perms = match state.perm_cache.get(auth.user_id, room_id).await {
         Some(PermMute { perm, .. }) => {
@@ -37,7 +37,11 @@ pub async fn get_room(state: &ServerState, auth: Authorization, room_id: Snowfla
 
 /// Simple version for regular users with cached permissions saying they cannot view overwrites
 /// which results in just a simple single lookup
-async fn get_room_simple(state: &ServerState, db: db::pool::Object, room_id: Snowflake) -> Result<Room, Error> {
+async fn get_room_simple(
+    state: ServerState,
+    db: db::pool::Object,
+    room_id: Snowflake,
+) -> Result<Room, Error> {
     let row = db
         .query_opt_cached_typed(
             || {
@@ -79,7 +83,7 @@ async fn get_room_simple(state: &ServerState, db: db::pool::Object, room_id: Sno
 }
 
 async fn get_room_full(
-    state: &ServerState,
+    state: ServerState,
     db: db::pool::Object,
     user_id: Snowflake,
     room_id: Snowflake,

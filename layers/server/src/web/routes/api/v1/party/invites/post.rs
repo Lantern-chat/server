@@ -1,17 +1,15 @@
 use ftl::*;
 
-use crate::{
-    web::{auth::Authorization, routes::api::ApiError},
-    ServerState,
-};
+use super::ApiResponse;
+use crate::{Authorization, ServerState};
 
 use sdk::api::commands::party::CreatePartyInviteBody;
 
-pub async fn post(mut route: Route<ServerState>, auth: Authorization) -> Response {
-    let form = match body::any::<CreatePartyInviteBody, _>(&mut route).await {
-        Ok(form) => form,
-        Err(e) => return ApiError::err(e.into()).into_response(),
-    };
+pub async fn post(
+    mut route: Route<ServerState>,
+    auth: Authorization,
+) -> ApiResponse {
+    let form = body::any::<CreatePartyInviteBody, _>(&mut route).await?;
 
-    ().into_response()
+    Ok(().into_response())
 }

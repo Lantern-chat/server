@@ -6,7 +6,7 @@ use crate::{Authorization, Error, ServerState};
 use sdk::models::*;
 
 pub async fn delete_msg(
-    state: &ServerState,
+    state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,

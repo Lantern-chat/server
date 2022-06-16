@@ -9,11 +9,11 @@ use futures::{Stream, StreamExt};
 
 use sdk::models::{AnyActivity, PartyMember, User, UserFlags, UserPresence, UserPresenceFlags};
 
-pub async fn get_members<'a>(
-    state: &'a ServerState,
+pub async fn get_members(
+    state: ServerState,
     party_id: Snowflake,
     user_id: Snowflake,
-) -> Result<impl Stream<Item = Result<PartyMember, Error>> + 'a, Error> {
+) -> Result<impl Stream<Item = Result<PartyMember, Error>>, Error> {
     let db = state.db.read.get().await?;
 
     let is_member = db

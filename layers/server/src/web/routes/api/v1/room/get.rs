@@ -2,13 +2,17 @@ use ftl::*;
 
 use schema::Snowflake;
 
-use crate::ctrl::room::get::get_room as get;
-use crate::ctrl::Error;
-use crate::web::{auth::Authorization, routes::api::ApiError};
+use super::ApiResponse;
+use crate::Authorization;
 
-pub async fn get_room(route: Route<crate::ServerState>, auth: Authorization, room_id: Snowflake) -> Response {
-    match crate::ctrl::room::get::get_room(route.state, auth, room_id).await {
-        Ok(ref room) => reply::json(room).into_response(),
-        Err(e) => ApiError::err(e).into_response(),
-    }
+pub async fn get_room(
+    route: Route<crate::ServerState>,
+    auth: Authorization,
+    room_id: Snowflake,
+) -> ApiResponse {
+    let room =
+        crate::backend::api::room::get::get_room(route.state, auth, room_id)
+            .await?;
+
+    Ok(reply::json(room).into_response())
 }

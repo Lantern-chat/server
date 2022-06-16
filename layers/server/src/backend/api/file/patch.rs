@@ -1,4 +1,4 @@
-use std::io::SeekFrom;
+use std::{error::Error as _, io::SeekFrom};
 
 use bytes::Bytes;
 use filesystem::store::{CipherOptions, FileExt, OpenMode, RWSeekStream};
@@ -21,27 +21,13 @@ pub struct FilePatchParams {
     pub content_length: u64,
 }
 
-pub enum PatchFileError<E> {
-    Standard(Error),
-    External(E),
-}
-
-impl<T, E> From<T> for PatchFileError<E>
-where
-    T: Into<Error>,
-{
-    fn from(err: T) -> Self {
-        PatchFileError::Standard(err.into())
-    }
-}
-
-pub async fn patch_file<E>(
-    state: &ServerState,
+pub async fn patch_file(
+    state: ServerState,
     auth: Authorization,
     file_id: Snowflake,
     params: FilePatchParams,
-    stream: impl Stream<Item = Result<Bytes, E>>,
-) -> Result<FilePatch, PatchFileError<E>> {
+    mut body: hyper::Body,
+) -> Result<FilePatch, Error> {
     let db = state.db.read.get().await?;
 
     let row = db
@@ -63,7 +49,7 @@ pub async fn patch_file<E>(
 
     let row = match row {
         Some(row) => row,
-        None => return Err(Error::NotFound.into()),
+        None => return Err(Error::NotFound),
     };
 
     let size = row.try_get::<_, i32>(0)? as u64;
@@ -75,7 +61,7 @@ pub async fn patch_file<E>(
 
     // a completed file cannot be modified
     if flags.contains(FileFlags::COMPLETE) {
-        return Err(Error::Conflict.into());
+        return Err(Error::Conflict);
     }
 
     let cipher_options = CipherOptions {
@@ -97,14 +83,14 @@ pub async fn patch_file<E>(
     let append_pos = file.seek(SeekFrom::End(0)).await?;
 
     if params.upload_offset as u64 != append_pos {
-        return Err(Error::Conflict.into());
+        return Err(Error::Conflict);
     }
 
     let end_pos = append_pos + params.content_length;
 
     // Don't allow excess writing
     if end_pos > size {
-        return Err(Error::RequestEntityTooLarge.into());
+        return Err(Error::RequestEntityTooLarge);
     }
 
     let mut crc32 = crc32fast::Hasher::new();
@@ -119,11 +105,9 @@ pub async fn patch_file<E>(
         prefix = vec![0u8; 260];
     }
 
-    futures::pin_mut!(stream);
-
     let mut res = loop {
         // flush file to disk and get next chunk at the same time
-        let (chunk, flush_result) = tokio::join!(stream.next(), file.flush());
+        let (chunk, flush_result) = tokio::join!(body.next(), file.flush());
 
         if let Err(e) = flush_result {
             break Some(e.into());
@@ -131,14 +115,22 @@ pub async fn patch_file<E>(
 
         match chunk {
             None => break None,
-            Some(Err(e)) => break Some(PatchFileError::External(e)),
+            Some(Err(e)) => {
+                let is_fatal = e.is_parse() || e.is_parse_status() || e.is_parse_too_large() || e.is_user();
+
+                break Some(if is_fatal {
+                    Error::InternalError(e.message().to_string())
+                } else {
+                    Error::UploadError
+                });
+            }
             Some(Ok(mut bytes)) => {
                 let num_bytes = bytes.len() as u64;
                 let new_bytes_written = bytes_written + num_bytes;
 
                 // check if request is too large before writing
                 if new_bytes_written > params.content_length {
-                    break Some(Error::RequestEntityTooLarge.into());
+                    break Some(Error::RequestEntityTooLarge);
                 }
 
                 // copy parts of the first chunk into the given prefix buffer
@@ -169,7 +161,7 @@ pub async fn patch_file<E>(
 
     if let Err(e) = file.flush().await {
         match res {
-            Some(PatchFileError::Standard(Error::IOError(_))) => {
+            Some(Error::IOError(_)) => {
                 log::error!("Error flushing file: {e}, probably due to previous IO error")
             }
             Some(_) => log::error!("Error flushing file after non-io error: {e}"),
@@ -182,7 +174,7 @@ pub async fn patch_file<E>(
     if params.crc32 != final_crc32 {
         log::debug!("{:X} != {:X}", params.crc32, final_crc32);
 
-        res = res.or(Some(Error::ChecksumMismatch.into()));
+        res = res.or(Some(Error::ChecksumMismatch));
     }
 
     if let Some(err) = res {

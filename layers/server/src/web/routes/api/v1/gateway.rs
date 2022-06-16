@@ -1,8 +1,9 @@
 use ftl::*;
 
+use super::ApiResponse;
 use crate::Error;
 
-pub fn gateway(route: Route<crate::ServerState>) -> Result<impl Reply, Error> {
+pub fn gateway(route: Route<crate::ServerState>) -> ApiResponse {
     let addr = match real_ip::get_real_ip(&route) {
         Ok(addr) => addr,
         Err(_) => return Err(Error::BadRequest),
@@ -23,5 +24,7 @@ pub fn gateway(route: Route<crate::ServerState>) -> Result<impl Reply, Error> {
 
     let ws = ws::Ws::new(route, Some(config))?;
 
-    Ok(ws.on_upgrade(move |ws| crate::web::gateway::client_connected(ws, query, addr, state)))
+    Ok(ws
+        .on_upgrade(move |ws| crate::web::gateway::client_connected(ws, query, addr, state))
+        .into_response())
 }

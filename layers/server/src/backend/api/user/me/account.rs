@@ -26,7 +26,7 @@ pub struct ModifyAccountForm {
 }
 
 pub async fn modify_account(
-    state: &ServerState,
+    state: ServerState,
     auth: Authorization,
     mut form: ModifyAccountForm,
 ) -> Result<(), Error> {

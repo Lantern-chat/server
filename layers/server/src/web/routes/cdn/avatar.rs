@@ -5,10 +5,11 @@ use smol_str::SmolStr;
 use schema::SnowflakeExt;
 use sdk::models::Snowflake;
 
-use backend::api::cdn::FileKind;
-use backend::util::encrypted_asset::decrypt_snowflake;
+use crate::backend::api::cdn::FileKind;
+use crate::backend::util::encrypted_asset::decrypt_snowflake;
 
-use crate::{web::routes::api::ApiError, ServerState};
+use super::ApiResponse;
+use crate::{Error, ServerState};
 
 pub enum AvatarKind {
     User,
@@ -17,23 +18,23 @@ pub enum AvatarKind {
     Role,
 }
 
-pub async fn avatar(mut route: Route<ServerState>, kind: AvatarKind) -> Response {
+pub async fn avatar(mut route: Route<ServerState>, kind: AvatarKind) -> ApiResponse {
     let kind_id = match route.next().param::<Snowflake>() {
         Some(Ok(room_id)) => room_id,
-        _ => return StatusCode::BAD_REQUEST.into_response(),
+        _ => return Err(Error::BadRequest),
     };
 
     let file_id = match route.next().param::<SmolStr>() {
         Some(Ok(avatar)) => match decrypt_snowflake(&route.state, &avatar) {
             Some(id) => id,
-            None => return StatusCode::BAD_REQUEST.into_response(),
+            None => return Err(Error::BadRequest),
         },
-        _ => return StatusCode::BAD_REQUEST.into_response(),
+        _ => return Err(Error::BadRequest),
     };
 
     let is_head = route.method() == Method::HEAD;
 
-    match crate::ctrl::cdn::get_file(
+    crate::backend::api::cdn::get_file(
         route,
         kind_id,
         file_id,
@@ -48,8 +49,4 @@ pub async fn avatar(mut route: Route<ServerState>, kind: AvatarKind) -> Response
         false,
     )
     .await
-    {
-        Err(e) => ApiError::err(e).into_response(),
-        Ok(res) => res,
-    }
 }

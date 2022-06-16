@@ -7,7 +7,7 @@ use crate::{Authorization, Error, ServerState};
 use sdk::models::gateway::message::ServerMsg;
 
 pub async fn trigger_typing(
-    state: &ServerState,
+    state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
 ) -> Result<(), Error> {

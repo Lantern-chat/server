@@ -2,12 +2,14 @@ use ftl::*;
 
 use crate::{web::auth::authorize, Error};
 
+use super::ApiResponse;
+
 //pub mod check;
 pub mod register;
 
 pub mod me;
 
-pub async fn user(mut route: Route<crate::ServerState>) -> Result<Response, Error> {
+pub async fn user(mut route: Route<crate::ServerState>) -> ApiResponse {
     match route.next().method_segment() {
         // POST /api/v1/user
         (&Method::POST, End) => register::register(route).await,

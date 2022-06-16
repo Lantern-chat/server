@@ -1,16 +1,19 @@
 use ftl::*;
 
-use crate::{Error, ServerState};
+use super::ApiResponse;
+use crate::ServerState;
 
-pub async fn register(mut route: Route<ServerState>) -> Result<Response, Error> {
+pub async fn register(mut route: Route<ServerState>) -> ApiResponse {
+    let form = body::any(&mut route).await?;
+
     let session = crate::backend::api::user::register::register_user(
-        &route.state,
+        route.state,
         route.real_addr,
-        body::any(&mut route).await?,
+        form,
     )
     .await?;
 
-    Ok(reply::json(&session)
+    Ok(reply::json(session)
         .with_status(StatusCode::CREATED)
         .into_response())
 }

@@ -2,7 +2,8 @@ use ftl::*;
 
 use schema::Snowflake;
 
-use crate::{ctrl::auth::Authorization, web::routes::api::ApiError};
+use super::ApiResponse;
+use crate::{Authorization, Error};
 
 pub mod delete;
 pub mod get_many;
@@ -14,7 +15,7 @@ pub async fn messages(
     mut route: Route<crate::ServerState>,
     auth: Authorization,
     room_id: Snowflake,
-) -> Response {
+) -> ApiResponse {
     match route.next().method_segment() {
         // POST /api/v1/room/1234/messages
         (&Method::POST, End) => post::post(route, auth, room_id).await,
@@ -34,11 +35,11 @@ pub async fn messages(
                 // DELETE /api/v1/room/1234/messages/5678
                 &Method::DELETE => delete::delete(route, auth, room_id, msg_id).await,
 
-                _ => StatusCode::METHOD_NOT_ALLOWED.into_response(),
+                _ => Err(Error::MethodNotAllowed),
             },
-            Some(Err(_)) => ApiError::bad_request().into_response(),
-            _ => StatusCode::METHOD_NOT_ALLOWED.into_response(),
+            Some(Err(_)) => Err(Error::BadRequest),
+            _ => Err(Error::MethodNotAllowed),
         },
-        _ => StatusCode::METHOD_NOT_ALLOWED.into_response(),
+        _ => Err(Error::MethodNotAllowed),
     }
 }

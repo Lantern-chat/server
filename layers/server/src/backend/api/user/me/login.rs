@@ -17,7 +17,7 @@ use sdk::{
 
 // TODO: Determine if I should give any feedback at all or
 // just say catchall "invalid username/email/password"
-pub async fn login(state: &ServerState, addr: SocketAddr, form: UserLoginForm) -> Result<Session, Error> {
+pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) -> Result<Session, Error> {
     validate_email(&form.email)?;
 
     let db = state.db.read.get().await?;
@@ -115,7 +115,7 @@ pub async fn login(state: &ServerState, addr: SocketAddr, form: UserLoginForm) -
 }
 
 pub async fn do_login(
-    state: &ServerState,
+    state: ServerState,
     addr: SocketAddr,
     user_id: Snowflake,
     now: std::time::SystemTime,

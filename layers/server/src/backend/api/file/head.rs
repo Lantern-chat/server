@@ -14,7 +14,7 @@ pub struct UploadHead {
     pub offset: i32,
 }
 
-pub async fn head(state: &ServerState, auth: Authorization, file_id: Snowflake) -> Result<UploadHead, Error> {
+pub async fn head(state: ServerState, auth: Authorization, file_id: Snowflake) -> Result<UploadHead, Error> {
     let fetch_record = async {
         let db = state.db.read.get().await?;
 

@@ -2,15 +2,16 @@ use ftl::*;
 
 use schema::Snowflake;
 
-use crate::{
-    ctrl::{auth::Authorization, user::me::friends::friends as list_friends},
-    web::routes::api::ApiError,
-    ServerState,
-};
+use super::ApiResponse;
+use crate::{Authorization, ServerState};
 
-pub async fn friends(route: Route<ServerState>, auth: Authorization) -> Response {
-    match list_friends(route.state, auth).await {
-        Ok(sessions) => reply::json::array_stream(sessions).into_response(),
-        Err(e) => ApiError::err(e).into_response(),
-    }
+pub async fn friends(
+    route: Route<ServerState>,
+    auth: Authorization,
+) -> ApiResponse {
+    let friends =
+        crate::backend::api::user::me::friends::friends(route.state, auth)
+            .await?;
+
+    Ok(reply::json::array_stream(friends).into_response())
 }

@@ -4,7 +4,7 @@ use sdk::models::UserPreferences;
 use thorn::pg::Json;
 
 pub async fn update_prefs(
-    state: &ServerState,
+    state: ServerState,
     auth: Authorization,
     mut prefs: UserPreferences,
 ) -> Result<(), Error> {

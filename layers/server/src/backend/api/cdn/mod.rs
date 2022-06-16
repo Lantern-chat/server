@@ -1,7 +1,18 @@
 use std::{io::SeekFrom, str::FromStr, time::Instant};
 
+use bytes::{Bytes, BytesMut};
+use ftl::{
+    fs::{bytes_range, Cond, Conditionals},
+    *,
+};
+
+use filesystem::store::{CipherOptions, OpenMode};
 use futures::FutureExt;
-use headers::Range;
+use headers::{
+    AcceptRanges, ContentLength, ContentRange, ContentType, HeaderMap, HeaderMapExt, HeaderValue,
+    IfModifiedSince, LastModified, Range,
+};
+use hyper::Body;
 use smol_str::SmolStr;
 use thorn::pg::ToSql;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
@@ -30,11 +41,6 @@ pub struct FileOptions {
     file_id: Snowflake,
 }
 
-pub async fn get_file(state: &ServerState) -> Result<File, Error> {
-    unimplemented!()
-}
-
-/*
 pub async fn get_file(
     route: Route<ServerState>,
     kind_id: Snowflake,
@@ -43,7 +49,7 @@ pub async fn get_file(
     filename: Option<SmolStr>,
     is_head: bool,
     download: bool,
-) -> Result<File, Error> {
+) -> Result<Response, Error> {
     let range = route.header::<headers::Range>();
     let conditionals = Conditionals::new(&route, range);
     let last_modified = LastModified::from(file_id.system_timestamp());
@@ -100,7 +106,7 @@ pub async fn get_file(
 
     let _fs_permit = state.fs_semaphore.acquire().await?;
 
-    let mut file = state.fs.open_crypt(file_id, OpenMode::Read, &options).await?;
+    let mut file = state.fs().open_crypt(file_id, OpenMode::Read, &options).await?;
 
     let mut len = size as u64;
 
@@ -239,7 +245,6 @@ pub async fn get_file(
 
     Ok(res)
 }
- */
 
 mod queries {
     use schema::*;

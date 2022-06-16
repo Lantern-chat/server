@@ -9,12 +9,12 @@ use crate::{Authorization, Error, ServerState};
 
 use sdk::api::commands::room::{GetMessagesQuery, MessageSearch};
 
-pub async fn get_many<'a>(
-    state: &'a ServerState,
+pub async fn get_many(
+    state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
     form: GetMessagesQuery,
-) -> Result<impl Stream<Item = Result<Message, Error>> + 'a, Error> {
+) -> Result<impl Stream<Item = Result<Message, Error>>, Error> {
     let had_perms = if let Some(perm) = state.perm_cache.get(auth.user_id, room_id).await {
         if !perm.contains(RoomPermissions::READ_MESSAGE_HISTORY) {
             return Err(Error::NotFound);

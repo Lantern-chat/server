@@ -46,7 +46,7 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
                 .into_response()
         }
 
-        (&Method::GET | &Method::HEAD, Exact("cdn")) => cdn::cdn(route).boxed().await,
+        (&Method::GET | &Method::HEAD, Exact("cdn")) => cdn::cdn(route).boxed().await.into_response(),
 
         (&Method::GET | &Method::HEAD, segment) => {
             let allowed = match segment {

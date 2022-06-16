@@ -29,7 +29,7 @@ impl From<RawOverwrite> for Overwrite {
 }
 
 pub async fn get_rooms(
-    state: &ServerState,
+    state: ServerState,
     auth: Authorization,
     party_id: Snowflake,
 ) -> Result<Vec<Room>, Error> {

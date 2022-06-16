@@ -16,7 +16,7 @@ use sdk::{api::commands::invite::RedeemInviteBody, models::*};
  */
 
 pub async fn redeem_invite(
-    state: &ServerState,
+    state: ServerState,
     auth: Authorization,
     code: SmolStr,
     body: RedeemInviteBody,

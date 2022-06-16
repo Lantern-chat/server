@@ -2,7 +2,8 @@ use ftl::*;
 
 use schema::Snowflake;
 
-use crate::web::{auth::authorize, routes::api::ApiError};
+use super::ApiResponse;
+use crate::Error;
 
 //pub mod delete;
 pub mod get;
@@ -13,11 +14,9 @@ pub mod invites;
 pub mod members;
 pub mod rooms;
 
-pub async fn party(mut route: Route<crate::ServerState>) -> Response {
-    let auth = match authorize(&route).await {
-        Ok(auth) => auth,
-        Err(e) => return ApiError::err(e).into_response(),
-    };
+#[rustfmt::skip]
+pub async fn party(mut route: Route<crate::ServerState>) -> ApiResponse {
+    let auth = crate::web::auth::authorize(&route).await?;
 
     match route.next().method_segment() {
         // POST /api/v1/party
@@ -43,11 +42,11 @@ pub async fn party(mut route: Route<crate::ServerState>) -> Response {
                 // GET /api/v1/party/1234/members
                 (&Method::GET, Exact("members")) => members::get_members(route, auth, party_id).await,
 
-                _ => ApiError::not_found().into_response(),
+                _ => Err(Error::NotFound),
             },
-            _ => return ApiError::bad_request().into_response(),
+            _ => Err(Error::BadRequest),
         },
 
-        _ => ApiError::not_found().into_response(),
+        _ => Err(Error::NotFound),
     }
 }

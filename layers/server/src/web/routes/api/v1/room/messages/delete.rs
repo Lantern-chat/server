@@ -2,16 +2,17 @@ use ftl::*;
 
 use schema::Snowflake;
 
-use crate::{ctrl::auth::Authorization, web::routes::api::ApiError, ServerState};
+use super::ApiResponse;
+use crate::{Authorization, ServerState};
 
 pub async fn delete(
     route: Route<ServerState>,
     auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,
-) -> Response {
-    match crate::ctrl::room::messages::delete::delete_msg(route.state, auth, room_id, msg_id).await {
-        Ok(res) => res.into_response(),
-        Err(e) => ApiError::err(e).into_response(),
-    }
+) -> ApiResponse {
+    let res =
+        crate::backend::api::room::messages::delete::delete_msg(route.state, auth, room_id, msg_id).await?;
+
+    Ok(StatusCode::OK.into_response())
 }

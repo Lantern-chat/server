@@ -11,18 +11,14 @@ use crate::{
 };
 
 use sdk::models::*;
-pub async fn get_party(
-    state: &ServerState,
-    auth: Authorization,
-    party_id: Snowflake,
-) -> Result<Party, Error> {
+pub async fn get_party(state: ServerState, auth: Authorization, party_id: Snowflake) -> Result<Party, Error> {
     let db = state.db.read.get().await?;
 
     get_party_inner(state, &db, auth.user_id, party_id).await
 }
 
 pub async fn get_party_inner(
-    state: &ServerState,
+    state: ServerState,
     db: &db::pool::Client,
     user_id: Snowflake,
     party_id: Snowflake,
@@ -70,7 +66,7 @@ pub async fn get_party_inner(
     };
 
     let roles = async {
-        super::roles::get_roles_raw(db, state, SearchMode::Single(party_id))
+        super::roles::get_roles_raw(db, &state, SearchMode::Single(party_id))
             .await?
             .try_collect::<Vec<_>>()
             .await

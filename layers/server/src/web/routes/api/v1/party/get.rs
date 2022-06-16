@@ -1,17 +1,18 @@
-use either::Either;
 use ftl::*;
 
 use schema::Snowflake;
 
-use crate::{
-    ctrl::{auth::Authorization, party::get::get_party},
-    web::routes::api::ApiError,
-    ServerState,
-};
+use super::ApiResponse;
+use crate::{Authorization, ServerState};
 
-pub async fn get(route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> Response {
-    match get_party(route.state, auth, party_id).await {
-        Ok(ref party) => reply::json(party).into_response(),
-        Err(e) => ApiError::err(e).into_response(),
-    }
+pub async fn get(
+    route: Route<ServerState>,
+    auth: Authorization,
+    party_id: Snowflake,
+) -> ApiResponse {
+    let party =
+        crate::backend::api::party::get::get_party(route.state, auth, party_id)
+            .await?;
+
+    Ok(reply::json(party).into_response())
 }

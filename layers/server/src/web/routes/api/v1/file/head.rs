@@ -2,24 +2,17 @@ use ftl::*;
 use headers::{CacheControl, HeaderMapExt, HeaderValue};
 use sdk::models::Snowflake;
 
-use crate::{
-    ctrl::{file::head::UploadHead, Error},
-    web::{auth::Authorization, routes::api::ApiError},
-    ServerState,
-};
+use super::ApiResponse;
+use crate::{backend::api::file::head::UploadHead, util::TupleClone, Authorization, ServerState};
 
-pub async fn head(
-    route: Route<ServerState>,
-    auth: Authorization,
-    file_id: Snowflake,
-) -> Result<Response, Error> {
-    let head = backend::api::file::head::head(&route.state, auth, file_id).await?;
+pub async fn head(route: Route<ServerState>, auth: Authorization, file_id: Snowflake) -> ApiResponse {
+    let head = crate::backend::api::file::head::head(route.state, auth, file_id).await?;
 
     let mut res = Response::default();
 
     let headers = res.headers_mut();
 
-    headers.extend(super::TUS_HEADERS.iter().map(|(k, v)| (k.clone(), v.clone())));
+    headers.extend(super::tus_headers());
 
     headers.insert("Upload-Metadata", encode_metadata(&head));
 

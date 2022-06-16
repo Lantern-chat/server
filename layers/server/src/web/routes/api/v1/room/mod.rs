@@ -1,11 +1,8 @@
 use ftl::*;
 use schema::Snowflake;
 
-use crate::web::{
-    auth::{authorize, Authorization},
-    routes::api::ApiError,
-};
-use crate::ServerState;
+use super::ApiResponse;
+use crate::{Error, ServerState};
 
 pub mod get;
 pub mod messages;
@@ -13,11 +10,8 @@ pub mod patch;
 pub mod threads;
 pub mod typing;
 
-pub async fn room(mut route: Route<ServerState>) -> Response {
-    let auth = match authorize(&route).await {
-        Ok(auth) => auth,
-        Err(e) => return ApiError::err(e).into_response(),
-    };
+pub async fn room(mut route: Route<ServerState>) -> ApiResponse {
+    let auth = crate::web::auth::authorize(&route).await?;
 
     // ANY /api/v1/room/1234
     match route.next().param::<Snowflake>() {
@@ -27,8 +21,8 @@ pub async fn room(mut route: Route<ServerState>) -> Response {
 
             (_, Exact("messages")) => messages::messages(route, auth, room_id).await,
             (_, Exact("threads")) => threads::threads(route, auth, room_id).await,
-            _ => ApiError::not_found().into_response(),
+            _ => Err(Error::NotFound),
         },
-        _ => ApiError::bad_request().into_response(),
+        _ => Err(Error::BadRequest),
     }
 }

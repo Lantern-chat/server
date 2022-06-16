@@ -27,13 +27,15 @@ use crate::{
     ServerState,
 };
 
-pub fn build(route: Route<ServerState>) -> Response {
+use super::ApiResponse;
+
+pub fn build(route: Route<ServerState>) -> ApiResponse {
     lazy_static::lazy_static! {
         static ref JSON_BUILD_INFO: String = serde_json::to_string(&BUILD_INFO).unwrap();
         //static ref MSGPACK_BUILD_INFO: Bytes = rmp_serde::to_vec(&BUILD_INFO).unwrap().into();
     }
 
-    match route.query::<EncodingQuery>() {
+    Ok(match route.query::<EncodingQuery>() {
         //Some(Ok(EncodingQuery {
         //    encoding: Encoding::MsgPack,
         //})) => bytes_as_msgpack(MSGPACK_BUILD_INFO.clone()),
@@ -41,5 +43,5 @@ pub fn build(route: Route<ServerState>) -> Response {
             .as_str()
             .with_header(ContentType::json())
             .into_response(),
-    }
+    })
 }

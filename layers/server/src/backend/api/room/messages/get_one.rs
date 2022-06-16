@@ -6,7 +6,7 @@ use thorn::pg::Json;
 use crate::{Authorization, Error, ServerState};
 
 pub async fn get_one(
-    state: &ServerState,
+    state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,

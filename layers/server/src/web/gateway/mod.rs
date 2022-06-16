@@ -23,11 +23,11 @@ use ftl::ws::{Message as WsMessage, SinkError, WebSocket};
 use schema::Snowflake;
 
 use crate::{
-    ctrl::{
-        auth::Authorization,
-        gateway::presence::{clear_presence, set_presence},
+    backend::{
+        api::auth::Authorization,
+        api::gateway::presence::{clear_presence, set_presence},
+        cache::permission_cache::PermMute,
     },
-    permission_cache::PermMute,
     web::encoding::Encoding,
     ServerState,
 };

@@ -13,7 +13,7 @@ use sdk::api::commands::room::CreateMessageBody;
 
 /// Returns an `Option<Message>` because slash-commands may not actually create a message
 pub async fn create_message(
-    state: &ServerState,
+    state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
     body: CreateMessageBody,
@@ -98,7 +98,7 @@ pub async fn create_message(
 
 pub(crate) async fn insert_message(
     mut db: db::pool::Object,
-    state: &ServerState,
+    state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,

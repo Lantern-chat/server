@@ -5,7 +5,7 @@ use crate::{Authorization, Error, ServerState};
 use sdk::models::*;
 
 pub async fn friends(
-    state: &ServerState,
+    state: ServerState,
     auth: Authorization,
 ) -> Result<impl Stream<Item = Result<Friend, Error>>, Error> {
     let db = state.db.read.get().await?;

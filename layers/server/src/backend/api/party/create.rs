@@ -18,7 +18,11 @@ pub struct PartyCreateForm {
     security: SecurityFlags,
 }
 
-pub async fn create_party(state: &ServerState, auth: Authorization, form: PartyCreateForm) -> Result<Party, Error> {
+pub async fn create_party(
+    state: ServerState,
+    auth: Authorization,
+    form: PartyCreateForm,
+) -> Result<Party, Error> {
     if !state.config.party.partyname_len.contains(&form.name.len()) {
         return Err(Error::InvalidName);
     }

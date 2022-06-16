@@ -11,7 +11,7 @@ use crate::{backend::cache::permission_cache::PermMute, Authorization, Error, Se
 use sdk::api::commands::room::EditMessageBody;
 
 pub async fn edit_message(
-    state: &ServerState,
+    state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,

@@ -4,10 +4,18 @@ use db::pool::Error as DbError;
 use ftl::{body::BodyDeserializeError, *};
 use http::header::InvalidHeaderValue;
 use sdk::{api::error::ApiErrorCode, models::UserPreferenceError};
+use smol_str::SmolStr;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     // FATAL ERRORS
+    #[error("Internal Error: {0}")]
+    InternalError(String),
+    #[error("Internal Error: {0}")]
+    InternalErrorSmol(SmolStr),
+    #[error("Internal Error: {0}")]
+    InternalErrorStatic(&'static str),
+
     #[error("Database Error {0}")]
     DbError(#[from] DbError),
     #[error("Join Error {0}")]
@@ -22,10 +30,6 @@ pub enum Error {
     HashError(#[from] argon2::Error),
     #[error("IO Error: {0}")]
     IOError(#[from] std::io::Error),
-    #[error("Internal Error: {0}")]
-    InternalError(String),
-    #[error("Internal Error: {0}")]
-    InternalErrorStatic(&'static str),
     #[error("Request Error: {0}")]
     RequestError(#[from] reqwest::Error),
 
@@ -47,6 +51,9 @@ pub enum Error {
 
     #[error("Missing Authorization Header")]
     MissingAuthorizationHeader,
+
+    #[error("Missing Content Type Header")]
+    MissingContentTypeHeader,
 
     #[error("Header Parse Error")]
     HeaderParseError(#[from] http::header::ToStrError),
@@ -150,6 +157,9 @@ pub enum Error {
     #[error("Checksum Mismatch")]
     ChecksumMismatch,
 
+    #[error("Unsupported Media Type: {0}")]
+    UnsupportedMediaType(headers::ContentType),
+
     #[error("Mime Parse Error: {0}")]
     MimeParseError(#[from] mime::FromStrError),
 
@@ -178,6 +188,9 @@ impl Error {
     #[rustfmt::skip]
     pub fn is_fatal(&self) -> bool {
         matches!(self,
+            | Error::InternalError(_)
+            | Error::InternalErrorSmol(_)
+            | Error::InternalErrorStatic(_)
             | Error::DbError(_)
             | Error::JoinError(_)
             | Error::SemaphoreError(_)
@@ -186,8 +199,6 @@ impl Error {
             | Error::XMLError(_)
             | Error::EventEncodingError(_)
             | Error::IOError(_)
-            | Error::InternalError(_)
-            | Error::InternalErrorStatic(_)
             | Error::RequestError(_)
             | Error::Unimplemented
         )
@@ -209,6 +220,7 @@ impl Error {
             Error::BadRequest => StatusCode::BAD_REQUEST,
             Error::AlreadyExists => StatusCode::CONFLICT,
             Error::MethodNotAllowed => StatusCode::METHOD_NOT_ALLOWED,
+            Error::UnsupportedMediaType(_) | Error::MissingContentTypeHeader => StatusCode::UNSUPPORTED_MEDIA_TYPE,
 
             | Error::AuthTokenError(_)
             | Error::Base64DecodeError(_)
@@ -252,14 +264,16 @@ impl Error {
     #[rustfmt::skip]
     pub fn to_apierror(&self) -> ApiErrorCode {
         match self {
+            | Error::InternalError(_)
+            | Error::InternalErrorStatic(_)
+            | Error::InternalErrorSmol(_)   => ApiErrorCode::InternalError,
+
             Error::DbError(_)               => ApiErrorCode::DbError,
             Error::JoinError(_)             => ApiErrorCode::JoinError,
             Error::SemaphoreError(_)        => ApiErrorCode::SemaphoreError,
             Error::HashError(_)             => ApiErrorCode::HashError,
             Error::JsonError(_)             => ApiErrorCode::JsonError,
             Error::EventEncodingError(_)    => ApiErrorCode::EventEncodingError,
-            Error::InternalError(_)         => ApiErrorCode::InternalError,
-            Error::InternalErrorStatic(_)   => ApiErrorCode::InternalErrorStatic,
             Error::Utf8ParseError(_)        => ApiErrorCode::Utf8ParseError,
             Error::IOError(_)               => ApiErrorCode::IOError,
             Error::InvalidHeaderValue(_)    => ApiErrorCode::InvalidHeaderValue,
@@ -280,6 +294,7 @@ impl Error {
             Error::InvalidTopic             => ApiErrorCode::InvalidTopic,
             Error::MissingUploadMetadataHeader  => ApiErrorCode::MissingUploadMetadataHeader,
             Error::MissingAuthorizationHeader   => ApiErrorCode::MissingAuthorizationHeader,
+            Error::MissingContentTypeHeader => ApiErrorCode::MissingContentTypeHeader,
             Error::NoSession                => ApiErrorCode::NoSession,
             Error::InvalidAuthFormat        => ApiErrorCode::InvalidAuthFormat,
             Error::HeaderParseError(_)      => ApiErrorCode::HeaderParseError,
@@ -307,6 +322,7 @@ impl Error {
             Error::MethodNotAllowed         => ApiErrorCode::MethodNotAllowed,
             Error::Conflict                 => ApiErrorCode::Conflict,
             Error::RequestEntityTooLarge    => ApiErrorCode::RequestEntityTooLarge,
+            Error::UnsupportedMediaType(_)  => ApiErrorCode::UnsupportedMediaType,
             Error::ChecksumMismatch         => ApiErrorCode::ChecksumMismatch,
         }
     }

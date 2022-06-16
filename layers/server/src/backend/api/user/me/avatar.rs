@@ -8,11 +8,7 @@ use crate::{Error, ServerState};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-pub async fn process_avatar(
-    state: &ServerState,
-    user_id: Snowflake,
-    file_id: Snowflake,
-) -> Result<(), Error> {
+pub async fn process_avatar(state: ServerState, user_id: Snowflake, file_id: Snowflake) -> Result<(), Error> {
     let read_db = state.db.read.get().await?;
 
     let row = read_db
@@ -119,7 +115,7 @@ pub async fn process_avatar(
 
     if new_file {
         let (new_file_id, nonce) = crate::backend::api::file::post::do_post_file(
-            state,
+            &state,
             user_id,
             encoded_image.buffer.len() as i32,
             format!("{user_id}_avatar.png").into(),

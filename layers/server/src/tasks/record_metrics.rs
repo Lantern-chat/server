@@ -1,4 +1,4 @@
-use crate::api::metrics::Metrics;
+use crate::backend::api::metrics::Metrics;
 
 use super::*;
 

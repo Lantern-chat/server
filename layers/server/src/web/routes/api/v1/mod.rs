@@ -18,7 +18,9 @@ pub mod user;
 #[cfg(debug_assertions)]
 pub mod debug;
 
-pub async fn api_v1(mut route: Route<crate::ServerState>) -> Result<Response, Error> {
+pub type ApiResponse = Result<Response, Error>;
+
+pub async fn api_v1(mut route: Route<crate::ServerState>) -> ApiResponse {
     match route.next().method_segment() {
         (_, Exact("user")) => user::user(route).boxed().await,
         (_, Exact("party")) => party::party(route).boxed().await,
@@ -37,8 +39,3 @@ pub async fn api_v1(mut route: Route<crate::ServerState>) -> Result<Response, Er
         _ => Err(Error::NotFound),
     }
 }
-
-pub type ApiResponse = Result<Response, BoxedError>;
-
-#[repr(transparent)]
-pub struct BoxedError(Box<Error>);

@@ -6,7 +6,7 @@ use crate::backend::api::room::messages::get_one;
 use crate::{Authorization, Error, ServerState};
 
 pub async fn get_thread(
-    state: &ServerState,
+    state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
     thread_id: Snowflake,

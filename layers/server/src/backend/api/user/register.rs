@@ -8,7 +8,7 @@ use crate::{Error, ServerState};
 use sdk::{api::commands::user::UserRegisterForm, models::Session};
 
 pub async fn register_user(
-    state: &ServerState,
+    state: ServerState,
     addr: SocketAddr,
     mut form: UserRegisterForm,
 ) -> Result<Session, Error> {

@@ -5,7 +5,7 @@ use crate::{Authorization, Error, ServerState};
 use sdk::models::AnonymousSession;
 
 pub async fn list_sessions(
-    state: &ServerState,
+    state: ServerState,
     auth: Authorization,
 ) -> Result<impl Stream<Item = Result<AnonymousSession, Error>>, Error> {
     let db = state.db.read.get().await?;
