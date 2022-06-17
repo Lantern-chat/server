@@ -1,13 +1,9 @@
-use std::sync::Arc;
-
-use futures::future::Either;
-use schema::EventCode;
 use thorn::pg::Json;
 
-use crate::{ctrl::util::encrypted_asset::encrypt_snowflake_opt, web::gateway::Event};
+use crate::backend::util::encrypted_asset::encrypt_snowflake_opt;
 
 use sdk::models::gateway::{
-    events::{PartyPositionUpdate, PartyUpdateEvent, RoleDeleteEvent},
+    events::{PartyPositionUpdate, PartyUpdateEvent},
     message::ServerMsg,
 };
 

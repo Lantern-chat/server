@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::web::gateway::Event;
+use crate::backend::gateway::Event;
 
 use sdk::models::gateway::{events::UserPresenceEvent, message::ServerMsg};
 

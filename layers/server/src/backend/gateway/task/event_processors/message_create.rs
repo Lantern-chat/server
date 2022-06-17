@@ -1,6 +1,6 @@
 use thorn::pg::Json;
 
-use crate::{ctrl::util::encrypted_asset::encrypt_snowflake, web::gateway::Event};
+use crate::backend::{gateway::Event, util::encrypted_asset::encrypt_snowflake};
 
 use sdk::models::gateway::message::ServerMsg;
 
@@ -133,7 +133,7 @@ pub async fn get_message(
                 attachments.reserve(meta.len());
 
                 for (meta, preview) in meta.into_iter().zip(previews) {
-                    use blurhash::base85::ToZ85;
+                    use z85::ToZ85;
 
                     attachments.push(Attachment {
                         file: File {

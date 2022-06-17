@@ -3,12 +3,9 @@ use std::sync::Arc;
 use futures::future::Either;
 use schema::EventCode;
 
-use crate::{ctrl::util::encrypted_asset::encrypt_snowflake_opt, web::gateway::Event};
+use sdk::models::gateway::{events::PartyMemberEvent, message::ServerMsg};
 
-use sdk::models::gateway::{
-    events::{PartyMemberEvent, UserPresenceEvent},
-    message::ServerMsg,
-};
+use crate::backend::{gateway::Event, util::encrypted_asset::encrypt_snowflake_opt};
 
 use super::prelude::*;
 
@@ -79,7 +76,7 @@ pub async fn member_event(
                         use schema::*;
                         use thorn::*;
 
-                        crate::ctrl::party::members::select_members2()
+                        crate::backend::api::party::members::select_members2()
                             .and_where(AggMembers::UserId.equals(Var::of(Users::Id)))
                     },
                     &[&party_id, &user_id],
@@ -125,7 +122,7 @@ pub async fn member_event(
 
     if event == EventCode::MemberJoined {
         party_future = Either::Right(async {
-            crate::ctrl::party::get::get_party_inner(state.clone(), db, user_id, party_id)
+            crate::backend::api::party::get::get_party_inner(state.clone(), db, user_id, party_id)
                 .await
                 .map(|party| Some(party))
         });

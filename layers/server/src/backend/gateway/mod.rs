@@ -1,5 +1,6 @@
 pub mod conn;
 pub mod event;
+pub mod task;
 
 use std::sync::atomic::AtomicI64;
 use std::{borrow::Cow, error::Error, pin::Pin, time::Duration};
@@ -7,7 +8,7 @@ use std::{borrow::Cow, error::Error, pin::Pin, time::Duration};
 use futures::{future, Future, FutureExt, SinkExt, StreamExt, TryStreamExt};
 
 use hashbrown::HashMap;
-use tokio::sync::{broadcast, mpsc, RwLock};
+use tokio::sync::{broadcast, mpsc, Notify, RwLock};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use schema::Snowflake;
@@ -97,9 +98,16 @@ pub struct Gateway {
     ///
     /// Second element stores the last event 60 seconds ago as determined by the `event_cleanup` task.
     pub last_events: [AtomicI64; 2],
+
+    /// Triggered by the database listener
+    pub notifier: Notify,
 }
 
 impl Gateway {
+    pub fn last_event(&self) -> &AtomicI64 {
+        &self.last_events[0]
+    }
+
     pub async fn broadcast_user_event(&self, event: Event, user_id: Snowflake) {
         if let Some(users) = self.users.get(&user_id).await {
             for conn in users.values() {

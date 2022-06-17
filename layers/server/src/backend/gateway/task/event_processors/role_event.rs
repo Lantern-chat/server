@@ -1,9 +1,6 @@
-use std::sync::Arc;
-
-use futures::future::Either;
 use schema::EventCode;
 
-use crate::{ctrl::util::encrypted_asset::encrypt_snowflake_opt, web::gateway::Event};
+use crate::backend::util::encrypted_asset::encrypt_snowflake_opt;
 
 use sdk::models::gateway::{events::RoleDeleteEvent, message::ServerMsg};
 
