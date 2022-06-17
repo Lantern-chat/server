@@ -185,3 +185,53 @@ where
         })
     }
 }
+
+pub struct RetryAsyncFnTask<T, S, POLICY, INSTRUMENT>(pub Config<POLICY, INSTRUMENT>, pub T, pub S);
+
+impl<T, F, E, S> RetryAsyncFnTask<T, S, (), ()>
+where
+    T: Fn(watch::Receiver<bool>, S) -> F + Send + 'static,
+    for<'a> &'a T: Send,
+    F: Future<Output = Result<(), E>> + Send + 'static,
+    E: std::error::Error + Send + 'static,
+    S: Clone + Send + 'static,
+{
+    pub fn new(state: S, f: T) -> impl Task {
+        RetryAsyncFnTask(Config::new(), f, state)
+    }
+}
+
+impl<T, F, E, S, POLICY: FailurePolicy, INSTRUMENT: Instrument> Task
+    for RetryAsyncFnTask<T, S, POLICY, INSTRUMENT>
+where
+    T: Fn(watch::Receiver<bool>, S) -> F + Send + 'static,
+    for<'a> &'a T: Send,
+    F: Future<Output = Result<(), E>> + Send + 'static,
+    E: std::error::Error + Send + 'static,
+    S: Clone + Send + 'static,
+    POLICY: Send + Sync + 'static,
+    INSTRUMENT: Send + Sync + 'static,
+{
+    fn start(self, alive: watch::Receiver<bool>) -> JoinHandle<()> {
+        AsyncFnTask::new(|mut alive| async move {
+            let RetryAsyncFnTask(config, task, state) = self;
+
+            let cb = config.build();
+
+            while *alive.borrow_and_update() {
+                // avoid &S: Send bounds by cloning ahead of time
+                let state = state.clone();
+
+                match cb.call(async { task(alive.clone(), state).await }).await {
+                    Ok(()) => log::trace!("Task ran successfully"),
+                    Err(Reject::Inner(e)) => log::error!("Error running task: {e}"),
+                    Err(Reject::Rejected) => {
+                        log::warn!("Task has been rate-limited");
+                        tokio::time::sleep(Duration::from_secs(1)).await;
+                    }
+                }
+            }
+        })
+        .start(alive)
+    }
+}
