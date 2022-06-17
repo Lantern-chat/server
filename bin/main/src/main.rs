@@ -87,19 +87,26 @@ async fn main() -> anyhow::Result<()> {
 
         db::migrate::migrate(write_pool.clone(), &config.db.migrations).await?;
 
-        server::DatabasePools {
+        server::backend::db::DatabasePools {
             write: write_pool,
             read: Pool::new(pool_config.readonly(), NoTls),
         }
     };
 
-    log::info!("Starting server...");
-    let (server, state) = server::start_server(config, db).await?;
+    let state = server::ServerState::new(config, db);
+
+    log::info!("Starting tasks...");
+    let runner = TaskRunner::new();
+    server::tasks::add_tasks(&state, &runner);
 
     log::trace!("Setting up shutdown signal for Ctrl+C");
-    tokio::spawn(tokio::signal::ctrl_c().then(move |_| async move { state.shutdown().await }));
+    let shutdown = runner.signal();
+    tokio::spawn(async move {
+        tokio::signal::ctrl_c().await;
+        shutdown.stop();
+    });
 
-    server.await?;
+    runner.wait().await?;
 
     Ok(())
 }

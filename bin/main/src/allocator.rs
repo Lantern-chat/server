@@ -15,7 +15,7 @@ static GLOBAL: Global = Global {};
 mod allocator {
     use super::Global;
 
-    use server::metric::MEMORY_METRICS;
+    use server::metrics::MEMORY_METRICS;
     use std::alloc::{GlobalAlloc, Layout};
     use util::likely::likely;
 
