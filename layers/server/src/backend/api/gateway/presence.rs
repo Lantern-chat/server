@@ -3,7 +3,7 @@ use sdk::models::{Snowflake, UserPresence};
 use crate::{Error, ServerState};
 
 pub async fn set_presence(
-    state: &ServerState,
+    state: ServerState,
     user_id: Snowflake,
     conn_id: Snowflake,
     presence: UserPresence,
@@ -31,7 +31,7 @@ pub async fn set_presence(
     Ok(())
 }
 
-pub async fn clear_presence(state: &ServerState, conn_id: Snowflake) -> Result<(), Error> {
+pub async fn clear_presence(state: ServerState, conn_id: Snowflake) -> Result<(), Error> {
     let db = state.db.write.get().await?;
 
     db.execute_cached_typed(

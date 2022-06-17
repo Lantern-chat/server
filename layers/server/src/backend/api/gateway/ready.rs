@@ -1,5 +1,5 @@
-use futures::{StreamExt, TryStreamExt};
-use hashbrown::{hash_map::Entry, HashMap};
+use futures::TryStreamExt;
+use hashbrown::HashMap;
 
 use schema::Snowflake;
 use thorn::pg::Json;
@@ -13,7 +13,7 @@ use crate::{Authorization, Error, ServerState};
 //}
 
 pub async fn ready(
-    state: &ServerState,
+    state: ServerState,
     conn_id: Snowflake,
     auth: Authorization,
 ) -> Result<sdk::models::events::Ready, Error> {
@@ -127,7 +127,7 @@ pub async fn ready(
 
         let (roles, emotes) = futures::future::join(
             async {
-                crate::backend::api::party::roles::get_roles_raw(&db, state, SearchMode::Many(&ids))
+                crate::backend::api::party::roles::get_roles_raw(&db, &state, SearchMode::Many(&ids))
                     .await?
                     .try_collect::<Vec<_>>()
                     .await

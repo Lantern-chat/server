@@ -13,7 +13,7 @@ use futures::{
     Future, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
 };
 
-use sdk::models::RoomPermissions;
+use sdk::{api::gateway::GatewayQueryParams, driver::Encoding, models::RoomPermissions};
 use tokio::sync::{broadcast::error::RecvError, mpsc};
 use tokio_stream::wrappers::{errors::BroadcastStreamRecvError, BroadcastStream, ReceiverStream};
 
@@ -28,11 +28,10 @@ use crate::{
         api::gateway::presence::{clear_presence, set_presence},
         cache::permission_cache::PermMute,
     },
-    web::encoding::Encoding,
     ServerState,
 };
 
-use super::{
+use crate::backend::gateway::{
     conn::GatewayConnection,
     event::{EncodedEvent, Event},
     PartySubscription,
@@ -93,7 +92,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                         let msg = decompress_if(query.compress, msg.as_bytes())?;
 
                         Ok(match query.encoding {
-                            Encoding::Json => serde_json::from_slice(&msg)?,
+                            Encoding::JSON => serde_json::from_slice(&msg)?,
                             Encoding::CBOR => ciborium::de::from_reader(&msg[..])?,
                         })
                     });
@@ -298,11 +297,11 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
             // 5 seconds would give enough time for a page reload, so if the user starts a new connection before then
             // we can avoid flickering presences
             let conn_id = conn.id;
-            let state2 = state.clone();
+            let state = state.clone();
             tokio::spawn(async move {
                 tokio::time::sleep(Duration::from_secs(5)).await;
 
-                if let Err(e) = clear_presence(state2, conn_id).await {
+                if let Err(e) = clear_presence(state, conn_id).await {
                     log::error!("Error clearing connection presence: {e}");
                 }
             });
@@ -379,7 +378,7 @@ fn decompress_if(cond: bool, msg: &[u8]) -> Result<Cow<[u8]>, std::io::Error> {
 
 async fn refresh_and_retry(state: ServerState, conn: GatewayConnection, event: Event, user_id: Snowflake, room_id: Snowflake) {
     if let Ok(db) = state.db.read.get().await {
-        if let Ok(_) = crate::ctrl::gateway::refresh::refresh_room_perms(&state, &db, user_id).await {
+        if let Ok(_) = crate::backend::api::gateway::refresh::refresh_room_perms(&state, &db, user_id).await {
             // double-check once refreshed. Only if it really exists should it continue.
             if state.perm_cache.get(user_id, room_id).await.is_some() {
                 // we don't care about the result of this

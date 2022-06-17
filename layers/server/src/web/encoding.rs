@@ -2,25 +2,12 @@ use bytes::Bytes;
 use ftl::*;
 use headers::ContentType;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum Encoding {
-    /// Textual JSON, simple.
-    Json,
-
-    /// Concise Binary Object Representation
-    CBOR,
-}
-
-impl Default for Encoding {
-    fn default() -> Self {
-        Encoding::Json
-    }
-}
+use sdk::driver::Encoding;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EncodingQuery {
     #[serde(default)]
+    #[serde(alias = "e")]
     pub encoding: Encoding,
 }
 

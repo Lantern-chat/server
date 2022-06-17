@@ -22,10 +22,7 @@ use headers::ContentType;
 
 use ftl::*;
 
-use crate::{
-    web::encoding::{Encoding, EncodingQuery},
-    ServerState,
-};
+use crate::{web::encoding::EncodingQuery, ServerState};
 
 use super::ApiResponse;
 
