@@ -118,7 +118,7 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
                 "Received {} party_events, {} direct events, {} user_events",
                 party_events.len(),
                 direct_events.len(),
-                user_events.len()
+                user_events.len(),
             );
 
             // process events from each party in parallel,

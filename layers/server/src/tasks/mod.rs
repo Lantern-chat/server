@@ -14,6 +14,9 @@ pub fn add_tasks(state: &ServerState, runner: &TaskRunner) {
     perm_cache_cleanup::perm_cache_cleanup(state, runner);
     record_metrics::add_record_metrics_task(state, runner);
     session_cleanup::add_cleanup_sessions_task(state, runner);
+
+    crate::backend::gateway::task::listen::add_gateway_listener(state.clone(), runner);
+    crate::backend::gateway::task::process::add_gateway_processor(state.clone(), runner);
 }
 
 use std::time::Duration;
