@@ -1,4 +1,3 @@
-use futures::FutureExt;
 use hyper::{
     server::conn::AddrStream,
     service::{make_service_fn, service_fn},
@@ -17,10 +16,10 @@ pub fn add_http_server_task(state: &ServerState, runner: &TaskRunner) {
 struct HttpServer(ServerState);
 
 impl task_runner::Task for HttpServer {
-    fn start(self, alive: tokio::sync::watch::Receiver<bool>) -> tokio::task::JoinHandle<()> {
+    fn start(self, mut alive: tokio::sync::watch::Receiver<bool>) -> tokio::task::JoinHandle<()> {
         let HttpServer(state) = self;
 
-        let server = Server::bind(&state.config().web.bind)
+        let server = Server::bind(&state.config.web.bind)
             .http2_adaptive_window(true)
             .tcp_nodelay(true)
             .serve(make_service_fn(move |socket: &AddrStream| {
@@ -44,8 +43,10 @@ impl task_runner::Task for HttpServer {
                     }
                 }))
             }))
-            .with_graceful_shutdown(alive.changed().map(|_| ()));
+            .with_graceful_shutdown(async move {
+                let _ = alive.changed().await;
+            });
 
-        tokio::spawn(server)
+        tokio::spawn(async move { server.await.unwrap() })
     }
 }
