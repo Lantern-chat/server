@@ -8,8 +8,6 @@ use tracing_subscriber::{
 pub mod allocator;
 pub mod cli;
 
-use futures::FutureExt;
-
 use task_runner::TaskRunner;
 
 #[tokio::main(flavor = "multi_thread")]
@@ -102,7 +100,7 @@ async fn main() -> anyhow::Result<()> {
     log::trace!("Setting up shutdown signal for Ctrl+C");
     let shutdown = runner.signal();
     tokio::spawn(async move {
-        tokio::signal::ctrl_c().await;
+        let _ = tokio::signal::ctrl_c().await;
         shutdown.stop();
     });
 

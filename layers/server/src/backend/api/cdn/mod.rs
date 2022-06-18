@@ -30,17 +30,6 @@ pub enum FileKind {
     RoomAvatar,
 }
 
-pub struct File {
-    range: Option<Range>,
-    id: Snowflake,
-    filename: SmolStr,
-}
-
-pub struct FileOptions {
-    kind_id: Snowflake,
-    file_id: Snowflake,
-}
-
 pub async fn get_file(
     route: Route<ServerState>,
     kind_id: Snowflake,
@@ -82,7 +71,9 @@ pub async fn get_file(
         Err(e) => return Err(e.into()),
     };
 
-    let name: &str = row.try_get(4)?;
+    use queries::Columns;
+
+    let name: &str = row.try_get(Columns::Name as usize)?;
 
     if let Some(filename) = filename {
         if name != filename {
@@ -93,11 +84,11 @@ pub async fn get_file(
 
     // TODO: Determine what to do with flags?
 
-    let file_id: Snowflake = row.try_get(0)?;
-    let size: i32 = row.try_get(1)?;
-    let _flags = FileFlags::from_bits_truncate(row.try_get(2)?);
-    let nonce: i64 = row.try_get(3)?;
-    let mime: Option<&str> = row.try_get(5)?;
+    let file_id: Snowflake = row.try_get(Columns::Id as usize)?;
+    let size: i32 = row.try_get(Columns::Size as usize)?;
+    let _flags = FileFlags::from_bits_truncate(row.try_get(Columns::Flags as usize)?);
+    let nonce: i64 = row.try_get(Columns::Nonce as usize)?;
+    let mime: Option<&str> = row.try_get(Columns::Mime as usize)?;
 
     let options = CipherOptions {
         key: state.config.keys.file_key,

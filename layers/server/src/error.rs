@@ -346,6 +346,7 @@ impl Error {
         })
     }
 
+    #[allow(non_upper_case_globals)]
     fn into_cached_json(self) -> reply::Json {
         use reply::Json;
 
@@ -379,7 +380,7 @@ impl Error {
 
 impl ftl::Reply for Error {
     fn into_response(self) -> Response {
-        self.into_json().into_response()
+        self.into_cached_json().into_response()
     }
 }
 

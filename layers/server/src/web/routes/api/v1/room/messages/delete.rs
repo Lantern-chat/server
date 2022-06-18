@@ -11,8 +11,7 @@ pub async fn delete(
     room_id: Snowflake,
     msg_id: Snowflake,
 ) -> ApiResponse {
-    let res =
-        crate::backend::api::room::messages::delete::delete_msg(route.state, auth, room_id, msg_id).await?;
+    crate::backend::api::room::messages::delete::delete_msg(route.state, auth, room_id, msg_id).await?;
 
     Ok(StatusCode::OK.into_response())
 }
