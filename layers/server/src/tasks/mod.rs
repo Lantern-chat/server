@@ -3,6 +3,8 @@ use task_runner::{AsyncFnTask, IntervalFnTask, RetryTask, TaskRunner};
 use crate::ServerState;
 
 pub fn add_tasks(state: &ServerState, runner: &TaskRunner) {
+    clean_presence::add_clean_presence_task(state.clone(), runner);
+
     cn_cleanup::add_cleanup_connections_task(state, runner);
     file_cache_cleanup::add_file_cache_cleanup_task(state, runner);
     http_server::add_http_server_task(state, runner);
@@ -16,6 +18,7 @@ pub fn add_tasks(state: &ServerState, runner: &TaskRunner) {
 
 use std::time::Duration;
 
+mod clean_presence;
 mod cn_cleanup;
 mod event_log_cleanup;
 mod file_cache_cleanup;
