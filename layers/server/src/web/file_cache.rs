@@ -393,12 +393,19 @@ impl MainFileCache {
 
             match m.pattern() {
                 0 => {
+                    let c = &state.config;
                     serde_json::to_writer(
                         &mut new_file,
                         &sdk::models::ServerConfig {
-                            hcaptcha_sitekey: state.config.services.hcaptcha_sitekey.clone(),
-                            cdn: state.config.web.cdn_domain.clone(),
-                            min_age: state.config.account.min_age,
+                            hcaptcha_sitekey: c.services.hcaptcha_sitekey.clone(),
+                            cdn: c.web.cdn_domain.clone(),
+                            min_age: c.account.min_age,
+                            secure: c.web.https,
+                            limits: sdk::models::ServerLimits {
+                                max_avatar_pixels: c.upload.max_avatar_pixels,
+                                max_avatar_size: c.upload.max_avatar_size as u32,
+                                max_upload_size: c.upload.max_upload_size,
+                            },
                         },
                     )
                     .unwrap();
