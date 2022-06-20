@@ -1,0 +1,22 @@
+[package]
+name = "config"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+util = { path = "../../crates/util" }
+schema = { path = "../schema" }
+
+tokio = { version = "1", default_features = false, features = ["fs"] }
+serde = { version = "1", features = ["derive"] }
+
+tracing = { version = "0.1", default_features = false }
+hex = "0.4.2"
+num_cpus = "1.13"
+aes = "0.7"
+
+serde_json = "1"
+toml = { version = "0.5", features = ["preserve_order"] }

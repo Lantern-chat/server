@@ -2,7 +2,7 @@ use std::fs::File;
 
 use image::ImageDecoder;
 
-use blurhash::base85::{FromZ85, ToZ85};
+use z85::{FromZ85, ToZ85};
 
 fn main() {
     let mut file = File::open("deps/blurhash/e.jpg").unwrap();
