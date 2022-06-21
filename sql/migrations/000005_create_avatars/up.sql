@@ -1,8 +1,8 @@
 -- Users can have multiple avatars, with one main avatar
 CREATE TABLE lantern.user_avatars (
     user_id     bigint  NOT NULL,
-    party_id    bigint,
-    file_id     bigint  NOT NULL
+    file_id     bigint  NOT NULL,
+    party_id    bigint
 );
 ALTER TABLE lantern.user_avatars OWNER TO postgres;
 
