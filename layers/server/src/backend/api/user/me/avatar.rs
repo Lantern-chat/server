@@ -8,7 +8,26 @@ use crate::{Error, ServerState};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-pub async fn process_avatar(state: ServerState, user_id: Snowflake, file_id: Snowflake) -> Result<(), Error> {
+pub async fn delete_avatar(state: ServerState, user_id: Snowflake) -> Result<(), Error> {
+    let db = state.db.write.get().await?;
+
+    db.execute_cached_typed(
+        || {
+            use schema::*;
+            use thorn::*;
+
+            Query::delete()
+                .from::<UserAvatars>()
+                .and_where(UserAvatars::UserId.equals(Var::of(Users::Id)))
+        },
+        &[&user_id],
+    )
+    .await?;
+
+    Ok(())
+}
+
+pub async fn set_avatar(state: ServerState, user_id: Snowflake, file_id: Snowflake) -> Result<(), Error> {
     let read_db = state.db.read.get().await?;
 
     let row = read_db
