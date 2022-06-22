@@ -10,6 +10,7 @@ section! {
         pub strict_cdn: bool = true,
         pub base_domain: String = "lantern.chat".to_owned() => "LANTERN_BASE_DOMAIN",
 
+        #[serde(skip_serializing)]
         pub https: Option<bool> = None,
         pub secure: bool = true => "LANTERN_HTTPS" | util::parse[true],
     }
