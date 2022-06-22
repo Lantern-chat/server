@@ -1,4 +1,5 @@
 use ftl::*;
+use futures::FutureExt;
 
 use crate::{Error, ServerState};
 
@@ -17,7 +18,7 @@ pub async fn cdn(mut route: Route<ServerState>) -> ApiResponse {
     }
 
     match route.next().segment() {
-        Exact("attachments") => attachments::attachments(route).await,
+        Exact("attachments") => attachments::attachments(route).boxed().await,
         Exact("avatar") => {
             let kind = match route.next().segment() {
                 Exact("user") => avatar::AvatarKind::User,
@@ -27,7 +28,7 @@ pub async fn cdn(mut route: Route<ServerState>) -> ApiResponse {
                 _ => return Err(Error::NotFound),
             };
 
-            avatar::avatar(route, kind).await
+            avatar::avatar(route, kind).boxed().await
         }
         _ => Err(Error::NotFound),
     }

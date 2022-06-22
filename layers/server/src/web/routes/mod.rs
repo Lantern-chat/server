@@ -41,6 +41,8 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
         .await
         .into_response(),
 
+        (&Method::GET | &Method::HEAD, Exact("cdn")) => cdn::cdn(route).boxed().await.into_response(),
+
         _ if BAD_PATTERNS.is_match(route.path()) => StatusCode::IM_A_TEAPOT.into_response(),
 
         (&Method::GET | &Method::HEAD, Exact("static")) => {
@@ -49,8 +51,6 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
                 .await
                 .into_response()
         }
-
-        (&Method::GET | &Method::HEAD, Exact("cdn")) => cdn::cdn(route).boxed().await.into_response(),
 
         (&Method::GET | &Method::HEAD, segment) => {
             let allowed = match segment {
@@ -100,8 +100,9 @@ use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 
 lazy_static::lazy_static! {
     static ref BAD_PATTERNS: AhoCorasick = AhoCorasickBuilder::new().dfa(true).build(&[
-        "wp-includes", "wp-admin", "wp-login", "wp-content", "wordpress", "xmlrpc.php",
-        "wlwmanifest", ".git", "drupal", "ajax", "claro", "wp-json"
+        "wp-includes", "wp-admin", "wp-login", "wp-content", "wordpress", "php",
+        "wlwmanifest", ".git", "drupal", "ajax", "claro", "wp-json", "tinymce", "kcfinder",
+        "filemanager", "alfa", "eval"
     ]);
 }
 
