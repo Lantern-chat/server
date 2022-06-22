@@ -400,7 +400,7 @@ impl MainFileCache {
                             hcaptcha_sitekey: c.services.hcaptcha_sitekey.clone(),
                             cdn: c.web.cdn_domain.clone(),
                             min_age: c.account.min_age,
-                            secure: c.web.https,
+                            secure: c.web.secure,
                             limits: sdk::models::ServerLimits {
                                 max_avatar_pixels: c.upload.max_avatar_pixels,
                                 max_avatar_size: c.upload.max_avatar_size as u32,

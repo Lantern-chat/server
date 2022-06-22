@@ -9,7 +9,9 @@ section! {
         pub cdn_domain: String = "cdn.lanternchat.net".to_owned() => "LANTERN_CDN_DOMAIN",
         pub strict_cdn: bool = true,
         pub base_domain: String = "lantern.chat".to_owned() => "LANTERN_BASE_DOMAIN",
-        pub https: bool = true => "LANTERN_HTTPS" | util::parse[true],
+
+        #[serde(alias = "https")]
+        pub secure: bool = true => "LANTERN_HTTPS" | util::parse[true],
     }
 }
 
@@ -19,6 +21,10 @@ fn parse_address(value: &str) -> SocketAddr {
 
 impl Web {
     pub fn base_url(&self) -> String {
-        format!("http{}://{}", if self.https { "s" } else { "" }, self.base_domain)
+        format!(
+            "http{}://{}",
+            if self.secure { "s" } else { "" },
+            self.base_domain
+        )
     }
 }
