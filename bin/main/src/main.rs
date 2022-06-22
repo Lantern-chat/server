@@ -51,23 +51,29 @@ async fn main() -> anyhow::Result<()> {
 
     log::debug!("Arguments: {:?}", args);
 
-    // Load save, allow it to fill in defaults, then save it back
+    use server::config::{Config, ConfigError};
+
     log::info!("Loading config from: {}", args.config_path.display());
-    let (initialized, mut config) = server::config::Config::load(&args.config_path).await?;
+    let mut config = match Config::load(&args.config_path).await {
+        Ok(config) => config,
+        Err(ConfigError::IOError(e)) if e.kind() == std::io::ErrorKind::NotFound && args.write_config => {
+            log::warn!("Config file not found, but --write-config given, therefore assuming defaults");
+
+            Config::default()
+        }
+        Err(e) => return Err(e.into()),
+    };
 
     log::info!("Applying environment overrides");
     config.apply_overrides();
 
-    // if write-config requested, do this before saving
     if args.write_config {
+        // if write-config requested, do this before saving
         config.configure();
-    }
 
-    if initialized || args.write_config {
         log::info!("Saving config to: {}", args.config_path.display());
         config.save(&args.config_path).await?;
 
-        log::info!("Save complete, exiting.");
         return Ok(());
     }
 
