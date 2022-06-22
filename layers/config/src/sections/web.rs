@@ -10,7 +10,7 @@ section! {
         pub strict_cdn: bool = true,
         pub base_domain: String = "lantern.chat".to_owned() => "LANTERN_BASE_DOMAIN",
 
-        #[serde(alias = "https")]
+        pub https: Option<bool> = None,
         pub secure: bool = true => "LANTERN_HTTPS" | util::parse[true],
     }
 }
@@ -20,6 +20,13 @@ fn parse_address(value: &str) -> SocketAddr {
 }
 
 impl Web {
+    pub fn configure(&mut self) {
+        if let Some(https) = self.https {
+            log::warn!("web::https is deprecated, please use web::secure instead");
+            self.secure = https;
+        }
+    }
+
     pub fn base_url(&self) -> String {
         format!(
             "http{}://{}",
