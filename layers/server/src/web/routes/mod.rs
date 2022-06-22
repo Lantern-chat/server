@@ -20,27 +20,31 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
 
     route.next();
 
+    let paths = &route.state.config.paths;
+
     match route.method_segment() {
         // ANY /api
         (_, Exact("api")) => compression::wrap_route(true, route, api::api)
             .await
             .into_response(),
 
-        (_, Exact("robots.txt")) => include_str!("robots.txt")
+        (&Method::GET, Exact("robots.txt")) => include_str!("robots.txt")
             .with_header(ContentType::text())
             .into_response(),
 
-        (&Method::GET | &Method::HEAD, Exact("favicon.ico")) => {
-            fs::file(&route, "frontend/assets/favicon.ico", &route.state.file_cache)
-                .boxed()
-                .await
-                .into_response()
-        }
+        (&Method::GET | &Method::HEAD, Exact("favicon.ico")) => fs::file(
+            &route,
+            paths.web_path.join("assets/favicon.ico"),
+            &route.state.file_cache,
+        )
+        .boxed()
+        .await
+        .into_response(),
 
         _ if BAD_PATTERNS.is_match(route.path()) => StatusCode::IM_A_TEAPOT.into_response(),
 
         (&Method::GET | &Method::HEAD, Exact("static")) => {
-            fs::dir(&route, "frontend/dist", &route.state.file_cache)
+            fs::dir(&route, paths.web_path.join("dist"), &route.state.file_cache)
                 .boxed()
                 .await
                 .into_response()
@@ -61,10 +65,14 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
                 return StatusCode::NOT_FOUND.into_response();
             }
 
-            let mut resp = fs::file(&route, "frontend/dist/index.html", &route.state.file_cache)
-                .boxed()
-                .await
-                .into_response();
+            let mut resp = fs::file(
+                &route,
+                paths.web_path.join("dist/index.html"),
+                &route.state.file_cache,
+            )
+            .boxed()
+            .await
+            .into_response();
 
             let headers = resp.headers_mut();
 

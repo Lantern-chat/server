@@ -6,5 +6,6 @@ section! {
         pub data_path: PathBuf = PathBuf::default() => "DATA_DIR",
         pub cert_path: PathBuf = PathBuf::default() => "CERT_PATH",
         pub key_path: PathBuf = PathBuf::default() => "KEY_PATH",
+        pub web_path: PathBuf = PathBuf::from("./frontend") => "WEB_PATH",
     }
 }
