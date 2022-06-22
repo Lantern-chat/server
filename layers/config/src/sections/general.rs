@@ -1,7 +1,6 @@
 use super::util;
 
 section! {
-    #[derive(Debug, Serialize, Deserialize)]
     #[serde(default)]
     pub struct General {
         pub server_name: String = "Lantern Chat".to_owned() => "LANTERN_SERVER_NAME",

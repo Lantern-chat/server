@@ -10,7 +10,6 @@ const MIBIBYTE: i32 = KIBIBYTE * 1024;
 const GIBIBYTE: i64 = MIBIBYTE as i64 * 1024;
 
 section! {
-    #[derive(Debug, Serialize, Deserialize)]
     #[serde(default)]
     pub struct Upload {
         pub max_upload_size: u64                = i32::MAX as u64,

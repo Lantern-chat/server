@@ -20,7 +20,9 @@ pub mod sections {
                     )?
             ),*$(,)?}
         ) => {
+            #[derive(Debug, Serialize, Deserialize)]
             $(#[$meta])*
+            #[serde(deny_unknown_fields)]
             $vis struct $name {$(
                 $(#[$field_meta])*
                 $field_vis $field_name: $field_ty,
@@ -67,7 +69,8 @@ macro_rules! decl_config {
     ),*$(,)?) => {
 
         #[derive(Default, Debug, Serialize, Deserialize)]
-        #[serde(default)]
+        #[serde(deny_unknown_fields)]
+        #[cfg_attr(not(feature = "strict"), serde(default))]
         pub struct Config {$(
             $(#[$meta])*
             pub $field: $field_ty,
@@ -100,8 +103,6 @@ enum Format {
     JSON,
 }
 
-use std::io::{self, ErrorKind};
-
 fn get_format(path: &Path) -> Format {
     let mut format = Format::TOML;
     if let Some(ext) = path.extension() {
@@ -114,44 +115,46 @@ fn get_format(path: &Path) -> Format {
     format
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum ConfigError {
+    #[error("IO Error: {0}")]
+    IOError(#[from] std::io::Error),
+
+    #[error("TOML Parse Error: {0}")]
+    TomlDeError(#[from] toml::de::Error),
+    #[error("TOML Format Error: {0}")]
+    TomlSeError(#[from] toml::ser::Error),
+
+    #[error("JSON Error: {0}")]
+    JsonError(#[from] serde_json::Error),
+}
+
 impl Config {
-    pub async fn load(path: impl AsRef<Path>) -> io::Result<(bool, Config)> {
+    pub async fn load(path: impl AsRef<Path>) -> Result<Config, ConfigError> {
         let path = path.as_ref();
 
-        let file = match tokio::fs::read_to_string(path).await {
-            Ok(file) => file,
-            Err(e) if e.kind() == ErrorKind::NotFound => {
-                log::warn!("{} not found, generating default config", path.display());
+        let file = tokio::fs::read_to_string(path).await?;
 
-                return Ok((true, Config::default()));
-            }
-            Err(e) => return Err(e),
-        };
-
-        let parsed = match get_format(path) {
-            Format::TOML => toml::from_str(&file).map_err(|e| io::Error::new(ErrorKind::InvalidData, e)),
-            Format::JSON => {
-                serde_json::from_str(&file).map_err(|e| io::Error::new(ErrorKind::InvalidData, e))
-            }
-        };
-
-        parsed.map(|config| (false, config))
+        Ok(match get_format(path) {
+            Format::TOML => toml::from_str(&file)?,
+            Format::JSON => serde_json::from_str(&file)?,
+        })
     }
 
     pub fn configure(&self) {
         self.general.configure();
     }
 
-    pub async fn save(&self, path: impl AsRef<Path>) -> io::Result<()> {
+    pub async fn save(&self, path: impl AsRef<Path>) -> Result<(), ConfigError> {
         let path = path.as_ref();
 
         let file = match get_format(path) {
-            Format::TOML => toml::to_string(self).map_err(|e| io::Error::new(ErrorKind::InvalidData, e)),
-            Format::JSON => {
-                serde_json::to_string(self).map_err(|e| io::Error::new(ErrorKind::InvalidData, e))
-            }
-        }?;
+            Format::TOML => toml::to_string(self)?,
+            Format::JSON => serde_json::to_string(self)?,
+        };
 
-        tokio::fs::write(path, file).await
+        tokio::fs::write(path, file).await?;
+
+        Ok(())
     }
 }

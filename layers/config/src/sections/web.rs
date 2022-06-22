@@ -3,7 +3,6 @@ use std::{net::SocketAddr, str::FromStr};
 use super::util;
 
 section! {
-    #[derive(Debug, Serialize, Deserialize)]
     #[serde(default)]
     pub struct Web {
         pub bind: SocketAddr = SocketAddr::from(([127, 0, 0, 1], 8080)) => "LANTERN_BIND" | parse_address,

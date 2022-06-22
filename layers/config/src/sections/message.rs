@@ -1,7 +1,6 @@
 use std::ops::Range;
 
 section! {
-    #[derive(Debug, Serialize, Deserialize)]
     #[serde(default)]
     pub struct Message {
         pub max_newlines: usize                 = 80,

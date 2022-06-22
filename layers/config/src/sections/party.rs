@@ -1,7 +1,6 @@
 use std::ops::Range;
 
 section! {
-    #[derive(Debug, Serialize, Deserialize)]
     #[serde(default)]
     pub struct Party {
         #[serde(with = "super::util::range")]

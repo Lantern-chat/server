@@ -5,7 +5,6 @@ use schema::auth::BotTokenKey;
 // which will be written back to the file for persistence
 
 section! {
-    #[derive(Debug, Serialize, Deserialize)]
     pub struct Keys {
         /// File encryption key
         #[serde(with = "super::util::hex_key")]

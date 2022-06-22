@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 section! {
-    #[derive(Debug, Serialize, Deserialize)]
     #[serde(default)]
     pub struct Paths {
         pub data_path: PathBuf = PathBuf::default() => "DATA_DIR",

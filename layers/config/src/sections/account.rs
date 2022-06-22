@@ -1,7 +1,6 @@
 use std::{ops::Range, time::Duration};
 
 section! {
-    #[derive(Debug, Serialize, Deserialize)]
     #[serde(default)]
     pub struct Account {
         #[serde(with = "super::util::duration")]
