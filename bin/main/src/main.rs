@@ -56,15 +56,23 @@ async fn main() -> anyhow::Result<()> {
     log::info!("Loading config from: {}", args.config_path.display());
     let mut config = match Config::load(&args.config_path).await {
         Ok(config) => config,
-        Err(ConfigError::IOError(e)) if e.kind() == std::io::ErrorKind::NotFound && args.write_config => {
-            log::warn!("Config file not found, but --write-config given, therefore assuming defaults");
+        Err(ConfigError::IOError(e)) if e.kind() == std::io::ErrorKind::NotFound => {
+            if args.write_config {
+                log::warn!("Config file not found, but `--write-config` given, therefore assuming defaults");
 
-            Config::default()
+                Config::default()
+            } else {
+                log::error!(concat!(
+                    "Config file not found, re-run with `--write-config` to generate default configuration\n\t",
+                    "Or specify a config file path with `--config ./somewhere/config.toml`"
+                ));
+                return Ok(());
+            }
         }
         Err(e) => return Err(e.into()),
     };
 
-    log::info!("Applying environment overrides");
+    log::info!("Applying environment overrides to configuration");
     config.apply_overrides();
 
     if args.write_config {

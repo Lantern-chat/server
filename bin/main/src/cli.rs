@@ -53,6 +53,7 @@ FLAGS:
     -V, --version   Prints version information
 
 OPTIONS:
-        --config <path>     Lantern configuration file location
+    -c, --config <path>     Specify Lantern configuration file location
+        --write-config      Writes out the configuration file with overrides having been applied
     -v, --verbose <level>   Logging level (0 = Info, 1 = Debug, 2 = Trace) [env LANTERN_VERBOSE]
 ";
