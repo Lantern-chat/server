@@ -7,8 +7,9 @@ use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Error, Server
 
 use futures::{Stream, StreamExt};
 
-use sdk::models::{AnyActivity, PartyMember, User, UserFlags, UserPresence, UserPresenceFlags};
+use sdk::models::{AnyActivity, PartyMember, User, UserFlags, UserPresence, UserPresenceFlags, UserProfile};
 
+// TODO: Add cursor-based pagination
 pub async fn get_members(
     state: ServerState,
     party_id: Snowflake,
@@ -36,132 +37,100 @@ pub async fn get_members(
     }
 
     let stream = db
-        .query_stream_cached_typed(|| select_members2(), &[&party_id])
+        .query_stream_cached_typed(|| query::select_members(), &[&party_id])
         .await?;
 
     Ok(stream.map(move |row| match row {
         Err(e) => Err(e.into()),
-        Ok(row) => Ok(PartyMember {
-            user: Some(User {
-                id: row.try_get(0)?,
-                username: row.try_get(2)?,
-                discriminator: row.try_get(1)?,
-                flags: UserFlags::from_bits_truncate(row.try_get(3)?).publicize(),
-                status: row.try_get(5)?,
-                bio: row.try_get(4)?,
-                email: None,
-                preferences: None,
-                avatar: encrypt_snowflake_opt(&state, row.try_get(9)?),
-            }),
-            nick: row.try_get(10)?,
-            presence: match row.try_get::<_, Option<_>>(7)? {
-                None => None,
-                Some(updated_at) => Some(UserPresence {
-                    updated_at: Some(updated_at),
-                    flags: UserPresenceFlags::from_bits_truncate(row.try_get(6)?),
-                    activity: match row.try_get::<_, Option<serde_json::Value>>(8)? {
-                        None => None,
-                        Some(value) => Some(AnyActivity::Any(value)),
-                    },
-                }),
-            },
-            roles: row.try_get(12)?,
-            flags: None,
-        }),
+        Ok(row) => parse_member(row, &state),
     }))
 }
 
-use thorn::*;
+pub fn parse_member(row: db::Row, state: &ServerState) -> Result<PartyMember, Error> {
+    use query::{MemberColumns, ProfileColumns, UserColumns};
 
-pub(crate) fn select_members2() -> query::SelectQuery {
+    Ok(PartyMember {
+        user: Some(User {
+            id: row.try_get(UserColumns::id())?,
+            username: row.try_get(UserColumns::username())?,
+            discriminator: row.try_get(UserColumns::discriminator())?,
+            flags: UserFlags::from_bits_truncate(row.try_get(UserColumns::flags())?).publicize(),
+            email: None,
+            preferences: None,
+            profile: match row.try_get(ProfileColumns::bits())? {
+                None => None,
+                Some(bits) => Some(UserProfile {
+                    bits,
+                    avatar: encrypt_snowflake_opt(state, row.try_get(ProfileColumns::avatar_id())?),
+                    banner: None,
+                    status: row.try_get(ProfileColumns::custom_status())?,
+                    bio: None,
+                }),
+            },
+        }),
+        nick: row.try_get(MemberColumns::nickname())?,
+        presence: match row.try_get(UserColumns::presence_updated_at())? {
+            None => None,
+            Some(updated_at) => Some(UserPresence {
+                updated_at: Some(updated_at),
+                flags: UserPresenceFlags::from_bits_truncate(row.try_get(UserColumns::presence_flags())?),
+                activity: match row.try_get(UserColumns::presence_activity())? {
+                    None => None,
+                    Some(value) => Some(AnyActivity::Any(value)),
+                },
+            }),
+        },
+        roles: row.try_get(MemberColumns::role_ids())?,
+        flags: None,
+    })
+}
+
+pub(crate) mod query {
     use schema::*;
+    use thorn::*;
 
-    Query::select()
-        .from(AggUsers::inner_join_table::<AggMembers>().on(AggMembers::UserId.equals(AggUsers::Id)))
-        .cols(&[
-            /* 0*/ AggUsers::Id,
-            /* 1*/ AggUsers::Discriminator,
-            /* 2*/ AggUsers::Username,
-            /* 3*/ AggUsers::Flags,
-            /* 4*/ AggUsers::Biography,
-            /* 5*/ AggUsers::CustomStatus,
-            /* 6*/ AggUsers::PresenceFlags,
-            /* 7*/ AggUsers::PresenceUpdatedAt,
-            /* 8*/ AggUsers::PresenceActivity,
-        ])
-        .expr(
-            /* 9*/ Builtin::coalesce((AggMembers::AvatarId, AggUsers::AvatarId)),
-        )
-        .cols(&[
-            /*10*/ AggMembers::Nickname,
-            /*11*/ AggMembers::JoinedAt,
-            /*12*/ AggMembers::RoleIds,
-        ])
-        .and_where(AggMembers::PartyId.equals(Var::of(Party::Id)))
-        .and_where(
-            // not banned
-            AggMembers::Flags.bit_and(1i16.lit()).equals(0i16.lit()),
-        )
+    pub use super::parse_member;
 
-    /*
+    indexed_columns! {
+        pub enum UserColumns {
+            AggUsers::Id,
+            AggUsers::Discriminator,
+            AggUsers::Username,
+            AggUsers::Flags,
+            AggUsers::PresenceFlags,
+            AggUsers::PresenceUpdatedAt,
+            AggUsers::PresenceActivity,
+        }
 
-    tables! {
-        struct AggPresence {
-            UserId: UserPresence::UserId,
-            UpdatedAt: UserPresence::UpdatedAt,
-            Flags: UserPresence::Flags,
-            Activity: UserPresence::Activity,
+        pub enum MemberColumns continue UserColumns {
+            AggMembers::Nickname,
+            AggMembers::JoinedAt,
+            AggMembers::RoleIds,
+        }
+
+        pub enum ProfileColumns continue MemberColumns {
+            AggProfiles::AvatarId,
+            AggProfiles::Bits,
+            AggProfiles::CustomStatus,
         }
     }
 
-    Query::with()
-        .with(
-            AggPresence::as_query(
-                Query::select()
-                    .distinct()
-                    .on(UserPresence::UserId)
-                    .cols(&[
-                        UserPresence::UserId,
-                        UserPresence::UpdatedAt,
-                        UserPresence::Flags,
-                        UserPresence::Activity,
-                    ])
-                    .from_table::<UserPresence>()
-                    .order_by(UserPresence::UserId.ascending())
-                    .order_by(UserPresence::UpdatedAt.descending()),
+    pub fn select_members() -> query::SelectQuery {
+        Query::select()
+            .cols(UserColumns::default())
+            .cols(MemberColumns::default())
+            .cols(ProfileColumns::default())
+            .from(
+                AggUsers::inner_join_table::<AggMembers>()
+                    .on(AggMembers::UserId.equals(AggUsers::Id))
+                    .left_join_table::<AggProfiles>()
+                    .on(AggProfiles::UserId
+                        .equals(AggUsers::Id)
+                        // profiles.party_id is allowed to be NULL, just not false
+                        .and(AggProfiles::PartyId.equals(AggMembers::PartyId).is_not_false())),
             )
-            .exclude(),
-        )
-        .select()
-        .cols(&[/* 0 */ PartyMember::Nickname])
-        .cols(&[
-            /* 1 */ Users::Id,
-            /* 2 */ Users::Username,
-            /* 3 */ Users::Discriminator,
-            /* 4 */ Users::Flags,
-        ])
-        .cols(&[
-            /* 5 */ AggPresence::UpdatedAt,
-            /* 6 */ AggPresence::Flags,
-            /* 7 */ AggPresence::Activity,
-        ])
-        .expr(
-            /* 8 */
-            Call::custom("ARRAY").args(
-                Query::select()
-                    .col(RoleMembers::RoleId)
-                    .from_table::<RoleMembers>()
-                    .and_where(RoleMembers::UserId.equals(Users::Id))
-                    .as_value(),
-            ),
-        )
-        .from(
-            AggPresence::right_join(
-                PartyMember::inner_join_table::<Users>().on(Users::Id.equals(PartyMember::UserId)),
-            )
-            .on(AggPresence::UserId.equals(PartyMember::UserId)),
-        )
-        .and_where(PartyMember::PartyId.equals(Var::of(Party::Id)))
-
-        */
+            .and_where(AggMembers::PartyId.equals(Var::of(Party::Id)))
+            // not banned
+            .and_where(AggMembers::Flags.bit_and(1i16.lit()).equals(0i16.lit()))
+    }
 }

@@ -38,3 +38,17 @@ CREATE INDEX file_idx ON lantern.files USING btree(user_id, id) INCLUDE (size);
 ALTER TABLE lantern.files ADD CONSTRAINT user_fk FOREIGN KEY (user_id)
     REFERENCES lantern.users (id) MATCH FULL
     ON DELETE RESTRICT ON UPDATE CASCADE;
+
+--
+-- Update existing tables with avatars fks
+--
+
+-- Add avatar to party
+ALTER TABLE lantern.party ADD CONSTRAINT avatar_fk FOREIGN KEY (avatar_id)
+    REFERENCES lantern.files (id) MATCH FULL
+    ON DELETE SET NULL ON UPDATE CASCADE; -- IMPORTANT: Only set NULL when deleting avatars, DO NOT CASCADE
+
+-- Add avatar to rooms
+ALTER TABLE lantern.rooms ADD CONSTRAINT avatar_fk FOREIGN KEY (avatar_id)
+    REFERENCES lantern.files (id) MATCH FULL
+    ON DELETE SET NULL ON UPDATE CASCADE; -- IMPORTANT: Only set NULL when deleting avatars, DO NOT CASCADE

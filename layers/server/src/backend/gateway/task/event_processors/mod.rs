@@ -52,7 +52,7 @@ pub async fn process(
             role_event::role_event(state, code, db, id, party_id).await
         }
         EventCode::SelfUpdated => user_event::self_update(state, db, id, party_id).await,
-        EventCode::UserUpdated => user_event::user_update(state, db, id).await,
+        EventCode::UserUpdated => user_event::user_update(state, db, id, party_id).await,
         _ => Err(Error::Unimplemented),
     }
 }

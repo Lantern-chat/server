@@ -11,6 +11,7 @@ CREATE OR REPLACE VIEW lantern.agg_messages(
     discriminator,
     user_flags,
     avatar_id,
+    profile_bits,
     thread_id,
     edited_at,
     message_flags,
@@ -31,12 +32,13 @@ SELECT
     users.username,
     users.discriminator,
     users.flags,
-    COALESCE(users.avatar_id, member.avatar_id),
+    profile.avatar_id,
+    COALESCE(profile.bits, 0), -- Might be NULL if the user has no profile at all
     messages.thread_id,
     messages.edited_at,
-    messages.flags as message_flags,
-    agg_mentions.kinds AS mention_kinds,
-    agg_mentions.ids AS mention_ids,
+    messages.flags,
+    agg_mentions.kinds,
+    agg_mentions.ids,
     messages.content,
     member.role_ids,
     agg_attachments.meta,
@@ -47,6 +49,12 @@ lantern.messages
 
 INNER JOIN lantern.agg_users users ON users.id = messages.user_id
 INNER JOIN lantern.rooms ON rooms.id = messages.room_id
+
+LEFT JOIN lantern.agg_profiles profile ON (
+    profile.user_id = messages.user_id AND
+    -- NOTE: profile.party_id is allowed to be NULL
+    (profile.party_id = rooms.party_id IS NOT FALSE)
+)
 
 LEFT JOIN lantern.agg_members member ON (member.user_id = messages.user_id AND member.party_id = rooms.party_id)
 LEFT JOIN lantern.agg_attachments ON agg_attachments.msg_id = messages.id

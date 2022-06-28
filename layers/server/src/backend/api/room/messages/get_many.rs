@@ -5,7 +5,7 @@ use schema::{flags::AttachmentFlags, Snowflake, SnowflakeExt};
 use sdk::models::*;
 use thorn::pg::{Json, ToSql};
 
-use crate::{Authorization, Error, ServerState};
+use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Authorization, Error, ServerState};
 
 use sdk::api::commands::room::{GetMessagesQuery, MessageSearch};
 
@@ -77,41 +77,39 @@ pub async fn get_many(
     Ok(stream.map(move |row| match row {
         Err(e) => Err(Error::from(e)),
         Ok(row) => {
-            let party_id: Option<Snowflake> = row.try_get(Columns::PartyId as usize)?;
-            let msg_id = row.try_get(Columns::MsgId as usize)?;
+            let party_id: Option<Snowflake> = row.try_get(Columns::party_id())?;
+            let msg_id = row.try_get(Columns::msg_id())?;
 
             let mut msg = Message {
                 id: msg_id,
                 party_id,
                 created_at: msg_id.timestamp(),
                 room_id,
-                flags: MessageFlags::from_bits_truncate(row.try_get(Columns::MessageFlags as usize)?),
-                kind: MessageKind::try_from(row.try_get::<_, i16>(Columns::Kind as usize)?)
-                    .unwrap_or_default(),
-                edited_at: row.try_get::<_, Option<_>>(Columns::EditedAt as usize)?,
-                content: row.try_get(Columns::Content as usize)?,
+                flags: MessageFlags::from_bits_truncate(row.try_get(Columns::message_flags())?),
+                kind: MessageKind::try_from(row.try_get::<_, i16>(Columns::kind())?).unwrap_or_default(),
+                edited_at: row.try_get::<_, Option<_>>(Columns::edited_at())?,
+                content: row.try_get(Columns::content())?,
                 author: {
-                    let id = row.try_get(Columns::UserId as usize)?;
+                    let id = row.try_get(Columns::user_id())?;
 
                     match last_user {
                         Some(ref last_user) if last_user.id == id => last_user.clone(),
                         _ => {
                             let user = User {
                                 id,
-                                username: row.try_get(Columns::Username as usize)?,
-                                discriminator: row.try_get(Columns::Discriminator as usize)?,
-                                flags: UserFlags::from_bits_truncate(
-                                    row.try_get(Columns::UserFlags as usize)?,
-                                )
-                                .publicize(),
-                                status: None,
-                                bio: None,
+                                username: row.try_get(Columns::username())?,
+                                discriminator: row.try_get(Columns::discriminator())?,
+                                flags: UserFlags::from_bits_truncate(row.try_get(Columns::user_flags())?)
+                                    .publicize(),
                                 email: None,
                                 preferences: None,
-                                avatar: crate::backend::util::encrypted_asset::encrypt_snowflake_opt(
-                                    &state,
-                                    row.try_get(Columns::AvatarId as usize)?,
-                                ),
+                                profile: Some(UserProfile {
+                                    avatar: encrypt_snowflake_opt(&state, row.try_get(Columns::avatar_id())?),
+                                    bits: row.try_get(Columns::profile_bits())?,
+                                    banner: None,
+                                    status: None,
+                                    bio: None,
+                                }),
                             };
 
                             last_user = Some(user.clone());
@@ -237,6 +235,7 @@ mod q {
             AggMessages::EditedAt,
             AggMessages::MessageFlags,
             AggMessages::AvatarId,
+            AggMessages::ProfileBits,
             AggMessages::ThreadId,
             AggMessages::Content,
             AggMessages::RoleIds,
@@ -246,8 +245,8 @@ mod q {
             AggMessages::AttachmentPreview,
         }
 
-        pub enum ReactionColumns {
-            TempReactions::Reactions = Columns::offset(),
+        pub enum ReactionColumns continue Columns {
+            TempReactions::Reactions,
         }
     }
 }

@@ -29,65 +29,37 @@ pub async fn ready(
         super::refresh::refresh_room_perms(&state, &db, auth.user_id).await
     };
 
-    let user_future = async {
-        let row = db
-            .query_one_cached_typed(
-                || {
-                    use schema::*;
-                    use thorn::*;
-
-                    Query::select()
-                        .and_where(AggUsers::Id.equals(Var::of(Users::Id)))
-                        .cols(&[
-                            /* 0*/ AggUsers::Username,
-                            /* 1*/ AggUsers::Discriminator,
-                            /* 2*/ AggUsers::Flags,
-                            /* 3*/ AggUsers::Email,
-                            /* 4*/ AggUsers::CustomStatus,
-                            /* 5*/ AggUsers::Biography,
-                            /* 6*/ AggUsers::Preferences,
-                            /* 7*/ AggUsers::AvatarId,
-                        ])
-                        .from_table::<AggUsers>()
-                        .limit_n(1)
-                },
-                &[&auth.user_id],
-            )
-            .await?;
-
-        Ok::<_, Error>(User {
-            id: auth.user_id,
-            username: row.try_get(0)?,
-            discriminator: row.try_get(1)?,
-            flags: UserFlags::from_bits_truncate(row.try_get(2)?),
-            email: Some(row.try_get(3)?),
-            avatar: encrypt_snowflake_opt(&state, row.try_get(7)?),
-            status: row.try_get(4)?,
-            bio: row.try_get(5)?,
-            preferences: {
-                let value: Option<Json<_>> = row.try_get(6)?;
-                value.map(|v| v.0)
-            },
-        })
-    };
+    let user_future = crate::backend::api::user::me::get::get_full(&state, auth.user_id);
 
     let parties_future = async {
+        mod party_query {
+            pub use schema::*;
+            pub use thorn::*;
+
+            indexed_columns! {
+                pub enum PartyColumns {
+                    Party::Id,
+                    Party::OwnerId,
+                    Party::Name,
+                    Party::AvatarId,
+                    Party::Description,
+                    Party::DefaultRoom,
+                }
+
+                pub enum MemberColumns continue PartyColumns {
+                    PartyMember::Position
+                }
+            }
+        }
+
         let rows = db
             .query_cached_typed(
                 || {
-                    use schema::*;
-                    use thorn::*;
+                    use party_query::*;
 
                     Query::select()
-                        .cols(&[
-                            /* 0*/ Party::Id,
-                            /* 1*/ Party::OwnerId,
-                            /* 2*/ Party::Name,
-                            /* 3*/ Party::AvatarId,
-                            /* 4*/ Party::Description,
-                            /* 5*/ Party::DefaultRoom,
-                        ])
-                        .col(/*6*/ PartyMember::Position)
+                        .cols(PartyColumns::default())
+                        .cols(MemberColumns::default())
                         .from(
                             Party::left_join_table::<PartyMember>()
                                 .on(PartyMember::PartyId.equals(Party::Id)),
@@ -99,11 +71,13 @@ pub async fn ready(
             )
             .await?;
 
+        use party_query::{MemberColumns, PartyColumns};
+
         let mut parties = HashMap::with_capacity(rows.len());
         let mut ids = Vec::with_capacity(rows.len());
 
         for row in rows {
-            let id = row.try_get(0)?;
+            let id = row.try_get(PartyColumns::id())?;
 
             ids.push(id);
             parties.insert(
@@ -111,21 +85,21 @@ pub async fn ready(
                 Party {
                     partial: PartialParty {
                         id,
-                        name: row.try_get(2)?,
-                        description: row.try_get(4)?,
+                        name: row.try_get(PartyColumns::name())?,
+                        description: row.try_get(PartyColumns::description())?,
                     },
-                    owner: row.try_get(1)?,
+                    owner: row.try_get(PartyColumns::owner_id())?,
                     security: SecurityFlags::empty(),
                     roles: Vec::new(),
                     emotes: Vec::new(),
-                    avatar: encrypt_snowflake_opt(&state, row.try_get(3)?),
-                    position: row.try_get(6)?,
-                    default_room: row.try_get(5)?,
+                    avatar: encrypt_snowflake_opt(&state, row.try_get(PartyColumns::avatar_id())?),
+                    position: row.try_get(MemberColumns::position())?,
+                    default_room: row.try_get(PartyColumns::default_room())?,
                 },
             );
         }
 
-        let (roles, emotes) = futures::future::join(
+        let (roles, emotes) = tokio::try_join!(
             async {
                 crate::backend::api::party::roles::get_roles_raw(&db, &state, SearchMode::Many(&ids))
                     .await?
@@ -133,15 +107,13 @@ pub async fn ready(
                     .await
             },
             async {
+                // TODO: Remove this in Ready event?
                 crate::backend::api::party::emotes::get_custom_emotes_raw(&db, SearchMode::Many(&ids))
                     .await?
                     .try_collect::<Vec<_>>()
                     .await
             },
-        )
-        .await;
-
-        let (roles, emotes) = (roles?, emotes?);
+        )?;
 
         for role in roles {
             if let Some(party) = parties.get_mut(&role.party_id) {
@@ -180,54 +152,3 @@ pub async fn ready(
         session: conn_id,
     })
 }
-
-/*
-fn select_members() -> impl AnyQuery {
-    use schema::*;
-
-    Query::select()
-        .and_where(PartyMember::PartyId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))
-        .cols(&[PartyMember::PartyId, PartyMember::Nickname])
-        .cols(&[
-            Users::Id,
-            Users::Username,
-            Users::Discriminator,
-            Users::Flags,
-        ])
-        .col(RoleMembers::RoleId)
-        .from(
-            RoleMembers::right_join(
-                Users::left_join_table::<PartyMember>().on(Users::Id.equals(PartyMember::UserId)),
-            )
-            .on(RoleMembers::UserId.equals(Users::Id)),
-        )
-}
-
-fn select_members_old() -> impl AnyQuery {
-    use schema::*;
-
-    Query::select()
-        .and_where(PartyMember::PartyId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))
-        .cols(&[PartyMember::PartyId, PartyMember::Nickname])
-        .cols(&[
-            Users::Id,
-            Users::Username,
-            Users::Discriminator,
-            Users::Flags,
-        ])
-        .expr(
-            Query::select()
-                .from_table::<RoleMembers>()
-                .expr(Builtin::array_agg(RoleMembers::RoleId))
-                .and_where(RoleMembers::UserId.equals(Users::Id))
-                .as_value(),
-        )
-        .from(Users::left_join_table::<PartyMember>().on(Users::Id.equals(PartyMember::UserId)))
-}
-
-fn select_emotes() -> impl AnyQuery {
-    use schema::*;
-
-    Query::select()
-}
-*/

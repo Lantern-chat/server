@@ -19,10 +19,7 @@ CREATE OR REPLACE VIEW lantern.agg_users(
     email,
     flags,
     username,
-    biography,
-    custom_status,
     preferences,
-    avatar_id,
     presence_flags,
     presence_updated_at,
     presence_activity
@@ -34,17 +31,13 @@ SELECT
     users.email,
     users.flags,
     users.username,
-    users.biography,
-    users.custom_status,
     users.preferences,
-    user_avatars.file_id,
-    agg_presence.flags, agg_presence.updated_at, agg_presence.activity
+    agg_presence.flags,
+    agg_presence.updated_at,
+    agg_presence.activity
 
 FROM
-    lantern.users
-
-LEFT JOIN lantern.agg_presence ON agg_presence.user_id = users.id
-LEFT JOIN lantern.user_avatars ON (user_avatars.user_id = users.id AND user_avatars.party_id IS NULL)
+    lantern.users LEFT JOIN lantern.agg_presence ON agg_presence.user_id = users.id
 ;
 
 CREATE OR REPLACE VIEW lantern.agg_members(
@@ -52,7 +45,6 @@ CREATE OR REPLACE VIEW lantern.agg_members(
     party_id,
     nickname,
     flags,
-    avatar_id,
     joined_at,
     role_ids
 ) AS
@@ -61,11 +53,10 @@ SELECT
     party_member.party_id,
     party_member.nickname,
     party_member.flags,
-    user_avatars.file_id,
     party_member.joined_at,
     agg_roles.roles
 FROM
-    lantern.party_member LEFT JOIN lantern.user_avatars ON (user_avatars.user_id = party_member.user_id AND user_avatars.party_id = party_member.party_id)
+    lantern.party_member
     LEFT JOIN LATERAL (
         SELECT
             ARRAY_AGG(role_id) as roles

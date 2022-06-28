@@ -10,10 +10,6 @@ CREATE TABLE lantern.users (
     username        text                NOT NULL,
     email           text                NOT NULL,
     passhash        text                NOT NULL,
-    -- custom_status tracks the little blurb that appears on users
-    custom_status   text,
-    -- biography is an extended user description on their profile
-    biography       text,
 
     -- 2FA Secret key
     mfa_secret      bytea,

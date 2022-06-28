@@ -21,6 +21,7 @@ pub mod user {
         pub mod account;
         pub mod avatar;
         pub mod friends;
+        pub mod get;
         pub mod login;
         pub mod logout;
         pub mod prefs;

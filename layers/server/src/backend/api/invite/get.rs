@@ -70,9 +70,9 @@ mod q {
             Invite::Vanity,
         }
 
-        pub enum PartyColumns {
-            Party::Name = InviteColumns::offset(),
-            Party::Description
+        pub enum PartyColumns continue InviteColumns {
+            Party::Name,
+            Party::Description,
         }
     }
 }

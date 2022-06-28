@@ -40,21 +40,30 @@ pub async fn role_event(
         return Ok(());
     }
 
+    mod role_query {
+        pub use schema::*;
+        pub use thorn::*;
+
+        indexed_columns! {
+            pub enum RoleColumns {
+                Roles::PartyId,
+                Roles::AvatarId,
+                Roles::Name,
+                Roles::Permissions,
+                Roles::Color,
+                Roles::Position,
+                Roles::Flags,
+            }
+        }
+    }
+
     let row = db
         .query_one_cached_typed(
             || {
-                use schema::*;
+                use role_query::*;
 
                 Query::select()
-                    .cols(&[
-                        /*0*/ Roles::PartyId,
-                        /*1*/ Roles::AvatarId,
-                        /*2*/ Roles::Name,
-                        /*3*/ Roles::Permissions,
-                        /*4*/ Roles::Color,
-                        /*5*/ Roles::Position,
-                        /*6*/ Roles::Flags,
-                    ])
+                    .cols(RoleColumns::default())
                     .from_table::<Roles>()
                     .and_where(Roles::Id.equals(Var::of(Roles::Id)))
             },
@@ -62,17 +71,22 @@ pub async fn role_event(
         )
         .await?;
 
-    let party_id = row.try_get(0)?;
+    use role_query::RoleColumns;
+
+    let party_id = row.try_get(RoleColumns::party_id())?;
 
     let role = Role {
         id: role_id,
         party_id,
-        avatar: encrypt_snowflake_opt(state, row.try_get(1)?),
-        name: row.try_get(2)?,
-        permissions: Permission::unpack(row.try_get::<_, i64>(3)? as u64),
-        color: row.try_get::<_, Option<i32>>(4)?.map(|c| c as u32),
+        avatar: encrypt_snowflake_opt(state, row.try_get(RoleColumns::avatar_id())?),
+        name: row.try_get(RoleColumns::name())?,
+        permissions: Permission::unpack_i64(row.try_get(RoleColumns::permissions())?),
+        color: {
+            row.try_get::<_, Option<i32>>(RoleColumns::color())?
+                .map(|c| c as u32)
+        },
         position: row.try_get(5)?,
-        flags: RoleFlags::from_bits_truncate(row.try_get(6)?),
+        flags: RoleFlags::from_bits_truncate(row.try_get(RoleColumns::flags())?),
     };
 
     let event = match event {

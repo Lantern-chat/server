@@ -10,20 +10,28 @@ use crate::{
 
 use sdk::models::*;
 
-fn base_query() -> thorn::query::SelectQuery {
-    use schema::*;
-    use thorn::*;
+mod role_query {
+    pub use schema::*;
+    pub use thorn::*;
 
-    Query::select().from_table::<Roles>().cols(&[
-        /*0*/ Roles::Id,
-        /*1*/ Roles::PartyId,
-        /*2*/ Roles::Name,
-        /*3*/ Roles::Permissions,
-        /*4*/ Roles::Color,
-        /*5*/ Roles::Position,
-        /*6*/ Roles::Flags,
-        /*7*/ Roles::AvatarId,
-    ])
+    indexed_columns! {
+        pub enum RoleColumns {
+            Roles::Id,
+            Roles::PartyId,
+            Roles::Name,
+            Roles::Permissions,
+            Roles::Color,
+            Roles::Position,
+            Roles::Flags,
+            Roles::AvatarId,
+        }
+    }
+}
+
+fn base_query() -> thorn::query::SelectQuery {
+    use role_query::*;
+
+    Query::select().from_table::<Roles>().cols(RoleColumns::default())
 }
 
 pub async fn get_roles_raw<'a, 'b>(
@@ -35,9 +43,7 @@ pub async fn get_roles_raw<'a, 'b>(
         SearchMode::Single(id) => db
             .query_stream_cached_typed(
                 || {
-                    use schema::*;
-                    use thorn::*;
-
+                    use role_query::*;
                     base_query().and_where(Roles::PartyId.equals(Var::of(Party::Id)))
                 },
                 &[&id],
@@ -47,9 +53,7 @@ pub async fn get_roles_raw<'a, 'b>(
         SearchMode::Many(ids) => db
             .query_stream_cached_typed(
                 || {
-                    use schema::*;
-                    use thorn::*;
-
+                    use role_query::*;
                     base_query().and_where(Roles::PartyId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))
                 },
                 &[&ids],
@@ -58,17 +62,21 @@ pub async fn get_roles_raw<'a, 'b>(
             .boxed(),
     };
 
+    use role_query::RoleColumns;
+
     Ok(stream.map(move |row| match row {
         Err(e) => Err(Error::from(e)),
         Ok(row) => Ok(Role {
-            id: row.try_get(0)?,
-            party_id: row.try_get(1)?,
-            name: row.try_get(2)?,
-            permissions: Permission::unpack(row.try_get::<_, i64>(3)? as u64),
-            color: row.try_get::<_, Option<i32>>(4)?.map(|c| c as u32),
-            position: row.try_get(5)?,
-            flags: RoleFlags::from_bits_truncate(row.try_get(6)?),
-            avatar: encrypt_snowflake_opt(&state, row.try_get(7)?),
+            id: row.try_get(RoleColumns::id())?,
+            party_id: row.try_get(RoleColumns::party_id())?,
+            name: row.try_get(RoleColumns::name())?,
+            permissions: Permission::unpack_i64(row.try_get(RoleColumns::permissions())?),
+            color: row
+                .try_get::<_, Option<i32>>(RoleColumns::color())?
+                .map(|c| c as u32),
+            position: row.try_get(RoleColumns::position())?,
+            flags: RoleFlags::from_bits_truncate(row.try_get(RoleColumns::flags())?),
+            avatar: encrypt_snowflake_opt(&state, row.try_get(RoleColumns::avatar_id())?),
         }),
     }))
 }

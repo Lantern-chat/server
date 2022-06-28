@@ -61,8 +61,6 @@ thorn::tables! {
         Username: Type::TEXT,
         Email: Type::TEXT,
         Passhash: Type::TEXT,
-        CustomStatus: Type::TEXT,
-        Biography: Type::TEXT,
         Preferences: Type::JSONB,
         MfaSecret: Type::BYTEA,
         MfaBackup: Type::BYTEA,
@@ -89,10 +87,14 @@ thorn::tables! {
         Activity: Type::JSONB,
     }
 
-    pub struct UserAvatars in Lantern {
+    pub struct Profiles in Lantern {
         UserId: Users::Id,
-        FileId: Files::Id,
-        PartyId: Party::Id,
+        PartyId: Party::Id, // NULLable
+        AvatarId: Files::Id,
+        BannerId: Files::Id,
+        Bits: Type::INT4,
+        CustomStatus: Type::TEXT,
+        Biography: Type::TEXT,
     }
 
     pub struct Sessions in Lantern {

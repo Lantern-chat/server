@@ -25,26 +25,40 @@ pub async fn member_event(
         }
     };
 
-    // Actual PartyMember row is deleted on member_left, so fetch user directly.
-    let member_future = if event == EventCode::MemberLeft {
-        Either::Left(async {
+    let member_future = match event {
+        EventCode::MemberLeft | EventCode::MemberBan | EventCode::MemberUnban => Either::Left(async {
+            mod user_query {
+                pub use schema::*;
+                pub use thorn::*;
+
+                indexed_columns! {
+                    pub enum UserColumns {
+                        Users::Username,
+                        Users::Discriminator,
+                        Users::Flags,
+                    }
+
+                    pub enum ProfileColumns continue UserColumns {
+                        Profiles::AvatarId,
+                        Profiles::Bits,
+                    }
+                }
+            }
+
             let row = db
                 .query_one_cached_typed(
                     || {
-                        use schema::*;
-                        use thorn::*;
+                        use user_query::*;
 
                         Query::select()
-                            .from_table::<AggUsers>()
-                            .cols(&[
-                                /* 0 */ AggUsers::Username,
-                                /* 1 */ AggUsers::Discriminator,
-                                /* 2 */ AggUsers::Flags,
-                                /* 3 */ AggUsers::AvatarId,
-                                /* 4 */ AggUsers::CustomStatus,
-                                /* 5 */ AggUsers::Biography,
-                            ])
-                            .and_where(AggUsers::Id.equals(Var::of(AggUsers::Id)))
+                            .cols(UserColumns::default())
+                            .cols(ProfileColumns::default())
+                            .from(
+                                Users::left_join_table::<Profiles>().on(Profiles::UserId
+                                    .equals(Users::Id)
+                                    .and(Profiles::PartyId.is_null())),
+                            )
+                            .and_where(Users::Id.equals(Var::of(Users::Id)))
                     },
                     &[&user_id],
                 )
@@ -56,9 +70,16 @@ pub async fn member_event(
                     username: row.try_get(0)?,
                     discriminator: row.try_get(1)?,
                     flags: UserFlags::from_bits_truncate(row.try_get(2)?).publicize(),
-                    avatar: encrypt_snowflake_opt(state, row.try_get(3)?),
-                    status: row.try_get(4)?,
-                    bio: row.try_get(5)?,
+                    profile: match row.try_get(4)? {
+                        None => None,
+                        Some(bits) => Some(UserProfile {
+                            avatar: encrypt_snowflake_opt(state, row.try_get(3)?),
+                            bits,
+                            banner: None,
+                            bio: None,
+                            status: None,
+                        }),
+                    },
                     email: None,
                     preferences: None,
                 }),
@@ -67,77 +88,48 @@ pub async fn member_event(
                 presence: None,
                 flags: None,
             }))
-        })
-    } else {
-        Either::Right(async {
+        }),
+        EventCode::MemberJoined | EventCode::MemberUpdated => Either::Right(async {
+            use crate::backend::api::party::members::query::{parse_member, select_members};
+
             let row = db
                 .query_opt_cached_typed(
                     || {
                         use schema::*;
                         use thorn::*;
 
-                        crate::backend::api::party::members::select_members2()
-                            .and_where(AggMembers::UserId.equals(Var::of(Users::Id)))
+                        select_members().and_where(AggMembers::UserId.equals(Var::of(Users::Id)))
                     },
                     &[&party_id, &user_id],
                 )
                 .await?;
 
-            let row = match row {
-                Some(row) => row,
-                None => return Ok(None),
-            };
-
-            Ok::<Option<_>, Error>(Some(PartyMember {
-                user: Some(User {
-                    id: row.try_get(0)?,
-                    username: row.try_get(2)?,
-                    discriminator: row.try_get(1)?,
-                    flags: UserFlags::from_bits_truncate(row.try_get(3)?).publicize(),
-                    status: row.try_get(5)?,
-                    bio: row.try_get(4)?,
-                    email: None,
-                    preferences: None,
-                    avatar: encrypt_snowflake_opt(state, row.try_get(9)?),
-                }),
-                nick: row.try_get(10)?,
-                presence: match row.try_get::<_, Option<_>>(7)? {
-                    None => None,
-                    Some(updated_at) => Some(UserPresence {
-                        updated_at: Some(updated_at),
-                        flags: UserPresenceFlags::from_bits_truncate(row.try_get(6)?),
-                        activity: match row.try_get::<_, Option<serde_json::Value>>(8)? {
-                            None => None,
-                            Some(value) => Some(AnyActivity::Any(value)),
-                        },
-                    }),
-                },
-                roles: row.try_get(12)?,
-                flags: None,
-            }))
-        })
+            match row {
+                Some(row) => parse_member(row, &state).map(Some),
+                None => Ok(None),
+            }
+        }),
+        _ => unreachable!(),
     };
 
-    let mut party_future = Either::Left(futures::future::ok::<Option<Party>, Error>(None));
-
-    if event == EventCode::MemberJoined {
-        party_future = Either::Right(async {
+    // If a user just joined a party, they need to be given information on it
+    let party_future = match event {
+        EventCode::MemberJoined => Either::Left(async {
             crate::backend::api::party::get::get_party_inner(state.clone(), db, user_id, party_id)
                 .await
                 .map(|party| Some(party))
-        });
-    }
+        }),
+        _ => Either::Right(futures::future::ok::<Option<Party>, Error>(None)),
+    };
 
     let (member, party): (Option<PartyMember>, _) = tokio::try_join!(member_future, party_future)?;
 
     // If no member was found, odds are it was just a side-effect
     // event from triggers after the member left
-    let member = match member {
-        Some(member) => member,
+    let inner = match member {
+        Some(member) => PartyMemberEvent { party_id, member },
         None => return Ok(()),
     };
-
-    let inner = PartyMemberEvent { party_id, member };
 
     let msg = match event {
         EventCode::MemberUpdated => ServerMsg::new_member_update(inner),
@@ -147,6 +139,7 @@ pub async fn member_event(
                 None => return Err(Error::InternalErrorStatic("Member Joined to non-existent party")),
             };
 
+            // Send user the party information
             state
                 .gateway
                 .broadcast_user_event(Event::new(ServerMsg::new_party_create(party), None)?, user_id)

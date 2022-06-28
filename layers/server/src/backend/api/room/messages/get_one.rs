@@ -3,7 +3,7 @@ use schema::Snowflake;
 use sdk::models::*;
 use thorn::pg::Json;
 
-use crate::{Authorization, Error, ServerState};
+use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Authorization, Error, ServerState};
 
 pub async fn get_one(
     state: ServerState,
@@ -38,16 +38,16 @@ pub async fn get_one(
 }
 
 pub(crate) fn parse_msg(state: &ServerState, row: &db::Row) -> Result<Message, Error> {
-    let flags = MessageFlags::from_bits_truncate(row.try_get(Columns::MessageFlags as usize)?);
+    let flags = MessageFlags::from_bits_truncate(row.try_get(Columns::message_flags())?);
 
     // doing this in the application layer results in simpler queries
     if flags.contains(MessageFlags::DELETED) {
         return Err(Error::NotFound);
     }
 
-    let msg_id = row.try_get(Columns::MsgId as usize)?;
-    let room_id = row.try_get(Columns::RoomId as usize)?;
-    let party_id = row.try_get(Columns::PartyId as usize)?;
+    let msg_id = row.try_get(Columns::msg_id())?;
+    let room_id = row.try_get(Columns::room_id())?;
+    let party_id = row.try_get(Columns::party_id())?;
 
     let mut msg = Message {
         id: msg_id,
@@ -55,34 +55,35 @@ pub(crate) fn parse_msg(state: &ServerState, row: &db::Row) -> Result<Message, E
         created_at: msg_id.timestamp(),
         room_id,
         flags,
-        kind: MessageKind::try_from(row.try_get::<_, i16>(Columns::Kind as usize)?).unwrap_or_default(),
-        edited_at: row.try_get::<_, Option<_>>(Columns::EditedAt as usize)?,
-        content: row.try_get(Columns::Content as usize)?,
+        kind: MessageKind::try_from(row.try_get::<_, i16>(Columns::kind())?).unwrap_or_default(),
+        edited_at: row.try_get::<_, Option<_>>(Columns::edited_at())?,
+        content: row.try_get(Columns::content())?,
         author: User {
-            id: row.try_get(Columns::UserId as usize)?,
-            username: row.try_get(Columns::Username as usize)?,
-            discriminator: row.try_get(Columns::Discriminator as usize)?,
-            flags: UserFlags::from_bits_truncate(row.try_get(Columns::UserFlags as usize)?).publicize(),
-            status: None,
-            bio: None,
+            id: row.try_get(Columns::user_id())?,
+            username: row.try_get(Columns::username())?,
+            discriminator: row.try_get(Columns::discriminator())?,
+            flags: UserFlags::from_bits_truncate(row.try_get(Columns::user_flags())?).publicize(),
             email: None,
             preferences: None,
-            avatar: crate::backend::util::encrypted_asset::encrypt_snowflake_opt(
-                &state,
-                row.try_get(Columns::AvatarId as usize)?,
-            ),
+            profile: Some(UserProfile {
+                avatar: encrypt_snowflake_opt(&state, row.try_get(Columns::avatar_id())?),
+                bits: row.try_get(Columns::profile_bits())?,
+                banner: None,
+                status: None,
+                bio: None,
+            }),
         },
         member: match party_id {
             None => None,
             Some(_) => Some(PartyMember {
                 user: None,
-                nick: row.try_get(Columns::Nickname as usize)?,
-                roles: row.try_get(Columns::RoleIds as usize)?,
+                nick: row.try_get(Columns::nickname())?,
+                roles: row.try_get(Columns::role_ids())?,
                 presence: None,
                 flags: None,
             }),
         },
-        thread_id: row.try_get(Columns::ThreadId as usize)?,
+        thread_id: row.try_get(Columns::thread_id())?,
         user_mentions: Vec::new(), // TODO
         role_mentions: Vec::new(), // TODO
         room_mentions: Vec::new(), // TODO
@@ -90,10 +91,10 @@ pub(crate) fn parse_msg(state: &ServerState, row: &db::Row) -> Result<Message, E
             let mut attachments = Vec::new();
 
             let meta: Option<Json<Vec<schema::AggAttachmentsMeta>>> =
-                row.try_get(Columns::AttachmentMeta as usize)?;
+                row.try_get(Columns::attachment_meta())?;
 
             if let Some(Json(meta)) = meta {
-                let previews: Vec<Option<&[u8]>> = row.try_get(Columns::AttachmentPreview as usize)?;
+                let previews: Vec<Option<&[u8]>> = row.try_get(Columns::attachment_preview())?;
 
                 if meta.len() != previews.len() {
                     return Err(Error::InternalErrorStatic("Meta != Previews length"));
@@ -124,10 +125,10 @@ pub(crate) fn parse_msg(state: &ServerState, row: &db::Row) -> Result<Message, E
         reactions: Vec::new(),
     };
 
-    let mention_kinds: Option<Vec<i32>> = row.try_get(Columns::MentionKinds as usize)?;
+    let mention_kinds: Option<Vec<i32>> = row.try_get(Columns::mention_kinds())?;
     if let Some(mention_kinds) = mention_kinds {
         // lazily parse ids
-        let mention_ids: Vec<Snowflake> = row.try_get(Columns::MentionIds as usize)?;
+        let mention_ids: Vec<Snowflake> = row.try_get(Columns::mention_ids())?;
 
         if mention_ids.len() != mention_kinds.len() {
             return Err(Error::InternalErrorStatic("Mismatched Mention aggregates!"));
@@ -160,6 +161,7 @@ thorn::indexed_columns! {
         AggMessages::UserFlags,
         AggMessages::EditedAt,
         AggMessages::AvatarId,
+        AggMessages::ProfileBits,
         AggMessages::ThreadId,
         AggMessages::MessageFlags,
         AggMessages::Username,

@@ -269,9 +269,9 @@ mod queries {
     pub fn select_user_avatar() -> impl AnyQuery {
         Query::select()
             .cols(Columns::default())
-            .from(Files::inner_join_table::<UserAvatars>().on(Files::Id.equals(UserAvatars::FileId)))
+            .from(Files::inner_join_table::<Profiles>().on(Files::Id.equals(Profiles::AvatarId)))
             .and_where(Files::Id.equals(Var::of(Files::Id)))
-            .and_where(UserAvatars::UserId.equals(Var::of(Users::Id)))
+            .and_where(Profiles::UserId.equals(Var::of(Users::Id)))
             .limit_n(1)
     }
 

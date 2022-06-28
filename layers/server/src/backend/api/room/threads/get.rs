@@ -52,8 +52,8 @@ pub async fn get_thread(
 use schema::Threads;
 
 thorn::indexed_columns! {
-    pub enum ThreadColumns {
-        Threads::Flags = get_one::Columns::offset(),
+    pub enum ThreadColumns continue get_one::Columns {
+        Threads::Flags,
     }
 }
 

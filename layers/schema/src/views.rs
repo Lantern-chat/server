@@ -16,7 +16,8 @@ thorn::tables! {
         Username: Users::Username,
         Discriminator: Users::Discriminator,
         UserFlags: Users::Flags,
-        AvatarId: UserAvatars::FileId,
+        AvatarId: AggProfiles::AvatarId,
+        ProfileBits: AggProfiles::Bits,
         ThreadId: Threads::Id,
         MentionKinds: AggMentions::Kinds,
         MentionIds: AggMentions::Ids,
@@ -34,13 +35,20 @@ thorn::tables! {
         Email: Users::Email,
         Flags: Users::Flags,
         Username: Users::Username,
-        Biography: Users::Biography,
-        CustomStatus: Users::CustomStatus,
         Preferences: Users::Preferences,
-        AvatarId: UserAvatars::FileId,
         PresenceFlags: UserPresence::Flags,
         PresenceUpdatedAt: UserPresence::UpdatedAt,
         PresenceActivity: UserPresence::Activity,
+    }
+
+    pub struct AggProfiles in Lantern {
+        UserId: Profiles::UserId,
+        PartyId: Profiles::PartyId,
+        AvatarId: Profiles::AvatarId,
+        BannerId: Profiles::BannerId,
+        Bits: Profiles::Bits,
+        CustomStatus: Profiles::CustomStatus,
+        Biography: Profiles::Biography,
     }
 
     pub struct AggMembers in Lantern {
@@ -48,7 +56,6 @@ thorn::tables! {
         PartyId: Party::Id,
         Nickname: PartyMember::Nickname,
         Flags: PartyMember::Flags,
-        AvatarId: UserAvatars::FileId,
         JoinedAt: PartyMember::JoinedAt,
         RoleIds: SNOWFLAKE_ARRAY,
     }
@@ -56,7 +63,7 @@ thorn::tables! {
     pub struct AggAttachments in Lantern {
         MsgId: Messages::Id,
 
-        /// Vec<{id: Snowflake, size: i32, name: String, mime: Option<String>, width: Option<i32>, height: Option<i32>, flags: Option<i16>}>
+        /// `Vec<`[`AggAttachmentsMeta`]`>`
         Meta: Type::JSONB_ARRAY,
 
         /// Vec<Option<Vec<u8>>>
