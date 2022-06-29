@@ -28,13 +28,16 @@ fn gen_blurhash(image: DynamicImage) -> Option<Vec<u8>> {
 
     let (xc, yc) = blurhash::encode::num_components(width, height);
 
-    // encode routine automatically premultiplies alpha
+    if has_alpha {
+        blurhash::encode::premultiply_alpha(width as usize, height as usize, &mut bytes);
+    }
+
     let hash = blurhash::encode::encode(
         xc,
         yc,
         width as usize,
         height as usize,
-        &mut bytes,
+        &bytes,
         if has_alpha { 4 } else { 3 },
     );
 
@@ -99,6 +102,7 @@ pub fn compute_edge_info(image: &RgbImage) -> EdgeInfo {
     }
 }
 
+// TODO: Work on color space parts
 #[allow(unused_imports, unused_variables)]
 pub fn encode_png_best(
     mut image: DynamicImage,
@@ -196,6 +200,7 @@ pub fn encode_png_best(
     })
 }
 
+#[allow(unused)]
 pub fn encode_jpeg_best(
     mut image: DynamicImage,
     mut preview: Option<Vec<u8>>,

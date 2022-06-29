@@ -64,38 +64,31 @@ fn encode_ac([r, g, b]: [f32; 3], m: f32) -> u16 {
     r * 19 * 19 + g * 19 + b
 }
 
-pub fn encode(
-    xc: usize,
-    yc: usize,
-    w: usize,
-    h: usize,
-    rgb: &mut [u8],
-    channels: usize,
-) -> io::Result<Vec<u8>> {
-    if channels == 4 {
-        // premultiply alpha
-        for y in 0..h {
-            for x in 0..w {
-                let i = 4 * (x + y * w);
+pub fn premultiply_alpha(w: usize, h: usize, rgba: &mut [u8]) {
+    // premultiply alpha
+    for y in 0..h {
+        for x in 0..w {
+            let i = 4 * (x + y * w);
 
-                match rgb[i + 3] {
-                    255 => continue,
-                    0 => rgb[i..(i + 3)].fill(0),
-                    alpha => {
-                        let a = alpha as f32 / 255.0;
+            match rgba[i + 3] {
+                255 => continue,
+                0 => rgba[i..(i + 3)].fill(0),
+                alpha => {
+                    let a = alpha as f32 / 255.0;
 
-                        rgb[i..(i + 3)].iter_mut().for_each(|c| {
-                            //*c = (*c as f32 * a) as u8;
+                    rgba[i..(i + 3)].iter_mut().for_each(|c| {
+                        //*c = (*c as f32 * a) as u8;
 
-                            *c = linear_to_srgb(srgb_to_linear(*c) * a);
-                        });
-                    }
+                        *c = linear_to_srgb(srgb_to_linear(*c) * a);
+                    });
                 }
             }
         }
-    } else {
-        assert_eq!(channels, 3);
     }
+}
+
+pub fn encode(xc: usize, yc: usize, w: usize, h: usize, rgb: &[u8], channels: usize) -> io::Result<Vec<u8>> {
+    assert!(channels == 3 || channels == 4);
 
     let buf_size = roundup4(4 + xc * yc * 2);
     let mut buf = Vec::with_capacity(buf_size);
