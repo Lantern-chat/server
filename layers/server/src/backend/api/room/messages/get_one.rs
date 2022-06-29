@@ -65,13 +65,16 @@ pub(crate) fn parse_msg(state: &ServerState, row: &db::Row) -> Result<Message, E
             flags: UserFlags::from_bits_truncate(row.try_get(Columns::user_flags())?).publicize(),
             email: None,
             preferences: None,
-            profile: Some(UserProfile {
-                avatar: encrypt_snowflake_opt(&state, row.try_get(Columns::avatar_id())?),
-                bits: row.try_get(Columns::profile_bits())?,
-                banner: None,
-                status: None,
-                bio: None,
-            }),
+            profile: match row.try_get(Columns::profile_bits())? {
+                None => Nullable::Null,
+                Some(bits) => Nullable::Some(UserProfile {
+                    bits,
+                    avatar: encrypt_snowflake_opt(&state, row.try_get(Columns::avatar_id())?).into(),
+                    banner: Nullable::Undefined,
+                    status: Nullable::Undefined,
+                    bio: Nullable::Undefined,
+                }),
+            },
         },
         member: match party_id {
             None => None,

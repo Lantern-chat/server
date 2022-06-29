@@ -57,11 +57,11 @@ pub async fn get_full(state: &ServerState, user_id: Snowflake) -> Result<User, E
                 .map(|v: Json<_>| v.0)
         },
         profile: match row.try_get(ProfileColumns::bits())? {
-            None => None,
-            Some(bits) => Some(UserProfile {
+            None => Nullable::Null,
+            Some(bits) => Nullable::Some(UserProfile {
                 bits,
-                avatar: encrypt_snowflake_opt(&state, row.try_get(ProfileColumns::avatar_id())?),
-                banner: encrypt_snowflake_opt(&state, row.try_get(ProfileColumns::banner_id())?),
+                avatar: encrypt_snowflake_opt(&state, row.try_get(ProfileColumns::avatar_id())?).into(),
+                banner: encrypt_snowflake_opt(&state, row.try_get(ProfileColumns::banner_id())?).into(),
                 status: row.try_get(ProfileColumns::custom_status())?,
                 bio: row.try_get(ProfileColumns::biography())?,
             }),

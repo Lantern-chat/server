@@ -95,7 +95,7 @@ pub async fn presence_updated(
         flags: UserFlags::from_bits_truncate(row.try_get(2)?).publicize(),
         email: None,
         preferences: None,
-        profile: None,
+        profile: Nullable::Undefined,
     };
 
     let inner = Arc::new(UserPresenceEvent { user, presence });

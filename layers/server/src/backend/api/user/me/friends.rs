@@ -73,13 +73,14 @@ pub async fn friends(
                 email: None,
                 preferences: None,
                 profile: match row.try_get(ProfileColumns::bits())? {
-                    None => None,
-                    Some(bits) => Some(UserProfile {
+                    None => Nullable::Null,
+                    Some(bits) => Nullable::Some(UserProfile {
                         bits,
-                        avatar: encrypt_snowflake_opt(&state, row.try_get(ProfileColumns::avatar_id())?),
+                        avatar: encrypt_snowflake_opt(&state, row.try_get(ProfileColumns::avatar_id())?)
+                            .into(),
                         status: row.try_get(ProfileColumns::custom_status())?,
-                        banner: None,
-                        bio: None,
+                        banner: Nullable::Undefined,
+                        bio: Nullable::Undefined,
                     }),
                 },
             },

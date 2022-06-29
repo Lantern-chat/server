@@ -33,7 +33,7 @@ SELECT
     users.discriminator,
     users.flags,
     profile.avatar_id,
-    COALESCE(profile.bits, 0), -- Might be NULL if the user has no profile at all
+    profile.bits, -- Might be NULL if the user has no profile at all
     messages.thread_id,
     messages.edited_at,
     messages.flags,

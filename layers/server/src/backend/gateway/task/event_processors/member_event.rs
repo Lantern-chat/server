@@ -71,13 +71,13 @@ pub async fn member_event(
                     discriminator: row.try_get(1)?,
                     flags: UserFlags::from_bits_truncate(row.try_get(2)?).publicize(),
                     profile: match row.try_get(4)? {
-                        None => None,
-                        Some(bits) => Some(UserProfile {
-                            avatar: encrypt_snowflake_opt(state, row.try_get(3)?),
+                        None => Nullable::Null,
+                        Some(bits) => Nullable::Some(UserProfile {
                             bits,
-                            banner: None,
-                            bio: None,
-                            status: None,
+                            avatar: encrypt_snowflake_opt(state, row.try_get(3)?).into(),
+                            banner: Nullable::Undefined,
+                            bio: Nullable::Undefined,
+                            status: Nullable::Undefined,
                         }),
                     },
                     email: None,

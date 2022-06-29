@@ -58,7 +58,7 @@ pub async fn user_update(
             flags: UserFlags::from_bits_truncate(row.try_get(UserColumns::flags())?).publicize(),
             email: None,
             preferences: None,
-            profile: None,
+            profile: Nullable::Undefined,
         })
     };
 
@@ -184,13 +184,13 @@ async fn user_per_party_update(
         email: None,
         preferences: None,
         profile: match row.try_get(ProfileColumns::bits())? {
-            None => None,
-            Some(bits) => Some(UserProfile {
+            None => Nullable::Null,
+            Some(bits) => Nullable::Some(UserProfile {
                 bits,
-                avatar: encrypt_snowflake_opt(&state, row.try_get(ProfileColumns::avatar_id())?),
-                banner: None,
+                avatar: encrypt_snowflake_opt(&state, row.try_get(ProfileColumns::avatar_id())?).into(),
+                banner: Nullable::Undefined,
                 status: row.try_get(ProfileColumns::custom_status())?,
-                bio: None,
+                bio: Nullable::Undefined,
             }),
         },
     };

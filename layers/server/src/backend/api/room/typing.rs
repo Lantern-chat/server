@@ -91,7 +91,7 @@ pub async fn trigger_typing(
         flags: UserFlags::from_bits_truncate(row.try_get(4)?).publicize(),
         email: None,
         preferences: None,
-        profile: None,
+        profile: Nullable::Undefined,
     };
 
     match party_id {

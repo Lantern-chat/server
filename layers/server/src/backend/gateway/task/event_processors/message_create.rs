@@ -101,13 +101,13 @@ pub async fn get_message(
             email: None,
             preferences: None,
             profile: match row.try_get(Columns::profile_bits())? {
-                None => None,
-                Some(bits) => Some(UserProfile {
+                None => Nullable::Null,
+                Some(bits) => Nullable::Some(UserProfile {
                     bits,
-                    avatar: encrypt_snowflake_opt(state, row.try_get(Columns::avatar_id())?),
-                    banner: None,
-                    status: None,
-                    bio: None,
+                    avatar: encrypt_snowflake_opt(state, row.try_get(Columns::avatar_id())?).into(),
+                    banner: Nullable::Undefined,
+                    status: Nullable::Undefined,
+                    bio: Nullable::Undefined,
                 }),
             },
         },

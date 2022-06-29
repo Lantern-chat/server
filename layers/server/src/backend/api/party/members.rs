@@ -7,7 +7,7 @@ use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Error, Server
 
 use futures::{Stream, StreamExt};
 
-use sdk::models::{AnyActivity, PartyMember, User, UserFlags, UserPresence, UserPresenceFlags, UserProfile};
+use sdk::models::*;
 
 // TODO: Add cursor-based pagination
 pub async fn get_members(
@@ -58,13 +58,13 @@ pub fn parse_member(row: db::Row, state: &ServerState) -> Result<PartyMember, Er
             email: None,
             preferences: None,
             profile: match row.try_get(ProfileColumns::bits())? {
-                None => None,
-                Some(bits) => Some(UserProfile {
+                None => Nullable::Null,
+                Some(bits) => Nullable::Some(UserProfile {
                     bits,
-                    avatar: encrypt_snowflake_opt(state, row.try_get(ProfileColumns::avatar_id())?),
-                    banner: None,
+                    avatar: encrypt_snowflake_opt(state, row.try_get(ProfileColumns::avatar_id())?).into(),
+                    banner: Nullable::Undefined,
                     status: row.try_get(ProfileColumns::custom_status())?,
-                    bio: None,
+                    bio: Nullable::Undefined,
                 }),
             },
         }),

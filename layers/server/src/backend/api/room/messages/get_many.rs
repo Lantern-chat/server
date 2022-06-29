@@ -103,13 +103,20 @@ pub async fn get_many(
                                     .publicize(),
                                 email: None,
                                 preferences: None,
-                                profile: Some(UserProfile {
-                                    avatar: encrypt_snowflake_opt(&state, row.try_get(Columns::avatar_id())?),
-                                    bits: row.try_get(Columns::profile_bits())?,
-                                    banner: None,
-                                    status: None,
-                                    bio: None,
-                                }),
+                                profile: match row.try_get(Columns::profile_bits())? {
+                                    None => Nullable::Null,
+                                    Some(bits) => Nullable::Some(UserProfile {
+                                        bits,
+                                        avatar: encrypt_snowflake_opt(
+                                            &state,
+                                            row.try_get(Columns::avatar_id())?,
+                                        )
+                                        .into(),
+                                        banner: Nullable::Undefined,
+                                        status: Nullable::Undefined,
+                                        bio: Nullable::Undefined,
+                                    }),
+                                },
                             };
 
                             last_user = Some(user.clone());
