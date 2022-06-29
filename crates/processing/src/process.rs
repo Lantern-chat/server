@@ -1,4 +1,7 @@
-use crate::read_image::{read_image, Image, ImageInfo, ImageReadError, Limits};
+use crate::{
+    encode::EncodedImage,
+    read_image::{read_image, Image, ImageReadError, Limits},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProcessConfig {
@@ -38,7 +41,7 @@ pub fn process_image(
     preview: Option<Vec<u8>>,
     config: ProcessConfig,
 ) -> Result<ProcessedImage, ProcessingError> {
-    use image::{imageops::FilterType, ImageFormat};
+    use image::{imageops::FilterType, math::Rect, ImageFormat};
 
     let format = match image::guess_format(&buffer) {
         Ok(format) => format,
@@ -62,7 +65,11 @@ pub fn process_image(
     let mut width = info.width;
     let mut height = info.height;
 
-    let mut try_use_existing = format == ImageFormat::Png && width <= max_width && height <= max_height;
+    let mut try_use_existing = matches!(format, ImageFormat::Png | ImageFormat::Jpeg | ImageFormat::Gif)
+        && width <= max_width
+        && height <= max_height;
+
+    let mut crop = None;
 
     match config {
         ProcessConfig::Avatar { .. } => {
@@ -83,12 +90,12 @@ pub fn process_image(
                     new_height = width;
                 }
 
-                log::trace!("Cropping avatar image from {width}x{height} to {new_width}x{new_height}");
-
-                image = image.crop_imm(x, y, new_width, new_height);
-
-                width = new_width;
-                height = new_height;
+                crop = Some(Rect {
+                    x,
+                    y,
+                    width: new_width,
+                    height: new_height,
+                });
             }
         }
         ProcessConfig::Banner { .. } => {
@@ -114,25 +121,40 @@ pub fn process_image(
                     x = (width - new_width) / 2; // center horizontally
                 }
 
-                log::trace!("Cropping banner image from {width}x{height} to {new_width}x{new_height}");
-
-                image = image.crop_imm(x, 0, new_width, new_height);
-
-                width = new_width;
-                height = new_height;
+                crop = Some(Rect {
+                    x,
+                    y: 0,
+                    width: new_width,
+                    height: new_height,
+                });
             }
         }
+    }
+
+    if let Some(rect) = crop {
+        let Rect {
+            x,
+            y,
+            width: new_width,
+            height: new_height,
+        } = rect;
+
+        log::trace!("Cropping image from {width}x{height} to {new_width}x{new_height}");
+
+        image = image.crop_imm(x, y, new_width, new_height);
+        width = new_width;
+        height = new_height;
     }
 
     // aspect ratio was already corrected above
     // so really both of these comparisons should be the same
     if width > max_width || height > max_height {
-        log::trace!("Resizing avatar or banner image from {width}^{height} to {max_width}^{max_height}");
+        log::trace!("Resizing image from {width}^{height} to {max_width}^{max_height}");
         image = image.resize(max_width, max_height, FilterType::Lanczos3);
     }
 
     // encode the image and generate a blurhash preview if needed
-    match encode_png_best(image, preview, info) {
+    match crate::encode::encode_png_best(image, preview, info) {
         Ok(mut output) => {
             let mut reused = false;
 
@@ -156,125 +178,4 @@ pub fn process_image(
         }
         Err(e) => Err(ProcessingError::Other(e.to_string())),
     }
-}
-
-pub struct EncodedImage {
-    pub buffer: Vec<u8>,
-    pub preview: Option<Vec<u8>>,
-    pub width: u32,
-    pub height: u32,
-}
-
-#[allow(unused_imports, unused_variables)]
-fn encode_png_best(
-    mut image: image::DynamicImage,
-    mut preview: Option<Vec<u8>>,
-    info: ImageInfo,
-) -> std::io::Result<EncodedImage> {
-    use image::{ColorType, DynamicImage, GenericImageView};
-    use png::{
-        AdaptiveFilterType, BitDepth, Compression, Encoder as PngEncoder, FilterType, ScaledFloat,
-        SourceChromaticities, SrgbRenderingIntent,
-    };
-
-    image = match image {
-        DynamicImage::ImageRgba16(_) => DynamicImage::ImageRgba8(image.to_rgba8()),
-        DynamicImage::ImageRgb16(_) => DynamicImage::ImageRgb8(image.to_rgb8()),
-        DynamicImage::ImageLuma16(_) => DynamicImage::ImageLuma8(image.to_luma8()),
-        DynamicImage::ImageLumaA16(_) => DynamicImage::ImageLumaA8(image.to_luma_alpha8()),
-        _ => image,
-    };
-
-    let bytes = image.as_bytes();
-    let (width, height) = image.dimensions();
-    let color = image.color();
-
-    // 1.5 bytes per pixel
-    const BYTES_PER_PIXEL_D: usize = 3;
-    const BYTES_PER_PIXEL_N: usize = 2;
-
-    let expected_bytes = ((width * height) as usize * BYTES_PER_PIXEL_D) / BYTES_PER_PIXEL_N;
-
-    let mut out = Vec::with_capacity(expected_bytes);
-
-    let mut encoder = PngEncoder::new(&mut out, width, height);
-
-    encoder.set_depth(BitDepth::Eight);
-    encoder.set_color(match color {
-        ColorType::L8 => png::ColorType::Grayscale,
-        ColorType::La8 => png::ColorType::GrayscaleAlpha,
-        ColorType::Rgb8 => png::ColorType::Rgb,
-        ColorType::Rgba8 => png::ColorType::Rgba,
-        _ => unreachable!(),
-    });
-
-    //encoder.set_trns(&[0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8] as &'static [u8]);
-    encoder.set_compression(Compression::Best);
-    encoder.set_filter(FilterType::Paeth);
-    encoder.set_adaptive_filter(AdaptiveFilterType::Adaptive);
-
-    //encoder.set_srgb(info.srgb.unwrap_or(SrgbRenderingIntent::AbsoluteColorimetric));
-    //encoder.set_source_gamma(info.source_gamma.unwrap_or_else(|| {
-    //    // Value taken from https://www.w3.org/TR/2003/REC-PNG-20031110/#11sRGB
-    //    ScaledFloat::from_scaled(45455)
-    //}));
-    //encoder.set_source_chromaticities(info.source_chromaticities.unwrap_or_else(|| {
-    //    // Values taken from https://www.w3.org/TR/2003/REC-PNG-20031110/#11sRGB
-    //    SourceChromaticities {
-    //        white: (ScaledFloat::from_scaled(31270), ScaledFloat::from_scaled(32900)),
-    //        red: (ScaledFloat::from_scaled(64000), ScaledFloat::from_scaled(33000)),
-    //        green: (ScaledFloat::from_scaled(30000), ScaledFloat::from_scaled(60000)),
-    //        blue: (ScaledFloat::from_scaled(15000), ScaledFloat::from_scaled(6000)),
-    //    }
-    //}));
-    //if let Some(_icc_profile) = info.icc_profile {
-    //    // TODO: ICC Profile
-    //}
-
-    let mut writer = encoder.write_header()?;
-    writer.write_image_data(bytes)?;
-
-    drop(writer);
-
-    if preview.is_none() {
-        let has_alpha = image.color().has_alpha();
-
-        let mut bytes = match has_alpha {
-            true => image.to_rgba8().into_raw(),
-            false => image.to_rgb8().into_raw(),
-        };
-
-        let (xc, yc) = blurhash::encode::num_components(width, height);
-
-        // encode routine automatically premultiplies alpha
-        let hash = blurhash::encode::encode(
-            xc,
-            yc,
-            width as usize,
-            height as usize,
-            &mut bytes,
-            if has_alpha { 4 } else { 3 },
-        );
-
-        match hash {
-            Err(e) => {
-                log::error!("Error computing blurhash for avatar: {e}")
-            }
-            Ok(hash) => {
-                preview = Some(hash);
-            }
-        }
-    }
-
-    log::trace!(
-        "PNG Encoder expected {expected_bytes} bytes, got {} bytes",
-        out.len()
-    );
-
-    Ok(EncodedImage {
-        buffer: out,
-        preview,
-        width,
-        height,
-    })
 }
