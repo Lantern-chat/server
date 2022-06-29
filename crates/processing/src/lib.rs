@@ -1,4 +1,4 @@
 extern crate tracing as log;
 
-pub mod avatar;
+pub mod process;
 pub mod read_image;

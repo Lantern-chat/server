@@ -1,8 +1,16 @@
 use crate::read_image::{read_image, Image, ImageInfo, ImageReadError, Limits};
 
-pub struct ProcessConfig {
-    pub max_width: u32,
-    pub max_pixels: u32,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProcessConfig {
+    Avatar {
+        max_width: u32,
+        max_pixels: u32,
+    },
+    Banner {
+        max_width: u32,
+        max_height: u32,
+        max_pixels: u32,
+    },
 }
 
 pub struct ProcessedImage {
@@ -25,7 +33,7 @@ pub enum ProcessingError {
     Other(String),
 }
 
-pub fn process_avatar(
+pub fn process_image(
     buffer: Vec<u8>,
     preview: Option<Vec<u8>>,
     config: ProcessConfig,
@@ -37,48 +45,90 @@ pub fn process_avatar(
         Err(_) => return Err(ProcessingError::InvalidImageFormat),
     };
 
-    let Image { mut image, info } = read_image(
-        &buffer,
-        format,
-        &Limits {
-            max_pixels: config.max_pixels,
-        },
-    )?;
+    let (max_width, max_height, max_pixels) = match config {
+        ProcessConfig::Avatar {
+            max_pixels,
+            max_width,
+        } => (max_width, max_width, max_pixels),
+        ProcessConfig::Banner {
+            max_pixels,
+            max_width,
+            max_height,
+        } => (max_width, max_height, max_pixels),
+    };
 
-    let max_width = config.max_width;
+    let Image { mut image, info } = read_image(&buffer, format, &Limits { max_pixels })?;
 
     let mut width = info.width;
-    let height = info.height;
+    let mut height = info.height;
 
-    let try_use_existing = format == ImageFormat::Png && width == height && width <= max_width;
+    let mut try_use_existing = format == ImageFormat::Png && width <= max_width && height <= max_height;
 
-    // crop out the center
-    if width != height {
-        let mut x = 0;
-        let mut y = 0;
-        let mut new_width = width;
-        let mut new_height = height;
+    match config {
+        ProcessConfig::Avatar { .. } => {
+            try_use_existing &= width == height;
 
-        if width > height {
-            x = (width - height) / 2;
-            new_width = height;
-        } else {
-            y = (height - width) / 2;
-            new_height = width;
+            // crop out the center
+            if width != height {
+                let mut x = 0;
+                let mut y = 0;
+                let mut new_width = width;
+                let mut new_height = height;
+
+                if width > height {
+                    x = (width - height) / 2;
+                    new_width = height;
+                } else {
+                    y = (height - width) / 2;
+                    new_height = width;
+                }
+
+                log::trace!("Cropping avatar image from {width}x{height} to {new_width}x{new_height}");
+
+                image = image.crop_imm(x, y, new_width, new_height);
+
+                width = new_width;
+                height = new_height;
+            }
         }
+        ProcessConfig::Banner { .. } => {
+            let desired_aspect = max_width as f32 / max_height as f32;
+            let actual_aspect = width as f32 / height as f32;
+            let aspect_diff = desired_aspect - actual_aspect;
 
-        log::trace!("Cropping avatar image from {width}x{height} to {new_width}x{new_height}");
+            // For example, 16/9 > 16/10
+            try_use_existing &= 0.0 <= aspect_diff && aspect_diff < 0.4; // allow slight overhang that's cropped client-side
 
-        image = image.crop_imm(x, y, new_width, new_height);
+            // crop if not ideal
+            if aspect_diff.abs() > 0.01 {
+                let mut x = 0;
+                let mut new_width = width;
+                let mut new_height = height;
 
-        width = new_width;
+                if aspect_diff > 0.0 {
+                    // image is taller than needed
+                    new_height = width * max_height / max_width;
+                } else {
+                    // image is wider than needed
+                    new_width = height * max_width / max_height;
+                    x = (width - new_width) / 2; // center horizontally
+                }
+
+                log::trace!("Cropping banner image from {width}x{height} to {new_width}x{new_height}");
+
+                image = image.crop_imm(x, 0, new_width, new_height);
+
+                width = new_width;
+                height = new_height;
+            }
+        }
     }
 
-    // shrink if necessary
-    if width > max_width {
-        log::trace!("Resizing avatar image from {width}^2 to {max_width}^2");
-
-        image = image.resize(max_width, max_width, FilterType::Lanczos3);
+    // aspect ratio was already corrected above
+    // so really both of these comparisons should be the same
+    if width > max_width || height > max_height {
+        log::trace!("Resizing avatar or banner image from {width}^{height} to {max_width}^{max_height}");
+        image = image.resize(max_width, max_height, FilterType::Lanczos3);
     }
 
     // encode the image and generate a blurhash preview if needed
