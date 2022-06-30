@@ -1,4 +1,4 @@
-use image::{ColorType, DynamicImage, GenericImageView, RgbImage};
+use image::{ColorType, DynamicImage, GenericImageView};
 use std::io;
 
 use crate::read_image::ImageInfo;
@@ -47,58 +47,6 @@ fn gen_blurhash(image: DynamicImage) -> Option<Vec<u8>> {
             None
         }
         Ok(hash) => Some(hash),
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct EdgeInfo {
-    average: f64,
-    variance: f64,
-}
-
-impl EdgeInfo {
-    pub fn use_lossy(&self) -> bool {
-        // NOTE: This is a guestimate
-        self.average < 0.03 && self.variance < 0.008
-    }
-}
-
-pub fn compute_edge_info(image: &RgbImage) -> EdgeInfo {
-    #[rustfmt::skip]
-    let edges = image::imageops::filter3x3(
-        image,
-        // Laplacian operator with diagonals
-        &[
-            -1.0, -1.0, -1.0,
-            -1.0,  8.0, -1.0,
-            -1.0, -1.0, -1.0
-        ]
-    );
-
-    let pixels = edges.pixels();
-    let num_pixels = pixels.len() as f64;
-    let weight = 1.0 / num_pixels;
-
-    let mut average = 0.0;
-    let mut sumsq = 0.0;
-
-    for pixel in pixels {
-        let [r, g, b] = pixel.0;
-
-        #[rustfmt::skip]
-        let luma =
-            (0.212671 / 255.0) * r as f64 +
-            (0.715160 / 255.0) * g as f64 +
-            (0.072169 / 255.0) * b as f64;
-
-        average += weight * luma;
-        sumsq += luma * luma;
-    }
-
-    EdgeInfo {
-        average,
-        // NOTE: since weight is 1/n, this may be slightly biased
-        variance: (sumsq - (average * average) * num_pixels) * weight,
     }
 }
 
