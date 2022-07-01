@@ -24,7 +24,7 @@ ALTER TABLE lantern.rooms ADD CONSTRAINT party_fk FOREIGN KEY (party_id)
 
 ALTER TABLE lantern.rooms ADD CONSTRAINT parent_fk FOREIGN KEY (parent_id)
     REFERENCES lantern.rooms (id) MATCH FULL
-    ON DELETE CASCADE ON UPDATE CASCADE; -- Delete rooms if whole category is deleted
+    ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- Party FK
 

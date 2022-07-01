@@ -23,5 +23,6 @@ pub mod sf;
 pub use sf::{Snowflake, SnowflakeExt};
 
 pub mod flags;
+pub mod asset;
 
 pub mod auth;

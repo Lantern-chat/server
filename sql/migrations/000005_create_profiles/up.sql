@@ -23,11 +23,11 @@ ALTER TABLE lantern.profiles ADD CONSTRAINT party_fk FOREIGN KEY(party_id)
     ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE lantern.profiles ADD CONSTRAINT avatar_fk FOREIGN KEY(avatar_id)
-    REFERENCES lantern.files (id) MATCH FULL
+    REFERENCES lantern.user_assets (id) MATCH FULL
     ON DELETE SET NULL ON UPDATE CASCADE;
 
 ALTER TABLE lantern.profiles ADD CONSTRAINT banner_fk FOREIGN KEY(banner_id)
-    REFERENCES lantern.files (id) MATCH FULL
+    REFERENCES lantern.user_assets (id) MATCH FULL
     ON DELETE SET NULL ON UPDATE CASCADE;
 
 CREATE OR REPLACE VIEW lantern.agg_profiles(

@@ -20,7 +20,7 @@ fn base_query() -> thorn::query::SelectQuery {
     Query::select().from_table::<Emotes>().cols(&[
         Emotes::Id,
         Emotes::PartyId,
-        Emotes::FileId,
+        Emotes::AssetId,
         Emotes::Name,
         Emotes::Flags,
         Emotes::AspectRatio,

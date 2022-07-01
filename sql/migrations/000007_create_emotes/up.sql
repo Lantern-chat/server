@@ -1,7 +1,7 @@
 CREATE TABLE lantern.emotes (
     id              bigint      NOT NULL,
     party_id        bigint,
-    file_id         bigint      NOT NULL,
+    asset_id         bigint      NOT NULL,
     aspect_ratio    real        NOT NULL,
     flags           smallint    NOT NULL,
     name            text        NOT NULL,
@@ -21,6 +21,6 @@ ALTER TABLE lantern.emotes ADD CONSTRAINT party_fk FOREIGN KEY (party_id)
     REFERENCES lantern.party (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE; -- Delete emotes on party deletion
 
-ALTER TABLE lantern.emotes ADD CONSTRAINT file_fk FOREIGN KEY (file_id)
-    REFERENCES lantern.files (id) MATCH FULL
+ALTER TABLE lantern.emotes ADD CONSTRAINT asset_fk FOREIGN KEY (asset_id)
+    REFERENCES lantern.user_assets (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;

@@ -60,6 +60,22 @@ thorn::tables! {
         RoleIds: SNOWFLAKE_ARRAY,
     }
 
+    pub struct AggAssets in Lantern {
+        AssetId: UserAssets::Id,
+        AssetFlags: UserAssetFiles::Flags,
+        FileId: Files::Id,
+        UserId: Files::UserId,
+        Nonce: Files::Nonce,
+        Size: Files::Size,
+        Width: Files::Width,
+        Height: Files::Height,
+        FileFlags: Files::Flags,
+        FileName: Files::Name,
+        Mime: Files::Mime,
+        Sha1: Files::Sha1,
+        Preview: UserAssets::Preview,
+    }
+
     pub struct AggAttachments in Lantern {
         MsgId: Messages::Id,
 

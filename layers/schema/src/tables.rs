@@ -87,11 +87,23 @@ thorn::tables! {
         Activity: Type::JSONB,
     }
 
+    pub struct UserAssets in Lantern {
+        Id: SNOWFLAKE,
+        FileId: Files::Id,
+        Preview: Type::BYTEA,
+    }
+
+    pub struct UserAssetFiles in Lantern {
+        AssetId: UserAssets::Id,
+        FileId: Files::Id,
+        Flags: Type::INT2,
+    }
+
     pub struct Profiles in Lantern {
         UserId: Users::Id,
         PartyId: Party::Id, // NULLable
-        AvatarId: Files::Id,
-        BannerId: Files::Id,
+        AvatarId: UserAssets::Id,
+        BannerId: UserAssets::Id,
         Bits: Type::INT4,
         CustomStatus: Type::TEXT,
         Biography: Type::TEXT,
@@ -120,7 +132,7 @@ thorn::tables! {
 
     pub struct Party in Lantern {
         Id: SNOWFLAKE,
-        AvatarId: Files::Id,
+        AvatarId: UserAssets::Id,
         OwnerId: Users::Id,
         DefaultRoom: Rooms::Id,
         Flags: Type::INT8,
@@ -157,7 +169,7 @@ thorn::tables! {
     pub struct Roles in Lantern {
         Id: SNOWFLAKE,
         PartyId: Party::Id,
-        AvatarId: Files::Id,
+        AvatarId: UserAssets::Id,
         Permissions: Type::INT8,
         /// Color encoded as a 32-bit integer
         Color: Type::INT4,
@@ -174,7 +186,7 @@ thorn::tables! {
     pub struct Emotes in Lantern {
         Id: SNOWFLAKE,
         PartyId: Party::Id,
-        FileId: Files::Id,
+        AssetId: UserAssets::Id,
         AspectRatio: Type::FLOAT4,
         Flags: Type::INT2,
         Name: Type::TEXT,
