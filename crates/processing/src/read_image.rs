@@ -207,10 +207,10 @@ fn cmyk_to_rgb(input: &[u8]) -> Vec<u8> {
     let out_pixels = output[..3 * count].chunks_exact_mut(3);
 
     for (pixel, outp) in in_pixels.zip(out_pixels) {
-        let c = 255 - u16::from(pixel[0]);
-        let m = 255 - u16::from(pixel[1]);
-        let y = 255 - u16::from(pixel[2]);
-        let k = 255 - u16::from(pixel[3]);
+        let c = 255 - (pixel[0] as u16);
+        let m = 255 - (pixel[1] as u16);
+        let y = 255 - (pixel[2] as u16);
+        let k = 255 - (pixel[3] as u16);
         // CMY -> RGB
         let r = (k * c) / 255;
         let g = (k * m) / 255;
