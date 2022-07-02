@@ -27,12 +27,29 @@ impl<F> EncryptedFile<F> {
     where
         F: AsyncWrite,
     {
-        // buffer with 1MiB to avoid rewinding the cipher as often
-        EncryptedFile::new(BufWriter::with_capacity(1024 * 1024, inner), cipher)
+        // buffer with 256KiB to avoid rewinding the cipher as often
+        EncryptedFile::new(BufWriter::with_capacity(1024 * 256, inner), cipher)
+    }
+
+    pub fn new_write_sync(inner: F, cipher: Aes256Ctr) -> EncryptedFile<io::BufWriter<F>>
+    where
+        F: io::Write,
+    {
+        EncryptedFile::new(io::BufWriter::with_capacity(1024 * 256, inner), cipher)
     }
 
     pub fn get_ref(&self) -> &F {
         &self.inner
+    }
+}
+
+impl<F: io::Read> io::Read for EncryptedFile<F> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let len = self.inner.read(buf)?;
+
+        self.cipher.apply_keystream(&mut buf[..len]);
+
+        Ok(len)
     }
 }
 
@@ -52,6 +69,28 @@ impl<F: AsyncRead + Unpin> AsyncRead for EncryptedFile<F> {
                 Poll::Ready(Ok(()))
             }
         }
+    }
+}
+
+impl<F: io::Write> io::Write for EncryptedFile<F> {
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let pos: u64 = self.cipher.current_pos();
+
+        let mut buf = buf.to_vec();
+        self.cipher.apply_keystream(&mut buf);
+
+        let bytes = self.inner.write(&buf)?;
+
+        if bytes < buf.len() {
+            // partial rewind
+            self.cipher.seek(pos + bytes as u64);
+        }
+
+        Ok(bytes)
     }
 }
 
@@ -88,6 +127,14 @@ impl<F: AsyncWrite + Unpin> AsyncWrite for EncryptedFile<F> {
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         self.project().inner.poll_shutdown(cx)
+    }
+}
+
+impl<F: io::Seek> io::Seek for EncryptedFile<F> {
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        let pos = self.inner.seek(pos)?;
+        self.cipher.seek(pos);
+        Ok(pos)
     }
 }
 
