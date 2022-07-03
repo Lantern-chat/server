@@ -29,7 +29,7 @@ fn main() {
 
     println!("{cx}x{cy}");
 
-    let buf = blurhash::encode::encode(cx, cy, w as usize, h as usize, &mut bytes, 3).unwrap();
+    let buf = blurhash::encode::encode::<true>(cx, cy, w as usize, h as usize, &mut bytes, 3).unwrap();
 
     let encoded = buf.to_z85().unwrap();
 

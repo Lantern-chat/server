@@ -1,5 +1,3 @@
-use std::io::Cursor;
-
 use image::{io::Reader, DynamicImage, ImageBuffer, ImageFormat};
 use png::{PixelDimensions, ScaledFloat, SourceChromaticities, SrgbRenderingIntent};
 
@@ -23,7 +21,7 @@ pub struct Limits {
     pub max_pixels: u32,
 }
 
-use std::io::{self, Read};
+use std::io::{self, BufRead, Read, Seek};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ImageReadError {
@@ -49,13 +47,17 @@ pub enum ImageReadError {
     Unsupported,
 }
 
-pub fn read_image(buffer: &[u8], format: ImageFormat, limits: &Limits) -> Result<Image, ImageReadError> {
+pub fn read_image<R: BufRead + Seek>(
+    mut source: R,
+    format: ImageFormat,
+    limits: &Limits,
+) -> Result<Image, ImageReadError> {
     match format {
-        ImageFormat::Png => read_png(buffer, limits),
-        ImageFormat::Jpeg => read_jpeg(buffer, limits),
+        ImageFormat::Png => read_png(source, limits),
+        ImageFormat::Jpeg => read_jpeg(source, limits),
         _ => {
             let (width, height) = {
-                let mut reader = Reader::new(Cursor::new(buffer));
+                let mut reader = Reader::new(&mut source);
                 reader.set_format(format);
 
                 match reader.into_dimensions() {
@@ -68,7 +70,9 @@ pub fn read_image(buffer: &[u8], format: ImageFormat, limits: &Limits) -> Result
                 return Err(ImageReadError::ImageTooLarge);
             }
 
-            let mut reader = Reader::new(Cursor::new(buffer));
+            source.rewind()?;
+
+            let mut reader = Reader::new(source);
             reader.set_format(format);
 
             let image = match reader.decode() {

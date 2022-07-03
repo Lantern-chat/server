@@ -7,7 +7,7 @@ use byteorder::WriteBytesExt;
 use crate::common::{linear_to_srgb, roundup4, srgb_to_linear};
 
 #[inline(always)]
-fn multiply_basis_function(
+fn multiply_basis_function<const MULTIPLY_ALPHA: bool>(
     xc: usize,
     yc: usize,
     w: usize,
@@ -24,9 +24,13 @@ fn multiply_basis_function(
 
     for y in 0..h {
         for x in 0..w {
-            let basis = (x as f32 * nx).cos() * (y as f32 * ny).cos();
+            let mut basis = (x as f32 * nx).cos() * (y as f32 * ny).cos();
 
             let i = channels * (x + y * w);
+
+            if MULTIPLY_ALPHA {
+                basis *= rgb[i + 3] as f32 * (1.0 / 255.0);
+            }
 
             r += basis * srgb_to_linear(rgb[i + 0]);
             g += basis * srgb_to_linear(rgb[i + 1]);
@@ -87,7 +91,14 @@ pub fn premultiply_alpha(w: usize, h: usize, rgba: &mut [u8]) {
     }
 }
 
-pub fn encode(xc: usize, yc: usize, w: usize, h: usize, rgb: &[u8], channels: usize) -> io::Result<Vec<u8>> {
+pub fn encode<const MULTIPLY_ALPHA: bool>(
+    xc: usize,
+    yc: usize,
+    w: usize,
+    h: usize,
+    rgb: &[u8],
+    channels: usize,
+) -> io::Result<Vec<u8>> {
     assert!(channels == 3 || channels == 4);
 
     let buf_size = roundup4(4 + xc * yc * 2);
@@ -97,7 +108,11 @@ pub fn encode(xc: usize, yc: usize, w: usize, h: usize, rgb: &[u8], channels: us
 
     for (y, y_factors) in factors.iter_mut().enumerate().take(yc) {
         for (x, factor) in y_factors.iter_mut().enumerate().take(xc) {
-            *factor = multiply_basis_function(x, y, w, h, rgb, channels);
+            if MULTIPLY_ALPHA && channels == 4 {
+                *factor = multiply_basis_function::<MULTIPLY_ALPHA>(x, y, w, h, rgb, channels);
+            } else {
+                *factor = multiply_basis_function::<false>(x, y, w, h, rgb, channels);
+            }
         }
     }
 

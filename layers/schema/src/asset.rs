@@ -1,5 +1,3 @@
-use std::ffi::OsStr;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(i8)]
 pub enum AssetFileFormat {
@@ -20,12 +18,9 @@ static FORMAT_EXTS: &[(AssetFileFormat, &'static str)] = &[
 ];
 
 impl AssetFileFormat {
-    pub fn from_ext<E: AsRef<OsStr>>(ext: E) -> Self {
-        let ext = ext.as_ref();
-        let len = ext.len();
-
+    pub fn from_ext(ext: &str) -> Self {
         // bailout on obviously invalid extensions
-        if 3 <= len && len < 5 {
+        if 3 <= ext.len() && ext.len() < 5 {
             for &(f, e) in FORMAT_EXTS {
                 if ext.eq_ignore_ascii_case(e) {
                     return f;

@@ -1,28 +1,30 @@
+use std::io::{self, BufRead, Seek};
+
+use image::DynamicImage;
+
 use crate::{
-    encode::EncodedImage,
+    heuristic::EdgeInfo,
     read_image::{read_image, Image, ImageReadError, Limits},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ProcessConfig {
-    Avatar {
-        max_width: u32,
-        max_pixels: u32,
-    },
-    Banner {
-        max_width: u32,
-        max_height: u32,
-        max_pixels: u32,
-    },
+pub struct ProcessConfig {
+    max_width: u32,
+    max_height: u32,
+    max_pixels: u32,
 }
 
 pub struct ProcessedImage {
-    pub reused: bool,
-    pub image: EncodedImage,
+    pub image: DynamicImage,
+    pub preview: Option<Vec<u8>>,
+    pub edge_info: EdgeInfo,
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProcessingError {
+    #[error("IO Error: {0}")]
+    IOError(#[from] io::Error),
+
     #[error("Invalid Image Format")]
     InvalidImageFormat,
 
@@ -36,98 +38,82 @@ pub enum ProcessingError {
     Other(String),
 }
 
-pub fn process_image(
-    buffer: Vec<u8>,
-    preview: Option<Vec<u8>>,
+pub fn process_image<R: BufRead + Seek>(
+    mut source: R,
     config: ProcessConfig,
 ) -> Result<ProcessedImage, ProcessingError> {
-    use image::{imageops::FilterType, math::Rect, ImageFormat};
+    use image::{imageops::FilterType, math::Rect};
 
-    let format = match image::guess_format(&buffer) {
+    let mut any_magic_bytes = Vec::with_capacity(32);
+    source.read_until(32, &mut any_magic_bytes)?;
+
+    let format = match image::guess_format(&any_magic_bytes) {
         Ok(format) => format,
         Err(_) => return Err(ProcessingError::InvalidImageFormat),
     };
 
-    let (max_width, max_height, max_pixels) = match config {
-        ProcessConfig::Avatar {
-            max_pixels,
-            max_width,
-        } => (max_width, max_width, max_pixels),
-        ProcessConfig::Banner {
-            max_pixels,
-            max_width,
-            max_height,
-        } => (max_width, max_height, max_pixels),
-    };
+    let ProcessConfig {
+        max_width,
+        max_height,
+        max_pixels,
+    } = config;
 
-    let Image { mut image, info } = read_image(&buffer, format, &Limits { max_pixels })?;
+    let Image { mut image, info } = read_image(source, format, &Limits { max_pixels })?;
 
     let mut width = info.width;
     let mut height = info.height;
 
-    let mut try_use_existing = matches!(format, ImageFormat::Png | ImageFormat::Jpeg | ImageFormat::Gif)
-        && width <= max_width
-        && height <= max_height;
-
     let mut crop = None;
 
-    match config {
-        ProcessConfig::Avatar { .. } => {
-            try_use_existing &= width == height;
+    if max_width == max_height {
+        // crop out the center
+        if width != height {
+            let mut x = 0;
+            let mut y = 0;
+            let mut new_width = width;
+            let mut new_height = height;
 
-            // crop out the center
-            if width != height {
-                let mut x = 0;
-                let mut y = 0;
-                let mut new_width = width;
-                let mut new_height = height;
-
-                if width > height {
-                    x = (width - height) / 2;
-                    new_width = height;
-                } else {
-                    y = (height - width) / 2;
-                    new_height = width;
-                }
-
-                crop = Some(Rect {
-                    x,
-                    y,
-                    width: new_width,
-                    height: new_height,
-                });
+            if width > height {
+                x = (width - height) / 2;
+                new_width = height;
+            } else {
+                y = (height - width) / 2;
+                new_height = width;
             }
+
+            crop = Some(Rect {
+                x,
+                y,
+                width: new_width,
+                height: new_height,
+            });
         }
-        ProcessConfig::Banner { .. } => {
-            let desired_aspect = max_width as f32 / max_height as f32;
-            let actual_aspect = width as f32 / height as f32;
-            let aspect_diff = desired_aspect - actual_aspect;
+    } else {
+        let desired_aspect = max_width as f32 / max_height as f32;
+        let actual_aspect = width as f32 / height as f32;
+        let aspect_diff = desired_aspect - actual_aspect;
 
-            // For example, 16/9 > 16/10
-            try_use_existing &= 0.0 <= aspect_diff && aspect_diff < 0.4; // allow slight overhang that's cropped client-side
+        // crop if not ideal
+        if aspect_diff.abs() > 0.01 {
+            let mut x = 0;
+            let mut new_width = width;
+            let mut new_height = height;
 
-            // crop if not ideal
-            if aspect_diff.abs() > 0.01 {
-                let mut x = 0;
-                let mut new_width = width;
-                let mut new_height = height;
-
-                if aspect_diff > 0.0 {
-                    // image is taller than needed
-                    new_height = width * max_height / max_width;
-                } else {
-                    // image is wider than needed
-                    new_width = height * max_width / max_height;
-                    x = (width - new_width) / 2; // center horizontally
-                }
-
-                crop = Some(Rect {
-                    x,
-                    y: 0,
-                    width: new_width,
-                    height: new_height,
-                });
+            if aspect_diff > 0.0 {
+                // image is taller than needed
+                new_height = width * max_height / max_width;
+            } else {
+                // image is wider than needed
+                new_width = height * max_width / max_height;
+                x = (width - new_width) / 2; // center horizontally
             }
+
+            crop = Some(Rect {
+                x,
+                y: 0,
+                width: new_width,
+                height: new_height,
+            });
         }
     }
 
@@ -153,29 +139,46 @@ pub fn process_image(
         image = image.resize(max_width, max_height, FilterType::Lanczos3);
     }
 
-    // encode the image and generate a blurhash preview if needed
-    match crate::encode::encode_png_best(image, preview, info) {
-        Ok(mut output) => {
-            let mut reused = false;
+    image = match crate::util::actually_has_alpha(&image) {
+        true => DynamicImage::ImageRgba8(image.to_rgba8()),
+        false => DynamicImage::ImageRgb8(image.to_rgb8()),
+    };
 
-            // if the existing PNG buffer is somehow smaller, use that
-            // could happen with a very-optimized PNG from photoshop or something
-            if try_use_existing && buffer.len() < output.buffer.len() {
-                log::trace!(
-                    "PNG Encoder got worse compression than original, {} vs {}",
-                    buffer.len(),
-                    output.buffer.len()
-                );
+    let edge_info = match image {
+        DynamicImage::ImageRgb8(ref image) => crate::heuristic::compute_edge_info(image),
+        DynamicImage::ImageRgba8(ref image) => crate::heuristic::compute_edge_info(image),
+        _ => unreachable!(),
+    };
 
-                reused = true;
-                output.buffer = buffer;
-            }
+    let preview = crate::encode::blurhash::gen_blurhash(&image);
 
-            Ok(ProcessedImage {
-                reused,
-                image: output,
-            })
-        }
-        Err(e) => Err(ProcessingError::Other(e.to_string())),
-    }
+    Ok(ProcessedImage {
+        image,
+        preview,
+        edge_info,
+    })
+
+    // let configs = &[
+    //     (ImageFormat::Png, 100u8),
+    //     (ImageFormat::Jpeg, 95),
+    //     (ImageFormat::Jpeg, 70),
+    //     (ImageFormat::Jpeg, 45),
+    //     (ImageFormat::Avif, 99),
+    //     (ImageFormat::Avif, 80),
+    // ];
+
+    // let mut images = Vec::new();
+
+    // for &(f, mut q) in configs {
+    //     if !edge_info.use_lossy() {
+    //         q = q.saturating_add(5u8).min(100);
+    //     }
+
+    //     images.push(match crate::encode::encode(&image, &info, f, q) {
+    //         Ok(img) => img,
+    //         Err(e) => return Err(ProcessingError::Other(e.to_string())),
+    //     });
+    // }
+
+    // Ok(ProcessedImages { images, preview })
 }
