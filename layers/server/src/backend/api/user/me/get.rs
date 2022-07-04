@@ -37,7 +37,11 @@ pub async fn get_full(state: &ServerState, user_id: Snowflake) -> Result<User, E
                 Query::select()
                     .cols(UserColumns::default())
                     .cols(ProfileColumns::default())
-                    .from_table::<Users>()
+                    .from(
+                        Users::left_join_table::<Profiles>().on(Profiles::UserId
+                            .equals(Users::Id)
+                            .and(Profiles::PartyId.is_null())),
+                    )
                     .and_where(Users::Id.equals(Var::of(Users::Id)))
             },
             &[&user_id],

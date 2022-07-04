@@ -149,7 +149,6 @@ thorn::tables! {
         Flags: Type::INT2,
         Position: Type::INT2,
         Nickname: Type::TEXT,
-        CustomStatus: Type::TEXT,
     }
 
     pub struct PartyBans in Lantern {
