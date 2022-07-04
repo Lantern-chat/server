@@ -74,8 +74,8 @@ impl<F: FileExt + Sync> FileExt for EncryptedFile<F> {
     }
 }
 
-pub trait RWSeekStream: AsyncWrite + AsyncRead + AsyncSeek + FileExt + Send + Sync {}
-impl<T> RWSeekStream for T where T: AsyncWrite + AsyncRead + AsyncSeek + FileExt + Send + Sync {}
+pub trait AsyncRWSeekStream: AsyncWrite + AsyncRead + AsyncSeek + FileExt + Send + Sync {}
+impl<T> AsyncRWSeekStream for T where T: AsyncWrite + AsyncRead + AsyncSeek + FileExt + Send + Sync {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
@@ -89,7 +89,7 @@ impl FileStore<'_> {
         id: Snowflake,
         mode: OpenMode,
         options: &CipherOptions,
-    ) -> io::Result<Pin<Box<dyn RWSeekStream>>> {
+    ) -> io::Result<Pin<Box<dyn AsyncRWSeekStream>>> {
         let cipher = options.create();
         let file = self.open(id, mode).await?;
 
@@ -116,7 +116,10 @@ impl FileStore<'_> {
             OpenMode::Write => options.write(true).create(true),
         };
 
-        log::trace!("Opening file: {} in mode: {mode:?}", path.display());
+        log::trace!(
+            "Asynchronously opening file: {} in mode: {mode:?}",
+            path.display()
+        );
 
         options.open(path).await
     }
@@ -129,5 +132,56 @@ impl FileStore<'_> {
         log::trace!("Loading metadata: {}", path.display());
 
         tokio::fs::metadata(path).await
+    }
+}
+
+pub trait ReadSeekStream: io::Read + io::Seek {}
+impl<T> ReadSeekStream for T where T: io::Read + io::Seek {}
+
+pub trait WriteSeekStream: io::Write + io::Seek {}
+impl<T> WriteSeekStream for T where T: io::Write + io::Seek {}
+
+impl FileStore<'_> {
+    pub fn open_crypt_write_sync(
+        &self,
+        id: Snowflake,
+        options: &CipherOptions,
+    ) -> io::Result<Box<dyn WriteSeekStream>> {
+        let cipher = options.create();
+        let file = self.open_sync(id, OpenMode::Write)?;
+
+        Ok(Box::new(EncryptedFile::new_write_sync(file, cipher)))
+    }
+
+    pub fn open_crypt_read_sync(
+        &self,
+        id: Snowflake,
+        options: &CipherOptions,
+    ) -> io::Result<Box<dyn ReadSeekStream>> {
+        let cipher = options.create();
+        let file = self.open_sync(id, OpenMode::Read)?;
+
+        Ok(Box::new(EncryptedFile::new(file, cipher)))
+    }
+
+    pub fn open_sync(&self, id: Snowflake, mode: OpenMode) -> io::Result<std::fs::File> {
+        let mut path = self.root.to_path_buf();
+        id_to_path(id, &mut path);
+
+        if mode == OpenMode::Write {
+            std::fs::create_dir_all(&path)?;
+        }
+
+        id_to_name(id, &mut path);
+
+        let mut options = std::fs::OpenOptions::new();
+        let _ = match mode {
+            OpenMode::Read => options.read(true),
+            OpenMode::Write => options.write(true).create(true),
+        };
+
+        log::trace!("Synchronously opening file: {} in mode: {mode:?}", path.display());
+
+        options.open(path)
     }
 }
