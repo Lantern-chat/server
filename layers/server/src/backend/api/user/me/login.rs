@@ -74,9 +74,10 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) ->
     }
 
     let verified = {
-        // NOTE: Given how expensive it can be to compute an argon2 hash,
-        // this only allows a given number to process at once.
-        let permit = state.hashing_semaphore.acquire().await?;
+        let _permit = state
+            .mem_semaphore
+            .acquire_many(crate::backend::api::user::register::hash_memory_cost())
+            .await?;
 
         // SAFETY: This is only used within the following spawn_blocking block,
         // but will remain alive until `drop(user)` below.
@@ -89,7 +90,7 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) ->
         })
         .await??;
 
-        drop(permit);
+        drop(_permit);
 
         verified
     };

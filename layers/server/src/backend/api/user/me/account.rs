@@ -8,7 +8,10 @@ use crate::{
     Authorization, Error, ServerState,
 };
 
-use crate::backend::api::user::{me::login::process_2fa, register::hash_config};
+use crate::backend::api::user::{
+    me::login::process_2fa,
+    register::{hash_config, hash_memory_cost},
+};
 
 #[derive(Deserialize)]
 pub struct ModifyAccountForm {
@@ -98,7 +101,7 @@ pub async fn modify_account(
     let verified = {
         // NOTE: Given how expensive it can be to compute an argon2 hash,
         // this only allows a given number to process at once.
-        let permit = state.hashing_semaphore.acquire().await?;
+        let _permit = state.mem_semaphore.acquire_many(hash_memory_cost()).await?;
 
         // SAFETY: This is only used within the following spawn_blocking block,
         // but will remain alive until `drop(user)` below.
@@ -111,7 +114,7 @@ pub async fn modify_account(
         })
         .await??;
 
-        drop(permit);
+        drop(_permit);
 
         verified
     };
@@ -134,10 +137,10 @@ pub async fn modify_account(
     let mut password_hash_task = None;
 
     if let Some(password) = std::mem::replace(&mut form.new_password, None) {
-        let permit = state.hashing_semaphore.acquire().await?;
+        let _permit = state.mem_semaphore.acquire_many(hash_memory_cost()).await?;
 
         password_hash_task = Some((
-            permit,
+            _permit,
             tokio::task::spawn_blocking(move || {
                 use rand::Rng;
 
@@ -168,10 +171,10 @@ pub async fn modify_account(
 
     drop(user); // referenced data from `user` row no longer needed, last used borrow of username above.
 
-    if let Some((permit, password_hash_task)) = password_hash_task {
+    if let Some((_permit, password_hash_task)) = password_hash_task {
         let password_hash = password_hash_task.await??;
 
-        drop(permit);
+        drop(_permit);
 
         p = Some(password_hash);
     }

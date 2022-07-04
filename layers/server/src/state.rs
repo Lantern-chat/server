@@ -23,8 +23,9 @@ pub struct InnerServerState {
     pub db: DatabasePools,
     pub config: Config,
     pub id_lock: IdLockMap,
-    pub hashing_semaphore: Semaphore,
-    pub processing_semaphore: Semaphore,
+    /// Each permit represents 1 Kibibyte of the limit
+    pub mem_semaphore: Semaphore,
+    pub cpu_semaphore: Semaphore,
     pub fs_semaphore: Semaphore,
     pub perm_cache: PermissionCache,
     pub session_cache: SessionCache,
@@ -50,10 +51,10 @@ impl ServerState {
     pub fn new(config: Config, db: DatabasePools) -> Self {
         ServerState(Arc::new(InnerServerState {
             db,
-            config,
             id_lock: IdLockMap::default(),
-            hashing_semaphore: Semaphore::new(16), // TODO: Set from available memory?
-            processing_semaphore: Semaphore::new(num_cpus::get() * 2),
+            // memory_limit is defined in mebibytes, so convert it to kibibytes
+            mem_semaphore: Semaphore::new((config.general.memory_limit / 1024) as usize),
+            cpu_semaphore: Semaphore::new(num_cpus::get() * 3 / 2),
             fs_semaphore: Semaphore::new(1024),
             perm_cache: PermissionCache::new(),
             session_cache: SessionCache::default(),
@@ -62,6 +63,7 @@ impl ServerState {
             gateway: Gateway::default(),
             rate_limit: RateLimitTable::new(),
             file_cache: MainFileCache::default(),
+            config,
         }))
     }
 

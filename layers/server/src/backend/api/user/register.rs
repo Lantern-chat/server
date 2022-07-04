@@ -61,9 +61,7 @@ pub async fn register_user(
 
     let password = std::mem::take(&mut form.password);
 
-    // NOTE: Given how expensive it can be to compute an argon2 hash,
-    // this only allows a given number to process at once.
-    let permit = state.hashing_semaphore.acquire().await?;
+    let _permit = state.mem_semaphore.acquire_many(hash_memory_cost()).await?;
 
     // fire this off while we sanitize the username
     let password_hash_task = tokio::task::spawn_blocking(move || {
@@ -81,7 +79,7 @@ pub async fn register_user(
 
     let password_hash = password_hash_task.await??;
 
-    drop(permit);
+    drop(_permit);
 
     let write_db = state.db.write.get().await?;
 
@@ -106,11 +104,16 @@ pub async fn register_user(
     super::me::login::do_login(state, addr, id, now).await
 }
 
+/// Returns the amount of memory the argon2 hash will use, in kilobytes
+pub const fn hash_memory_cost() -> u32 {
+    8 * 1024 // 8 MiB
+}
+
 pub fn hash_config() -> argon2::Config<'static> {
     let mut config = argon2::Config::default();
 
     config.ad = b"Lantern";
-    config.mem_cost = 8 * 1024; // 8 MiB
+    config.mem_cost = hash_memory_cost();
     config.variant = argon2::Variant::Argon2id;
     config.lanes = 1;
     config.time_cost = 3;

@@ -4,6 +4,10 @@ extern crate tracing as log;
 
 use std::path::Path;
 
+const KIBIBYTE: i32 = 1024;
+const MIBIBYTE: i32 = KIBIBYTE * 1024;
+const GIBIBYTE: i64 = MIBIBYTE as i64 * 1024;
+
 pub mod sections {
     use super::util;
 

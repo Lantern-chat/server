@@ -6,6 +6,8 @@ section! {
         pub server_name: String = "Lantern Chat".to_owned() => "LANTERN_SERVER_NAME",
         pub instance_id: u16 = 0 => "LANTERN_INSTANCE_ID" | util::parse[0u16],
         pub worker_id: u16 = 0 => "LANTERN_WORKER_ID" | util::parse[0u16],
+
+        pub memory_limit: u64 = crate::GIBIBYTE as u64 => "LANTERN_MEMORY_LIMIT" | util::parse[crate::GIBIBYTE as u64],
     }
 }
 

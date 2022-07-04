@@ -1,7 +1,7 @@
 use std::{error::Error as _, io::SeekFrom};
 
 use bytes::Bytes;
-use filesystem::store::{CipherOptions, FileExt, OpenMode, RWSeekStream};
+use filesystem::store::{AsyncRWSeekStream, CipherOptions, FileExt, OpenMode};
 
 use crate::{Authorization, Error, ServerState};
 
