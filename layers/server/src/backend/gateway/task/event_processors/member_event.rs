@@ -64,17 +64,20 @@ pub async fn member_event(
                 )
                 .await?;
 
+            use user_query::{ProfileColumns, UserColumns};
+
             Ok::<Option<_>, Error>(Some(PartyMember {
                 user: Some(User {
                     id: user_id,
-                    username: row.try_get(0)?,
-                    discriminator: row.try_get(1)?,
-                    flags: UserFlags::from_bits_truncate(row.try_get(2)?).publicize(),
-                    profile: match row.try_get(4)? {
+                    username: row.try_get(UserColumns::username())?,
+                    discriminator: row.try_get(UserColumns::discriminator())?,
+                    flags: UserFlags::from_bits_truncate(row.try_get(UserColumns::flags())?).publicize(),
+                    profile: match row.try_get(ProfileColumns::bits())? {
                         None => Nullable::Null,
                         Some(bits) => Nullable::Some(UserProfile {
                             bits,
-                            avatar: encrypt_snowflake_opt(state, row.try_get(3)?).into(),
+                            avatar: encrypt_snowflake_opt(state, row.try_get(ProfileColumns::avatar_id())?)
+                                .into(),
                             banner: Nullable::Undefined,
                             bio: Nullable::Undefined,
                             status: Nullable::Undefined,

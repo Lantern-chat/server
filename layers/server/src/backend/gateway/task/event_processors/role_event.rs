@@ -85,7 +85,7 @@ pub async fn role_event(
             row.try_get::<_, Option<i32>>(RoleColumns::color())?
                 .map(|c| c as u32)
         },
-        position: row.try_get(5)?,
+        position: row.try_get(RoleColumns::position())?,
         flags: RoleFlags::from_bits_truncate(row.try_get(RoleColumns::flags())?),
     };
 
