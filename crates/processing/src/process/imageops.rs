@@ -29,6 +29,10 @@ where
     let new_width = new_width.min(width);
     let new_height = new_height.min(height);
 
+
+    let h1 = height as u64 - 1;
+    let w1 = width as u64 - 1;
+
     let w_ratio = width as f32 / new_width as f32;
     let h_ratio = height as f32 / new_height as f32;
 
@@ -54,11 +58,11 @@ where
         // of the current pixel in the output image.
         let inputy = (outy as f32 + 0.5) * h_ratio;
 
-        let top = (inputy - h_src_support) as i64; // truncate f32 -> i64
-        let top = top.clamp(0, height as i64 - 1);
+        let top = (inputy - h_src_support) as u64; // truncate f32 -> u64
+        let top = top.min(h1);
 
-        let bottom = (inputy + h_src_support) as i64;
-        let bottom = bottom.clamp(top + 1, height as i64);
+        let bottom = (inputy + h_src_support) as u64;
+        let bottom = bottom.clamp(top + 1, height as u64);
 
         let top = top as u32;
         let bottom = bottom as u32;
@@ -98,13 +102,13 @@ where
         }
 
         for outx in 0..new_width {
-            let inputx = (outx as f32 + 0.5) * w_sratio;
+            let inputx = (outx as f32 + 0.5) * w_ratio;
 
-            let left = (inputx - w_src_support) as i64; // truncate f32 -> i64
-            let left = left.clamp(0, width as i64 - 1);
+            let left = (inputx - w_src_support) as u64; // truncate f32 -> u64
+            let left = left.min(w1);
 
-            let right = (inputx + w_src_support) as i64;
-            let right = right.clamp(left + 1, width as i64);
+            let right = (inputx + w_src_support) as u64;
+            let right = right.clamp(left + 1, width as u64);
 
             let left = left as u32;
             let right = right as u32;
@@ -132,7 +136,7 @@ where
             // normalize and add f32->u8 factor
             let factor = 255.0 / sum;
             for (&t, c) in t.iter().zip(out.get_pixel_mut(outx, outy).channels_mut()) {
-                *c = (t * factor).max(0.0).min(255.0) as u8;
+                *c = (t * factor).clamp(0.0, 255.0) as u8;
             }
         }
     }
