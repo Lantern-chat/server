@@ -186,53 +186,53 @@ fn read_jpeg<R: Read>(source: R, limits: &Limits) -> Result<Image, ImageReadErro
 
     let image = match image_info.pixel_format {
         PixelFormat::L8 => DynamicImage::ImageLuma8(from_raw!(info, buf)),
-        PixelFormat::L16 => DynamicImage::ImageLuma8(from_raw!(info, l16_to_l8(&buf))),
+        PixelFormat::L16 => DynamicImage::ImageLuma8(from_raw!(info, l16_to_l8(buf))),
         PixelFormat::RGB24 => DynamicImage::ImageRgb8(from_raw!(info, buf)),
-        PixelFormat::CMYK32 => DynamicImage::ImageRgb8(from_raw!(info, cmyk_to_rgb(&buf))),
+        PixelFormat::CMYK32 => DynamicImage::ImageRgb8(from_raw!(info, cmyk_to_rgb(buf))),
     };
 
     Ok(Image { image, info })
 }
 
-fn l16_to_l8(input: &[u8]) -> Vec<u8> {
-    let mut output = vec![0u8; input.len() / 2];
-    for (chunk, out) in input.chunks_exact(2).zip(&mut output) {
-        *out = chunk[0]; // strip lower bits by ignoring the second chunk
+// maps 2x->x without re-allocating, slicing off the lower bits of each u16
+fn l16_to_l8(mut input: Vec<u8>) -> Vec<u8> {
+    let new_len = input.len() / 2;
+    for i in 0..new_len {
+        input[i] = input[i * 2];
     }
 
-    output
+    input.truncate(new_len);
+
+    input
 }
 
-// fn l16_to_l16(input: &[u8]) -> Vec<u16> {
-//     let mut output = vec![0u16; input.len() / 2];
-//     for (chunk, out) in input.chunks_exact(2).zip(&mut output) {
-//         *out = ((chunk[0] as u16) << 8) | (chunk[1] as u16)
-//     }
+// maps 4x->3x without re-allocating
+fn cmyk_to_rgb(mut input: Vec<u8>) -> Vec<u8> {
+    let mut rgb_offset = 0;
+    let mut cmyk_offset = 0;
 
-//     output
-// }
-
-fn cmyk_to_rgb(input: &[u8]) -> Vec<u8> {
     let count = input.len() / 4;
-    let mut output = vec![0; 3 * count];
 
-    let in_pixels = input[..4 * count].chunks_exact(4);
-    let out_pixels = output[..3 * count].chunks_exact_mut(3);
+    for _ in 0..count {
+        let c = 255 - (input[cmyk_offset + 0] as u16);
+        let m = 255 - (input[cmyk_offset + 1] as u16);
+        let y = 255 - (input[cmyk_offset + 2] as u16);
+        let k = 255 - (input[cmyk_offset + 3] as u16);
 
-    for (pixel, outp) in in_pixels.zip(out_pixels) {
-        let c = 255 - (pixel[0] as u16);
-        let m = 255 - (pixel[1] as u16);
-        let y = 255 - (pixel[2] as u16);
-        let k = 255 - (pixel[3] as u16);
-        // CMY -> RGB
+        // CMYK -> RGB
         let r = (k * c) / 255;
         let g = (k * m) / 255;
         let b = (k * y) / 255;
 
-        outp[0] = r as u8;
-        outp[1] = g as u8;
-        outp[2] = b as u8;
+        input[rgb_offset + 0] = r as u8;
+        input[rgb_offset + 1] = g as u8;
+        input[rgb_offset + 2] = b as u8;
+
+        cmyk_offset += 4;
+        rgb_offset += 3;
     }
 
-    output
+    input.truncate(3 * count);
+
+    input
 }
