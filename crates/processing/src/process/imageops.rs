@@ -136,7 +136,8 @@ where
             // normalize and add f32->u8 factor
             let factor = 255.0 / sum;
             for (&t, c) in t.iter().zip(out.get_pixel_mut(outx, outy).channels_mut()) {
-                *c = (t * factor).clamp(0.0, 255.0) as u8;
+                // f32->u8 automatically clamps
+                *c = (t * factor) as u8;
             }
         }
     }
