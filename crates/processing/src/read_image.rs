@@ -117,7 +117,7 @@ fn read_png<R: Read>(source: R, limits: &Limits) -> Result<Image, ImageReadError
     let mut info = {
         let image_info = reader.info();
 
-        if (image_info.width * image_info.height) > limits.max_pixels {
+        if (image_info.width as u64 * image_info.height as u64) > limits.max_pixels as u64 {
             return Err(ImageReadError::ImageTooLarge);
         }
 
@@ -168,7 +168,7 @@ fn read_jpeg<R: Read>(source: R, limits: &Limits) -> Result<Image, ImageReadErro
 
     let image_info = decoder.info().unwrap();
 
-    if (image_info.width as u32 * image_info.height as u32) > limits.max_pixels {
+    if (image_info.width as u64 * image_info.height as u64) > limits.max_pixels as u64 {
         return Err(ImageReadError::ImageTooLarge);
     }
 
