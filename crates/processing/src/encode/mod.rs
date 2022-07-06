@@ -1,6 +1,6 @@
 use image::{DynamicImage, ImageFormat, ImageResult};
 
-use crate::read_image::ImageInfo;
+use crate::read_image::{Image, ImageInfo};
 
 pub struct EncodedImage {
     pub buffer: Vec<u8>,
@@ -14,12 +14,7 @@ pub mod blurhash;
 pub mod jpeg;
 pub mod png;
 
-pub fn encode(
-    image: &DynamicImage,
-    info: &ImageInfo,
-    format: ImageFormat,
-    quality: u8,
-) -> ImageResult<EncodedImage> {
+pub fn encode(Image { image, info }: &Image, format: ImageFormat, quality: u8) -> ImageResult<EncodedImage> {
     debug_assert!(quality <= 100);
 
     match format {

@@ -47,11 +47,17 @@ pub enum ImageReadError {
     Unsupported,
 }
 
-pub fn read_image<R: BufRead + Seek>(
-    mut source: R,
-    format: ImageFormat,
-    limits: &Limits,
-) -> Result<Image, ImageReadError> {
+pub fn read_image<R: BufRead + Seek>(mut source: R, limits: &Limits) -> Result<Image, ImageReadError> {
+    let mut any_magic_bytes = Vec::with_capacity(32);
+    source.read_until(32, &mut any_magic_bytes)?;
+
+    let format = match image::guess_format(&any_magic_bytes) {
+        Ok(format) => format,
+        Err(_) => return Err(ImageReadError::InvalidImageFormat),
+    };
+
+    source.rewind()?;
+
     match format {
         ImageFormat::Png => read_png(source, limits),
         ImageFormat::Jpeg => read_jpeg(source, limits),
@@ -66,7 +72,7 @@ pub fn read_image<R: BufRead + Seek>(
                 }
             };
 
-            if (width * height) > limits.max_pixels {
+            if (width as u64 * height as u64) > limits.max_pixels as u64 {
                 return Err(ImageReadError::ImageTooLarge);
             }
 

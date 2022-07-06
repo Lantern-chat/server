@@ -1,21 +1,20 @@
-use std::io::{self, BufRead, Seek};
+use std::io;
 
-use image::DynamicImage;
+use image::{DynamicImage, GenericImageView, ImageBuffer};
 
 use crate::{
     heuristic::EdgeInfo,
-    read_image::{read_image, Image, ImageReadError, Limits},
+    read_image::{Image, ImageReadError},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ProcessConfig {
-    max_width: u32,
-    max_height: u32,
-    max_pixels: u32,
+    pub max_width: u32,
+    pub max_height: u32,
+    pub max_pixels: u32,
 }
 
 pub struct ProcessedImage {
-    pub image: DynamicImage,
     pub preview: Option<Vec<u8>>,
     pub edge_info: EdgeInfo,
 }
@@ -38,27 +37,22 @@ pub enum ProcessingError {
     Other(String),
 }
 
-pub fn process_image<R: BufRead + Seek>(
-    mut source: R,
+pub mod imageops;
+
+pub fn process_image(
+    Image {
+        ref mut image,
+        ref info,
+    }: &mut Image,
     config: ProcessConfig,
 ) -> Result<ProcessedImage, ProcessingError> {
     use image::{imageops::FilterType, math::Rect};
 
-    let mut any_magic_bytes = Vec::with_capacity(32);
-    source.read_until(32, &mut any_magic_bytes)?;
-
-    let format = match image::guess_format(&any_magic_bytes) {
-        Ok(format) => format,
-        Err(_) => return Err(ProcessingError::InvalidImageFormat),
-    };
-
     let ProcessConfig {
         max_width,
         max_height,
-        max_pixels,
+        ..
     } = config;
-
-    let Image { mut image, info } = read_image(source, format, &Limits { max_pixels })?;
 
     let mut width = info.width;
     let mut height = info.height;
@@ -117,6 +111,12 @@ pub fn process_image<R: BufRead + Seek>(
         }
     }
 
+    // TODO: **IMPORTANT**, combine crop+resize+alpha check into a single algorithm
+    //
+    // `.resize` allocates an intermediate f32 buffer for an entire image,
+    // which could be avoid by going line-by-line. Compute the vertical filter for one line,
+    // then reduce it horizontally
+
     if let Some(rect) = crop {
         let Rect {
             x,
@@ -127,7 +127,12 @@ pub fn process_image<R: BufRead + Seek>(
 
         log::trace!("Cropping image from {width}x{height} to {new_width}x{new_height}");
 
-        image = image.crop_imm(x, y, new_width, new_height);
+        //*image = match image {
+        //    DynamicImage::ImageLuma8(ref image) => imageops::crop_and_resize(image, x, y, crop_width, crop_height, new_width, new_height)
+        //}
+
+        *image = imageops::crop_and_reduce(image, x, y, new_width, new_height);
+
         width = new_width;
         height = new_height;
     }
@@ -136,27 +141,27 @@ pub fn process_image<R: BufRead + Seek>(
     // so really both of these comparisons should be the same
     if width > max_width || height > max_height {
         log::trace!("Resizing image from {width}^{height} to {max_width}^{max_height}");
-        image = image.resize(max_width, max_height, FilterType::Lanczos3);
+        *image = image.resize_exact(max_width, max_height, FilterType::Lanczos3);
     }
 
-    image = match crate::util::actually_has_alpha(&image) {
-        true => DynamicImage::ImageRgba8(image.to_rgba8()),
-        false => DynamicImage::ImageRgb8(image.to_rgb8()),
+    *image = match (crate::util::actually_has_alpha(&image), image.color().has_color()) {
+        (true, true) => DynamicImage::ImageRgba8(image.to_rgba8()),
+        (false, true) => DynamicImage::ImageRgb8(image.to_rgb8()),
+        (true, false) => DynamicImage::ImageLuma8(image.to_luma8()),
+        (false, false) => DynamicImage::ImageLumaA8(image.to_luma_alpha8()),
     };
 
     let edge_info = match image {
         DynamicImage::ImageRgb8(ref image) => crate::heuristic::compute_edge_info(image),
         DynamicImage::ImageRgba8(ref image) => crate::heuristic::compute_edge_info(image),
+        DynamicImage::ImageLuma8(ref image) => crate::heuristic::compute_edge_info(image),
+        DynamicImage::ImageLumaA8(ref image) => crate::heuristic::compute_edge_info(image),
         _ => unreachable!(),
     };
 
     let preview = crate::encode::blurhash::gen_blurhash(&image);
 
-    Ok(ProcessedImage {
-        image,
-        preview,
-        edge_info,
-    })
+    Ok(ProcessedImage { preview, edge_info })
 
     // let configs = &[
     //     (ImageFormat::Png, 100u8),

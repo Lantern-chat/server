@@ -1,4 +1,6 @@
-use image::{GenericImageView, ImageBuffer, Pixel};
+use std::marker::PhantomData;
+
+use image::{DynamicImage, GenericImageView, ImageBuffer, Pixel, SubImage};
 
 fn sinc(mut a: f32) -> f32 {
     a *= std::f32::consts::PI;
@@ -17,6 +19,24 @@ fn lanczos(x: f32, t: f32) -> f32 {
     }
 }
 
+pub fn crop_and_resize<I, P>(
+    image: &I,
+    x: u32,
+    y: u32,
+    crop_width: u32,
+    crop_height: u32,
+    new_width: u32,
+    new_height: u32,
+) -> ImageBuffer<P, Vec<u8>>
+where
+    I: GenericImageView<Pixel = P>,
+    P: Pixel<Subpixel = u8>,
+{
+    let view = image.view(x, y, crop_width, crop_height);
+
+    resize(&*view, new_width, new_height)
+}
+
 /// Based on image::imageops::resize routines, but merged together and only using a single
 /// line buffer to reduce memory usage by a factor of `new_height`
 pub fn resize<I, P>(image: &I, new_width: u32, new_height: u32) -> ImageBuffer<P, Vec<u8>>
@@ -29,6 +49,12 @@ where
     let new_width = new_width.min(width);
     let new_height = new_height.min(height);
 
+    // TODO: Faster routines for resizing only a single dimension
+    // if width == new_width {
+    //     return resize_vertical(image, new_height);
+    // } else if height == new_height {
+    //     return resize_horizontal(image, new_width);
+    // }
 
     let h1 = height as u64 - 1;
     let w1 = width as u64 - 1;
@@ -143,4 +169,140 @@ where
     }
 
     out
+}
+
+// fn resize_vertical<I, P>(image: &I, new_height: u32) -> ImageBuffer<P, Vec<u8>>
+// where
+//     I: GenericImageView<Pixel = P>,
+//     P: Pixel<Subpixel = u8>,
+// {
+//     todo!()
+// }
+
+// fn resize_horizontal<I, P>(image: &I, new_width: u32) -> ImageBuffer<P, Vec<u8>>
+// where
+//     I: GenericImageView<Pixel = P>,
+//     P: Pixel<Subpixel = u8>,
+// {
+//     todo!()
+// }
+
+pub trait ReduceSubpixel {
+    fn to_u8(self) -> u8;
+}
+
+impl ReduceSubpixel for u8 {
+    #[inline(always)]
+    fn to_u8(self) -> u8 {
+        self
+    }
+}
+
+impl ReduceSubpixel for u16 {
+    #[inline(always)]
+    fn to_u8(self) -> u8 {
+        (self >> 8) as u8
+    }
+}
+
+impl ReduceSubpixel for f32 {
+    #[inline(always)]
+    fn to_u8(self) -> u8 {
+        (self * 255.0) as u8
+    }
+}
+
+pub struct ReducedView<'a, S, P> {
+    inner: SubImage<&'a S>,
+    _pixel: PhantomData<P>,
+}
+
+impl<S, P, SP> GenericImageView for ReducedView<'_, S, P>
+where
+    S: GenericImageView<Pixel = SP>,
+    SP: Pixel,
+    <SP as Pixel>::Subpixel: ReduceSubpixel,
+    P: Pixel<Subpixel = u8>,
+{
+    type Pixel = P;
+
+    #[inline]
+    fn dimensions(&self) -> (u32, u32) {
+        self.inner.dimensions()
+    }
+
+    #[inline]
+    fn bounds(&self) -> (u32, u32, u32, u32) {
+        self.inner.bounds()
+    }
+
+    #[inline]
+    fn get_pixel(&self, x: u32, y: u32) -> Self::Pixel {
+        let channels = &mut [0u8; 4][..P::CHANNEL_COUNT as usize];
+        for (dst, src) in channels.iter_mut().zip(self.inner.get_pixel(x, y).channels()) {
+            *dst = src.to_u8();
+        }
+        *P::from_slice(&channels)
+    }
+}
+
+pub fn reduce_to_u8<I, FP, P>(image: &I) -> ImageBuffer<P, Vec<u8>>
+where
+    I: GenericImageView<Pixel = FP>,
+    FP: Pixel,
+    <FP as Pixel>::Subpixel: ReduceSubpixel,
+    P: Pixel<Subpixel = u8>,
+{
+    let (width, height) = image.dimensions();
+    let mut out: ImageBuffer<P, Vec<u8>> = ImageBuffer::new(width, height);
+
+    for (dst, (_, _, src)) in out.pixels_mut().zip(image.pixels()) {
+        for (dc, sc) in dst.channels_mut().iter_mut().zip(src.channels()) {
+            *dc = sc.to_u8();
+        }
+    }
+
+    out
+}
+
+pub fn crop_and_reduce(image: &DynamicImage, x: u32, y: u32, width: u32, height: u32) -> DynamicImage {
+    match image {
+        DynamicImage::ImageLuma8(_)
+        | DynamicImage::ImageLumaA8(_)
+        | DynamicImage::ImageRgb8(_)
+        | DynamicImage::ImageRgba8(_) => image.crop_imm(x, y, width, height),
+
+        DynamicImage::ImageLuma16(img) => {
+            DynamicImage::ImageLuma8(reduce_to_u8(&*img.view(x, y, width, height)))
+        }
+        DynamicImage::ImageLumaA16(img) => {
+            DynamicImage::ImageLumaA8(reduce_to_u8(&*img.view(x, y, width, height)))
+        }
+        DynamicImage::ImageRgb16(img) => {
+            DynamicImage::ImageRgb8(reduce_to_u8(&*img.view(x, y, width, height)))
+        }
+        DynamicImage::ImageRgba16(img) => {
+            DynamicImage::ImageRgba8(reduce_to_u8(&*img.view(x, y, width, height)))
+        }
+        DynamicImage::ImageRgb32F(img) => {
+            DynamicImage::ImageRgb8(reduce_to_u8(&*img.view(x, y, width, height)))
+        }
+        DynamicImage::ImageRgba32F(img) => {
+            DynamicImage::ImageRgba8(reduce_to_u8(&*img.view(x, y, width, height)))
+        }
+
+        // DynamicImage is non-exhaustive, so fallback to two-step crop and convert
+        _ => {
+            let image = image.crop_imm(x, y, width, height);
+
+            let color = image.color();
+
+            match (color.has_alpha(), color.has_alpha()) {
+                (true, true) => DynamicImage::ImageRgba8(image.to_rgba8()),
+                (true, false) => DynamicImage::ImageRgb8(image.to_rgb8()),
+                (false, true) => DynamicImage::ImageLumaA8(image.to_luma_alpha8()),
+                (false, false) => DynamicImage::ImageLuma8(image.to_luma8()),
+            }
+        }
+    }
 }
