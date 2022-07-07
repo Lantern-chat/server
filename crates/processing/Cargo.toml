@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 blurhash = { path = "../blurhash" }
 
-image = { version = "0.24", default-features = false, features = ["gif", "jpeg", "ico", "png", "pnm", "tga", "tiff", "webp", "bmp", "avif"] }
+image = { version = "0.24", default-features = false, features = ["gif", "jpeg", "ico", "png", "pnm", "tga", "tiff", "webp", "bmp"] }
 tracing = "0.1.26"
 png = "0.17"
 thiserror = "1.0.30"
@@ -18,3 +18,5 @@ jpeg-encoder = "0.5.1"
 oxipng = { git = "https://github.com/Lantern-chat/oxipng", default-features = false, features = ["libdeflater", "zopfli"] }
 mozjpeg = { version = "0.9.3" }
 
+ravif = { git = "https://github.com/kornelski/cavif-rs" }
+rgb = "0.8"

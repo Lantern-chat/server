@@ -45,12 +45,14 @@ pub enum ImageReadError {
 }
 
 pub fn read_image<R: BufRead + Seek>(mut source: R, config: &ProcessConfig) -> Result<Image, ImageReadError> {
-    let mut any_magic_bytes = Vec::with_capacity(32);
-    source.read_until(32, &mut any_magic_bytes)?;
+    let format = {
+        let mut any_magic_bytes = Vec::with_capacity(32);
+        source.read_until(32, &mut any_magic_bytes)?;
 
-    let format = match image::guess_format(&any_magic_bytes) {
-        Ok(format) => format,
-        Err(_) => return Err(ImageReadError::InvalidImageFormat),
+        match image::guess_format(&any_magic_bytes) {
+            Ok(format) => format,
+            Err(_) => return Err(ImageReadError::InvalidImageFormat),
+        }
     };
 
     source.rewind()?;

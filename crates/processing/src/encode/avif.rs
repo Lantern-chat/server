@@ -31,28 +31,58 @@ pub fn encode_avif(
     _heuristics: HeuristicsInfo,
     quality: u8,
 ) -> ImageResult<EncodedImage> {
-    use image::codecs::avif::{AvifEncoder, ColorSpace};
+    use ravif::{encode_rgb, encode_rgba, ColorSpace, Config, Img};
+    use rgb::AsPixels;
 
     debug_assert!(quality <= 100);
 
-    let mut buffer = Vec::new();
-
     let (width, height) = image.dimensions();
 
-    AvifEncoder::new_with_speed_quality(
-        &mut buffer,
-        if quality < 90 { 5 } else { 4 },
-        JPEG_TO_AVIF_QUALITY[quality as usize],
-    )
-    .with_colorspace(ColorSpace::Bt709)
-    .write_image(image.as_bytes(), width, height, image.color())?;
+    let small = (width * height) <= (256 * 256);
+    let speed = match (quality < 90, small) {
+        (true, false) => 8,  // low-quality, large image, gotta go fast
+        (true, true) => 5,   // low-quality, small image, slightly faster than default
+        (false, false) => 6, // high-quality, large image, can't spend too much time on it
+        (false, true) => 4,  // high-quality, small image, try to optimize well enough
+    };
+    let quality = JPEG_TO_AVIF_QUALITY[quality as usize];
 
-    Ok(EncodedImage {
-        buffer,
-        width,
-        height,
-        format: ImageFormat::Avif,
-    })
+    let config = Config {
+        quality: quality as f32,
+        alpha_quality: quality as f32,
+        speed,
+        premultiplied_alpha: false,
+        color_space: ColorSpace::YCbCr,
+        // try to save some parallelism on small images, but larger images require extra
+        threads: Some(if small { 1 } else { 3 }),
+    };
+
+    let res = match image {
+        DynamicImage::ImageRgb8(image) => encode_rgb(
+            Img::new(image.as_raw().as_pixels(), width as usize, height as usize),
+            &config,
+        )
+        .map(|r| r.0),
+        DynamicImage::ImageRgba8(image) => encode_rgba(
+            Img::new(image.as_raw().as_pixels(), width as usize, height as usize),
+            &config,
+        )
+        .map(|r| r.0),
+        _ => unimplemented!(),
+    };
+
+    match res {
+        Ok(buffer) => Ok(EncodedImage {
+            buffer,
+            width,
+            height,
+            format: ImageFormat::Avif,
+        }),
+        Err(err) => Err(image::ImageError::Encoding(image::error::EncodingError::new(
+            ImageFormat::Avif.into(),
+            err,
+        ))),
+    }
 }
 
 #[cfg(test)]
