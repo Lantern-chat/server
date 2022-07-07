@@ -39,6 +39,7 @@ pub fn encode_jpeg(
 
 fn try_encode_mozjpeg(image: &DynamicImage, quality: u8) -> Option<Vec<u8>> {
     let res = std::panic::catch_unwind(|| {
+        #[allow(unused_imports)]
         use mozjpeg::{qtable as Q, ColorSpace, Compress};
 
         let mut encoder = Compress::new(match image.color() {
@@ -54,11 +55,12 @@ fn try_encode_mozjpeg(image: &DynamicImage, quality: u8) -> Option<Vec<u8>> {
         encoder.set_use_scans_in_trellis(true);
         encoder.set_optimize_coding(true);
 
-        // with decreasing quality, increase smoothing, from 15% at 100 to 50% at 0
-        encoder.set_smoothing_factor({ 50u16.saturating_sub(quality as u16 * 7 / 20) } as u8);
+        // with decreasing quality, increase smoothing, from 5% at 100 to 40% at 0
+        encoder.set_smoothing_factor({ 40u16.saturating_sub(quality as u16 * 7 / 20) } as u8);
 
-        encoder.set_chroma_qtable(&Q::AnnexK_Chroma);
-        encoder.set_luma_qtable(&Q::AnnexK_Luma);
+        // NOTE: mozjpeg seems to give better results without explicit quanization tables
+        //encoder.set_chroma_qtable(&Q::NRobidoux);
+        //encoder.set_luma_qtable(&Q::NRobidoux);
 
         if quality >= 60 {
             for component in encoder.components_mut() {

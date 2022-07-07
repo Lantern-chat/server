@@ -28,18 +28,12 @@ static JPEG_TO_AVIF_QUALITY: [u8; 101] = [
 pub fn encode_avif(
     image: &DynamicImage,
     _info: &ImageInfo,
-    heuristics: HeuristicsInfo,
-    mut quality: u8,
+    _heuristics: HeuristicsInfo,
+    quality: u8,
 ) -> ImageResult<EncodedImage> {
     use image::codecs::avif::{AvifEncoder, ColorSpace};
 
     debug_assert!(quality <= 100);
-
-    // AVIF, being a video codec, can show video artifacts in dark scenes
-    if heuristics.luma_avg < 0.3 {
-        log::trace!("Increasing AVIF quality for dark image");
-        quality = quality.saturating_add(10).min(100);
-    }
 
     let mut buffer = Vec::new();
 
