@@ -1,9 +1,9 @@
 use std::io;
 
-use image::{DynamicImage, GenericImageView, ImageBuffer};
+use image::{math::Rect, DynamicImage, GenericImageView};
 
 use crate::{
-    heuristic::EdgeInfo,
+    heuristic::HeuristicsInfo,
     read_image::{Image, ImageReadError},
 };
 
@@ -16,7 +16,7 @@ pub struct ProcessConfig {
 
 pub struct ProcessedImage {
     pub preview: Option<Vec<u8>>,
-    pub edge_info: EdgeInfo,
+    pub heuristics: HeuristicsInfo,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -39,25 +39,21 @@ pub enum ProcessingError {
 
 pub mod imageops;
 
-pub fn process_image(
-    Image {
-        ref mut image,
-        ref info,
-    }: &mut Image,
-    config: ProcessConfig,
-) -> Result<ProcessedImage, ProcessingError> {
-    use image::{imageops::FilterType, math::Rect};
-
+fn compute_crop((width, height): (u32, u32), config: ProcessConfig) -> (Rect, Rect) {
     let ProcessConfig {
         max_width,
         max_height,
         ..
     } = config;
 
-    let mut width = info.width;
-    let mut height = info.height;
+    let uncropped = Rect {
+        x: 0,
+        y: 0,
+        width,
+        height,
+    };
 
-    let mut crop = None;
+    let mut cropped = uncropped;
 
     if max_width == max_height {
         // crop out the center
@@ -75,12 +71,12 @@ pub fn process_image(
                 new_height = width;
             }
 
-            crop = Some(Rect {
+            cropped = Rect {
                 x,
                 y,
                 width: new_width,
                 height: new_height,
-            });
+            };
         }
     } else {
         let desired_aspect = max_width as f32 / max_height as f32;
@@ -102,88 +98,113 @@ pub fn process_image(
                 x = (width - new_width) / 2; // center horizontally
             }
 
-            crop = Some(Rect {
+            cropped = Rect {
                 x,
                 y: 0,
                 width: new_width,
                 height: new_height,
-            });
+            };
         }
     }
 
-    // TODO: **IMPORTANT**, combine crop+resize+alpha check into a single algorithm
-    //
-    // `.resize` allocates an intermediate f32 buffer for an entire image,
-    // which could be avoid by going line-by-line. Compute the vertical filter for one line,
-    // then reduce it horizontally
+    (cropped, uncropped)
+}
 
-    if let Some(rect) = crop {
-        let Rect {
-            x,
-            y,
-            width: new_width,
-            height: new_height,
-        } = rect;
+pub fn process_image(
+    Image { ref mut image, .. }: &mut Image,
+    config: ProcessConfig,
+) -> Result<ProcessedImage, ProcessingError> {
+    let ProcessConfig {
+        max_width,
+        max_height,
+        ..
+    } = config;
 
-        log::trace!("Cropping image from {width}x{height} to {new_width}x{new_height}");
+    let (width, height) = image.dimensions();
+    let color = image.color();
 
-        //*image = match image {
-        //    DynamicImage::ImageLuma8(ref image) => imageops::crop_and_resize(image, x, y, crop_width, crop_height, new_width, new_height)
-        //}
+    let (crop, uncrop) = compute_crop((width, height), config);
 
-        *image = imageops::crop_and_reduce(image, x, y, new_width, new_height);
+    let needs_crop = crop != uncrop;
+    let needs_resize = crop.width > max_width || crop.height > max_height;
+    let needs_reduce = color.bytes_per_pixel() / color.channel_count() != 1;
 
-        width = new_width;
-        height = new_height;
-    }
+    let new_width = max_width.min(crop.width);
+    let new_height = max_height.min(crop.height);
 
-    // aspect ratio was already corrected above
-    // so really both of these comparisons should be the same
-    if width > max_width || height > max_height {
-        log::trace!("Resizing image from {width}^{height} to {max_width}^{max_height}");
-        *image = image.resize_exact(max_width, max_height, FilterType::Lanczos3);
-    }
-
-    *image = match (crate::util::actually_has_alpha(&image), image.color().has_color()) {
-        (true, true) => DynamicImage::ImageRgba8(image.to_rgba8()),
-        (false, true) => DynamicImage::ImageRgb8(image.to_rgb8()),
-        (true, false) => DynamicImage::ImageLuma8(image.to_luma8()),
-        (false, false) => DynamicImage::ImageLumaA8(image.to_luma_alpha8()),
+    *image = match (needs_crop, needs_resize, needs_reduce) {
+        (true, false, true) => imageops::crop_and_reduce(image, crop),
+        (_, true, true) => imageops::crop_and_reduce_and_resize(image, crop, new_width, new_height),
+        (false, false, _) => match crate::util::actually_has_alpha(&image) {
+            true => DynamicImage::ImageRgba8(image.to_rgba8()),
+            false => DynamicImage::ImageRgb8(image.to_rgb8()),
+        },
+        (true, false, false) => {
+            match image {
+                DynamicImage::ImageLumaA8(image) => DynamicImage::ImageRgba8(imageops::reduce_to_u8(
+                    &*image.view(crop.x, crop.y, crop.width, crop.height),
+                )),
+                DynamicImage::ImageLuma8(image) => DynamicImage::ImageRgb8(imageops::reduce_to_u8(
+                    &*image.view(crop.x, crop.y, crop.width, crop.height),
+                )),
+                DynamicImage::ImageRgb8(_) | DynamicImage::ImageRgba8(_) => {
+                    image.crop_imm(crop.x, crop.y, crop.width, crop.height)
+                }
+                // sane non-exhaustive fallback
+                _ => DynamicImage::ImageRgba8(
+                    image.crop_imm(crop.x, crop.y, crop.width, crop.height).to_rgba8(),
+                ),
+            }
+        }
+        (false, true, false) => match image {
+            DynamicImage::ImageLuma8(image) => {
+                DynamicImage::ImageRgb8(imageops::resize(&ReducedView::new(image), new_width, new_height))
+            }
+            DynamicImage::ImageLumaA8(image) => {
+                DynamicImage::ImageRgba8(imageops::resize(&ReducedView::new(image), new_width, new_height))
+            }
+            DynamicImage::ImageRgb8(image) => {
+                DynamicImage::ImageRgb8(imageops::resize(image, new_width, new_height))
+            }
+            DynamicImage::ImageRgba8(image) => {
+                DynamicImage::ImageRgba8(imageops::resize(image, new_width, new_height))
+            }
+            // sane non-exhaustive fallback
+            _ => DynamicImage::ImageRgba8(imageops::resize(image, new_width, new_height)),
+        },
+        (true, true, false) => match image {
+            DynamicImage::ImageLuma8(image) => DynamicImage::ImageRgb8(imageops::crop_and_resize(
+                &ReducedView::new(image),
+                crop,
+                new_width,
+                new_height,
+            )),
+            DynamicImage::ImageLumaA8(image) => DynamicImage::ImageRgba8(imageops::crop_and_resize(
+                &ReducedView::new(image),
+                crop,
+                new_width,
+                new_height,
+            )),
+            DynamicImage::ImageRgb8(image) => {
+                DynamicImage::ImageRgb8(imageops::crop_and_resize(image, crop, new_width, new_height))
+            }
+            DynamicImage::ImageRgba8(image) => {
+                DynamicImage::ImageRgba8(imageops::crop_and_resize(image, crop, new_width, new_height))
+            }
+            // sane non-exhaustive fallback
+            _ => DynamicImage::ImageRgba8(imageops::crop_and_resize(image, crop, new_width, new_height)),
+        },
     };
 
-    let edge_info = match image {
-        DynamicImage::ImageRgb8(ref image) => crate::heuristic::compute_edge_info(image),
-        DynamicImage::ImageRgba8(ref image) => crate::heuristic::compute_edge_info(image),
-        DynamicImage::ImageLuma8(ref image) => crate::heuristic::compute_edge_info(image),
-        DynamicImage::ImageLumaA8(ref image) => crate::heuristic::compute_edge_info(image),
+    let heuristics = match image {
+        DynamicImage::ImageRgb8(ref image) => crate::heuristic::compute_heuristics(image),
+        DynamicImage::ImageRgba8(ref image) => crate::heuristic::compute_heuristics(image),
         _ => unreachable!(),
     };
 
-    let preview = crate::encode::blurhash::gen_blurhash(&image);
+    let preview = crate::encode::blurhash::gen_blurhash(image.thumbnail(64, 64));
 
-    Ok(ProcessedImage { preview, edge_info })
-
-    // let configs = &[
-    //     (ImageFormat::Png, 100u8),
-    //     (ImageFormat::Jpeg, 95),
-    //     (ImageFormat::Jpeg, 70),
-    //     (ImageFormat::Jpeg, 45),
-    //     (ImageFormat::Avif, 99),
-    //     (ImageFormat::Avif, 80),
-    // ];
-
-    // let mut images = Vec::new();
-
-    // for &(f, mut q) in configs {
-    //     if !edge_info.use_lossy() {
-    //         q = q.saturating_add(5u8).min(100);
-    //     }
-
-    //     images.push(match crate::encode::encode(&image, &info, f, q) {
-    //         Ok(img) => img,
-    //         Err(e) => return Err(ProcessingError::Other(e.to_string())),
-    //     });
-    // }
-
-    // Ok(ProcessedImages { images, preview })
+    Ok(ProcessedImage { preview, heuristics })
 }
+
+use imageops::ReducedView;

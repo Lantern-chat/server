@@ -2,6 +2,7 @@
 name = "processing"
 version = "0.1.0"
 edition = "2021"
+publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -13,7 +14,7 @@ tracing = "0.1.26"
 png = "0.17"
 thiserror = "1.0.30"
 jpeg-decoder = { version = "0.2", default-features = false }
-# jpeg-encoder = "0.5.1"
+jpeg-encoder = "0.5.1"
 oxipng = { git = "https://github.com/Lantern-chat/oxipng", default-features = false, features = ["libdeflater", "zopfli"] }
 mozjpeg = { version = "0.9.3" }
 

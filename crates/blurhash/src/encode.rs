@@ -106,8 +106,8 @@ pub fn encode<const MULTIPLY_ALPHA: bool>(
 
     let mut factors: [[[f32; 3]; 9]; 9] = [[[0.0; 3]; 9]; 9];
 
-    for (y, y_factors) in factors.iter_mut().enumerate().take(yc) {
-        for (x, factor) in y_factors.iter_mut().enumerate().take(xc) {
+    for (y, y_factors) in factors[..yc].iter_mut().enumerate() {
+        for (x, factor) in y_factors[..xc].iter_mut().enumerate() {
             if MULTIPLY_ALPHA && channels == 4 {
                 *factor = multiply_basis_function::<MULTIPLY_ALPHA>(x, y, w, h, rgb, channels);
             } else {
@@ -125,8 +125,8 @@ pub fn encode<const MULTIPLY_ALPHA: bool>(
 
     if ac_count > 0 {
         let mut actual_max: f32 = 0.0;
-        for (y, y_factors) in factors.iter().enumerate().take(yc) {
-            for (x, factor) in y_factors.iter().enumerate().take(xc) {
+        for (y, y_factors) in factors[..yc].iter().enumerate() {
+            for (x, factor) in y_factors[..xc].iter().enumerate() {
                 if y == 0 && x == 0 {
                     continue;
                 }
@@ -147,8 +147,8 @@ pub fn encode<const MULTIPLY_ALPHA: bool>(
 
     buf.write_u32::<BigEndian>(encode_dc(factors[0][0]))?;
 
-    for (y, y_factors) in factors.iter().enumerate().take(yc) {
-        for (x, factor) in y_factors.iter().enumerate().take(xc) {
+    for (y, y_factors) in factors[..yc].iter().enumerate() {
+        for (x, factor) in y_factors[..xc].iter().enumerate() {
             if y == 0 && x == 0 {
                 continue;
             }

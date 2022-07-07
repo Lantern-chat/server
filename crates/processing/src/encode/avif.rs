@@ -1,6 +1,6 @@
 use image::{DynamicImage, GenericImageView, ImageFormat, ImageResult};
 
-use crate::read_image::ImageInfo;
+use crate::{heuristic::HeuristicsInfo, read_image::ImageInfo};
 
 use super::EncodedImage;
 
@@ -25,10 +25,21 @@ static JPEG_TO_AVIF_QUALITY: [u8; 101] = [
     73, 74, 75, 77, 78, 80, 81, 83, 85, 86, 88, 89, 91, 93, 94, 96, 98, 100,
 ];
 
-pub fn encode_avif(image: &DynamicImage, _info: &ImageInfo, quality: u8) -> ImageResult<EncodedImage> {
-    use image::codecs::avif::AvifEncoder;
+pub fn encode_avif(
+    image: &DynamicImage,
+    _info: &ImageInfo,
+    heuristics: HeuristicsInfo,
+    mut quality: u8,
+) -> ImageResult<EncodedImage> {
+    use image::codecs::avif::{AvifEncoder, ColorSpace};
 
     debug_assert!(quality <= 100);
+
+    // AVIF, being a video codec, can show video artifacts in dark scenes
+    if heuristics.luma_avg < 0.3 {
+        log::trace!("Increasing AVIF quality for dark image");
+        quality = quality.saturating_add(10).min(100);
+    }
 
     let mut buffer = Vec::new();
 
@@ -39,6 +50,7 @@ pub fn encode_avif(image: &DynamicImage, _info: &ImageInfo, quality: u8) -> Imag
         if quality < 90 { 5 } else { 4 },
         JPEG_TO_AVIF_QUALITY[quality as usize],
     )
+    .with_colorspace(ColorSpace::Bt709)
     .write_image(image.as_bytes(), width, height, image.color())?;
 
     Ok(EncodedImage {

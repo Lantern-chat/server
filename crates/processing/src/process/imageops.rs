@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use image::{DynamicImage, GenericImageView, ImageBuffer, Pixel, SubImage};
+use image::{math::Rect, DynamicImage, GenericImageView, ImageBuffer, Pixel};
 
 fn sinc(mut a: f32) -> f32 {
     a *= std::f32::consts::PI;
@@ -21,10 +21,7 @@ fn lanczos(x: f32, t: f32) -> f32 {
 
 pub fn crop_and_resize<I, P>(
     image: &I,
-    x: u32,
-    y: u32,
-    crop_width: u32,
-    crop_height: u32,
+    rect: Rect,
     new_width: u32,
     new_height: u32,
 ) -> ImageBuffer<P, Vec<u8>>
@@ -32,8 +29,7 @@ where
     I: GenericImageView<Pixel = P>,
     P: Pixel<Subpixel = u8>,
 {
-    let view = image.view(x, y, crop_width, crop_height);
-
+    let view = image.view(rect.x, rect.y, rect.width, rect.height);
     resize(&*view, new_width, new_height)
 }
 
@@ -213,15 +209,35 @@ impl ReduceSubpixel for f32 {
 }
 
 pub struct ReducedView<'a, S, P> {
-    inner: SubImage<&'a S>,
+    inner: &'a S,
     _pixel: PhantomData<P>,
 }
 
-impl<S, P, SP> GenericImageView for ReducedView<'_, S, P>
+impl<'a, S, P> ReducedView<'a, S, P> {
+    pub fn new(inner: &'a S) -> Self {
+        ReducedView {
+            inner,
+            _pixel: PhantomData,
+        }
+    }
+}
+
+pub type GenericImageViewPixel<S> = <S as GenericImageView>::Pixel;
+pub type GenericImageViewSubpixel<S> = <GenericImageViewPixel<S> as Pixel>::Subpixel;
+
+fn integer_luma(r: u8, g: u8, b: u8) -> u8 {
+    // 255 * 72(max channel) * 3 <= 2^16-1
+    let r = r as u16 * 21;
+    let g = g as u16 * 72;
+    let b = b as u16 * 7;
+
+    ((r + g + b) / 100).min(255) as u8
+}
+
+impl<S, P> GenericImageView for ReducedView<'_, S, P>
 where
-    S: GenericImageView<Pixel = SP>,
-    SP: Pixel,
-    <SP as Pixel>::Subpixel: ReduceSubpixel,
+    S: GenericImageView,
+    GenericImageViewSubpixel<S>: ReduceSubpixel,
     P: Pixel<Subpixel = u8>,
 {
     type Pixel = P;
@@ -238,11 +254,58 @@ where
 
     #[inline]
     fn get_pixel(&self, x: u32, y: u32) -> Self::Pixel {
-        let channels = &mut [0u8; 4][..P::CHANNEL_COUNT as usize];
+        let mut channels = [0u8; 4];
         for (dst, src) in channels.iter_mut().zip(self.inner.get_pixel(x, y).channels()) {
             *dst = src.to_u8();
         }
-        *P::from_slice(&channels)
+
+        match (
+            <GenericImageViewPixel<S> as Pixel>::CHANNEL_COUNT,
+            P::CHANNEL_COUNT,
+        ) {
+            // L -> RGB
+            (1, 3) => {
+                channels[1] = channels[0];
+                channels[2] = channels[0];
+            }
+            // L -> RGBA
+            (1, 4) => {
+                channels[1] = channels[0];
+                channels[2] = channels[0];
+                channels[3] = 255;
+            }
+            // LA -> RGBA
+            (2, 4) => {
+                // move alpha
+                channels[3] = channels[1];
+                // L->RGB
+                channels[1] = channels[0];
+                channels[2] = channels[0];
+            }
+            // RGB -> RGBA (give full opacity)
+            (3, 4) => {
+                channels[3] = 255;
+            }
+            // RGBA -> LA
+            (4, 2) => {
+                channels[0] = integer_luma(channels[0], channels[1], channels[2]);
+
+                // move alpha
+                channels[1] = channels[3];
+            }
+            // RGB -> LA
+            (3, 2) => {
+                channels[0] = integer_luma(channels[0], channels[1], channels[2]);
+                channels[1] = 255;
+            }
+            // RGBA -> L
+            (3 | 4, 1) => {
+                channels[0] = integer_luma(channels[0], channels[1], channels[2]);
+            }
+            _ => {}
+        }
+
+        *P::from_slice(&channels[..P::CHANNEL_COUNT as usize])
     }
 }
 
@@ -255,28 +318,31 @@ where
 {
     let (width, height) = image.dimensions();
     let mut out: ImageBuffer<P, Vec<u8>> = ImageBuffer::new(width, height);
+    let view = ReducedView::<_, P>::new(image);
 
-    for (dst, (_, _, src)) in out.pixels_mut().zip(image.pixels()) {
-        for (dc, sc) in dst.channels_mut().iter_mut().zip(src.channels()) {
-            *dc = sc.to_u8();
+    for (dst, (_, _, src)) in out.pixels_mut().zip(view.pixels()) {
+        for (dc, &sc) in dst.channels_mut().iter_mut().zip(src.channels()) {
+            *dc = sc;
         }
     }
 
     out
 }
 
-pub fn crop_and_reduce(image: &DynamicImage, x: u32, y: u32, width: u32, height: u32) -> DynamicImage {
+pub fn crop_and_reduce(image: &DynamicImage, Rect { x, y, width, height }: Rect) -> DynamicImage {
     match image {
-        DynamicImage::ImageLuma8(_)
-        | DynamicImage::ImageLumaA8(_)
-        | DynamicImage::ImageRgb8(_)
-        | DynamicImage::ImageRgba8(_) => image.crop_imm(x, y, width, height),
-
+        DynamicImage::ImageRgb8(_) | DynamicImage::ImageRgba8(_) => image.crop_imm(x, y, width, height),
+        DynamicImage::ImageLuma8(img) => {
+            DynamicImage::ImageRgb8(reduce_to_u8(&*img.view(x, y, width, height)))
+        }
+        DynamicImage::ImageLumaA8(img) => {
+            DynamicImage::ImageRgba8(reduce_to_u8(&*img.view(x, y, width, height)))
+        }
         DynamicImage::ImageLuma16(img) => {
-            DynamicImage::ImageLuma8(reduce_to_u8(&*img.view(x, y, width, height)))
+            DynamicImage::ImageRgb8(reduce_to_u8(&*img.view(x, y, width, height)))
         }
         DynamicImage::ImageLumaA16(img) => {
-            DynamicImage::ImageLumaA8(reduce_to_u8(&*img.view(x, y, width, height)))
+            DynamicImage::ImageRgba8(reduce_to_u8(&*img.view(x, y, width, height)))
         }
         DynamicImage::ImageRgb16(img) => {
             DynamicImage::ImageRgb8(reduce_to_u8(&*img.view(x, y, width, height)))
@@ -295,13 +361,76 @@ pub fn crop_and_reduce(image: &DynamicImage, x: u32, y: u32, width: u32, height:
         _ => {
             let image = image.crop_imm(x, y, width, height);
 
-            let color = image.color();
+            match image.color().has_alpha() {
+                true => DynamicImage::ImageRgba8(image.to_rgba8()),
+                false => DynamicImage::ImageRgb8(image.to_rgb8()),
+            }
+        }
+    }
+}
 
-            match (color.has_alpha(), color.has_alpha()) {
-                (true, true) => DynamicImage::ImageRgba8(image.to_rgba8()),
-                (true, false) => DynamicImage::ImageRgb8(image.to_rgb8()),
-                (false, true) => DynamicImage::ImageLumaA8(image.to_luma_alpha8()),
-                (false, false) => DynamicImage::ImageLuma8(image.to_luma8()),
+pub fn crop_and_reduce_and_resize(
+    image: &DynamicImage,
+    Rect { x, y, width, height }: Rect,
+    new_width: u32,
+    new_height: u32,
+) -> DynamicImage {
+    match image {
+        DynamicImage::ImageLuma8(image) => DynamicImage::ImageRgb8(resize(
+            &ReducedView::new(&*image.view(x, y, width, height)),
+            new_width,
+            new_height,
+        )),
+        DynamicImage::ImageLumaA8(image) => DynamicImage::ImageRgba8(resize(
+            &ReducedView::new(&*image.view(x, y, width, height)),
+            new_width,
+            new_height,
+        )),
+        DynamicImage::ImageRgb8(image) => {
+            DynamicImage::ImageRgb8(resize(&*image.view(x, y, width, height), new_width, new_height))
+        }
+        DynamicImage::ImageRgba8(image) => {
+            DynamicImage::ImageRgba8(resize(&*image.view(x, y, width, height), new_width, new_height))
+        }
+
+        DynamicImage::ImageLuma16(img) => DynamicImage::ImageRgb8(resize(
+            &ReducedView::new(&*img.view(x, y, width, height)),
+            new_width,
+            new_height,
+        )),
+        DynamicImage::ImageLumaA16(img) => DynamicImage::ImageRgba8(resize(
+            &ReducedView::new(&*img.view(x, y, width, height)),
+            new_width,
+            new_height,
+        )),
+        DynamicImage::ImageRgb16(img) => DynamicImage::ImageRgb8(resize(
+            &ReducedView::new(&*img.view(x, y, width, height)),
+            new_width,
+            new_height,
+        )),
+        DynamicImage::ImageRgba16(img) => DynamicImage::ImageRgba8(resize(
+            &ReducedView::new(&*img.view(x, y, width, height)),
+            new_width,
+            new_height,
+        )),
+        DynamicImage::ImageRgb32F(img) => DynamicImage::ImageRgb8(resize(
+            &ReducedView::new(&*img.view(x, y, width, height)),
+            new_width,
+            new_height,
+        )),
+        DynamicImage::ImageRgba32F(img) => DynamicImage::ImageRgba8(resize(
+            &ReducedView::new(&*img.view(x, y, width, height)),
+            new_width,
+            new_height,
+        )),
+
+        // DynamicImage is non-exhaustive, so fallback to two-step crop and convert
+        _ => {
+            let image = image.crop_imm(x, y, width, height);
+
+            match image.color().has_alpha() {
+                true => DynamicImage::ImageRgba8(image.to_rgba8()),
+                false => DynamicImage::ImageRgb8(image.to_rgb8()),
             }
         }
     }

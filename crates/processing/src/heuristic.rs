@@ -1,18 +1,19 @@
 use image::{GenericImageView, Pixel};
 
 #[derive(Debug, Clone, Copy)]
-pub struct EdgeInfo {
-    pub average: f64,
-    pub variance: f64,
+pub struct HeuristicsInfo {
+    pub luma_avg: f64,
+    pub edge_average: f64,
+    pub edge_variance: f64,
 }
 
-impl EdgeInfo {
+impl HeuristicsInfo {
     // NOTE: This is a guestimate
     pub fn use_lossy(&self) -> bool {
         // try to avoid images that have many lines
-        self.average < 0.035 && self.variance < 0.013
-        // but if it has very little high-freq details, use PNG
-        && (self.average > 0.005 || self.variance < 0.001)
+        self.edge_average < 0.035 && self.edge_variance < 0.013
+        // if it has very little high-freq details
+        && (self.edge_average > 0.005 || self.edge_variance < 0.001)
     }
 }
 
@@ -76,7 +77,15 @@ const LAPLACIAN: [f32; 9] = [
     -1.0, -1.0, -1.0,
 ];
 
-pub fn compute_edge_info<I, P>(image: &I) -> EdgeInfo
+#[rustfmt::skip]
+#[inline]
+fn luma([r, g, b]: [f32; 3]) -> f32 {
+    0.212671 * r +
+    0.715160 * g +
+    0.072169 * b
+}
+
+pub fn compute_heuristics<I, P>(image: &I) -> HeuristicsInfo
 where
     I: GenericImageView<Pixel = P>,
     P: Pixel<Subpixel = u8>,
@@ -85,23 +94,31 @@ where
     let n = (width as u64 * height as u64) as f64;
     let weight = 1.0 / n;
 
-    let mut average = 0.0;
+    let mut luma_avg = 0.0;
+    let mut edge_average = 0.0;
     let mut sumsq = 0.0;
 
-    apply_kernel(image, LAPLACIAN, |_x, _y, [r, g, b]| {
-        #[rustfmt::skip]
-            let luma =
-                0.212671 * r as f64 +
-                0.715160 * g as f64 +
-                0.072169 * b as f64;
+    apply_kernel(image, LAPLACIAN, |x, y, edge| {
+        let p = image.get_pixel(x, y).to_rgb();
 
-        average += weight * luma;
+        luma_avg += {
+            let mut rgb = [0.0f32; 3];
+            for (dst, &src) in rgb.iter_mut().zip(p.channels()) {
+                *dst = src as f32 * (1.0 / 255.0);
+            }
+            weight * luma(rgb) as f64
+        };
+
+        let luma = luma(edge) as f64;
+
+        edge_average += weight * luma;
         sumsq += luma * luma;
     });
 
-    EdgeInfo {
-        average,
+    HeuristicsInfo {
+        luma_avg,
+        edge_average,
         // NOTE: since weight is 1/n, this may be slightly biased
-        variance: (sumsq - (average * average) * n) * weight,
+        edge_variance: (sumsq - (edge_average * edge_average) * n) * weight,
     }
 }
