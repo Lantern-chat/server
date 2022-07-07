@@ -5,14 +5,8 @@ use image::{math::Rect, DynamicImage, GenericImageView};
 use crate::{
     heuristic::HeuristicsInfo,
     read_image::{Image, ImageReadError},
+    ProcessConfig,
 };
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ProcessConfig {
-    pub max_width: u32,
-    pub max_height: u32,
-    pub max_pixels: u32,
-}
 
 pub struct ProcessedImage {
     pub preview: Option<Vec<u8>>,

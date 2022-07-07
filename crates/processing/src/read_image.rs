@@ -16,12 +16,9 @@ pub struct Image {
     pub info: ImageInfo,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct Limits {
-    pub max_pixels: u32,
-}
-
 use std::io::{self, BufRead, Read, Seek};
+
+use crate::ProcessConfig;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ImageReadError {
@@ -47,7 +44,7 @@ pub enum ImageReadError {
     Unsupported,
 }
 
-pub fn read_image<R: BufRead + Seek>(mut source: R, limits: &Limits) -> Result<Image, ImageReadError> {
+pub fn read_image<R: BufRead + Seek>(mut source: R, config: &ProcessConfig) -> Result<Image, ImageReadError> {
     let mut any_magic_bytes = Vec::with_capacity(32);
     source.read_until(32, &mut any_magic_bytes)?;
 
@@ -59,8 +56,8 @@ pub fn read_image<R: BufRead + Seek>(mut source: R, limits: &Limits) -> Result<I
     source.rewind()?;
 
     match format {
-        ImageFormat::Png => read_png(source, limits),
-        ImageFormat::Jpeg => read_jpeg(source, limits),
+        ImageFormat::Png => read_png(source, config),
+        ImageFormat::Jpeg => read_jpeg(source, config),
         _ => {
             let (width, height) = {
                 let mut reader = Reader::new(&mut source);
@@ -72,7 +69,7 @@ pub fn read_image<R: BufRead + Seek>(mut source: R, limits: &Limits) -> Result<I
                 }
             };
 
-            if (width as u64 * height as u64) > limits.max_pixels as u64 {
+            if (width as u64 * height as u64) > config.max_pixels as u64 {
                 return Err(ImageReadError::ImageTooLarge);
             }
 
@@ -112,22 +109,33 @@ macro_rules! from_raw {
 }
 
 /// Reads in a PNG image, converting it to 8-bit color channels and checking limits first
-fn read_png<R: Read>(source: R, limits: &Limits) -> Result<Image, ImageReadError> {
+///
+/// TODO: Convert this to a scan-line reader that can resize the input line-by-line
+fn read_png<R: Read>(source: R, config: &ProcessConfig) -> Result<Image, ImageReadError> {
     use png::{BitDepth, ColorType, Decoder, Transformations};
 
     let mut decoder = Decoder::new(source);
     decoder.set_transformations(Transformations::EXPAND | Transformations::STRIP_16);
+    decoder.set_ignore_text_chunk(true);
 
     let mut reader = decoder.read_info()?;
 
     let mut info = {
-        let image_info = reader.info();
+        let info = reader.info();
 
-        if (image_info.width as u64 * image_info.height as u64) > limits.max_pixels as u64 {
+        if (info.width as u64 * info.height as u64) > config.max_pixels as u64 {
             return Err(ImageReadError::ImageTooLarge);
         }
 
-        copy_png_info(image_info)
+        ImageInfo {
+            icc_profile: info.icc_profile.as_ref().map(|icc| icc.to_vec()),
+            width: info.width,
+            height: info.height,
+            pixel_dims: info.pixel_dims,
+            source_gamma: info.source_gamma,
+            source_chromaticities: info.source_chromaticities,
+            srgb: info.srgb,
+        }
     };
 
     let mut buf = vec![0u8; reader.output_buffer_size()];
@@ -153,28 +161,18 @@ fn read_png<R: Read>(source: R, limits: &Limits) -> Result<Image, ImageReadError
     Ok(Image { image, info })
 }
 
-fn copy_png_info(src: &png::Info) -> ImageInfo {
-    ImageInfo {
-        icc_profile: src.icc_profile.as_ref().map(|icc| icc.to_vec()),
-        width: src.width,
-        height: src.height,
-        pixel_dims: src.pixel_dims,
-        source_gamma: src.source_gamma,
-        source_chromaticities: src.source_chromaticities,
-        srgb: src.srgb,
-    }
-}
-
-fn read_jpeg<R: Read>(source: R, limits: &Limits) -> Result<Image, ImageReadError> {
+fn read_jpeg<R: Read>(source: R, config: &ProcessConfig) -> Result<Image, ImageReadError> {
     use jpeg_decoder::{Decoder, PixelFormat};
 
     let mut decoder = Decoder::new(source);
+
+    decoder.scale(config.max_width as u16, config.max_height as u16)?;
 
     decoder.read_info()?;
 
     let image_info = decoder.info().unwrap();
 
-    if (image_info.width as u64 * image_info.height as u64) > limits.max_pixels as u64 {
+    if (image_info.width as u64 * image_info.height as u64) > config.max_pixels as u64 {
         return Err(ImageReadError::ImageTooLarge);
     }
 
