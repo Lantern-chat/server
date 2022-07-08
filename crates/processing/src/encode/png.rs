@@ -68,8 +68,8 @@ pub fn encode_png(image: &DynamicImage, info: &ImageInfo, quality: u8) -> io::Re
 
     let small = num_pixels <= (256 * 256);
     let mut opts = oxipng::Options::from_preset(if small { 3 } else { 1 });
-    opts.palette_reduction = small;
-    opts.use_heuristics = !small;
+    opts.palette_reduction = true;
+    opts.bit_depth_reduction = quality <= 60;
 
     let out = match oxipng::optimize_from_memory(&out, &opts) {
         Ok(new_out) => {
