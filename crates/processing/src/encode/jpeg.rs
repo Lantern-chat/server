@@ -1,3 +1,5 @@
+use std::io::{Seek, Write};
+
 use image::{
     error::{EncodingError, ImageFormatHint},
     ColorType, DynamicImage, GenericImageView, ImageError, ImageFormat, ImageResult,
@@ -5,40 +7,31 @@ use image::{
 
 use crate::{heuristic::HeuristicsInfo, read_image::ImageInfo};
 
-use super::EncodedImage;
-
 #[allow(unused)]
-pub fn encode_jpeg(
+pub fn encode_jpeg<W: Write + Seek>(
+    mut w: W,
     image: &DynamicImage,
     info: &ImageInfo,
     heuristics: HeuristicsInfo,
     mut quality: u8,
-) -> ImageResult<EncodedImage> {
+) -> ImageResult<()> {
     debug_assert!(quality <= 100);
 
     if !heuristics.use_lossy() {
         quality = quality.saturating_add(10).min(100);
     }
 
-    let out = match try_encode_mozjpeg(image, quality) {
-        Some(out) => out,
-        None => encode_fallback(image, quality)?,
-    };
+    if !try_encode_mozjpeg(&mut w, image, quality)? {
+        w.rewind()?;
 
-    log::trace!("JPEG Encoder produced {} bytes", out.len());
+        encode_fallback(&mut w, image, quality)?;
+    }
 
-    let (width, height) = image.dimensions();
-
-    Ok(EncodedImage {
-        buffer: out,
-        width,
-        height,
-        format: ImageFormat::Jpeg,
-    })
+    Ok(())
 }
 
-fn try_encode_mozjpeg(image: &DynamicImage, quality: u8) -> Option<Vec<u8>> {
-    let res = std::panic::catch_unwind(|| {
+fn try_encode_mozjpeg<W: Write>(mut w: W, image: &DynamicImage, quality: u8) -> Result<bool, std::io::Error> {
+    let res = std::panic::catch_unwind(move || {
         #[allow(unused_imports)]
         use mozjpeg::{qtable as Q, ColorSpace, Compress};
 
@@ -74,44 +67,47 @@ fn try_encode_mozjpeg(image: &DynamicImage, quality: u8) -> Option<Vec<u8>> {
         assert!(encoder.write_scanlines(image.as_bytes()));
         encoder.finish_compress();
 
-        encoder.data_to_vec().unwrap()
+        encoder
     });
 
+    // NOTE: Getting the output slice and dropping the encoder should be
+    // safe, unless there is a double-free or something obscure that actually
+    // warrants a panic
+
     match res {
-        Ok(res) => Some(res),
+        Ok(mut encoder) => match encoder.data_as_mut_slice() {
+            Ok(buf) => w.write_all(buf).map(|_| true),
+            Err(_) => Ok(false),
+        },
         Err(_) => {
             log::error!("Error encoding JPEG with mozjpeg");
 
-            None
+            Ok(false)
         }
     }
 }
 
-fn encode_fallback(image: &DynamicImage, quality: u8) -> ImageResult<Vec<u8>> {
+fn encode_fallback<W: Write>(w: W, image: &DynamicImage, quality: u8) -> ImageResult<()> {
     use jpeg_encoder::{ColorType as C, Encoder, QuantizationTableType as Q, SamplingFactor as S};
 
-    let mut out = Vec::new();
-
-    let mut encoder = Encoder::new(&mut out, quality);
+    let mut encoder = Encoder::new(w, quality);
     encoder.set_optimized_huffman_tables(true);
     encoder.set_quantization_tables(Q::ImageMagick, Q::ImageMagick);
     encoder.set_sampling_factor(S::F_1_1);
 
     let (width, height) = image.dimensions();
-    encoder
-        .encode(
-            image.as_bytes(),
-            width as u16,
-            height as u16,
-            match image.color() {
-                ColorType::Rgb8 => C::Rgb,
-                ColorType::L8 => C::Luma,
-                _ => unreachable!(),
-            },
-        )
-        .map_err(|e| {
-            ImageError::Encoding(EncodingError::new(ImageFormatHint::Exact(ImageFormat::Jpeg), e))
-        })?;
 
-    Ok(out)
+    let res = encoder.encode(
+        image.as_bytes(),
+        width as u16,
+        height as u16,
+        match image.color() {
+            ColorType::Rgb8 => C::Rgb,
+            ColorType::Rgba8 => C::Rgba,
+            ColorType::L8 => C::Luma,
+            _ => unreachable!(),
+        },
+    );
+
+    res.map_err(|e| ImageError::Encoding(EncodingError::new(ImageFormatHint::Exact(ImageFormat::Jpeg), e)))
 }

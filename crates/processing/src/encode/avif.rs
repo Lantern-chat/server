@@ -1,8 +1,8 @@
+use std::io::Write;
+
 use image::{DynamicImage, GenericImageView, ImageFormat, ImageResult};
 
 use crate::{heuristic::HeuristicsInfo, read_image::ImageInfo};
-
-use super::EncodedImage;
 
 #[cfg(test)]
 fn map_jpeg_to_avif_quality(q: u8) -> u8 {
@@ -25,12 +25,13 @@ static JPEG_TO_AVIF_QUALITY: [u8; 101] = [
     73, 74, 75, 77, 78, 80, 81, 83, 85, 86, 88, 89, 91, 93, 94, 96, 98, 100,
 ];
 
-pub fn encode_avif(
+pub fn encode_avif<W: Write>(
+    mut w: W,
     image: &DynamicImage,
     _info: &ImageInfo,
     _heuristics: HeuristicsInfo,
     quality: u8,
-) -> ImageResult<EncodedImage> {
+) -> ImageResult<()> {
     use ravif::{encode_rgb, encode_rgba, ColorSpace, Config, Img};
     use rgb::AsPixels;
 
@@ -71,12 +72,13 @@ pub fn encode_avif(
         _ => unimplemented!(),
     };
 
+    // TODO: Figure out a better way to write directly to the writer?
+    // the av1 serializer supports merging components into a stream,
+    // but ravif chooses to put it all in a Vec
+
     match res {
-        Ok(buffer) => Ok(EncodedImage {
-            buffer,
-            width,
-            height,
-            format: ImageFormat::Avif,
+        Ok(buffer) => Ok({
+            w.write_all(&buffer)?;
         }),
         Err(err) => Err(image::ImageError::Encoding(image::error::EncodingError::new(
             ImageFormat::Avif.into(),

@@ -1,13 +1,11 @@
-use image::{ColorType, DynamicImage, GenericImageView, ImageFormat};
-use std::io;
+use image::{ColorType, DynamicImage, GenericImageView};
+use std::io::{self, Write};
 
 use crate::read_image::ImageInfo;
 
-use super::EncodedImage;
-
 // TODO: Work on color space parts
 #[allow(unused_imports, unused_variables)]
-pub fn encode_png(image: &DynamicImage, info: &ImageInfo, quality: u8) -> io::Result<EncodedImage> {
+pub fn encode_png<W: Write>(mut w: W, image: &DynamicImage, info: &ImageInfo, quality: u8) -> io::Result<()> {
     use png::{
         AdaptiveFilterType, BitDepth, Compression, Encoder as PngEncoder, FilterType, ScaledFloat,
         SourceChromaticities, SrgbRenderingIntent,
@@ -38,7 +36,7 @@ pub fn encode_png(image: &DynamicImage, info: &ImageInfo, quality: u8) -> io::Re
     });
 
     //encoder.set_trns(&[0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8] as &'static [u8]);
-    encoder.set_compression(Compression::Huffman);
+    encoder.set_compression(Compression::Fast);
     encoder.set_filter(FilterType::NoFilter);
     encoder.set_adaptive_filter(AdaptiveFilterType::NonAdaptive);
 
@@ -87,10 +85,7 @@ pub fn encode_png(image: &DynamicImage, info: &ImageInfo, quality: u8) -> io::Re
         out.len()
     );
 
-    Ok(EncodedImage {
-        buffer: out,
-        width,
-        height,
-        format: ImageFormat::Png,
+    Ok({
+        w.write_all(&out)?;
     })
 }
