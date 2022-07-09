@@ -234,6 +234,54 @@ fn integer_luma(r: u8, g: u8, b: u8) -> u8 {
     ((r + g + b) / 100).min(255) as u8
 }
 
+#[inline(always)]
+pub fn reduce_pixel<FROM: Pixel, TO: Pixel>(mut channels: [u8; 4]) -> [u8; 4] {
+    match (FROM::CHANNEL_COUNT, TO::CHANNEL_COUNT) {
+        // L -> RGB
+        (1, 3) => {
+            channels[1] = channels[0];
+            channels[2] = channels[0];
+        }
+        // L -> RGBA
+        (1, 4) => {
+            channels[1] = channels[0];
+            channels[2] = channels[0];
+            channels[3] = 255;
+        }
+        // LA -> RGBA
+        (2, 4) => {
+            // move alpha
+            channels[3] = channels[1];
+            // L->RGB
+            channels[1] = channels[0];
+            channels[2] = channels[0];
+        }
+        // RGB -> RGBA (give full opacity)
+        (3, 4) => {
+            channels[3] = 255;
+        }
+        // RGBA -> LA
+        (4, 2) => {
+            channels[0] = integer_luma(channels[0], channels[1], channels[2]);
+
+            // move alpha
+            channels[1] = channels[3];
+        }
+        // RGB -> LA
+        (3, 2) => {
+            channels[0] = integer_luma(channels[0], channels[1], channels[2]);
+            channels[1] = 255;
+        }
+        // RGBA -> L
+        (3 | 4, 1) => {
+            channels[0] = integer_luma(channels[0], channels[1], channels[2]);
+        }
+        _ => {}
+    }
+
+    channels
+}
+
 impl<S, P> GenericImageView for ReducedView<'_, S, P>
 where
     S: GenericImageView,
@@ -259,51 +307,7 @@ where
             *dst = src.to_u8();
         }
 
-        match (
-            <GenericImageViewPixel<S> as Pixel>::CHANNEL_COUNT,
-            P::CHANNEL_COUNT,
-        ) {
-            // L -> RGB
-            (1, 3) => {
-                channels[1] = channels[0];
-                channels[2] = channels[0];
-            }
-            // L -> RGBA
-            (1, 4) => {
-                channels[1] = channels[0];
-                channels[2] = channels[0];
-                channels[3] = 255;
-            }
-            // LA -> RGBA
-            (2, 4) => {
-                // move alpha
-                channels[3] = channels[1];
-                // L->RGB
-                channels[1] = channels[0];
-                channels[2] = channels[0];
-            }
-            // RGB -> RGBA (give full opacity)
-            (3, 4) => {
-                channels[3] = 255;
-            }
-            // RGBA -> LA
-            (4, 2) => {
-                channels[0] = integer_luma(channels[0], channels[1], channels[2]);
-
-                // move alpha
-                channels[1] = channels[3];
-            }
-            // RGB -> LA
-            (3, 2) => {
-                channels[0] = integer_luma(channels[0], channels[1], channels[2]);
-                channels[1] = 255;
-            }
-            // RGBA -> L
-            (3 | 4, 1) => {
-                channels[0] = integer_luma(channels[0], channels[1], channels[2]);
-            }
-            _ => {}
-        }
+        channels = reduce_pixel::<S::Pixel, P>(channels);
 
         *P::from_slice(&channels[..P::CHANNEL_COUNT as usize])
     }

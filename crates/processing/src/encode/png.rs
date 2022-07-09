@@ -32,6 +32,8 @@ pub fn encode_png<W: Write>(mut w: W, image: &DynamicImage, info: &ImageInfo, qu
     encoder.set_color(match color {
         ColorType::Rgb8 => png::ColorType::Rgb,
         ColorType::Rgba8 => png::ColorType::Rgba,
+        ColorType::L8 => png::ColorType::Grayscale,
+        ColorType::La8 => png::ColorType::GrayscaleAlpha,
         _ => unreachable!(),
     });
 
