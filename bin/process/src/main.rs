@@ -9,7 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut stderr = io::stderr();
 
     // TODO: Use stderr to send back results of operations,
-    // OR use some kind of framed writer to sending
+    // OR use some kind of framed writer to send
     // back delimited chunks through stdout
 
     let mut processed_image = None;
