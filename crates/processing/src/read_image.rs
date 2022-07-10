@@ -1,4 +1,4 @@
-use image::{io::Reader, DynamicImage, ImageBuffer, ImageFormat};
+use image::{DynamicImage, ImageBuffer, ImageDecoder, ImageFormat};
 use png::{PixelDimensions, ScaledFloat, SourceChromaticities, SrgbRenderingIntent};
 
 pub struct ImageInfo {
@@ -16,7 +16,7 @@ pub struct Image {
     pub info: ImageInfo,
 }
 
-use std::io::{self, BufRead, Read, Seek};
+use std::io::{self, Read};
 
 use crate::ProcessConfig;
 
@@ -44,10 +44,16 @@ pub enum ImageReadError {
     Unsupported,
 }
 
-pub fn read_image<R: BufRead + Seek>(mut source: R, config: &ProcessConfig) -> Result<Image, ImageReadError> {
+pub fn read_image<R: Read>(
+    unbuffered_source: R,
+    config: &ProcessConfig,
+    length_hint: Option<u64>,
+) -> Result<Image, ImageReadError> {
+    let mut source = unbuffered_source;
+    let mut any_magic_bytes = Vec::with_capacity(32);
+
     let format = {
-        let mut any_magic_bytes = Vec::with_capacity(32);
-        source.read_until(32, &mut any_magic_bytes)?;
+        (&mut source).take(32).read_to_end(&mut any_magic_bytes)?;
 
         match image::guess_format(&any_magic_bytes) {
             Ok(format) => format,
@@ -55,50 +61,79 @@ pub fn read_image<R: BufRead + Seek>(mut source: R, config: &ProcessConfig) -> R
         }
     };
 
-    source.rewind()?;
+    // re-use format bytes, + bufreader to amatorize the chain logic + speed up decoding
+    let source = io::BufReader::new(any_magic_bytes.chain(source));
 
     match format {
         ImageFormat::Png => read_png(source, config),
         ImageFormat::Jpeg => read_jpeg(source, config),
+        ImageFormat::Gif => read_generic(image::codecs::gif::GifDecoder::new(source)?, config),
+        ImageFormat::WebP => read_generic(image::codecs::webp::WebPDecoder::new(source)?, config),
+        ImageFormat::Pnm => read_generic(image::codecs::pnm::PnmDecoder::new(source)?, config),
         _ => {
-            let (width, height) = {
-                let mut reader = Reader::new(&mut source);
-                reader.set_format(format);
+            // TODO: Pass this value as a config?
+            let max_file_size: usize = 10 * 1024 * 1024;
 
-                match reader.into_dimensions() {
-                    Ok(dim) => dim,
-                    Err(_) => return Err(ImageReadError::InvalidImageFormat),
+            match length_hint {
+                Some(length) if length >= max_file_size as u64 => {
+                    return Err(ImageReadError::ImageTooLarge);
                 }
-            };
+                _ => {}
+            }
 
-            if (width as u64 * height as u64) > config.max_pixels as u64 {
+            // These formats REQUIRE Read+Seek, so buffer 10MiB or so and hope that's enough
+
+            let mut buffer = Vec::new();
+
+            if max_file_size >= source.take(max_file_size as u64).read_to_end(&mut buffer)? {
                 return Err(ImageReadError::ImageTooLarge);
             }
 
-            source.rewind()?;
+            let source = io::Cursor::new(buffer);
 
-            let mut reader = Reader::new(source);
-            reader.set_format(format);
-
-            let image = match reader.decode() {
-                Ok(image) => image,
-                Err(_) => return Err(ImageReadError::InvalidImageFormat),
-            };
-
-            Ok(Image {
-                image,
-                info: ImageInfo {
-                    width,
-                    height,
-                    source_gamma: None,
-                    source_chromaticities: None,
-                    icc_profile: None,
-                    srgb: None,
-                    pixel_dims: None,
-                },
-            })
+            match format {
+                ImageFormat::Tiff => read_generic(image::codecs::tiff::TiffDecoder::new(source)?, config),
+                ImageFormat::Tga => read_generic(image::codecs::tga::TgaDecoder::new(source)?, config),
+                ImageFormat::Bmp => read_generic(image::codecs::bmp::BmpDecoder::new(source)?, config),
+                ImageFormat::Ico => read_generic(image::codecs::ico::IcoDecoder::new(source)?, config),
+                _ => Err(ImageReadError::InvalidImageFormat),
+            }
         }
+        //ImageFormat::Dds => read_generic(image::codecs::dds::DdsDecoder::new(source)?, config),
+        //ImageFormat::Hdr => read_generic(image::codecs::hdr::HdrDecoder::new(source)?, config),
+        //ImageFormat::OpenExr => read_generic(image::codecs::openexr::OpenExrDecoder::new(source)?, config),
+        //ImageFormat::Farbfeld => read_generic(image::codecs::farbfeld::FarbfieldDecoder::new(source)?, config),
+        //ImageFormat::Avif => read_generic(image::codecs::gif::GifDecoder::new(source)?, config),
     }
+}
+
+fn read_generic<'a, D: ImageDecoder<'a>>(
+    decoder: D,
+    config: &ProcessConfig,
+) -> Result<Image, ImageReadError> {
+    let (width, height) = decoder.dimensions();
+
+    if (width as u64 * height as u64) > config.max_pixels as u64 {
+        return Err(ImageReadError::ImageTooLarge);
+    }
+
+    let image = match DynamicImage::from_decoder(decoder) {
+        Ok(image) => image,
+        Err(_) => return Err(ImageReadError::InvalidImageFormat),
+    };
+
+    Ok(Image {
+        image,
+        info: ImageInfo {
+            width,
+            height,
+            source_gamma: None,
+            source_chromaticities: None,
+            icc_profile: None,
+            srgb: None,
+            pixel_dims: None,
+        },
+    })
 }
 
 macro_rules! from_raw {

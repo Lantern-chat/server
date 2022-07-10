@@ -1,4 +1,4 @@
-use std::io::{Seek, Write};
+use std::io::Write;
 
 use image::{
     error::{EncodingError, ImageFormatHint},
@@ -8,7 +8,7 @@ use image::{
 use crate::{heuristic::HeuristicsInfo, read_image::ImageInfo};
 
 #[allow(unused)]
-pub fn encode_jpeg<W: Write + Seek>(
+pub fn encode_jpeg<W: Write>(
     mut w: W,
     image: &DynamicImage,
     info: &ImageInfo,
@@ -21,11 +21,15 @@ pub fn encode_jpeg<W: Write + Seek>(
         quality = quality.saturating_add(10).min(100);
     }
 
-    if !try_encode_mozjpeg(&mut w, image, quality)? {
-        w.rewind()?;
+    let mut buffer = Vec::new();
 
-        encode_fallback(&mut w, image, quality)?;
+    if !try_encode_mozjpeg(&mut buffer, image, quality)? {
+        drop(buffer);
+
+        return encode_fallback(&mut w, image, quality);
     }
+
+    w.write_all(&buffer)?;
 
     Ok(())
 }

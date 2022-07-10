@@ -1,4 +1,4 @@
-use std::io::{Seek, Write};
+use std::io::Write;
 
 use image::{ImageFormat, ImageResult};
 
@@ -9,7 +9,7 @@ pub mod blurhash;
 pub mod jpeg;
 pub mod png;
 
-pub fn encode<W: Write + Seek>(
+pub fn encode<W: Write>(
     w: W,
     Image { image, info }: &Image,
     format: ImageFormat,
