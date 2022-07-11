@@ -109,9 +109,9 @@ impl<R: Read> FramedReader<R> {
 
     /// Once the previous message is finished,
     /// this will try to begin reading the next message.
-    pub fn next_msg(&mut self) -> io::Result<bool> {
+    pub fn next_msg<'a>(&'a mut self) -> io::Result<Option<&'a mut Self>> {
         if self.len > 0 {
-            return Ok(true);
+            return Ok(Some(self));
         }
 
         match read_header(&mut self.inner) {
@@ -125,9 +125,9 @@ impl<R: Read> FramedReader<R> {
                 self.msg = msg;
                 self.len = len;
 
-                true
+                Some(self)
             }),
-            Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => Ok(false),
+            Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => Ok(None),
             Err(e) => Err(e),
         }
     }

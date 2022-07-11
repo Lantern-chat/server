@@ -17,8 +17,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut output = framed::FramedReader::new(child.stdout.take().unwrap());
     //let mut err = child.stderr.take().unwrap();
 
-    while output.next_msg()? {
-        let msg: Response = bincode::deserialize_from(&mut output)?;
+    while let Some(msg) = output.next_msg()? {
+        let msg: Response = bincode::deserialize_from(msg)?;
+
 
         match msg {
             Response::Ready => {
@@ -57,8 +58,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .truncate(true)
                     .open("./out.jpeg")?;
 
-                if output.next_msg()? {
-                    std::io::copy(&mut output, &mut f)?;
+                if let Some(msg) = output.next_msg()? {
+                    std::io::copy(msg, &mut f)?;
                 }
 
                 bincode::serialize_into(input.new_message(), &Command::Exit)?;

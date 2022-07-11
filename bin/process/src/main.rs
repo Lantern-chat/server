@@ -22,9 +22,9 @@ fn task() -> Result<(), Box<dyn std::error::Error>> {
 
     bincode::serialize_into(out.new_message(), &Response::Ready)?;
 
-    while stdin.next_msg()? {
+    while let Some(msg) = stdin.next_msg()? {
         // this is blocking
-        let cmd: Command = bincode::deserialize_from(&mut stdin)?;
+        let cmd: Command = bincode::deserialize_from(msg)?;
 
         match cmd {
             Command::Exit => return Ok(()),
@@ -41,8 +41,8 @@ fn task() -> Result<(), Box<dyn std::error::Error>> {
                 };
             }
             Command::ReadAndProcess { length } => {
-                if stdin.next_msg()? {
-                    let mut image = read_image(&mut stdin, &config, Some(length))?;
+                if let Some(msg) = stdin.next_msg()? {
+                    let mut image = read_image(msg, &config, Some(length))?;
 
                     let p = processing::process::process_image(&mut image, config)?;
 
