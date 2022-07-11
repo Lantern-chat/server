@@ -107,11 +107,17 @@ impl<R: Read> FramedReader<R> {
         }
     }
 
+    #[cold]
+    fn sink(&mut self) -> io::Result<u64> {
+        io::copy(self, &mut io::sink())
+    }
+
     /// Once the previous message is finished,
     /// this will try to begin reading the next message.
     pub fn next_msg<'a>(&'a mut self) -> io::Result<Option<&'a mut Self>> {
         if self.len > 0 {
-            return Ok(Some(self));
+            // consume the rest of this message, INCLUDING THE CLOSING FRAME
+            self.sink()?;
         }
 
         match read_header(&mut self.inner) {
