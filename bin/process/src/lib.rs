@@ -10,6 +10,7 @@ pub enum EncodingFormat {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[repr(C)]
 pub enum Command {
     Initialize {
         width: u32,
@@ -26,4 +27,12 @@ pub enum Command {
     Pause,
     Exit,
     Clear,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[repr(C)]
+pub enum Response {
+    Ready,
+    Processed { preview: Option<Vec<u8>> },
+    Encoded,
 }

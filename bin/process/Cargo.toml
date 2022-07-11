@@ -9,4 +9,5 @@ edition = "2021"
 bincode = "1"
 serde = { version = "1", features = ["derive"] }
 
+framed = { path = "../../crates/framed" }
 processing = { path = "../../crates/processing" }
