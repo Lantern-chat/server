@@ -134,13 +134,16 @@ impl<R: Read> FramedReader<R> {
 }
 
 fn read_header<R: Read>(mut r: R) -> io::Result<(u64, u32, u32)> {
+    let mut header = [0u8; 8 + 4 + 4];
+    r.read_exact(&mut header)?;
+
     let mut msg = [0u8; 8];
     let mut len = [0u8; 4];
     let mut flags = [0u8; 4];
 
-    r.read_exact(&mut msg)?;
-    r.read_exact(&mut len)?;
-    r.read_exact(&mut flags)?;
+    msg.copy_from_slice(&header[0..8]);
+    len.copy_from_slice(&header[8..12]);
+    flags.copy_from_slice(&header[12..16]);
 
     Ok((
         u64::from_be_bytes(msg),
@@ -170,7 +173,7 @@ impl<R: Read> Read for FramedReader<R> {
         }
 
         // read enough to fill the buffer or up to the end of the frame
-        let can_be_filled = self.len.min(buf.len() as u32) as usize;
+        let can_be_filled = buf.len().min(self.len as usize);
         let bytes_read = self.inner.read(&mut buf[..can_be_filled])?;
 
         // mark as read
