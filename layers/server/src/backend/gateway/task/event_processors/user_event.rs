@@ -55,7 +55,7 @@ pub async fn user_update(
             id: user_id,
             username: row.try_get(UserColumns::username())?,
             discriminator: row.try_get(UserColumns::discriminator())?,
-            flags: UserFlags::from_bits_truncate(row.try_get(UserColumns::flags())?).publicize(),
+            flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
             email: None,
             preferences: None,
             profile: Nullable::Undefined,
@@ -180,7 +180,7 @@ async fn user_per_party_update(
         id: user_id,
         username: row.try_get(UserColumns::username())?,
         discriminator: row.try_get(UserColumns::discriminator())?,
-        flags: UserFlags::from_bits_truncate(row.try_get(UserColumns::flags())?).publicize(),
+        flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
         email: None,
         preferences: None,
         profile: match row.try_get(ProfileColumns::bits())? {

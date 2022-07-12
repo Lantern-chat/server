@@ -68,7 +68,7 @@ pub async fn friends(
             user: User {
                 id: row.try_get(FriendColumns::friend_id())?,
                 username: row.try_get(UserColumns::username())?,
-                flags: UserFlags::from_bits_truncate(row.try_get(UserColumns::discriminator())?).publicize(),
+                flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::discriminator())?),
                 discriminator: row.try_get(UserColumns::discriminator())?,
                 email: None,
                 preferences: None,

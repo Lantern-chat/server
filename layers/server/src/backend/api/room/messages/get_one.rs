@@ -38,7 +38,7 @@ pub async fn get_one(
 }
 
 pub(crate) fn parse_msg(state: &ServerState, row: &db::Row) -> Result<Message, Error> {
-    let flags = MessageFlags::from_bits_truncate(row.try_get(Columns::message_flags())?);
+    let flags = MessageFlags::from_bits_truncate_public(row.try_get(Columns::message_flags())?);
 
     // doing this in the application layer results in simpler queries
     if flags.contains(MessageFlags::DELETED) {
@@ -62,7 +62,7 @@ pub(crate) fn parse_msg(state: &ServerState, row: &db::Row) -> Result<Message, E
             id: row.try_get(Columns::user_id())?,
             username: row.try_get(Columns::username())?,
             discriminator: row.try_get(Columns::discriminator())?,
-            flags: UserFlags::from_bits_truncate(row.try_get(Columns::user_flags())?).publicize(),
+            flags: UserFlags::from_bits_truncate_public(row.try_get(Columns::user_flags())?),
             email: None,
             preferences: None,
             profile: match row.try_get(Columns::profile_bits())? {

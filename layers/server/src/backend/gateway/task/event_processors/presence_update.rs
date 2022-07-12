@@ -92,7 +92,7 @@ pub async fn presence_updated(
         id,
         username: row.try_get(0)?,
         discriminator: row.try_get(1)?,
-        flags: UserFlags::from_bits_truncate(row.try_get(2)?).publicize(),
+        flags: UserFlags::from_bits_truncate_public(row.try_get(2)?),
         email: None,
         preferences: None,
         profile: Nullable::Undefined,

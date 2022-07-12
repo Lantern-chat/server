@@ -85,7 +85,7 @@ pub async fn get_many(
                 party_id,
                 created_at: msg_id.timestamp(),
                 room_id,
-                flags: MessageFlags::from_bits_truncate(row.try_get(Columns::message_flags())?),
+                flags: MessageFlags::from_bits_truncate_public(row.try_get(Columns::message_flags())?),
                 kind: MessageKind::try_from(row.try_get::<_, i16>(Columns::kind())?).unwrap_or_default(),
                 edited_at: row.try_get::<_, Option<_>>(Columns::edited_at())?,
                 content: row.try_get(Columns::content())?,
@@ -99,8 +99,9 @@ pub async fn get_many(
                                 id,
                                 username: row.try_get(Columns::username())?,
                                 discriminator: row.try_get(Columns::discriminator())?,
-                                flags: UserFlags::from_bits_truncate(row.try_get(Columns::user_flags())?)
-                                    .publicize(),
+                                flags: UserFlags::from_bits_truncate_public(
+                                    row.try_get(Columns::user_flags())?,
+                                ),
                                 email: None,
                                 preferences: None,
                                 profile: match row.try_get(Columns::profile_bits())? {

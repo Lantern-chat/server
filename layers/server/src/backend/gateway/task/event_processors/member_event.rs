@@ -71,7 +71,7 @@ pub async fn member_event(
                     id: user_id,
                     username: row.try_get(UserColumns::username())?,
                     discriminator: row.try_get(UserColumns::discriminator())?,
-                    flags: UserFlags::from_bits_truncate(row.try_get(UserColumns::flags())?).publicize(),
+                    flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
                     profile: match row.try_get(ProfileColumns::bits())? {
                         None => Nullable::Null,
                         Some(bits) => Nullable::Some(UserProfile {

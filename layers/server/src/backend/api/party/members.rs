@@ -54,7 +54,7 @@ pub fn parse_member(row: db::Row, state: &ServerState) -> Result<PartyMember, Er
             id: row.try_get(UserColumns::id())?,
             username: row.try_get(UserColumns::username())?,
             discriminator: row.try_get(UserColumns::discriminator())?,
-            flags: UserFlags::from_bits_truncate(row.try_get(UserColumns::flags())?).publicize(),
+            flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
             email: None,
             preferences: None,
             profile: match row.try_get(ProfileColumns::bits())? {

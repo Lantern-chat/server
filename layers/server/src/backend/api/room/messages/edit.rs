@@ -69,7 +69,7 @@ pub async fn edit_message(
         return Err(Error::Unauthorized);
     }
 
-    let _prev_flags = MessageFlags::from_bits_truncate(row.try_get(1)?);
+    let _prev_flags = MessageFlags::from_bits_truncate_public(row.try_get(1)?);
     let prev_content: Option<&str> = row.try_get(2)?;
     let prev_files: Option<Vec<Snowflake>> = row.try_get(3)?;
 

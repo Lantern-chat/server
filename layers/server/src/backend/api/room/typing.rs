@@ -88,7 +88,7 @@ pub async fn trigger_typing(
         id: auth.user_id,
         username: row.try_get(2)?,
         discriminator: row.try_get(3)?,
-        flags: UserFlags::from_bits_truncate(row.try_get(4)?).publicize(),
+        flags: UserFlags::from_bits_truncate_public(row.try_get(4)?),
         email: None,
         preferences: None,
         profile: Nullable::Undefined,
