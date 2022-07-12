@@ -89,6 +89,10 @@ fn task() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() {
+    if !process_utils::set_own_process_priority(process_utils::Priority::Idle) {
+        eprintln!("Unable to set process priority");
+    }
+
     if let Err(e) = task() {
         eprintln!("ERROR: {}", e);
     }
