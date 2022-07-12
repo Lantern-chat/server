@@ -32,6 +32,20 @@ impl<W: Write> FramedWriter<W> {
     }
 }
 
+#[cfg(feature = "encoding")]
+impl<W: Write> FramedWriter<W> {
+    /// Writes a bincode-encoded object as a message
+    pub fn write_object<T: serde::Serialize>(&mut self, value: &T) -> bincode::Result<()> {
+        let mut msg = self.new_message();
+        bincode::serialize_into(&mut msg, value)?;
+        match msg.into_inner() {
+            Ok(w) => w.close()?,
+            Err(e) => return Err(io::Error::from(e).into()),
+        }
+        Ok(())
+    }
+}
+
 pub struct MessageWriter<'a, W: Write> {
     w: &'a mut FramedWriter<W>,
 }
@@ -107,7 +121,6 @@ impl<R: Read> FramedReader<R> {
         }
     }
 
-    #[cold]
     fn sink(&mut self) -> io::Result<u64> {
         io::copy(self, &mut io::sink())
     }
@@ -186,5 +199,19 @@ impl<R: Read> Read for FramedReader<R> {
         self.len -= bytes_read as u32;
 
         Ok(bytes_read)
+    }
+}
+
+#[cfg(feature = "encoding")]
+impl<R: Read> FramedReader<R> {
+    /// Read a bincode-encoded object message
+    pub fn read_object<T>(&mut self) -> bincode::Result<Option<T>>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        match self.next_msg()? {
+            Some(msg) => bincode::deserialize_from(msg).map(Some),
+            None => Ok(None),
+        }
     }
 }

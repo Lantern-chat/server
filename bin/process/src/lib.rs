@@ -29,10 +29,17 @@ pub enum Command {
     Clear,
 }
 
+pub const HAS_ALPHA: u8 = 1;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[repr(C)]
 pub enum Response {
     Ready,
-    Processed { preview: Option<Vec<u8>> },
+    Processed {
+        preview: Option<Vec<u8>>,
+        width: u32,
+        height: u32,
+        flags: u8,
+    },
     Encoded,
 }

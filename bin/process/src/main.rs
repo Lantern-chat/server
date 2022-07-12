@@ -20,12 +20,9 @@ fn task() -> Result<(), Box<dyn std::error::Error>> {
         max_pixels: 0,
     };
 
-    bincode::serialize_into(out.new_message(), &Response::Ready)?;
+    out.write_object(&Response::Ready)?;
 
-    while let Some(msg) = stdin.next_msg()? {
-        // this is blocking
-        let cmd: Command = bincode::deserialize_from(msg)?;
-
+    while let Some(cmd) = stdin.read_object()? {
         match cmd {
             Command::Exit => return Ok(()),
             Command::Pause => continue,
@@ -46,7 +43,20 @@ fn task() -> Result<(), Box<dyn std::error::Error>> {
 
                     let p = processing::process::process_image(&mut image, config)?;
 
-                    bincode::serialize_into(out.new_message(), &Response::Processed { preview: p.preview })?;
+                    out.write_object(&Response::Processed {
+                        preview: p.preview,
+                        width: image.image.width(),
+                        height: image.image.height(),
+                        flags: {
+                            let mut flags = 0;
+
+                            if image.image.color().has_alpha() {
+                                flags |= process::HAS_ALPHA;
+                            }
+
+                            flags
+                        },
+                    })?;
 
                     heuristics = Some(p.heuristics);
                     processed_image = Some(image);
@@ -64,7 +74,7 @@ fn task() -> Result<(), Box<dyn std::error::Error>> {
                     EncodingFormat::Avif => ImageFormat::Avif,
                 };
 
-                bincode::serialize_into(out.new_message(), &Response::Encoded)?;
+                out.write_object(&Response::Encoded)?;
 
                 processing::encode::encode(out.new_message(), image, format, heuristics.unwrap(), quality)?;
             }
