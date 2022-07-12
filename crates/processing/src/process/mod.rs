@@ -33,7 +33,7 @@ pub enum ProcessingError {
 
 pub mod imageops;
 
-fn compute_crop((width, height): (u32, u32), config: ProcessConfig) -> (Rect, Rect) {
+pub fn compute_crop((width, height): (u32, u32), config: ProcessConfig) -> (Rect, Rect) {
     let ProcessConfig {
         max_width,
         max_height,
@@ -189,6 +189,13 @@ pub fn process_image(
             _ => DynamicImage::ImageRgba8(imageops::crop_and_resize(image, crop, new_width, new_height)),
         },
     };
+
+    if needs_crop || needs_resize {
+        *image = match crate::util::actually_has_alpha(&image) {
+            true => DynamicImage::ImageRgba8(image.to_rgba8()),
+            false => DynamicImage::ImageRgb8(image.to_rgb8()),
+        };
+    }
 
     let heuristics = match image {
         DynamicImage::ImageRgb8(ref image) => crate::heuristic::compute_heuristics(image),

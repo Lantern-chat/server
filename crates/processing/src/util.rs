@@ -17,20 +17,22 @@ pub(crate) fn actually_has_alpha(image: &DynamicImage) -> bool {
     }
 }
 
-pub(crate) trait AlphaValue: PartialOrd {
+// NOTE: These are adjusted to ignore about 1% of alpha
+
+pub(crate) trait AlphaValue: PartialOrd + std::fmt::Debug {
     const MAX: Self;
 }
 
 impl AlphaValue for u8 {
-    const MAX: u8 = u8::MAX;
+    const MAX: u8 = u8::MAX - (u8::MAX / 100 + 1);
 }
 
 impl AlphaValue for u16 {
-    const MAX: u16 = u16::MAX;
+    const MAX: u16 = u16::MAX - (u16::MAX / 100 + 1);
 }
 
 impl AlphaValue for f32 {
-    const MAX: f32 = 1.0;
+    const MAX: f32 = 0.99;
 }
 
 fn check_pixels_for_alpha<G>(image: &G) -> bool
