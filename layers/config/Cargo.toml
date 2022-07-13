@@ -13,6 +13,7 @@ process_utils = { path = "../../crates/process_utils" }
 
 tokio = { version = "1", default_features = false, features = ["fs"] }
 serde = { version = "1", features = ["derive"] }
+serde-aux = "3.1.0"
 
 tracing = { version = "0.1", default_features = false }
 hex = "0.4.2"

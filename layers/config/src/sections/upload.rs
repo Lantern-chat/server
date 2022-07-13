@@ -23,7 +23,9 @@ section! {
         pub max_avatar_pixels: u32              = 1024 * 1024,  // 4-byte/32-bit color * 1024^2 = 4 MiB RAM usage
         pub max_banner_pixels: u32              = 2560 * 1440, // 4-byte/32-bit color * 2073600 = 14.0625 MiB RAM usage
 
+        #[serde(deserialize_with = "serde_aux::container_attributes::deserialize_struct_case_insensitive")]
         pub avatar_formats: UserAssetFormats = default_avatar_formats(),
+        #[serde(deserialize_with = "serde_aux::container_attributes::deserialize_struct_case_insensitive")]
         pub banner_formats: UserAssetFormats = default_banner_formats(),
     }
 }
