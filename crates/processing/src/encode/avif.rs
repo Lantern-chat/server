@@ -10,19 +10,23 @@ fn map_jpeg_to_avif_quality(q: u8) -> u8 {
         return q;
     }
 
-    const A: f32 = 1.0 / 55.0;
-    const C: f32 = 39.5825619849;
-    //const C: f32 = 100.0 / (2f32.powf(100.0 / A) - 1.0);
+    let a = 1.0 / 40.0;
+    let c = 100.0 / (2f32.powf(100.0 * a) - 1.0);
 
-    C.mul_add(2f32.powf(q as f32 * A), -C) as u8
+    let x = q as f32;
+    let d = c.mul_add(2f32.powf(x * a), -c);
+
+    let t = x / 100.0;
+
+    ((1.0 - t) * x + t * d).ceil() as u8
 }
 
 /// `map_jpeg_to_avif_quality` made into a lookup table
 static JPEG_TO_AVIF_QUALITY: [u8; 101] = [
-    0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 8, 8, 9, 10, 10, 11, 11, 12, 13, 13, 14, 15, 16, 16, 17, 18,
-    18, 19, 20, 21, 21, 22, 23, 24, 25, 25, 26, 27, 28, 29, 30, 31, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40,
-    41, 42, 43, 44, 45, 46, 47, 49, 50, 51, 52, 53, 54, 56, 57, 58, 59, 61, 62, 63, 64, 66, 67, 68, 70, 71,
-    73, 74, 75, 77, 78, 80, 81, 83, 85, 86, 88, 89, 91, 93, 94, 96, 98, 100,
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 13, 14, 15, 16, 17, 17, 18, 19, 20, 21, 21, 22, 23, 24, 24,
+    25, 26, 27, 27, 28, 29, 30, 30, 31, 32, 32, 33, 34, 35, 35, 36, 37, 37, 38, 39, 40, 40, 41, 42, 43, 43,
+    44, 45, 46, 46, 47, 48, 49, 50, 51, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 66, 67, 68,
+    69, 71, 72, 73, 75, 76, 77, 79, 81, 82, 84, 85, 87, 89, 91, 93, 94, 96, 98, 100,
 ];
 
 pub fn encode_avif<W: Write>(
@@ -89,17 +93,16 @@ pub fn encode_avif<W: Write>(
 
 #[cfg(test)]
 mod tests {
-    use super::map_jpeg_to_avif_quality;
+    use super::{map_jpeg_to_avif_quality, JPEG_TO_AVIF_QUALITY};
 
     #[test]
     fn test_map_jpeg_to_avif_quality() {
-        assert_eq!(map_jpeg_to_avif_quality(0), 0);
-        assert_eq!(map_jpeg_to_avif_quality(100), 100);
-
-        assert_eq!(map_jpeg_to_avif_quality(50), 34);
-
-        for q in 0..100 {
+        for q in 0..101 {
             print!("{},", map_jpeg_to_avif_quality(q));
         }
+
+        assert_eq!(map_jpeg_to_avif_quality(0), JPEG_TO_AVIF_QUALITY[0]);
+        assert_eq!(map_jpeg_to_avif_quality(100), JPEG_TO_AVIF_QUALITY[100]);
+        assert_eq!(map_jpeg_to_avif_quality(50), JPEG_TO_AVIF_QUALITY[50]);
     }
 }
