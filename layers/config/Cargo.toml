@@ -9,6 +9,7 @@ publish = false
 [dependencies]
 util = { path = "../../crates/util" }
 schema = { path = "../schema" }
+process_utils = { path = "../../crates/process_utils" }
 
 tokio = { version = "1", default_features = false, features = ["fs"] }
 serde = { version = "1", features = ["derive"] }

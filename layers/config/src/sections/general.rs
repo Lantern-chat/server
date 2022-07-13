@@ -2,6 +2,8 @@ use super::util;
 
 use uuid::Uuid;
 
+const HALF_GIB_AS_KIB: u64 = crate::GIBIBYTE as u64 / (2 * 1024);
+
 section! {
     #[serde(default)]
     pub struct General {
@@ -19,13 +21,16 @@ section! {
         /// ID of worker machine, just keep it at 0 if using one machine
         pub worker_id: u16 = 0 => "LANTERN_WORKER_ID" | util::parse[0u16],
 
-        //pub memory_limit: u64 = crate::GIBIBYTE as u64 => "LANTERN_MEMORY_LIMIT" | util::parse[crate::GIBIBYTE as u64],
+        /// Memory limit (in kibibytes) for core tasks, does NOT including image encoding
+        ///
+        /// Default value for this is half of the available system memory
+        pub memory_limit: u64 = 0u64 => "LANTERN_MEMORY_LIMIT" | util::parse[0u64],
 
         /// The maximum number of CPU-intensive tasks that can run in parallel,
         /// defaults to the number of system threads.
         ///
         /// Setting this to 0 will use the default value.
-        pub cpu_limit: u64 = num_cpus::get() as u64 => "LANTERN_CPU_LIMIT" | util::parse[num_cpus::get() as u64],
+        pub cpu_limit: u64 = 0u64 as u64 => "LANTERN_CPU_LIMIT" | util::parse[0u64],
     }
 }
 
@@ -40,6 +45,18 @@ impl General {
 
         if self.cpu_limit == 0 {
             self.cpu_limit = num_cpus::get() as u64;
+
+            log::info!("Setting CPU limit to {}", self.cpu_limit);
+        }
+
+        if self.memory_limit == 0 {
+            self.memory_limit = match process_utils::get_sysinfo() {
+                None => HALF_GIB_AS_KIB,
+                // divide by 2 and convert to KiB
+                Some(sysinfo) => sysinfo.total_memory / (2 * 1024),
+            };
+
+            log::info!("Setting memory limit to {} KiB", self.memory_limit);
         }
     }
 }

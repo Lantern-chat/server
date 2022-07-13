@@ -8,12 +8,13 @@ pub enum Priority {
     Realtime,
 }
 
-#[cfg(not(any(target_os = "windows", target_os = "unix", target_os = "macos")))]
+#[cfg(not(any(windows, unix, target_os = "macos")))]
 pub fn set_own_process_priority(priority: Priority) -> bool {
+    compile_error!("Here");
     false
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 pub fn set_own_process_priority(priority: Priority) -> bool {
     use windows::Win32::System::Threading::{GetCurrentProcess, SetPriorityClass};
 
@@ -38,14 +39,14 @@ pub fn set_own_process_priority(priority: Priority) -> bool {
     }
 }
 
-#[cfg(any(target_os = "unix", target_os = "macos"))]
+#[cfg(any(unix, target_os = "macos"))]
 pub fn set_own_process_priority(priority: Priority) -> bool {
     use libc::{getpid, setpriority, PRIO_PROCESS};
 
     unsafe {
         0 != setpriority(
             PRIO_PROCESS,
-            getpid(),
+            getpid() as u32,
             match priority {
                 Priority::Idle => 20,
                 Priority::BelowNormal => 10,
@@ -55,5 +56,62 @@ pub fn set_own_process_priority(priority: Priority) -> bool {
                 Priority::Realtime => -20,
             },
         )
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SysInfo {
+    /// Total system memory in bytes
+    pub total_memory: u64,
+}
+
+#[cfg(not(any(target_os = "windows", unix, target_os = "macos")))]
+pub fn get_sysinfo() -> Option<SysInfo> {
+    None
+}
+
+#[cfg(windows)]
+pub fn get_sysinfo() -> Option<SysInfo> {
+    use std::mem::MaybeUninit;
+
+    use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
+
+    unsafe {
+        let mut mse: MaybeUninit<MEMORYSTATUSEX> = MaybeUninit::zeroed();
+
+        {
+            // must write dwLength before call
+            let length: *const u32 = memoffset::raw_field!(mse.as_mut_ptr(), MEMORYSTATUSEX, dwLength);
+            (length as *mut u32).write(std::mem::size_of::<MEMORYSTATUSEX>() as u32);
+        }
+
+        if GlobalMemoryStatusEx(mse.as_mut_ptr()).as_bool() {
+            let mse = mse.assume_init();
+            Some(SysInfo {
+                total_memory: mse.ullTotalPhys,
+            })
+        } else {
+            None
+        }
+    }
+}
+
+#[cfg(any(unix, target_os = "macos"))]
+pub fn get_sysinfo() -> Option<SysInfo> {
+    use std::mem::MaybeUninit;
+
+    unsafe {
+        let mut si = MaybeUninit::zeroed();
+
+        if 0 == libc::sysinfo(si.as_mut_ptr()) {
+            let si = si.assume_init();
+
+            Some(SysInfo {
+                // convert to bytes with mem_unit
+                total_memory: si.totalram * si.mem_unit as u64,
+            })
+        } else {
+            None
+        }
     }
 }
