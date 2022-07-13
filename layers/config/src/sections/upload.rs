@@ -22,5 +22,96 @@ section! {
 
         pub max_avatar_pixels: u32              = 1024 * 1024,  // 4-byte/32-bit color * 1024^2 = 4 MiB RAM usage
         pub max_banner_pixels: u32              = 2560 * 1440, // 4-byte/32-bit color * 2073600 = 14.0625 MiB RAM usage
+
+        pub avatar_formats: UserAssetFormats = default_avatar_formats(),
+        pub banner_formats: UserAssetFormats = default_banner_formats(),
+    }
+}
+
+impl Upload {
+    pub fn configure(&mut self) {
+        self.avatar_formats.clean();
+        self.banner_formats.clean();
+
+        self.avatar_formats.check("avatar", default_avatar_formats);
+        self.banner_formats.check("banner", default_banner_formats);
+    }
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct UserAssetFormats {
+    pub png: Vec<u8>,
+    pub jpeg: Vec<u8>,
+    /// NOTE: The actual quality of AVIF encoding has been adjusted to more closely match JPEG quality,
+    /// so use numbers here that would be similar to JPEG.
+    pub avif: Vec<u8>,
+    pub gif: Vec<u8>,
+    pub webm: Vec<u8>,
+}
+
+impl UserAssetFormats {
+    pub fn static_is_empty(&self) -> bool {
+        self.png.is_empty() && self.jpeg.is_empty() && self.avif.is_empty()
+    }
+
+    pub fn animated_is_empty(&self) -> bool {
+        self.gif.is_empty() && self.webm.is_empty()
+    }
+
+    pub fn check(&mut self, name: &'static str, default: impl FnOnce() -> Self) {
+        let d = default();
+
+        if self.static_is_empty() {
+            log::warn!("Configuration is missing static {name} file formats, using defaults!");
+
+            self.png = d.png;
+            self.jpeg = d.jpeg;
+            self.avif = d.avif;
+        }
+
+        if self.animated_is_empty() {
+            log::warn!("Configuration is missing animated {name} file formats, using defaults!");
+
+            self.gif = d.gif;
+            self.webm = d.webm;
+        }
+    }
+
+    pub fn clean(&mut self) {
+        self.png.sort_unstable();
+        self.png.dedup();
+
+        self.jpeg.sort_unstable();
+        self.jpeg.dedup();
+
+        self.avif.sort_unstable();
+        self.avif.dedup();
+
+        self.gif.sort_unstable();
+        self.gif.dedup();
+
+        self.webm.sort_unstable();
+        self.webm.dedup();
+    }
+}
+
+fn default_avatar_formats() -> UserAssetFormats {
+    UserAssetFormats {
+        png: vec![100],
+        jpeg: vec![92, 70, 45],
+        avif: vec![95, 80],
+        gif: vec![100],
+        webm: vec![95],
+    }
+}
+
+fn default_banner_formats() -> UserAssetFormats {
+    UserAssetFormats {
+        png: vec![100],
+        jpeg: vec![92, 70, 45],
+        avif: vec![90],
+        gif: vec![95],
+        webm: vec![95],
     }
 }

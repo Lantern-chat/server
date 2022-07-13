@@ -162,6 +162,7 @@ impl Config {
     pub fn configure(&mut self) {
         self.general.configure();
         self.web.configure();
+        self.upload.configure();
     }
 
     pub async fn save(&self, path: impl AsRef<Path>) -> Result<(), ConfigError> {
