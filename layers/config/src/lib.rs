@@ -64,7 +64,6 @@ pub mod sections {
     pub mod party;
     pub mod paths;
     pub mod services;
-    pub mod tasks;
     pub mod upload;
     pub mod web;
 }
@@ -111,7 +110,6 @@ decl_config! {
     services: sections::services::Services,
     /// Cryptographic keys
     keys: sections::keys::Keys,
-    tasks: sections::tasks::Tasks,
     /// Web/HTTP Configuration
     web: sections::web::Web,
 }

@@ -129,19 +129,16 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
                 db: &db::pool::Client,
             ) {
                 futures::stream::iter(events.drain())
-                    .for_each_concurrent(
-                        state.config.tasks.max_parallel_tasks,
-                        |(party_id, events)| async move {
-                            for event in events {
-                                if let Err(e) =
-                                    super::event_processors::process(&state, db, event, Some(party_id)).await
-                                {
-                                    log::error!("Error processing party event: {event:?} {e}");
-                                    // TODO: Disconnect party
-                                }
+                    .for_each_concurrent(None, |(party_id, events)| async move {
+                        for event in events {
+                            if let Err(e) =
+                                super::event_processors::process(&state, db, event, Some(party_id)).await
+                            {
+                                log::error!("Error processing party event: {event:?} {e}");
+                                // TODO: Disconnect party
                             }
-                        },
-                    )
+                        }
+                    })
                     .await
             }
 
@@ -153,18 +150,14 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
                 db: &db::pool::Client,
             ) {
                 futures::stream::iter(events.drain())
-                    .for_each_concurrent(
-                        state.config.tasks.max_parallel_tasks,
-                        |(_room_id, events)| async move {
-                            for event in events {
-                                if let Err(e) = super::event_processors::process(state, db, event, None).await
-                                {
-                                    log::error!("Error processing direct event: {event:?} {e}");
-                                    // TODO: Disconnect users
-                                }
+                    .for_each_concurrent(None, |(_room_id, events)| async move {
+                        for event in events {
+                            if let Err(e) = super::event_processors::process(state, db, event, None).await {
+                                log::error!("Error processing direct event: {event:?} {e}");
+                                // TODO: Disconnect users
                             }
-                        },
-                    )
+                        }
+                    })
                     .await
             }
 
@@ -175,7 +168,7 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
                 db: &db::pool::Client,
             ) {
                 futures::stream::iter(events.drain(..))
-                    .for_each_concurrent(state.config.tasks.max_parallel_tasks, |event| async move {
+                    .for_each_concurrent(None, |event| async move {
                         if let Err(e) = super::event_processors::process(state, db, event, None).await {
                             log::error!("Error processing user event: {event:?} {e}");
                             // TODO: Disconnect users
