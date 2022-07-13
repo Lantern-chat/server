@@ -1,8 +1,5 @@
 use std::io::{self, BufWriter, Read, Write};
 
-const MSG_BODY: u32 = 1;
-const MSG_CLOSE: u32 = 2;
-
 pub struct FramedWriter<W: Write> {
     inner: W,
     msg: u64,
@@ -21,13 +18,10 @@ impl<W: Write> FramedWriter<W> {
         BufWriter::new(MessageWriter { w: self })
     }
 
-    fn write_header(&mut self, len: u32, flag: u32) -> io::Result<()> {
-        let mut header = [0u8; 8 + 4 + 4];
-
+    fn write_header(&mut self, len: u64) -> io::Result<()> {
+        let mut header = [0u8; 8 + 8];
         header[0..8].copy_from_slice(&self.msg.to_be_bytes());
-        header[8..12].copy_from_slice(&len.to_be_bytes());
-        header[12..16].copy_from_slice(&flag.to_be_bytes());
-
+        header[8..16].copy_from_slice(&len.to_be_bytes());
         self.inner.write_all(&header)
     }
 }
@@ -52,7 +46,7 @@ pub struct MessageWriter<'a, W: Write> {
 
 impl<W: Write> MessageWriter<'_, W> {
     fn try_close(&mut self) -> io::Result<()> {
-        self.w.write_header(0, MSG_CLOSE)?;
+        self.w.write_header(0)?;
         self.w.inner.flush()
     }
 
@@ -81,9 +75,15 @@ impl<W: Write> Write for MessageWriter<'_, W> {
     }
 
     fn write_all(&mut self, mut data: &[u8]) -> io::Result<()> {
-        self.w.write_header(data.len() as u32, MSG_BODY)?;
+        // protection against accidental close frames
+        if data.is_empty() {
+            return Ok(());
+        }
 
-        while !data.is_empty() {
+        self.w.write_header(data.len() as u64)?;
+
+        // do-while, as the above branch ensured there is data to write
+        loop {
             match self.w.inner.write(data) {
                 Ok(0) => {
                     return Err(io::Error::new(
@@ -94,6 +94,10 @@ impl<W: Write> Write for MessageWriter<'_, W> {
                 Ok(n) => data = &data[n..],
                 Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
                 Err(e) => return Err(e),
+            }
+
+            if data.is_empty() {
+                break;
             }
         }
 
@@ -109,7 +113,7 @@ impl<W: Write> Write for MessageWriter<'_, W> {
 pub struct FramedReader<R: Read> {
     inner: R,
     msg: u64,
-    len: u32,
+    len: u64,
 }
 
 impl<R: Read> FramedReader<R> {
@@ -121,6 +125,7 @@ impl<R: Read> FramedReader<R> {
         }
     }
 
+    /// Throw away rest of the message
     fn sink(&mut self) -> io::Result<u64> {
         io::copy(self, &mut io::sink())
     }
@@ -133,42 +138,38 @@ impl<R: Read> FramedReader<R> {
             self.sink()?;
         }
 
-        match read_header(&mut self.inner) {
-            Ok((msg, len, flags)) => Ok({
-                // sometimes readers don't consume the closing frame
-                // so if that happens just skip it and recurse.
-                if flags == MSG_CLOSE {
-                    return self.next_msg();
-                }
+        loop {
+            return match read_header(&mut self.inner) {
+                Ok((msg, len)) => Ok({
+                    // sometimes readers don't consume the closing frame
+                    // so if that happens just skip it and try again
+                    if len == 0 {
+                        continue; // goto loop start
+                    }
 
-                self.msg = msg;
-                self.len = len;
+                    self.msg = msg;
+                    self.len = len;
 
-                Some(self)
-            }),
-            Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => Ok(None),
-            Err(e) => Err(e),
+                    Some(self)
+                }),
+                Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => Ok(None),
+                Err(e) => Err(e),
+            };
         }
     }
 }
 
-fn read_header<R: Read>(mut r: R) -> io::Result<(u64, u32, u32)> {
-    let mut header = [0u8; 8 + 4 + 4];
+fn read_header<R: Read>(mut r: R) -> io::Result<(u64, u64)> {
+    let mut header = [0u8; 8 + 8];
     r.read_exact(&mut header)?;
 
     let mut msg = [0u8; 8];
-    let mut len = [0u8; 4];
-    let mut flags = [0u8; 4];
+    let mut len = [0u8; 8];
 
     msg.copy_from_slice(&header[0..8]);
-    len.copy_from_slice(&header[8..12]);
-    flags.copy_from_slice(&header[12..16]);
+    len.copy_from_slice(&header[8..16]);
 
-    Ok((
-        u64::from_be_bytes(msg),
-        u32::from_be_bytes(len),
-        u32::from_be_bytes(flags),
-    ))
+    Ok((u64::from_be_bytes(msg), u64::from_be_bytes(len)))
 }
 
 impl<R: Read> Read for FramedReader<R> {
@@ -176,8 +177,8 @@ impl<R: Read> Read for FramedReader<R> {
         // if the current frame has been fully read
         if self.len == 0 {
             match read_header(&mut self.inner) {
-                Ok((msg, len, flags)) => {
-                    if flags == MSG_CLOSE {
+                Ok((msg, len)) => {
+                    if len == 0 {
                         return Ok(0); // EOF for end of message
                     }
 
@@ -196,7 +197,7 @@ impl<R: Read> Read for FramedReader<R> {
         let bytes_read = self.inner.read(&mut buf[..can_be_filled])?;
 
         // mark as read
-        self.len -= bytes_read as u32;
+        self.len -= bytes_read as u64;
 
         Ok(bytes_read)
     }
