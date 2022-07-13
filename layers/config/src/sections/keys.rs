@@ -1,10 +1,8 @@
 use aes::{cipher::BlockCipherKey, Aes128, Aes256};
 use schema::auth::BotTokenKey;
 
-// NOTE: When not present, keys will be filled in with random bytes
-// which will be written back to the file for persistence
-
 section! {
+    /// NOTE: When not present, keys will be filled in with random bytes.
     pub struct Keys {
         /// File encryption key
         #[serde(with = "super::util::hex_key")]
@@ -18,6 +16,9 @@ section! {
         #[serde(with = "super::util::hex_key")]
         pub sf_key: BlockCipherKey<Aes128> = util::rng::gen_crypto_bytes().into() => "SF_KEY" | parse_hex_key,
 
+        /// Bot Token Key
+        ///
+        /// Used for signing bot tokens
         #[serde(with = "super::util::hex_key")]
         pub bt_key: BotTokenKey = util::rng::gen_crypto_bytes().into() => "BT_KEY" | parse_hex_key,
     }

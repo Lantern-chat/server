@@ -23,12 +23,16 @@ pub mod sections {
                         )?
                     )?
             ),*$(,)?}
-        ) => {
+        ) => { paste::paste! {
             #[derive(Debug, Serialize, Deserialize)]
             $(#[$meta])*
             #[serde(deny_unknown_fields)]
             $vis struct $name {$(
                 $(#[$field_meta])*
+                $(
+                    #[doc = ""]
+                    #[doc = "**Overridden by the `" $field_env "` environment variable.**"]
+                )?
                 $field_vis $field_name: $field_ty,
             )*}
 
@@ -41,6 +45,7 @@ pub mod sections {
             }
 
             impl $name {
+                /// Applies any environmental overrides
                 pub fn apply_overrides(&mut self) {$($(
                     if let Ok(value) = std::env::var($field_env) {
                         log::debug!("Applying environment overwrite for {}.{}=>{}", stringify!($name), stringify!($field_name), $field_env);
@@ -48,7 +53,7 @@ pub mod sections {
                     }
                 )?)*}
             }
-        };
+        }};
     }
 
     pub mod account;
@@ -72,6 +77,7 @@ macro_rules! decl_config {
         $field:ident: $field_ty:ty
     ),*$(,)?) => {
 
+        /// Root Config object
         #[derive(Default, Debug, Serialize, Deserialize)]
         #[serde(deny_unknown_fields)]
         #[cfg_attr(not(feature = "strict"), serde(default))]
@@ -81,6 +87,7 @@ macro_rules! decl_config {
         )*}
 
         impl Config {
+            /// Applies any environmental overrides
             pub fn apply_overrides(&mut self) {
                 $(self.$field.apply_overrides();)*
             }
@@ -89,16 +96,23 @@ macro_rules! decl_config {
 }
 
 decl_config! {
+    /// Overall server configuration
     general: sections::general::General,
+    /// Filesystem paths
     paths: sections::paths::Paths,
+    /// Database configuration
     db: sections::db::Database,
+    /// User account configuration
     account: sections::account::Account,
     message: sections::message::Message,
     party: sections::party::Party,
+    /// User uploads configuration
     upload: sections::upload::Upload,
     services: sections::services::Services,
+    /// Cryptographic keys
     keys: sections::keys::Keys,
     tasks: sections::tasks::Tasks,
+    /// Web/HTTP Configuration
     web: sections::web::Web,
 }
 
@@ -137,7 +151,7 @@ impl Config {
     pub async fn load(path: impl AsRef<Path>) -> Result<Config, ConfigError> {
         let path = path.as_ref();
 
-        let file = tokio::fs::read_to_string(path).await?;
+        let file: String = tokio::fs::read_to_string(path).await?;
 
         Ok(match get_format(path) {
             Format::TOML => toml::from_str(&file)?,
