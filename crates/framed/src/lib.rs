@@ -1,3 +1,6 @@
+#[cfg(feature = "tokio")]
+pub mod tokio;
+
 use std::io::{self, BufWriter, Read, Write};
 
 pub struct FramedWriter<W: Write> {
@@ -53,11 +56,11 @@ impl<W: Write> MessageWriter<'_, W> {
 
     /// Manually close this message, to handle errors
     pub fn close(mut self) -> io::Result<()> {
-        self.try_close()?;
+        let res = self.try_close();
 
         std::mem::forget(self);
 
-        Ok(())
+        res
     }
 }
 
