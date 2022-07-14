@@ -53,15 +53,15 @@ pub struct UserAssetFormats {
 }
 
 impl UserAssetFormats {
-    pub fn static_is_empty(&self) -> bool {
+    fn static_is_empty(&self) -> bool {
         self.png.is_empty() && self.jpeg.is_empty() && self.avif.is_empty()
     }
 
-    pub fn animated_is_empty(&self) -> bool {
+    fn animated_is_empty(&self) -> bool {
         self.gif.is_empty() && self.webm.is_empty()
     }
 
-    pub fn check(&mut self, name: &'static str, default: impl FnOnce() -> Self) {
+    fn check(&mut self, name: &'static str, default: impl FnOnce() -> Self) {
         let d = default();
 
         if self.static_is_empty() {
@@ -80,7 +80,7 @@ impl UserAssetFormats {
         }
     }
 
-    pub fn clean(&mut self) {
+    fn clean(&mut self) {
         self.png.sort_unstable();
         self.png.dedup();
 

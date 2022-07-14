@@ -6,6 +6,11 @@ publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+# Disallow unknown keys in configuration
+strict = []
+default = ["strict"]
+
 [dependencies]
 util = { path = "../../crates/util" }
 schema = { path = "../schema" }
@@ -26,5 +31,6 @@ paste = "1"
 serde_json = "1"
 toml = { version = "0.5", features = ["preserve_order"] }
 
-[features]
-strict = []
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

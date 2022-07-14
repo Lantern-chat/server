@@ -15,7 +15,7 @@ impl<W: Write> FramedWriter<W> {
     /// the buffer on drop
     pub fn new_message<'a>(&'a mut self) -> BufWriter<MessageWriter<'a, W>> {
         self.msg += 1;
-        BufWriter::new(MessageWriter { w: self })
+        BufWriter::new(MessageWriter { w: self, len: 0 })
     }
 
     fn write_header(&mut self, len: u64) -> io::Result<()> {
@@ -42,6 +42,7 @@ impl<W: Write> FramedWriter<W> {
 
 pub struct MessageWriter<'a, W: Write> {
     w: &'a mut FramedWriter<W>,
+    len: u64,
 }
 
 impl<W: Write> MessageWriter<'_, W> {
@@ -68,40 +69,18 @@ impl<W: Write> Drop for MessageWriter<'_, W> {
 }
 
 impl<W: Write> Write for MessageWriter<'_, W> {
-    #[inline]
     fn write(&mut self, data: &[u8]) -> io::Result<usize> {
-        self.write_all(data)?;
-        Ok(data.len())
-    }
-
-    fn write_all(&mut self, mut data: &[u8]) -> io::Result<()> {
-        // protection against accidental close frames
-        if data.is_empty() {
-            return Ok(());
+        if self.len == 0 && !data.is_empty() {
+            self.len = data.len() as u64;
+            self.w.write_header(self.len)?;
         }
 
-        self.w.write_header(data.len() as u64)?;
+        let bytes_to_write = data.len().min(self.len as usize);
+        let bytes_written = self.w.inner.write(&data[..bytes_to_write])?;
 
-        // do-while, as the above branch ensured there is data to write
-        loop {
-            match self.w.inner.write(data) {
-                Ok(0) => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::WriteZero,
-                        "failed to write framed data",
-                    ))
-                }
-                Ok(n) => data = &data[n..],
-                Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {}
-                Err(e) => return Err(e),
-            }
+        self.len -= bytes_written as u64;
 
-            if data.is_empty() {
-                break;
-            }
-        }
-
-        Ok(())
+        Ok(bytes_written)
     }
 
     #[inline]
