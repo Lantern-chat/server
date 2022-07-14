@@ -29,7 +29,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     input.write_object(&Command::ReadAndProcess {
                         length: file.len() as u64,
                     })?;
-                    input.new_message().write_all(&file)?;
+
+                    input.with_msg(|msg| msg.write_all(&file))?;
                 }
             }
             Response::Processed { .. } => {

@@ -76,7 +76,9 @@ fn task() -> Result<(), Box<dyn std::error::Error>> {
 
                 out.write_object(&Response::Encoded)?;
 
-                processing::encode::encode(out.new_message(), image, format, heuristics.unwrap(), quality)?;
+                out.with_msg(|msg| {
+                    processing::encode::encode(msg, image, format, heuristics.unwrap(), quality)
+                })?;
             }
             Command::Clear => {
                 processed_image = None;
