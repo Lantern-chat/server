@@ -1,4 +1,4 @@
-use tokio::io::{self, AsyncRead, AsyncWrite, AsyncWriteExt, BufWriter};
+use tokio::io::{self, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufWriter, ReadBuf};
 
 pub struct AsyncFramedWriter<W> {
     inner: W,
@@ -115,5 +115,117 @@ impl<W: AsyncWrite + Unpin> AsyncWrite for AsyncMessageWriter<'_, W> {
                 Ok(bytes_written)
             }
         })
+    }
+}
+
+pub struct AsyncFramedReader<R: AsyncRead> {
+    inner: R,
+    msg: u64,
+    len: u64,
+
+    header: [u8; 16],
+    pos: usize,
+}
+
+impl<R: AsyncRead + Unpin> AsyncFramedReader<R> {
+    pub fn new(inner: R) -> Self {
+        AsyncFramedReader {
+            inner,
+            msg: 0,
+            len: 0,
+            header: [0; 16],
+            pos: 0,
+        }
+    }
+
+    pub async fn next_msg<'a>(&'a mut self) -> io::Result<Option<&'a mut Self>> {
+        if self.len > 0 {
+            io::copy(self, &mut io::sink()).await?;
+        }
+
+        loop {
+            return match self.inner.read_exact(&mut self.header).await {
+                Ok(_) => Ok({
+                    // ensure the header cursor is at the end
+                    self.pos = self.header.len();
+
+                    let mut msg = [0u8; 8];
+                    let mut len = [0u8; 8];
+
+                    msg.copy_from_slice(&self.header[0..8]);
+                    len.copy_from_slice(&self.header[8..16]);
+
+                    self.msg = u64::from_be_bytes(msg);
+                    self.len = u64::from_be_bytes(len);
+
+                    if self.len == 0 {
+                        continue;
+                    }
+
+                    Some(self)
+                }),
+                Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => Ok(None),
+                Err(e) => Err(e),
+            };
+        }
+    }
+}
+
+impl<R: AsyncRead + Unpin> AsyncRead for AsyncFramedReader<R> {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        if self.len == 0 {
+            // reset header position if it was previously fully read
+            if self.pos == self.header.len() {
+                self.pos = 0;
+            }
+
+            while self.pos < self.header.len() {
+                // split mutable borrows
+                let AsyncFramedReader {
+                    ref mut header,
+                    ref mut pos,
+                    ref mut inner,
+                    ..
+                } = *self.as_mut();
+
+                let mut buf = ReadBuf::new(header);
+                buf.set_filled(*pos);
+
+                match Pin::new(inner).poll_read(cx, &mut buf) {
+                    Poll::Ready(Ok(())) => {
+                        *pos = buf.filled().len();
+                    }
+                    other => return other,
+                }
+            }
+
+            let mut msg = [0u8; 8];
+            let mut len = [0u8; 8];
+
+            msg.copy_from_slice(&self.header[0..8]);
+            len.copy_from_slice(&self.header[8..16]);
+
+            self.msg = u64::from_be_bytes(msg);
+            self.len = u64::from_be_bytes(len);
+
+            if self.len == 0 {
+                return Poll::Ready(Ok(())); // EOF for end of message
+            }
+        }
+
+        // automatically takes `min(remaining, len)`
+        let mut buf = buf.take(self.len as usize);
+        match Pin::new(&mut self.inner).poll_read(cx, &mut buf) {
+            Poll::Ready(Ok(())) => {
+                self.len -= buf.filled().len() as u64;
+
+                Poll::Ready(Ok(()))
+            }
+            other => other,
+        }
     }
 }

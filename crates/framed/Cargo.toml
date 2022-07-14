@@ -10,6 +10,7 @@ bincode = { version = "1", optional = true }
 serde = { version = "1", optional = true }
 
 tokio = { version = "1", optional = true, default-features = false }
+
 [features]
-default = ["encoding"]
+default = ["encoding", "tokio"]
 encoding = ["serde", "bincode"]
