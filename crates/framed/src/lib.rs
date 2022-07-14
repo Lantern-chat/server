@@ -27,19 +27,30 @@ impl<W: Write> FramedWriter<W> {
         header[8..16].copy_from_slice(&len.to_be_bytes());
         self.inner.write_all(&header)
     }
+
+    /// Use message within a callback and have it be closed automatically after
+    pub fn with_msg<F, T, E>(&mut self, f: F) -> Result<T, E>
+    where
+        F: FnOnce(&mut BufWriter<MessageWriter<W>>) -> Result<T, E>,
+        E: From<io::Error>,
+    {
+        let mut msg = self.new_message();
+
+        f(&mut msg).and_then(|t| match msg.into_inner() {
+            Ok(w) => match w.close() {
+                Ok(()) => Ok(t),
+                Err(e) => Err(e.into()),
+            },
+            Err(e) => Err(io::Error::from(e).into()),
+        })
+    }
 }
 
 #[cfg(feature = "encoding")]
 impl<W: Write> FramedWriter<W> {
     /// Writes a bincode-encoded object as a message
     pub fn write_object<T: serde::Serialize>(&mut self, value: &T) -> bincode::Result<()> {
-        let mut msg = self.new_message();
-        bincode::serialize_into(&mut msg, value)?;
-        match msg.into_inner() {
-            Ok(w) => w.close()?,
-            Err(e) => return Err(io::Error::from(e).into()),
-        }
-        Ok(())
+        self.with_msg(|msg| bincode::serialize_into(msg, value))
     }
 }
 

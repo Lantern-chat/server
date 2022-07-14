@@ -1,3 +1,7 @@
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+
 use tokio::io::{self, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufWriter, ReadBuf};
 
 pub struct AsyncFramedWriter<W> {
@@ -22,6 +26,26 @@ impl<W: AsyncWrite + Unpin> AsyncFramedWriter<W> {
             len: 0,
             pos: 0,
         })
+    }
+
+    /// Use message within a callback and have it be closed automatically after
+    pub async fn with_msg<F, R, T, E>(&mut self, f: F) -> Result<T, E>
+    where
+        F: FnOnce(&mut BufWriter<AsyncMessageWriter<W>>) -> R,
+        R: Future<Output = Result<T, E>>,
+        E: From<io::Error>,
+    {
+        let mut msg = self.new_message();
+        match f(&mut msg).await {
+            Ok(t) => match msg.flush().await {
+                Ok(()) => match msg.into_inner().close().await {
+                    Ok(()) => Ok(t),
+                    Err(e) => Err(e.into()),
+                },
+                Err(e) => Err(io::Error::from(e).into()),
+            },
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -56,9 +80,6 @@ impl<W: AsyncWrite + Unpin> AsyncMessageWriter<'_, W> {
         res
     }
 }
-
-use std::pin::Pin;
-use std::task::{Context, Poll};
 
 impl<W> Drop for AsyncMessageWriter<'_, W> {
     fn drop(&mut self) {
