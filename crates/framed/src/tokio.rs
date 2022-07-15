@@ -39,7 +39,12 @@ impl<W: AsyncWrite + Unpin> AsyncFramedWriter<W> {
     pub async fn dispose_msg(mut msg: BufWriter<AsyncMessageWriter<'_, W>>) -> io::Result<()> {
         match msg.flush().await {
             Ok(()) => msg.into_inner().close().await,
-            Err(e) => Err(io::Error::from(e).into()),
+            Err(e) => {
+                // don't let AsyncMessageWriter drop...
+                std::mem::forget(msg.into_inner());
+
+                Err(io::Error::from(e).into())
+            }
         }
     }
 
@@ -163,7 +168,7 @@ impl<W: AsyncWrite + Unpin> AsyncWrite for AsyncMessageWriter<'_, W> {
 
         let len = self.len;
         let bytes_to_write = buf.len().min(len as usize);
-        Poll::Ready(match self.inner().poll_write(cx, &buf[bytes_to_write..]) {
+        Poll::Ready(match self.inner().poll_write(cx, &buf[..bytes_to_write]) {
             Poll::Pending => return Poll::Pending,
             Poll::Ready(Err(e)) => Err(e),
             Poll::Ready(Ok(bytes_written)) => {
@@ -257,14 +262,51 @@ impl<R: AsyncRead + Unpin> AsyncRead for AsyncFramedReader<R> {
         }
 
         // automatically takes `min(remaining, len)`
-        let mut buf = buf.take(self.len as usize);
-        match Pin::new(&mut self.inner).poll_read(cx, &mut buf) {
+        let mut b2 = buf.take(self.len as usize);
+
+        match Pin::new(&mut self.inner).poll_read(cx, &mut b2) {
             Poll::Ready(Ok(())) => {
-                self.len -= buf.filled().len() as u64;
+                let init_after = b2.initialized().len();
+                let filled_after = b2.filled().len();
+
+                // buf.take() doesn't actually update the original ReadBuf positions,
+                // only writes to the *actual* underlying buffer, so update buf here or
+                // else the parent reader will think it EOFed.
+                unsafe {
+                    // filled is the baseline position where `take()` started,
+                    // as take returns the unfilled slice only. Therefore,
+                    // a conservative estimate initialized memory
+                    // is known-filled + newly initialized
+                    let filled = buf.filled().len();
+                    buf.assume_init(filled + init_after);
+                    buf.set_filled(filled + filled_after);
+                }
+
+                self.len -= filled_after as u64;
 
                 Poll::Ready(Ok(()))
             }
             other => other,
+        }
+    }
+}
+
+#[cfg(feature = "encoding")]
+impl<R: AsyncRead + Unpin> AsyncFramedReader<R> {
+    /// Read a bincode-encoded object message,
+    /// after it has been buffered from the async stream.
+    pub async fn read_buffered_object<T>(&mut self) -> bincode::Result<Option<T>>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        match self.next_msg().await? {
+            Some(msg) => {
+                // pre-allocate first frame
+                let mut buf = Vec::with_capacity(msg.len as usize);
+                msg.read_to_end(&mut buf).await?;
+                bincode::deserialize(&buf).map(Some)
+            }
+            None => Ok(None),
         }
     }
 }
