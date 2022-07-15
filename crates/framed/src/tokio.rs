@@ -1,4 +1,3 @@
-use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -6,54 +5,91 @@ use tokio::io::{self, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufWri
 
 pub struct AsyncFramedWriter<W> {
     inner: W,
-    msg: u64,
 }
+
+// Leaving here for later...
+// pub trait WithMsgCallback<'a, W, T, E>:
+//     FnOnce(&'a mut BufWriter<AsyncMessageWriter<W>>) -> Self::Fut + 'a
+// {
+//     type Fut: Future<Output = Result<T, E>> + 'a;
+// }
+
+// impl<'a, F, FF, W, T, E> WithMsgCallback<'a, W, T, E> for F
+// where
+//     F: FnOnce(&'a mut BufWriter<AsyncMessageWriter<W>>) -> FF + 'a,
+//     FF: Future<Output = Result<T, E>> + 'a,
+// {
+//     type Fut = FF;
+// }
 
 impl<W: AsyncWrite + Unpin> AsyncFramedWriter<W> {
     pub fn new(inner: W) -> Self {
-        AsyncFramedWriter { inner, msg: 1 }
+        AsyncFramedWriter { inner }
     }
 
     pub fn new_message<'a>(&'a mut self) -> BufWriter<AsyncMessageWriter<'a, W>> {
-        self.msg += 1;
         BufWriter::new(AsyncMessageWriter {
-            header: {
-                let mut header = [0; 16];
-                header[0..8].copy_from_slice(&self.msg.to_be_bytes());
-                header
-            },
             w: self,
             len: 0,
+            header: [0; 8],
             pos: 0,
         })
     }
 
-    /// Use message within a callback and have it be closed automatically after
-    pub async fn with_msg<F, R, T, E>(&mut self, f: F) -> Result<T, E>
-    where
-        F: FnOnce(&mut BufWriter<AsyncMessageWriter<W>>) -> R,
-        R: Future<Output = Result<T, E>>,
-        E: From<io::Error>,
-    {
-        let mut msg = self.new_message();
-        match f(&mut msg).await {
-            Ok(t) => match msg.flush().await {
-                Ok(()) => match msg.into_inner().close().await {
-                    Ok(()) => Ok(t),
-                    Err(e) => Err(e.into()),
-                },
-                Err(e) => Err(io::Error::from(e).into()),
-            },
-            Err(e) => Err(e),
+    pub async fn dispose_msg(mut msg: BufWriter<AsyncMessageWriter<'_, W>>) -> io::Result<()> {
+        match msg.flush().await {
+            Ok(()) => msg.into_inner().close().await,
+            Err(e) => Err(io::Error::from(e).into()),
         }
+    }
+
+    pub async fn write_msg(&mut self, buf: &[u8]) -> io::Result<()> {
+        let mut msg = self.new_message();
+
+        let res: io::Result<()> = msg.write_all(buf).await;
+
+        Self::dispose_msg(msg).await?;
+
+        res
+    }
+
+    // Leaving here for later...
+    // /// Use message within a callback and have it be closed automatically after
+    // pub async fn with_msg<F, T, E>(&mut self, f: F) -> Result<T, E>
+    // where
+    //     F: for<'a> WithMsgCallback<'a, W, T, E>,
+    //     E: From<io::Error>,
+    // {
+    //     let mut msg = self.new_message();
+    //     let res: Result<T, E> = { f(&mut msg).await };
+    //     match res {
+    //         Ok(t) => match msg.flush().await {
+    //             Ok(()) => match msg.into_inner().close().await {
+    //                 Ok(()) => Ok(t),
+    //                 Err(e) => Err(e.into()),
+    //             },
+    //             Err(e) => Err(io::Error::from(e).into()),
+    //         },
+    //         Err(e) => Err(e),
+    //     }
+    // }
+}
+
+#[cfg(feature = "encoding")]
+impl<W: AsyncWrite + Unpin + 'static> AsyncFramedWriter<W> {
+    /// serializes to a buffer then writes that out as an async message
+    pub async fn write_buffered_object<T: serde::Serialize>(&mut self, value: &T) -> bincode::Result<()> {
+        self.write_msg(&bincode::serialize(value)?).await?;
+
+        Ok(())
     }
 }
 
 pub struct AsyncMessageWriter<'a, W> {
     w: &'a mut AsyncFramedWriter<W>,
-
     len: u64,
-    header: [u8; 16],
+
+    header: [u8; 8],
     pos: usize,
 }
 
@@ -65,7 +101,7 @@ impl<W: AsyncWrite + Unpin> AsyncMessageWriter<'_, W> {
 
     async fn try_close(&mut self) -> io::Result<()> {
         // set length to 0 for closing frame
-        self.header[8..16].fill(0);
+        self.header = [0; 8];
 
         self.w.inner.write_all(&self.header).await?;
         self.w.inner.flush().await
@@ -83,7 +119,7 @@ impl<W: AsyncWrite + Unpin> AsyncMessageWriter<'_, W> {
 
 impl<W> Drop for AsyncMessageWriter<'_, W> {
     fn drop(&mut self) {
-        panic!("AsyncMessageWriter cannot be dropped! Use `.close()`!");
+        panic!("AsyncMessageWriter cannot be dropped! Use `.close()` or `AsyncFramedWriter::dispose_msg(msg)` instead!");
     }
 }
 
@@ -141,10 +177,9 @@ impl<W: AsyncWrite + Unpin> AsyncWrite for AsyncMessageWriter<'_, W> {
 
 pub struct AsyncFramedReader<R: AsyncRead> {
     inner: R,
-    msg: u64,
     len: u64,
 
-    header: [u8; 16],
+    header: [u8; 8],
     pos: usize,
 }
 
@@ -152,9 +187,8 @@ impl<R: AsyncRead + Unpin> AsyncFramedReader<R> {
     pub fn new(inner: R) -> Self {
         AsyncFramedReader {
             inner,
-            msg: 0,
             len: 0,
-            header: [0; 16],
+            header: [0; 8],
             pos: 0,
         }
     }
@@ -169,15 +203,7 @@ impl<R: AsyncRead + Unpin> AsyncFramedReader<R> {
                 Ok(_) => Ok({
                     // ensure the header cursor is at the end
                     self.pos = self.header.len();
-
-                    let mut msg = [0u8; 8];
-                    let mut len = [0u8; 8];
-
-                    msg.copy_from_slice(&self.header[0..8]);
-                    len.copy_from_slice(&self.header[8..16]);
-
-                    self.msg = u64::from_be_bytes(msg);
-                    self.len = u64::from_be_bytes(len);
+                    self.len = u64::from_be_bytes(self.header);
 
                     if self.len == 0 {
                         continue;
@@ -224,14 +250,7 @@ impl<R: AsyncRead + Unpin> AsyncRead for AsyncFramedReader<R> {
                 }
             }
 
-            let mut msg = [0u8; 8];
-            let mut len = [0u8; 8];
-
-            msg.copy_from_slice(&self.header[0..8]);
-            len.copy_from_slice(&self.header[8..16]);
-
-            self.msg = u64::from_be_bytes(msg);
-            self.len = u64::from_be_bytes(len);
+            self.len = u64::from_be_bytes(self.header);
 
             if self.len == 0 {
                 return Poll::Ready(Ok(())); // EOF for end of message

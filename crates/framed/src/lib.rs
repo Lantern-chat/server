@@ -5,27 +5,22 @@ use std::io::{self, BufWriter, Read, Write};
 
 pub struct FramedWriter<W: Write> {
     inner: W,
-    msg: u64,
 }
 
 impl<W: Write> FramedWriter<W> {
     pub fn new(inner: W) -> Self {
-        FramedWriter { inner, msg: 1 }
+        FramedWriter { inner }
     }
 
     /// Constructs a new message writer that will
     /// take care of closing the messagee and flushing
     /// the buffer on drop
     pub fn new_message<'a>(&'a mut self) -> BufWriter<MessageWriter<'a, W>> {
-        self.msg += 1;
         BufWriter::new(MessageWriter { w: self, len: 0 })
     }
 
     fn write_header(&mut self, len: u64) -> io::Result<()> {
-        let mut header = [0u8; 8 + 8];
-        header[0..8].copy_from_slice(&self.msg.to_be_bytes());
-        header[8..16].copy_from_slice(&len.to_be_bytes());
-        self.inner.write_all(&header)
+        self.inner.write_all(&len.to_be_bytes())
     }
 
     /// Use message within a callback and have it be closed automatically after
@@ -68,9 +63,7 @@ impl<W: Write> MessageWriter<'_, W> {
     /// Manually close this message, to handle errors
     pub fn close(mut self) -> io::Result<()> {
         let res = self.try_close();
-
         std::mem::forget(self);
-
         res
     }
 }
@@ -105,17 +98,12 @@ impl<W: Write> Write for MessageWriter<'_, W> {
 
 pub struct FramedReader<R: Read> {
     inner: R,
-    msg: u64,
     len: u64,
 }
 
 impl<R: Read> FramedReader<R> {
     pub fn new(inner: R) -> FramedReader<R> {
-        FramedReader {
-            inner,
-            msg: 0,
-            len: 0,
-        }
+        FramedReader { inner, len: 0 }
     }
 
     /// Throw away rest of the message
@@ -133,14 +121,13 @@ impl<R: Read> FramedReader<R> {
 
         loop {
             return match read_header(&mut self.inner) {
-                Ok((msg, len)) => Ok({
+                Ok(len) => Ok({
                     // sometimes readers don't consume the closing frame
                     // so if that happens just skip it and try again
                     if len == 0 {
                         continue; // goto loop start
                     }
 
-                    self.msg = msg;
                     self.len = len;
 
                     Some(self)
@@ -152,17 +139,10 @@ impl<R: Read> FramedReader<R> {
     }
 }
 
-fn read_header<R: Read>(mut r: R) -> io::Result<(u64, u64)> {
-    let mut header = [0u8; 8 + 8];
-    r.read_exact(&mut header)?;
-
-    let mut msg = [0u8; 8];
+fn read_header<R: Read>(mut r: R) -> io::Result<u64> {
     let mut len = [0u8; 8];
-
-    msg.copy_from_slice(&header[0..8]);
-    len.copy_from_slice(&header[8..16]);
-
-    Ok((u64::from_be_bytes(msg), u64::from_be_bytes(len)))
+    r.read_exact(&mut len)?;
+    Ok(u64::from_be_bytes(len))
 }
 
 impl<R: Read> Read for FramedReader<R> {
@@ -170,12 +150,11 @@ impl<R: Read> Read for FramedReader<R> {
         // if the current frame has been fully read
         if self.len == 0 {
             match read_header(&mut self.inner) {
-                Ok((msg, len)) => {
+                Ok(len) => {
                     if len == 0 {
                         return Ok(0); // EOF for end of message
                     }
 
-                    self.msg = msg;
                     self.len = len;
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::UnexpectedEof => {
