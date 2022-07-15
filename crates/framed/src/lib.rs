@@ -56,6 +56,11 @@ pub struct MessageWriter<'a, W: Write> {
 
 impl<W: Write> MessageWriter<'_, W> {
     fn try_close(&mut self) -> io::Result<()> {
+        if self.len > 0 {
+            // If the message didn't write as many bytes as it expected, then just fill with zeroes...
+            io::copy(&mut io::repeat(0).take(self.len), self)?;
+        }
+
         self.w.write_header(0)?;
         self.w.inner.flush()
     }

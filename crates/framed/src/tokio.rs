@@ -105,6 +105,11 @@ impl<W: AsyncWrite + Unpin> AsyncMessageWriter<'_, W> {
     }
 
     async fn try_close(&mut self) -> io::Result<()> {
+        if self.len > 0 {
+            // If the message didn't write as many bytes as it expected, then just fill with zeroes...
+            io::copy(&mut io::repeat(0).take(self.len), self).await?;
+        }
+
         // set length to 0 for closing frame
         self.header = [0; 8];
 
