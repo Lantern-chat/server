@@ -142,10 +142,9 @@ impl<W: AsyncWrite + Unpin> AsyncWrite for AsyncMessageWriter<'_, W> {
         }
 
         if self.len == 0 {
-            let len = buf.len() as u64;
-            self.len = len;
+            self.len = buf.len() as u64;
             self.pos = 0; // reset position so header can be written out
-            self.header[8..16].copy_from_slice(&len.to_be_bytes());
+            self.header = self.len.to_be_bytes();
         }
 
         // try to write out the whole header in one call, even if has a partial write.
