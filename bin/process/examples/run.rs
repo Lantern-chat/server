@@ -1,10 +1,24 @@
 use process::{Command, EncodingFormat, Response};
 
-use std::io::Write;
-use std::process::{Command as PCommand, Stdio};
+//use std::io::Write;
+use std::process::Stdio;
+use tokio::process::Command as PCommand;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let file = std::fs::read("test.png")?;
+use tokio::fs;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut file = fs::OpenOptions::new().read(true).open("test.png").await?;
+
+    let mut formats = vec![
+        (EncodingFormat::Png, 100),
+        (EncodingFormat::Jpeg, 95),
+        (EncodingFormat::Jpeg, 80),
+        (EncodingFormat::Jpeg, 45),
+        (EncodingFormat::Avif, 95),
+        (EncodingFormat::Avif, 80),
+        (EncodingFormat::Avif, 45),
+    ];
 
     let mut child = PCommand::new("../../target/debug/process.exe")
         .stdin(Stdio::piped())
@@ -12,45 +26,76 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .stderr(Stdio::inherit())
         .spawn()?;
 
-    let mut input = framed::FramedWriter::new(child.stdin.take().unwrap());
-    let mut output = framed::FramedReader::new(child.stdout.take().unwrap());
-    //let mut err = child.stderr.take().unwrap();
+    let mut input = framed::tokio::AsyncFramedWriter::new(child.stdin.take().unwrap());
+    let mut output = framed::tokio::AsyncFramedReader::new(child.stdout.take().unwrap());
 
-    while let Some(msg) = output.read_object()? {
+    let mut current = None;
+
+    while let Some(msg) = output.read_buffered_object().await? {
         match msg {
             Response::Ready => {
-                input.write_object(&Command::Initialize {
-                    width: 1600,
-                    height: 900,
-                    max_pixels: u32::MAX,
-                })?;
+                input
+                    .write_buffered_object(&Command::Initialize {
+                        width: 3840 / 2,
+                        height: 2160 / 2,
+                        max_pixels: u32::MAX,
+                    })
+                    .await?;
 
                 {
-                    input.write_object(&Command::ReadAndProcess {
-                        length: file.len() as u64,
-                    })?;
+                    input
+                        .write_buffered_object(&Command::ReadAndProcess {
+                            length: file.metadata().await?.len(),
+                        })
+                        .await?;
 
-                    input.with_msg(|msg| msg.write_all(&file))?;
+                    let mut msg = input.new_message();
+                    tokio::io::copy(&mut file, &mut msg).await?;
+                    framed::tokio::AsyncFramedWriter::dispose_msg(msg).await?;
                 }
             }
             Response::Processed { .. } => {
-                input.write_object(&Command::Encode {
-                    format: EncodingFormat::Jpeg,
-                    quality: 100,
-                })?;
+                if let Some((format, quality)) = formats.pop() {
+                    input
+                        .write_buffered_object(&Command::Encode { format, quality })
+                        .await?;
+
+                    current = Some((format, quality));
+                }
             }
             Response::Encoded => {
-                let mut f = std::fs::OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .truncate(true)
-                    .open("./out.jpeg")?;
+                if let Some((format, quality)) = current {
+                    let mut f = fs::OpenOptions::new()
+                        .write(true)
+                        .create(true)
+                        .truncate(true)
+                        .open(format!(
+                            "./test_{}.{}",
+                            quality,
+                            match format {
+                                EncodingFormat::Png => "png",
+                                EncodingFormat::Jpeg => "jpeg",
+                                EncodingFormat::Avif => "avif",
+                            }
+                        ))
+                        .await?;
 
-                if let Some(msg) = output.next_msg()? {
-                    std::io::copy(msg, &mut f)?;
+                    if let Some(msg) = output.next_msg().await? {
+                        tokio::io::copy(msg, &mut f).await?;
+                    }
+
+                    if let Some((format, quality)) = formats.pop() {
+                        input
+                            .write_buffered_object(&Command::Encode { format, quality })
+                            .await?;
+
+                        current = Some((format, quality));
+                    } else {
+                        input.write_buffered_object(&Command::Clear).await?;
+
+                        input.write_buffered_object(&Command::Exit).await?;
+                    }
                 }
-
-                input.write_object(&Command::Exit)?;
             }
         }
     }

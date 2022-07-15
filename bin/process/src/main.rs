@@ -8,10 +8,6 @@ fn task() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut out = framed::FramedWriter::new(io::stdout());
 
-    // TODO: Use stderr to send back results of operations,
-    // OR use some kind of framed writer to send
-    // back delimited chunks through stdout
-
     let mut processed_image = None;
     let mut heuristics = None;
     let mut config = ProcessConfig {
@@ -96,6 +92,6 @@ fn main() {
     }
 
     if let Err(e) = task() {
-        eprintln!("ERROR: {}", e);
+        eprintln!("SUB ERROR: {}", e);
     }
 }

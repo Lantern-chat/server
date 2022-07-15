@@ -12,3 +12,6 @@ serde = { version = "1", features = ["derive"] }
 framed = { path = "../../crates/framed", features = ["encoding"] }
 processing = { path = "../../crates/processing" }
 process_utils = { path = "../../crates/process_utils" }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
