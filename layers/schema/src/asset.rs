@@ -1,29 +1,49 @@
 bitflags::bitflags! {
+    /// NOTE: Formats are as individual bitflags (rather than some integer value) so we can do
+    /// simpler queries when matching valid formats. A user can select formats A, B and C, and testing for a match
+    /// can be done with a single bitwise-AND operation, rather than many comparisons or an `IN ARRAY` operation.
     pub struct AssetFlags: i16 {
         /// 7-bit unsigned integer for quality from `[0-128)`
         ///
         /// A quality value greater then 100 indicates some lossless encoding
         const QUALITY  = 127;
 
-        /// Indicates if the encoded image is animated
-        const ANIMATED = 1 << 8;
+        const OPAQUE = 1 << 8;
 
-        /// Reserved for some potentially useful flag
-        const RESERVED = 1 << 9;
+        /// Indicates if the encoded image is animated
+        const ANIMATED = 1 << 9;
 
         const FORMAT_PNG  = 1 << 10;
         const FORMAT_JPEG = 1 << 11;
         const FORMAT_GIF  = 1 << 12;
         const FORMAT_AVIF = 1 << 13;
+        const FORMAT_WEBM = 1 << 14;
 
-        const FORMATS = Self::FORMAT_PNG.bits | Self::FORMAT_JPEG.bits | Self::FORMAT_GIF.bits | Self::FORMAT_AVIF.bits;
+        const FORMATS = Self::FORMAT_PNG.bits | Self::FORMAT_JPEG.bits | Self::FORMAT_GIF.bits | Self::FORMAT_AVIF.bits | Self::FORMAT_WEBM.bits;
+
+        const FLAGS = Self::FORMATS.bits | Self::ANIMATED.bits | Self::OPAQUE.bits;
     }
 }
 
 impl AssetFlags {
-    pub fn with_quality(mut self, q: u8) -> Self {
-        self.remove(Self::QUALITY);
-        self | AssetFlags::from_bits_truncate(q.min(127) as i16)
+    pub const fn with_quality(self, q: u8) -> Self {
+        self.intersection(Self::QUALITY.complement()).union(if q < 128 {
+            AssetFlags::from_bits_truncate(q as i16)
+        } else {
+            AssetFlags::QUALITY
+        })
+    }
+
+    pub const fn with_alpha(&self, has_alpha: bool) -> Self {
+        if has_alpha {
+            self.difference(Self::OPAQUE)
+        } else {
+            self.union(Self::OPAQUE)
+        }
+    }
+
+    pub const fn quality(&self) -> u8 {
+        self.intersection(Self::QUALITY).bits as u8
     }
 
     pub fn from_ext(ext: &str) -> Self {
@@ -44,7 +64,7 @@ impl AssetFlags {
             }
         }
 
-        AssetFlags::FORMAT_JPEG
+        AssetFlags::empty()
     }
 
     pub fn with_ext(self, ext: &str) -> Self {

@@ -24,6 +24,8 @@ pub enum Error {
     SemaphoreError(#[from] tokio::sync::AcquireError),
     #[error("Parse Error {0}")]
     JsonError(#[from] serde_json::Error),
+    #[error("Bincode Error: {0}")]
+    BincodeError(#[from] bincode::Error),
     #[error("XML Serialize Error {0}")]
     XMLError(#[from] quick_xml::de::DeError),
     #[error("Password Hash Error {0}")]
@@ -196,6 +198,7 @@ impl Error {
             | Error::SemaphoreError(_)
             | Error::HashError(_)
             | Error::JsonError(_)
+            | Error::BincodeError(_)
             | Error::XMLError(_)
             | Error::EventEncodingError(_)
             | Error::IOError(_)
@@ -273,6 +276,7 @@ impl Error {
             Error::SemaphoreError(_)        => ApiErrorCode::SemaphoreError,
             Error::HashError(_)             => ApiErrorCode::HashError,
             Error::JsonError(_)             => ApiErrorCode::JsonError,
+            Error::BincodeError(_)          => ApiErrorCode::BincodeError,
             Error::EventEncodingError(_)    => ApiErrorCode::EventEncodingError,
             Error::Utf8ParseError(_)        => ApiErrorCode::Utf8ParseError,
             Error::IOError(_)               => ApiErrorCode::IOError,
