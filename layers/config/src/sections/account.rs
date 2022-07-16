@@ -3,6 +3,11 @@ use std::{ops::Range, time::Duration};
 section! {
     #[serde(default)]
     pub struct Account {
+        /// Duration of a user session.
+        ///
+        /// Can be parsed from plain seconds or an array of `[seconds, nanoseconds]`
+        ///
+        /// Default value is 90 days
         #[serde(with = "super::util::duration")]
         pub session_duration: Duration      = Duration::from_secs(90 * 24 * 60 * 60), // 90 days
 
