@@ -28,6 +28,14 @@ impl CipherOptions {
     pub fn create(&self) -> Aes256Ctr {
         Aes256Ctr::new(&self.key, &self.nonce)
     }
+
+    #[inline]
+    pub fn new_from_i64_nonce(key: BlockCipherKey<Aes256>, nonce: i64) -> Self {
+        CipherOptions {
+            key,
+            nonce: unsafe { std::mem::transmute([nonce, nonce]) },
+        }
+    }
 }
 
 use super::crypt::EncryptedFile;

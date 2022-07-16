@@ -149,14 +149,9 @@ pub async fn set_avatar(state: ServerState, user_id: Snowflake, file_id: Snowfla
 
         let _fs_permit = state.fs_semaphore.acquire().await?;
 
-        let cipher_options = CipherOptions {
-            key: state.config.keys.file_key,
-            nonce: unsafe { std::mem::transmute([nonce, nonce]) },
-        };
-
         let mut file = state
             .fs()
-            .open_crypt(avatar_file_id, OpenMode::Write, &cipher_options)
+            .open_crypt(avatar_file_id, OpenMode::Write, &CipherOptions::new_from_i64_nonce(state.config.keys.file_key, nonce))
             .await?;
 
         file.write_all(&encoded_image.buffer).await?;

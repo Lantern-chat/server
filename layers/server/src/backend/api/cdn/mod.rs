@@ -90,14 +90,16 @@ pub async fn get_file(
     let nonce: i64 = row.try_get(Columns::Nonce as usize)?;
     let mime: Option<&str> = row.try_get(Columns::Mime as usize)?;
 
-    let options = CipherOptions {
-        key: state.config.keys.file_key,
-        nonce: unsafe { std::mem::transmute([nonce, nonce]) },
-    };
-
     let _fs_permit = state.fs_semaphore.acquire().await?;
 
-    let mut file = state.fs().open_crypt(file_id, OpenMode::Read, &options).await?;
+    let mut file = state
+        .fs()
+        .open_crypt(
+            file_id,
+            OpenMode::Read,
+            &CipherOptions::new_from_i64_nonce(state.config.keys.file_key, nonce)
+        )
+        .await?;
 
     let mut len = size as u64;
 

@@ -64,11 +64,6 @@ pub async fn patch_file(
         return Err(Error::Conflict);
     }
 
-    let cipher_options = CipherOptions {
-        key: state.config.keys.file_key,
-        nonce: unsafe { std::mem::transmute([nonce, nonce]) },
-    };
-
     // acquire these at the same time
     let (_file_lock, _fs_permit) = tokio::try_join! {
         async { Ok(state.id_lock.lock(file_id).await) },
@@ -77,7 +72,11 @@ pub async fn patch_file(
 
     let mut file = state
         .fs()
-        .open_crypt(file_id, OpenMode::Write, &cipher_options)
+        .open_crypt(
+            file_id,
+            OpenMode::Write,
+            &CipherOptions::new_from_i64_nonce(state.config.keys.file_key, nonce),
+        )
         .await?;
 
     let append_pos = file.seek(SeekFrom::End(0)).await?;
