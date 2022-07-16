@@ -1,6 +1,5 @@
 use filesystem::store::{CipherOptions, OpenMode};
 use framed::tokio::{AsyncFramedReader, AsyncFramedWriter};
-use futures::TryFutureExt;
 use process::{Command, EncodingFormat, ProcessedResponse, Response};
 use rand::Rng;
 
@@ -165,7 +164,9 @@ pub async fn add_asset(state: &ServerState, mode: AssetMode, file_id: Snowflake)
                 use process::Error as P;
                 return Err(match e {
                     P::FileTooLarge | P::ImageTooLarge => Error::RequestEntityTooLarge,
-                    P::InvalidImageFormat | P::UnsupportedFormat => Error::BadRequest,
+                    P::InvalidImageFormat | P::UnsupportedFormat | P::DecodingError(_) => {
+                        Error::InvalidImageFormat
+                    }
                     _ => Error::InternalError(e.to_string()),
                 });
             }
