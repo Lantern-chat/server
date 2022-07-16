@@ -97,6 +97,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             }
+            Response::Error(err) => {
+                println!("Error: {:?}", err);
+                return Ok(());
+            }
         }
     }
 

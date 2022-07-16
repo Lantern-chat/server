@@ -1,45 +1,56 @@
 use std::io;
 
-use process::{Command, EncodingFormat, Response};
-use processing::{read_image::read_image, ImageFormat, ProcessConfig};
+use framed::{FramedReader, FramedWriter};
+use process::{Command, EncodingFormat, Error, ProcessedResponse, Response};
+use processing::{
+    heuristic::HeuristicsInfo,
+    read_image::{read_image, Image},
+    ImageFormat, ProcessConfig,
+};
 
-fn task() -> Result<(), Box<dyn std::error::Error>> {
-    let mut stdin = framed::FramedReader::new(io::stdin());
+struct ProcessState {
+    config: ProcessConfig,
+    image: Option<Image>,
+    heuristics: Option<HeuristicsInfo>,
+}
 
-    let mut out = framed::FramedWriter::new(io::stdout());
+enum Action {
+    Exit,
+    Continue,
+}
 
-    let mut processed_image = None;
-    let mut heuristics = None;
-    let mut config = ProcessConfig {
-        max_height: 0,
-        max_width: 0,
-        max_pixels: 0,
-    };
-
-    out.write_object(&Response::Ready)?;
-
-    while let Some(cmd) = stdin.read_object()? {
+impl ProcessState {
+    fn run(
+        &mut self,
+        input: &mut FramedReader<io::Stdin>,
+        output: &mut FramedWriter<io::Stdout>,
+        cmd: Command,
+    ) -> Result<Action, Error> {
         match cmd {
-            Command::Exit => return Ok(()),
-            Command::Pause => continue,
+            Command::Exit => return Ok(Action::Exit),
+            Command::Pause => return Ok(Action::Continue),
             Command::Initialize {
                 width,
                 height,
                 max_pixels,
             } => {
-                config = ProcessConfig {
+                self.config = ProcessConfig {
                     max_height: height,
                     max_width: width,
                     max_pixels,
                 };
             }
+            Command::Clear => {
+                self.image = None;
+                self.heuristics = None;
+            }
             Command::ReadAndProcess { length } => {
-                if let Some(msg) = stdin.next_msg()? {
-                    let mut image = read_image(msg, &config, Some(length))?;
+                if let Some(msg) = input.next_msg()? {
+                    let mut image = read_image(msg, &self.config, Some(length))?;
 
-                    let p = processing::process::process_image(&mut image, config)?;
+                    let p = processing::process::process_image(&mut image, self.config)?;
 
-                    out.write_object(&Response::Processed {
+                    output.write_object(&Response::Processed(ProcessedResponse {
                         preview: p.preview,
                         width: image.image.width(),
                         height: image.image.height(),
@@ -52,16 +63,16 @@ fn task() -> Result<(), Box<dyn std::error::Error>> {
 
                             flags
                         },
-                    })?;
+                    }))?;
 
-                    heuristics = Some(p.heuristics);
-                    processed_image = Some(image);
+                    self.heuristics = Some(p.heuristics);
+                    self.image = Some(image);
                 }
             }
             Command::Encode { format, quality } => {
-                let image = match processed_image {
+                let image = match self.image {
                     Some(ref image) => image,
-                    None => continue,
+                    None => return Ok(Action::Continue),
                 };
 
                 let format = match format {
@@ -70,16 +81,41 @@ fn task() -> Result<(), Box<dyn std::error::Error>> {
                     EncodingFormat::Avif => ImageFormat::Avif,
                 };
 
-                out.write_object(&Response::Encoded)?;
+                output.write_object(&Response::Encoded)?;
 
-                out.with_msg(|msg| {
-                    processing::encode::encode(msg, image, format, heuristics.unwrap(), quality)
+                output.with_msg(|msg| {
+                    processing::encode::encode(msg, image, format, self.heuristics.unwrap(), quality)
                 })?;
             }
-            Command::Clear => {
-                processed_image = None;
-                heuristics = None;
-            }
+        }
+
+        Ok(Action::Continue)
+    }
+}
+
+fn task() -> Result<(), Box<dyn std::error::Error>> {
+    let mut input = FramedReader::new(io::stdin());
+    let mut output = FramedWriter::new(io::stdout());
+
+    let mut state = ProcessState {
+        config: ProcessConfig {
+            max_width: 0,
+            max_height: 0,
+            max_pixels: 0,
+        },
+        image: None,
+        heuristics: None,
+    };
+
+    output.write_object(&Response::Ready)?;
+
+    while let Some(cmd) = input.read_object()? {
+        match state.run(&mut input, &mut output, cmd) {
+            Ok(action) => match action {
+                Action::Continue => continue,
+                Action::Exit => return Ok(()),
+            },
+            Err(e) => output.write_object(&Response::Error(e))?,
         }
     }
 

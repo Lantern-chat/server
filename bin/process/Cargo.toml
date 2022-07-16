@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 bincode = "1"
 serde = { version = "1", features = ["derive"] }
+thiserror = "1"
 
 framed = { path = "../../crates/framed", features = ["encoding"] }
 processing = { path = "../../crates/processing" }
