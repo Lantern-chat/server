@@ -62,7 +62,7 @@ impl OEmbedClient {
 }
 
 async fn read_head<'a>(
-    resp: &mut reqwest::Response,
+    resp: &'a mut reqwest::Response,
     html: &'a mut Vec<u8>,
 ) -> Result<Option<HeaderList<'a>>, Error> {
     while let Some(chunk) = resp.chunk().await? {
