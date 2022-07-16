@@ -14,6 +14,7 @@ pub fn add_tasks(state: &ServerState, runner: &TaskRunner) {
     perm_cache_cleanup::perm_cache_cleanup(state, runner);
     record_metrics::add_record_metrics_task(state, runner);
     session_cleanup::add_cleanup_sessions_task(state, runner);
+    file_cleanup::add_orphaned_file_cleanup_task(state, runner);
 
     crate::backend::gateway::task::listen::add_gateway_listener(state.clone(), runner);
     crate::backend::gateway::task::process::add_gateway_processor(state.clone(), runner);
@@ -25,6 +26,7 @@ mod clean_presence;
 mod cn_cleanup;
 mod event_log_cleanup;
 mod file_cache_cleanup;
+mod file_cleanup;
 mod http_server;
 mod id_lock_cleanup;
 mod perm_cache_cleanup;

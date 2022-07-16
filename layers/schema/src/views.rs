@@ -98,6 +98,10 @@ thorn::tables! {
         UserId: Overwrites::UserId,
         Perms: Type::INT8,
     }
+
+    pub struct AggUsedFiles in Lantern {
+        Id: Files::Id,
+    }
 }
 
 use smol_str::SmolStr;
