@@ -1,3 +1,4 @@
+#[rustfmt::skip]
 pub fn linear_to_srgb(v: f32) -> u8 {
     //return (v * 255.0) as u8;
 

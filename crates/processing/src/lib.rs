@@ -13,4 +13,4 @@ pub struct ProcessConfig {
     pub max_pixels: u32,
 }
 
-pub use image::ImageFormat;
+pub use image::{self, ImageFormat};

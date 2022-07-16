@@ -65,7 +65,7 @@ pub struct SysInfo {
     pub total_memory: u64,
 }
 
-#[cfg(not(any(target_os = "windows", unix, target_os = "macos")))]
+#[cfg(not(any(windows, unix, target_os = "macos")))]
 pub fn get_sysinfo() -> Option<SysInfo> {
     None
 }

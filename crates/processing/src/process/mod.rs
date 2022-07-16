@@ -2,11 +2,7 @@ use std::io;
 
 use image::{math::Rect, DynamicImage, GenericImageView};
 
-use crate::{
-    heuristic::HeuristicsInfo,
-    read_image::{Image, ImageReadError},
-    ProcessConfig,
-};
+use crate::{heuristic::HeuristicsInfo, read_image::Image, ProcessConfig};
 
 pub struct ProcessedImage {
     pub preview: Option<Vec<u8>>,
@@ -17,15 +13,6 @@ pub struct ProcessedImage {
 pub enum ProcessingError {
     #[error("IO Error: {0}")]
     IOError(#[from] io::Error),
-
-    #[error("Invalid Image Format")]
-    InvalidImageFormat,
-
-    #[error("Image Read Error")]
-    ImageReadError(#[from] ImageReadError),
-
-    #[error("Image Too Large")]
-    TooLarge,
 
     #[error("Other: {0}")]
     Other(String),

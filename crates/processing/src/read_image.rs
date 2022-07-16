@@ -34,6 +34,9 @@ pub enum ImageReadError {
     #[error("Image Too Large")]
     ImageTooLarge,
 
+    #[error("File Too Large")]
+    FileTooLarge,
+
     #[error("Png Decode Error: {0}")]
     PngDecodeError(#[from] png::DecodingError),
 
@@ -76,7 +79,7 @@ pub fn read_image<R: Read>(
 
             match length_hint {
                 Some(length) if length >= max_file_size as u64 => {
-                    return Err(ImageReadError::ImageTooLarge);
+                    return Err(ImageReadError::FileTooLarge);
                 }
                 _ => {}
             }
@@ -86,7 +89,7 @@ pub fn read_image<R: Read>(
             let mut buffer = Vec::new();
 
             if max_file_size >= source.take(max_file_size as u64).read_to_end(&mut buffer)? {
-                return Err(ImageReadError::ImageTooLarge);
+                return Err(ImageReadError::FileTooLarge);
             }
 
             let source = io::Cursor::new(buffer);

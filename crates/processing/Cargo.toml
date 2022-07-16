@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 blurhash = { path = "../blurhash" }
 
-image = { version = "0.24", default-features = false, features = ["gif", "jpeg", "ico", "png", "pnm", "tga", "tiff", "webp", "bmp"] }
+image = { version = "0.24", default-features = false, features = ["gif", "ico", "png", "pnm", "tga", "tiff", "webp", "bmp"] }
 tracing = "0.1.26"
 png = "0.17"
 thiserror = "1.0.30"
