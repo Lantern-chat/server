@@ -92,6 +92,13 @@ pub struct FileStore<'a> {
 }
 
 impl FileStore<'_> {
+    pub async fn delete(&self, id: Snowflake) -> io::Result<()> {
+        let mut path = self.root.to_path_buf();
+        id_to_path(id, &mut path);
+        id_to_name(id, &mut path);
+        fs::remove_file(path).await
+    }
+
     pub async fn open_crypt(
         &self,
         id: Snowflake,
