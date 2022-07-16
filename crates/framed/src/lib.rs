@@ -1,6 +1,9 @@
 #[cfg(feature = "tokio")]
 pub mod tokio;
 
+#[cfg(feature = "futures")]
+pub mod futures;
+
 use std::io::{self, BufWriter, Read, Write};
 
 pub struct FramedWriter<W: Write> {
