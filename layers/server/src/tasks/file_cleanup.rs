@@ -60,6 +60,8 @@ pub fn add_orphaned_file_cleanup_task(state: &ServerState, runner: &TaskRunner) 
 
                 let res = deleting.await;
 
+                drop(_fs_permit);
+
                 // if any were deleted successfully, DELETE from database
                 if !deleted.is_empty() {
                     let db = state.db.write.get().await?;
