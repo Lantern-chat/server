@@ -55,6 +55,10 @@ ALTER TABLE lantern.user_assets OWNER TO postgres;
 
 CREATE INDEX user_asset_origina_file_idx ON lantern.user_assets (file_id);
 
+ALTER TABLE lantern.user_assets ADD CONSTRAINT file_id_fk FOREIGN KEY (file_id)
+    REFERENCES lantern.files (id) MATCH FULL
+    ON DELETE CASCADE ON UPDATE CASCADE;
+
 CREATE TABLE lantern.user_asset_files (
     asset_id    bigint      NOT NULL,
     file_id     bigint      NOT NULL,
@@ -68,6 +72,10 @@ ALTER TABLE lantern.user_asset_files OWNER TO postgres;
 
 -- TODO: Is this even necessary with such a simple table? The index itself has the same information as the actual table
 CREATE INDEX user_asset_file_idx ON lantern.user_asset_files USING btree(asset_id, file_id) INCLUDE (flags);
+
+ALTER TABLE lantern.user_asset_files ADD CONSTRAINT file_id_fk FOREIGN KEY (file_id)
+    REFERENCES lantern.files (id) MATCH FULL
+    ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- Update existing tables with avatars fks

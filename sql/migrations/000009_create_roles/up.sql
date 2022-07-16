@@ -23,7 +23,7 @@ ALTER TABLE lantern.roles ADD CONSTRAINT party_fk FOREIGN KEY (party_id)
     ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE lantern.roles ADD CONSTRAINT avatar_fk FOREIGN KEY (avatar_id)
-    REFERENCES lantern.files (id) MATCH FULL
+    REFERENCES lantern.user_assets (id) MATCH FULL
     ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- Role/User association map
