@@ -53,6 +53,8 @@ CREATE TABLE lantern.user_assets (
 );
 ALTER TABLE lantern.user_assets OWNER TO postgres;
 
+CREATE INDEX user_asset_origina_file_idx ON lantern.user_assets (file_id);
+
 CREATE TABLE lantern.user_asset_files (
     asset_id    bigint      NOT NULL,
     file_id     bigint      NOT NULL,
