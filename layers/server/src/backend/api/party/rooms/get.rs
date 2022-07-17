@@ -114,7 +114,7 @@ pub async fn get_rooms(
                 party_id: Some(party_id),
                 name: row.try_get(1)?,
                 topic: row.try_get(2)?,
-                flags: RoomFlags::from_bits_truncate(row.try_get(3)?),
+                flags: row.try_get(3)?,
                 avatar: encrypt_snowflake_opt(&state, row.try_get(4)?),
                 position: row.try_get(5)?,
                 rate_limit_per_user: None,

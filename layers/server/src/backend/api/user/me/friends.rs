@@ -64,7 +64,7 @@ pub async fn friends(
         Err(e) => Err(e.into()),
         Ok(row) => Ok(Friend {
             note: row.try_get(FriendColumns::note())?,
-            flags: FriendFlags::from_bits_truncate(row.try_get(FriendColumns::flags())?),
+            flags: row.try_get(FriendColumns::flags())?,
             user: User {
                 id: row.try_get(FriendColumns::friend_id())?,
                 username: row.try_get(UserColumns::username())?,

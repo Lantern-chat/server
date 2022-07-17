@@ -86,7 +86,7 @@ pub async fn role_event(
                 .map(|c| c as u32)
         },
         position: row.try_get(RoleColumns::position())?,
-        flags: RoleFlags::from_bits_truncate(row.try_get(RoleColumns::flags())?),
+        flags: row.try_get(RoleColumns::flags())?,
     };
 
     let event = match event {

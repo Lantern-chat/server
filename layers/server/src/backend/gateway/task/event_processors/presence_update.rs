@@ -71,16 +71,11 @@ pub async fn presence_updated(
     let party_ids: Vec<Snowflake> = row.try_get(6)?;
 
     let presence = match row.try_get::<_, Option<_>>(3)? {
-        Some(updated_at) => {
-            let flags = UserPresenceFlags::from_bits_truncate(row.try_get(4)?);
-            let activity = None; // TODO
-
-            UserPresence {
-                flags,
-                updated_at: Some(updated_at),
-                activity,
-            }
-        }
+        Some(updated_at) => UserPresence {
+            flags: row.try_get(4)?,
+            updated_at: Some(updated_at),
+            activity: None,
+        },
         None => UserPresence {
             flags: UserPresenceFlags::empty(),
             updated_at: None,

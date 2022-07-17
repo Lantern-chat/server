@@ -43,7 +43,7 @@ pub async fn get_thread(
             Ok(Thread {
                 id: thread_id,
                 parent: msg,
-                flags: ThreadFlags::from_bits_truncate(row.try_get(ThreadColumns::Flags as usize)?),
+                flags: row.try_get(ThreadColumns::Flags as usize)?,
             })
         }
     }

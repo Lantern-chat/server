@@ -74,7 +74,7 @@ async fn get_room_simple(
             name: row.try_get(2)?,
             topic: row.try_get(3)?,
             position: row.try_get(4)?,
-            flags: RoomFlags::from_bits_truncate(row.try_get(5)?),
+            flags: row.try_get(5)?,
             rate_limit_per_user: None,
             parent_id: row.try_get(6)?,
             overwrites: Vec::new(),

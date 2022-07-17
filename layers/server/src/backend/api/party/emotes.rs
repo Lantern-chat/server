@@ -65,7 +65,7 @@ pub async fn get_custom_emotes_raw<'a>(
             party_id: row.try_get(1)?,
             file: row.try_get(2)?,
             name: row.try_get(3)?,
-            flags: EmoteFlags::from_bits_truncate(row.try_get(4)?),
+            flags: row.try_get(4)?,
             aspect_ratio: row.try_get(5)?,
         }),
     }))
