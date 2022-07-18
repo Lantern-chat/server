@@ -7,7 +7,7 @@ use rand::Rng;
 use std::process::Stdio;
 use tokio::process::Command as SystemCommand;
 
-use schema::{asset::AssetFlags as Asset, SnowflakeExt};
+use schema::{asset::AssetFlags as Asset, flags::FileFlags, SnowflakeExt};
 use sdk::Snowflake;
 
 use crate::{Error, ServerState};
@@ -211,10 +211,10 @@ pub async fn add_asset(
 
                         let ProcessedResponse { width, height, .. } = *processed;
 
-                        let mime = match format {
-                            EncodingFormat::Jpeg => "image/jpeg",
-                            EncodingFormat::Png => "image/png",
-                            EncodingFormat::Avif => "image/avif",
+                        let ext = match format {
+                            EncodingFormat::Jpeg => "jpeg",
+                            EncodingFormat::Png => "png",
+                            EncodingFormat::Avif => "avif",
                         };
 
                         db.execute_cached_typed(
@@ -232,6 +232,8 @@ pub async fn add_asset(
                                         Files::Width,
                                         Files::Height,
                                         Files::Mime,
+                                        Files::Flags,
+                                        Files::Name,
                                     ])
                                     .values([
                                         Var::of(Files::Id),
@@ -241,6 +243,8 @@ pub async fn add_asset(
                                         Var::of(Files::Width),
                                         Var::of(Files::Height),
                                         Var::of(Files::Mime),
+                                        Var::of(Files::Flags),
+                                        Var::of(Files::Name),
                                     ])
                             },
                             &[
@@ -250,7 +254,9 @@ pub async fn add_asset(
                                 &len,
                                 &(width as i32),
                                 &(height as i32),
-                                &mime,
+                                &format!("image/{ext}"),
+                                &FileFlags::COMPLETE.bits(),
+                                &format!("{user_id}_asset.{ext}"),
                             ],
                         )
                         .await?;

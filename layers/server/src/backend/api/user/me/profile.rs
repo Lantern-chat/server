@@ -29,22 +29,34 @@ pub async fn patch_profile(
         match (has_status, has_bio) {
             (true, true) => {
                 db.execute_cached_typed(
-                    || insert_or_update_profile(&[Profiles::CustomStatus, Profiles::Biography]),
-                    &[&auth.user_id, &party_id, &new_profile.status, &new_profile.bio],
+                    || {
+                        insert_or_update_profile(&[
+                            Profiles::Bits,
+                            Profiles::CustomStatus,
+                            Profiles::Biography,
+                        ])
+                    },
+                    &[
+                        &auth.user_id,
+                        &party_id,
+                        &new_profile.bits,
+                        &new_profile.status,
+                        &new_profile.bio,
+                    ],
                 )
                 .await?;
             }
             (true, false) => {
                 db.execute_cached_typed(
-                    || insert_or_update_profile(&[Profiles::CustomStatus]),
-                    &[&auth.user_id, &party_id, &new_profile.status],
+                    || insert_or_update_profile(&[Profiles::Bits, Profiles::CustomStatus]),
+                    &[&auth.user_id, &party_id, &new_profile.bits, &new_profile.status],
                 )
                 .await?;
             }
             (false, true) => {
                 db.execute_cached_typed(
-                    || insert_or_update_profile(&[Profiles::Biography]),
-                    &[&auth.user_id, &party_id, &new_profile.bio],
+                    || insert_or_update_profile(&[Profiles::Bits, Profiles::Biography]),
+                    &[&auth.user_id, &party_id, &new_profile.bits, &new_profile.bio],
                 )
                 .await?;
             }
@@ -126,7 +138,7 @@ pub async fn patch_profile(
 
     // NOTE: This is kind of in reverse order from the status/bio combinations due to the wildcard matching
     match (new_avatar_id, new_banner_id) {
-        (Nullable::Undefined, Nullable::Undefined) => {
+        (Nullable::Undefined, Nullable::Undefined) if !has_status && !has_bio => {
             // just set bits...
             db.execute_cached_typed(
                 || insert_or_update_profile(&[Profiles::Bits]),
@@ -134,24 +146,31 @@ pub async fn patch_profile(
             )
             .await?;
         }
+        (Nullable::Undefined, Nullable::Undefined) => {}
         (avatar_id, Nullable::Undefined) => {
             db.execute_cached_typed(
                 || insert_or_update_profile(&[Profiles::AvatarId, Profiles::Bits]),
-                &[&auth.user_id, &party_id, &avatar_id],
+                &[&auth.user_id, &party_id, &avatar_id, &new_profile.bits],
             )
             .await?;
         }
         (Nullable::Undefined, banner_id) => {
             db.execute_cached_typed(
                 || insert_or_update_profile(&[Profiles::BannerId, Profiles::Bits]),
-                &[&auth.user_id, &party_id, &banner_id],
+                &[&auth.user_id, &party_id, &banner_id, &new_profile.bits],
             )
             .await?;
         }
         (avatar_id, banner_id) => {
             db.execute_cached_typed(
                 || insert_or_update_profile(&[Profiles::AvatarId, Profiles::BannerId, Profiles::Bits]),
-                &[&auth.user_id, &party_id, &avatar_id, &banner_id],
+                &[
+                    &auth.user_id,
+                    &party_id,
+                    &avatar_id,
+                    &banner_id,
+                    &new_profile.bits,
+                ],
             )
             .await?;
         }
@@ -169,6 +188,7 @@ pub async fn patch_profile(
 fn insert_or_update_profile(cols: &[schema::Profiles]) -> impl thorn::AnyQuery {
     use schema::*;
     use thorn::conflict::ConflictAction;
+    use thorn::table::ColumnExt;
     use thorn::*;
 
     let mut q = Query::insert().into::<Profiles>();
@@ -179,18 +199,24 @@ fn insert_or_update_profile(cols: &[schema::Profiles]) -> impl thorn::AnyQuery {
     q = q.values(cols.iter().enumerate().map(|(v, c)| Var::at(*c, v + 3)));
 
     // TODO: Make this more ergonomic...
-    q = q.on_conflict([Profiles::UserId, Profiles::PartyId], {
-        let mut i = cols.iter().enumerate();
+    q = q.on_expr_conflict(
+        [
+            Box::new(Profiles::UserId.as_name_only()) as Box<dyn Expr>,
+            Box::new(Builtin::coalesce((Profiles::PartyId.as_name_only(), 1i64.lit()))) as Box<dyn Expr>,
+        ],
+        {
+            let mut i = cols.iter().enumerate();
 
-        let first = i.next().unwrap();
-        let mut action = DoUpdate.set(*first.1, Var::at(*first.1, first.0 + 3));
+            let first = i.next().unwrap();
+            let mut action = DoUpdate.set(*first.1, Var::at(*first.1, first.0 + 3));
 
-        for (v, c) in i {
-            action = action.set(*c, Var::at(*c, v + 3));
-        }
+            for (v, c) in i {
+                action = action.set(*c, Var::at(*c, v + 3));
+            }
 
-        action
-    });
+            action
+        },
+    );
 
     q
 }
