@@ -11,6 +11,7 @@ pub mod login;
 pub mod logout;
 pub mod prefs;
 pub mod sessions;
+pub mod profile;
 
 #[rustfmt::skip]
 pub async fn me(mut route: Route<crate::ServerState>) -> ApiResponse {
@@ -28,6 +29,7 @@ pub async fn me(mut route: Route<crate::ServerState>) -> ApiResponse {
                 (&Method::GET, Exact("friends")) => friends::friends(route, auth).await,
                 (&Method::PATCH, Exact("prefs")) => prefs::prefs(route, auth).await,
                 (&Method::PATCH, Exact("account")) => account::patch_account(route, auth).await,
+                (&Method::PATCH, Exact("profile")) => profile::patch_profile(route, auth).await,
                 _ => Err(Error::NotFound),
             }
         },
