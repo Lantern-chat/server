@@ -72,4 +72,4 @@ ALTER TABLE lantern.messages ADD COLUMN IF NOT EXISTS ts tsvector
     -- take the top 6 bits of the smallint flags as a language code
     GENERATED ALWAYS AS (to_tsvector(lantern.to_language(flags >> 10), content)) STORED;
 
-CREATE INDEX msg_ts_idx IF NOT EXISTS ON lantern.messages USING GIN (ts);
+CREATE INDEX IF NOT EXISTS msg_ts_idx ON lantern.messages USING GIN (ts);

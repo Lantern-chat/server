@@ -47,7 +47,7 @@ pub fn add_orphaned_file_cleanup_task(state: &ServerState, runner: &TaskRunner) 
                         let id = row.try_get(0)?;
                         match fs.delete(id).await {
                             Ok(_) => {}
-                            Err(ref e) if e.kind() != std::io::ErrorKind::NotFound => {
+                            Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {
                                 // allow already-deleted files to be cleaned
                             }
                             Err(e) => return Err(e.into()),
@@ -73,7 +73,7 @@ pub fn add_orphaned_file_cleanup_task(state: &ServerState, runner: &TaskRunner) 
 
                             Query::delete().from::<Files>().and_where(
                                 Query::select()
-                                    .expr(Var::of(SNOWFLAKE_ARRAY))
+                                    .expr(Builtin::unnest((Var::of(SNOWFLAKE_ARRAY),)))
                                     .any()
                                     .equals(Files::Id),
                             )
