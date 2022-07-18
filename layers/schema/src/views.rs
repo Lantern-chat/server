@@ -110,6 +110,11 @@ thorn::tables! {
         AvatarFileId: Files::Id,
         BannerFileId: Files::Id,
     }
+
+    pub struct AggUserAssociations in Lantern {
+        UserId: Users::Id,
+        OtherId: Users::Id,
+    }
 }
 
 use smol_str::SmolStr;

@@ -67,3 +67,10 @@ FROM
             AND role_members.user_id = party_member.user_id
     ) agg_roles ON TRUE
 ;
+
+CREATE OR REPLACE VIEW lantern.agg_user_associations(user_id, other_id) AS
+SELECT user_id, friend_id FROM lantern.agg_friends
+UNION ALL
+SELECT my.user_id, o.user_id FROM
+    lantern.party_member my INNER JOIN lantern.party_member o ON (o.party_id = my.party_id)
+;
