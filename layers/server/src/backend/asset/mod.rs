@@ -35,7 +35,12 @@ fn gen_formats(state: &ServerState, mode: AssetMode) -> Vec<(EncodingFormat, u8)
     all_formats
 }
 
-pub async fn add_asset(state: &ServerState, mode: AssetMode, file_id: Snowflake) -> Result<Snowflake, Error> {
+pub async fn add_asset(
+    state: &ServerState,
+    mode: AssetMode,
+    user_id: Snowflake,
+    file_id: Snowflake,
+) -> Result<Snowflake, Error> {
     let max_width;
     let max_height;
     let max_pixels;
@@ -221,6 +226,7 @@ pub async fn add_asset(state: &ServerState, mode: AssetMode, file_id: Snowflake)
                                     .into::<Files>()
                                     .cols(&[
                                         Files::Id,
+                                        Files::UserId,
                                         Files::Nonce,
                                         Files::Size,
                                         Files::Width,
@@ -229,6 +235,7 @@ pub async fn add_asset(state: &ServerState, mode: AssetMode, file_id: Snowflake)
                                     ])
                                     .values([
                                         Var::of(Files::Id),
+                                        Var::of(Files::UserId),
                                         Var::of(Files::Nonce),
                                         Var::of(Files::Size),
                                         Var::of(Files::Width),
@@ -236,7 +243,15 @@ pub async fn add_asset(state: &ServerState, mode: AssetMode, file_id: Snowflake)
                                         Var::of(Files::Mime),
                                     ])
                             },
-                            &[&id, &nonce, &len, &(width as i32), &(height as i32), &mime],
+                            &[
+                                &id,
+                                &user_id,
+                                &nonce,
+                                &len,
+                                &(width as i32),
+                                &(height as i32),
+                                &mime,
+                            ],
                         )
                         .await?;
 

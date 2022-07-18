@@ -102,6 +102,14 @@ thorn::tables! {
     pub struct AggUsedFiles in Lantern {
         Id: Files::Id,
     }
+
+    pub struct AggOriginalProfileFiles in Lantern {
+        UserId: Users::Id,
+        PartyId: Party::Id,
+        Bits: Profiles::Bits,
+        AvatarFileId: Files::Id,
+        BannerFileId: Files::Id,
+    }
 }
 
 use smol_str::SmolStr;

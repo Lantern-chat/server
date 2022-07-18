@@ -70,3 +70,22 @@ FROM
         ON (party_profile.user_id = base_profile.user_id AND party_profile.party_id IS NOT NULL)
     WHERE base_profile.party_id IS NULL
 ;
+
+CREATE OR REPLACE VIEW lantern.agg_original_profile_files(
+    user_id,
+    party_id,
+    bits,
+    avatar_file_id,
+    banner_file_id
+) AS
+SELECT
+    profiles.user_id,
+    profiles.party_id,
+    profiles.bits,
+    avatar_asset.file_id,
+    banner_asset.file_id
+FROM
+    lantern.profiles
+    LEFT JOIN lantern.user_assets avatar_asset ON avatar_asset.id = profiles.avatar_id
+    LEFT JOIN lantern.user_assets banner_asset ON banner_asset.id = profiles.banner_id
+;

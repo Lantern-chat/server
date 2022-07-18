@@ -5,7 +5,6 @@ use super::ApiResponse;
 use crate::{web::auth::authorize, Error};
 
 pub mod account;
-pub mod avatar;
 pub mod billing;
 pub mod friends;
 pub mod login;
@@ -27,8 +26,6 @@ pub async fn me(mut route: Route<crate::ServerState>) -> ApiResponse {
                 (&Method::DELETE, End) => logout::logout(route, auth).await,
                 (&Method::GET, Exact("sessions")) => sessions::sessions(route, auth).await,
                 (&Method::GET, Exact("friends")) => friends::friends(route, auth).await,
-                (&Method::POST, Exact("avatar")) => avatar::post_avatar(route, auth).boxed().await,
-                (&Method::DELETE, Exact("avatar")) => avatar::delete_avatar(route, auth).await,
                 (&Method::PATCH, Exact("prefs")) => prefs::prefs(route, auth).await,
                 (&Method::PATCH, Exact("account")) => account::patch_account(route, auth).await,
                 _ => Err(Error::NotFound),

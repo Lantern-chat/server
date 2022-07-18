@@ -2,6 +2,7 @@ pub mod db;
 pub mod queues;
 
 pub mod api;
+pub mod asset;
 pub mod gateway;
 pub mod services;
 pub mod util;

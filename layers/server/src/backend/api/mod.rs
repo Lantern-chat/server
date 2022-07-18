@@ -15,16 +15,17 @@ pub mod gateway {
 }
 
 pub mod user {
+    pub mod profile;
     pub mod register;
 
     pub mod me {
         pub mod account;
-        pub mod avatar;
         pub mod friends;
         pub mod get;
         pub mod login;
         pub mod logout;
         pub mod prefs;
+        pub mod profile;
         pub mod sessions;
     }
 }
