@@ -25,6 +25,7 @@ members = ["crates/*", "bin/*", "layers/*"]
 [profile.dev]
 opt-level = 1
 lto = false
+incremental = false
 
 [profile.release]
 opt-level = 3
