@@ -24,7 +24,7 @@ pub async fn set_presence(
                 Var::of(UserPresence::Activity),
             )))
         },
-        &[&user_id, &conn_id, &presence.flags.bits(), &activity],
+        &[&user_id, &conn_id, &presence.flags, &activity],
     )
     .await?;
 

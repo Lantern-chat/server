@@ -153,7 +153,7 @@ pub(crate) async fn insert_message(
                 &room_id,
                 &parent_msg_id,
                 &thread_id,
-                &ThreadFlags::empty().bits(), // TODO
+                &ThreadFlags::empty(), // TODO
                 &content,
             ],
         )

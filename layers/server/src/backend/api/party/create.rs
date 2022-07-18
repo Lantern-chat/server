@@ -98,7 +98,7 @@ pub async fn create_party(
         ),
         t.execute_cached_typed(
             || insert_room(),
-            &[&room_id, &party.id, &"general", &0i16, &RoomFlags::DEFAULT.bits()],
+            &[&room_id, &party.id, &"general", &0i16, &RoomFlags::DEFAULT],
         ),
     )
     .await?;
