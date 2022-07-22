@@ -8,7 +8,7 @@ bitflags::bitflags! {
         /// A quality value greater then 100 indicates some lossless encoding
         const QUALITY  = 127;
 
-        const OPAQUE = 1 << 8;
+        const HAS_ALPHA = 1 << 8;
 
         /// Indicates if the encoded image is animated
         const ANIMATED = 1 << 9;
@@ -21,7 +21,7 @@ bitflags::bitflags! {
 
         const FORMATS = Self::FORMAT_PNG.bits | Self::FORMAT_JPEG.bits | Self::FORMAT_GIF.bits | Self::FORMAT_AVIF.bits | Self::FORMAT_WEBM.bits;
 
-        const FLAGS = Self::FORMATS.bits | Self::ANIMATED.bits | Self::OPAQUE.bits;
+        const FLAGS = Self::FORMATS.bits | Self::ANIMATED.bits | Self::HAS_ALPHA.bits;
     }
 }
 
@@ -36,9 +36,9 @@ impl AssetFlags {
 
     pub const fn with_alpha(&self, has_alpha: bool) -> Self {
         if has_alpha {
-            self.difference(Self::OPAQUE)
+            self.union(Self::HAS_ALPHA)
         } else {
-            self.union(Self::OPAQUE)
+            self.difference(Self::HAS_ALPHA)
         }
     }
 
