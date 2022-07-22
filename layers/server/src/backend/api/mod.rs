@@ -75,8 +75,6 @@ pub mod file {
     pub mod post;
 }
 
-pub mod cdn;
-
 pub mod metrics;
 
 pub mod oembed {

@@ -3,6 +3,7 @@ pub mod queues;
 
 pub mod api;
 pub mod asset;
+pub mod cdn;
 pub mod gateway;
 pub mod services;
 pub mod util;
