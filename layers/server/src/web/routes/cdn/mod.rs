@@ -1,10 +1,11 @@
 use ftl::*;
 use futures::FutureExt;
+use sdk::Snowflake;
 
 use crate::{Error, ServerState};
 
+pub mod asset;
 pub mod attachments;
-pub mod avatar;
 
 use super::api::v1::ApiResponse;
 
@@ -19,17 +20,7 @@ pub async fn cdn(mut route: Route<ServerState>) -> ApiResponse {
 
     match route.next().segment() {
         Exact("attachments") => attachments::attachments(route).boxed().await,
-        Exact("avatar") => {
-            let kind = match route.next().segment() {
-                Exact("user") => avatar::AvatarKind::User,
-                Exact("room") => avatar::AvatarKind::Room,
-                Exact("party") => avatar::AvatarKind::Party,
-                Exact("role") => avatar::AvatarKind::Role,
-                _ => return Err(Error::NotFound),
-            };
-
-            avatar::avatar(route, kind).boxed().await
-        }
+        Exact("user" | "room" | "party" | "role") => asset::asset(route).boxed().await,
         _ => Err(Error::NotFound),
     }
 }

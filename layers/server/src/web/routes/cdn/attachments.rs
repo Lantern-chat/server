@@ -3,7 +3,7 @@ use ftl::*;
 use sdk::models::Snowflake;
 
 use super::ApiResponse;
-use crate::{backend::api::cdn::FileKind, Error, ServerState};
+use crate::{Error, ServerState};
 
 pub async fn attachments(mut route: Route<ServerState>) -> ApiResponse {
     let room_id = match route.next().param::<Snowflake>() {
@@ -16,7 +16,7 @@ pub async fn attachments(mut route: Route<ServerState>) -> ApiResponse {
         _ => return Err(Error::BadRequest),
     };
 
-    let filename = match route.next().segment() {
+    let filename: smol_str::SmolStr = match route.next().segment() {
         Exact(filename) => urlencoding::decode(filename)?.into(),
         _ => return Err(Error::BadRequest),
     };
@@ -25,14 +25,6 @@ pub async fn attachments(mut route: Route<ServerState>) -> ApiResponse {
 
     let download = route.raw_query() == Some("download");
 
-    crate::backend::api::cdn::get_file(
-        route,
-        room_id,
-        attachment_id,
-        FileKind::Attachment,
-        Some(filename),
-        is_head,
-        download,
-    )
-    .await
+    crate::backend::cdn::get_attachment(route, room_id, attachment_id, Some(&filename), is_head, download)
+        .await
 }

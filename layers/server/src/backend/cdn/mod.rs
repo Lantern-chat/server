@@ -81,7 +81,7 @@ pub async fn get_asset(
 
 pub async fn get_attachment(
     route: Route<ServerState>,
-    msg_id: Snowflake,
+    room_id: Snowflake,
     file_id: Snowflake,
     provided_name: Option<&str>,
     is_head: bool,
@@ -100,7 +100,7 @@ pub async fn get_attachment(
     let db = state.db.read.get().await?;
 
     let row = db
-        .query_opt_cached_typed(|| query::select_attachment(), &[&file_id, &msg_id])
+        .query_opt_cached_typed(|| query::select_attachment(), &[&file_id, &room_id])
         .await?;
 
     let row = match row {
