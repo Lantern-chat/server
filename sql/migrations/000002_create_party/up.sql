@@ -4,12 +4,13 @@
 
 CREATE TABLE lantern.party (
     id              bigint      NOT NULL,
-    avatar_id       bigint,
     owner_id        bigint      NOT NULL,
     -- NOTE: FK is added in later migration
     default_room    bigint      NOT NULL,
     -- packed party flags
     flags           bigint      NOT NULL DEFAULT 0,
+    avatar_id       bigint,
+    banner_id       bigint,
     deleted_at      timestamp,
     name            text        NOT NULL,
     description     text,
@@ -19,7 +20,6 @@ CREATE TABLE lantern.party (
 ALTER TABLE lantern.party OWNER TO postgres;
 
 CREATE INDEX party_name_idx ON lantern.party USING btree (name);
-CREATE INDEX party_avatar_idx ON lantern.party USING hash(avatar_id);
 
 ALTER TABLE lantern.party ADD CONSTRAINT owner_fk FOREIGN KEY (owner_id)
     REFERENCES lantern.users (id) MATCH FULL

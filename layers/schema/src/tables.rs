@@ -132,9 +132,10 @@ thorn::tables! {
 
     pub struct Party in Lantern {
         Id: SNOWFLAKE,
-        AvatarId: UserAssets::Id,
         OwnerId: Users::Id,
         DefaultRoom: Rooms::Id,
+        AvatarId: UserAssets::Id,
+        BannerId: UserAssets::Id,
         Flags: Type::INT8,
         DeletedAt: Type::TIMESTAMP,
         Name: Type::TEXT,

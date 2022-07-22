@@ -54,6 +54,7 @@ pub async fn create_party(
         roles: Vec::new(),
         emotes: Vec::new(),
         avatar: None,
+        banner: Nullable::Null,
         position: 0,
         default_room: room_id,
     };

@@ -23,21 +23,35 @@ pub async fn get_party_inner(
     user_id: Snowflake,
     party_id: Snowflake,
 ) -> Result<Party, Error> {
+    mod party_query {
+        pub use schema::*;
+        use thorn::indexed_columns;
+        pub use thorn::*;
+
+        indexed_columns! {
+            pub enum PartyColumns {
+                Party::Name,
+                Party::OwnerId,
+                Party::AvatarId,
+                Party::BannerId,
+                Party::Description,
+                Party::DefaultRoom,
+            }
+
+            pub enum PartyMemberColumns continue PartyColumns {
+                PartyMember::Position,
+            }
+        }
+    }
+
     let row = db
         .query_opt_cached_typed(
             || {
-                use schema::*;
-                use thorn::*;
+                use party_query::*;
 
                 Query::select()
-                    .cols(&[
-                        /*0*/ Party::Name,
-                        /*1*/ Party::OwnerId,
-                        /*2*/ Party::AvatarId,
-                        /*3*/ Party::Description,
-                        /*4*/ Party::DefaultRoom,
-                    ])
-                    .col(/*5*/ PartyMember::Position)
+                    .cols(PartyColumns::default())
+                    .cols(PartyMemberColumns::default())
                     .and_where(Party::Id.equals(Var::of(Party::Id)))
                     .from(Party::left_join_table::<PartyMember>().on(PartyMember::PartyId.equals(Party::Id)))
                     .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
@@ -47,21 +61,24 @@ pub async fn get_party_inner(
         )
         .await?;
 
+    use party_query::{PartyColumns, PartyMemberColumns};
+
     let mut party = match row {
         None => return Err(Error::NotFound),
         Some(row) => Party {
             partial: PartialParty {
                 id: party_id,
-                name: row.try_get(0)?,
-                description: row.try_get(3)?,
+                name: row.try_get(PartyColumns::name())?,
+                description: row.try_get(PartyColumns::description())?,
             },
-            owner: row.try_get(1)?,
+            owner: row.try_get(PartyColumns::owner_id())?,
             security: SecurityFlags::empty(),
             roles: Vec::new(),
             emotes: Vec::new(),
-            avatar: encrypt_snowflake_opt(&state, row.try_get(2)?),
-            position: row.try_get(5)?,
-            default_room: row.try_get(4)?,
+            avatar: encrypt_snowflake_opt(&state, row.try_get(PartyColumns::avatar_id())?),
+            banner: Nullable::Undefined,
+            position: row.try_get(PartyMemberColumns::position())?,
+            default_room: row.try_get(PartyColumns::default_room())?,
         },
     };
 

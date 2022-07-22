@@ -4,7 +4,10 @@ use hashbrown::HashMap;
 use schema::Snowflake;
 use thorn::pg::Json;
 
-use crate::backend::{api::SearchMode, util::encrypted_asset::encrypt_snowflake_opt};
+use crate::backend::{
+    api::SearchMode,
+    util::encrypted_asset::{encrypt_snowflake, encrypt_snowflake_opt},
+};
 use crate::{Authorization, Error, ServerState};
 
 //struct Associated<T> {
@@ -42,6 +45,7 @@ pub async fn ready(
                     Party::OwnerId,
                     Party::Name,
                     Party::AvatarId,
+                    Party::BannerId,
                     Party::Description,
                     Party::DefaultRoom,
                 }
@@ -93,6 +97,9 @@ pub async fn ready(
                     roles: Vec::new(),
                     emotes: Vec::new(),
                     avatar: encrypt_snowflake_opt(&state, row.try_get(PartyColumns::avatar_id())?),
+                    banner: row
+                        .try_get::<_, Nullable<_>>(PartyColumns::banner_id())?
+                        .map(|id| encrypt_snowflake(&state, id)),
                     position: row.try_get(MemberColumns::position())?,
                     default_room: row.try_get(PartyColumns::default_room())?,
                 },
