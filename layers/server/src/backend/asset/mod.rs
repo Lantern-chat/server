@@ -335,6 +335,14 @@ pub async fn add_asset(
             .with_quality(quality)
             .with_alpha(processed.flags & process::HAS_ALPHA != 0);
 
+        asset_flags = match format {
+            // JPEGs cannot have alpha channels
+            EncodingFormat::Jpeg => asset_flags.with_alpha(false),
+            // PNGs are always lossless
+            EncodingFormat::Png => asset_flags.with_quality(127),
+            EncodingFormat::Avif => asset_flags,
+        };
+
         t.execute_cached_typed(
             || {
                 use schema::*;
