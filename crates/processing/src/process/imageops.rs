@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use image::{math::Rect, DynamicImage, GenericImageView, ImageBuffer, Pixel};
+use image::{math::Rect, DynamicImage, GenericImageView, ImageBuffer, Pixel, RgbaImage};
 
 fn sinc(mut a: f32) -> f32 {
     a *= std::f32::consts::PI;
@@ -437,5 +437,15 @@ pub fn crop_and_reduce_and_resize(
                 false => DynamicImage::ImageRgb8(image.to_rgb8()),
             }
         }
+    }
+}
+
+pub fn fast_premultiply_alpha(image: &mut RgbaImage) {
+    for p in image.pixels_mut() {
+        let alpha = p.0[3] as u16;
+        for c in &mut p.0[0..3] {
+            *c = ((*c as u16 * alpha) >> 8) as u8;
+        }
+        p.0[3] = 255;
     }
 }
