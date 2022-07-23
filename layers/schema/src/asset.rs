@@ -21,7 +21,11 @@ bitflags::bitflags! {
 
         const FORMATS = Self::FORMAT_PNG.bits | Self::FORMAT_JPEG.bits | Self::FORMAT_GIF.bits | Self::FORMAT_AVIF.bits | Self::FORMAT_WEBM.bits;
 
-        const FLAGS = Self::FORMATS.bits | Self::ANIMATED.bits | Self::HAS_ALPHA.bits;
+        const MAYBE_UNSUPPORTED_FORMATS = Self::FORMAT_AVIF.bits;
+
+        const FLAGS = Self::HAS_ALPHA.bits | Self::ANIMATED.bits;
+
+        const FORMATS_AND_FLAGS = Self::FORMATS.bits | Self::FLAGS.bits;
     }
 }
 
@@ -70,4 +74,51 @@ impl AssetFlags {
     pub fn with_ext(self, ext: &str) -> Self {
         self | Self::from_ext(ext)
     }
+}
+
+use sdk::api::AssetQuery;
+use smol_str::SmolStr;
+
+#[derive(Debug, thiserror::Error)]
+pub enum AssetQueryParseError {
+    #[error(transparent)]
+    IntParseError(#[from] std::num::ParseIntError),
+
+    #[error("Invalid Query")]
+    InvalidQuery,
+}
+
+pub fn parse(s: &str) -> Result<AssetQuery, AssetQueryParseError> {
+    let mut quality = 80;
+    let mut animated = true;
+    let mut with_alpha = true;
+    let mut ext = None;
+
+    for (key, value) in form_urlencoded::parse(s.as_bytes()) {
+        match &*key {
+            "f" | "flags" => {
+                return Ok(AssetQuery::Flags {
+                    flags: if value.starts_with("0b") {
+                        u16::from_str_radix(&value[2..], 2)?
+                    } else if value.starts_with("0x") {
+                        u16::from_str_radix(&value[2..], 16)?
+                    } else {
+                        u16::from_str_radix(&value, 10)?
+                    },
+                });
+            }
+            "q" | "quality" => quality = value.parse()?,
+            "animated" => animated = util::parse_boolean(&value)?,
+            "alpha" | "with_alpha" => with_alpha = util::parse_boolean(&value)?,
+            "ext" | "format" if !value.is_empty() => ext = Some(SmolStr::from(value)),
+            _ => {}
+        }
+    }
+
+    Ok(AssetQuery::HumanReadable {
+        quality,
+        animated,
+        with_alpha,
+        ext,
+    })
 }

@@ -2,8 +2,8 @@ use ftl::*;
 
 use smol_str::SmolStr;
 
-use schema::SnowflakeExt;
-use sdk::models::Snowflake;
+use schema::{asset::AssetFlags, SnowflakeExt};
+use sdk::{api::AssetQuery, models::Snowflake};
 
 use crate::backend::{cdn::AssetKind, util::encrypted_asset::decrypt_snowflake};
 
@@ -67,5 +67,35 @@ pub async fn asset(mut route: Route<ServerState>) -> ApiResponse {
 
     let is_head = route.method() == Method::HEAD;
 
-    crate::backend::cdn::get_asset(route, kind, kind_id, asset_id, is_head, false).await
+    let flags = match route.raw_query().map(|query| schema::asset::parse(query)) {
+        Some(Ok(q)) => match q {
+            AssetQuery::Flags { flags } => AssetFlags::from_bits_truncate(flags as i16),
+            AssetQuery::HumanReadable {
+                quality,
+                animated,
+                with_alpha,
+                ext,
+            } => {
+                let mut flags = AssetFlags::empty().with_quality(quality).with_alpha(with_alpha);
+
+                if animated {
+                    flags |= AssetFlags::ANIMATED;
+                }
+
+                match ext {
+                    Some(ext) => flags.with_ext(&ext),
+                    None => flags
+                        .union(AssetFlags::FORMATS)
+                        .difference(AssetFlags::MAYBE_UNSUPPORTED_FORMATS),
+                }
+            }
+        },
+        _ => AssetFlags::all()
+            .difference(AssetFlags::MAYBE_UNSUPPORTED_FORMATS)
+            .with_quality(80),
+    };
+
+    log::debug!("REQUESTED ASSET FLAGS: {}={:?}", flags.bits(), flags);
+
+    crate::backend::cdn::get_asset(route, kind, kind_id, asset_id, is_head, false, flags).await
 }

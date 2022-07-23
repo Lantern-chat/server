@@ -97,6 +97,8 @@ impl UserAssetFormats {
     }
 
     fn clean(&mut self) {
+        self.png.push(100);
+
         self.png.sort_unstable();
         self.png.dedup();
 

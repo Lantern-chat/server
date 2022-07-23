@@ -17,7 +17,7 @@ use smol_str::SmolStr;
 use thorn::pg::ToSql;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
-use schema::flags::FileFlags;
+use schema::{asset::AssetFlags, flags::FileFlags};
 use sdk::models::Snowflake;
 
 use crate::{Error, ServerState};
@@ -40,6 +40,7 @@ pub async fn get_asset(
     asset_id: Snowflake,
     is_head: bool,
     download: bool,
+    flags: AssetFlags,
 ) -> Result<Response, Error> {
     let range = route.header::<headers::Range>();
     let last_modified = LastModified::from(asset_id.system_timestamp());
@@ -53,7 +54,7 @@ pub async fn get_asset(
 
     let db = state.db.read.get().await?;
 
-    let params: &[&(dyn ToSql + Sync)] = &[&asset_id, &kind_id];
+    let params: &[&(dyn ToSql + Sync)] = &[&asset_id, &kind_id, &flags.bits()];
 
     // // boxing these is probably cheaper than the compiled state machines of all of them combined
     #[rustfmt::skip]
@@ -176,33 +177,38 @@ mod query {
 
     pub fn select_asset(kind: AssetKind) -> impl thorn::AnyQuery {
         use schema::{asset::AssetFlags, *};
-        use std::ops::Not;
         use thorn::*;
 
         let asset_id = Var::at(UserAssetFiles::AssetId, 1);
         let kind_id = Var::at(UserAssetFiles::AssetId, 2);
         let var_flags = Var::at(UserAssetFiles::Flags, 3);
 
-        let flags_quality = UserAssetFiles::Flags.bit_and(AssetFlags::QUALITY.bits().lit());
-        let flags_flags = UserAssetFiles::Flags.bit_and(AssetFlags::FLAGS.bits().lit());
-
-        let has_alpha = || UserAssetFiles::Flags.bit_and(AssetFlags::HAS_ALPHA.bits().lit());
-
-        let var_flags_quality = Builtin::min((
-            var_flags.clone().bit_and(AssetFlags::QUALITY.bits().lit()),
-            100i16.lit(),
-        ));
-        let var_flags_flags = var_flags.clone().bit_and(AssetFlags::FLAGS.bits().lit());
+        let quality = UserAssetFiles::Flags.bit_and(AssetFlags::QUALITY.bits().lit());
 
         let q = Query::select()
             .cols(Columns::default())
             .and_where(UserAssetFiles::AssetId.equals(asset_id))
             // select files of at least the given quality
-            .and_where(flags_quality.greater_than_equal(var_flags_quality))
-            // filter by flags as well, for format and alpha channel
-            .and_where(flags_flags.bit_and(var_flags_flags).not_equals(0.lit()))
-            // prioritize images with alpha
-            .order_by(has_alpha().descending())
+            .and_where(quality.greater_than_equal(Builtin::least((
+                var_flags.clone().bit_and(AssetFlags::QUALITY.bits().lit()),
+                100i16.lit(),
+            ))))
+            .and_where(
+                UserAssetFiles::Flags
+                    .has_any_bits(var_flags.clone().bit_and(AssetFlags::FORMATS.bits().lit())),
+            )
+            .and_where(
+                UserAssetFiles::Flags
+                    .has_any_bits(var_flags.clone().bit_and(AssetFlags::FLAGS.bits().lit()))
+                    .or(UserAssetFiles::Flags.has_no_bits(AssetFlags::FLAGS.bits().lit())),
+            )
+            .order_by(
+                // prioritize images with animation, then alpha, then without alpha
+                // this is possible because the ANIMATED flag is higher than HAS_ALPHA
+                UserAssetFiles::Flags
+                    .bit_and(AssetFlags::FLAGS.bits().lit())
+                    .descending(),
+            )
             // order by file size, to pick the smallest one first
             .order_by(Files::Size.ascending())
             .limit_n(1);

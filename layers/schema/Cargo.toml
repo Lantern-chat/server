@@ -6,6 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+util = { path = "../../crates/util" }
+
 sdk = { git = "https://github.com/Lantern-chat/client-sdk-rs", default-features = false, features = ["pg"], package = "client-sdk" }
 
 thorn = { git = "https://github.com/Lantern-chat/thorn" }
@@ -26,6 +28,7 @@ thiserror = "1"
 sha-1 = "0.10"
 hmac = "0.12"
 byteorder = "1.4"
+form_urlencoded = "1"
 
 [dev-dependencies]
 serde_json = "1.0.64"

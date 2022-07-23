@@ -4,6 +4,7 @@ use framed::{FramedReader, FramedWriter};
 use process::{Command, EncodingFormat, Error, ProcessedResponse, Response};
 use processing::{
     heuristic::HeuristicsInfo,
+    image::DynamicImage,
     read_image::{read_image, Image},
     ImageFormat, ProcessConfig,
 };
@@ -71,13 +72,21 @@ impl ProcessState {
             }
             Command::Encode { format, quality } => {
                 let image = match self.image {
-                    Some(ref image) => image,
+                    Some(ref mut image) => image,
                     None => return Ok(Action::Continue),
                 };
 
                 let format = match format {
                     EncodingFormat::Png => ImageFormat::Png,
-                    EncodingFormat::Jpeg => ImageFormat::Jpeg,
+                    EncodingFormat::Jpeg => {
+                        // even if mozjpeg can handle RGBA bytes, it still needs to be
+                        // premultiplied or it'll be a mess
+                        if let DynamicImage::ImageRgba8(ref mut rgba) = image.image {
+                            processing::process::imageops::fast_premultiply_alpha(rgba);
+                        }
+
+                        ImageFormat::Jpeg
+                    }
                     EncodingFormat::Avif => ImageFormat::Avif,
                 };
 

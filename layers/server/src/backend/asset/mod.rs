@@ -30,6 +30,8 @@ fn gen_formats(state: &ServerState, mode: AssetMode) -> Vec<(EncodingFormat, u8)
 
     all_formats.extend(formats.avif.iter().copied().map(|q| (EncodingFormat::Avif, q)));
     all_formats.extend(formats.png.iter().copied().map(|q| (EncodingFormat::Png, q)));
+
+    // NOTE: JPEG must go last, as it will premultiply any alpha channel
     all_formats.extend(formats.jpeg.iter().copied().map(|q| (EncodingFormat::Jpeg, q)));
 
     all_formats
