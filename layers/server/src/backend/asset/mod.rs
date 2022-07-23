@@ -7,7 +7,7 @@ use rand::Rng;
 use std::process::Stdio;
 use tokio::process::Command as SystemCommand;
 
-use schema::{asset::AssetFlags as Asset, flags::FileFlags, SnowflakeExt};
+use schema::{flags::FileFlags, SnowflakeExt};
 use sdk::Snowflake;
 
 use crate::{Error, ServerState};
@@ -327,10 +327,12 @@ pub async fn add_asset(
     .await?;
 
     for (file_id, format, quality) in assets {
+        use sdk::models::AssetFlags;
+
         let mut asset_flags = match format {
-            EncodingFormat::Jpeg => Asset::FORMAT_JPEG,
-            EncodingFormat::Png => Asset::FORMAT_PNG,
-            EncodingFormat::Avif => Asset::FORMAT_AVIF,
+            EncodingFormat::Jpeg => AssetFlags::FORMAT_JPEG,
+            EncodingFormat::Png => AssetFlags::FORMAT_PNG,
+            EncodingFormat::Avif => AssetFlags::FORMAT_AVIF,
         };
 
         asset_flags = asset_flags

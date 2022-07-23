@@ -17,8 +17,8 @@ use smol_str::SmolStr;
 use thorn::pg::ToSql;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 
-use schema::{asset::AssetFlags, flags::FileFlags};
-use sdk::models::Snowflake;
+use schema::flags::FileFlags;
+use sdk::models::{AssetFlags, Snowflake};
 
 use crate::{Error, ServerState};
 
@@ -129,7 +129,7 @@ mod query {
     use schema::*;
     use thorn::*;
 
-    use super::AssetKind;
+    use super::{AssetFlags, AssetKind};
 
     indexed_columns! {
         pub enum Columns {
@@ -176,9 +176,6 @@ mod query {
     }
 
     pub fn select_asset(kind: AssetKind) -> impl thorn::AnyQuery {
-        use schema::{asset::AssetFlags, *};
-        use thorn::*;
-
         let asset_id = Var::at(UserAssetFiles::AssetId, 1);
         let kind_id = Var::at(UserAssetFiles::AssetId, 2);
         let var_flags = Var::at(UserAssetFiles::Flags, 3);
