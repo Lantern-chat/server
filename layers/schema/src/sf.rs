@@ -23,7 +23,8 @@ pub trait SnowflakeExt {
 
     #[inline]
     fn max_value() -> Snowflake {
-        Snowflake(unsafe { NonZeroU64::new_unchecked(9223372036854775807) })
+        // max signed 64-bit value, what Postgres uses for bigint
+        Snowflake(unsafe { NonZeroU64::new_unchecked(i64::MAX as u64) })
     }
 
     // Constructs a Snowflake from the given timestamp with any of the deduplication
@@ -76,6 +77,8 @@ pub trait SnowflakeExt {
         Self::at_ms_since_lantern_epoch(seconds.whole_seconds() as u64 * 1000)
     }
 
+    fn add(self, duration: time::Duration) -> Option<Snowflake>;
+
     fn encrypt(self, key: aes::cipher::BlockCipherKey<aes::Aes128>) -> u128;
 
     #[inline]
@@ -97,6 +100,23 @@ pub trait SnowflakeExt {
 }
 
 impl SnowflakeExt for Snowflake {
+    fn add(self, duration: time::Duration) -> Option<Snowflake> {
+        let value = self.0.get();
+        let offset = duration.whole_milliseconds() as i64;
+
+        let mut raw_ts = value >> 22;
+        if offset < 0 {
+            raw_ts = raw_ts.saturating_sub(-offset as u64);
+        } else {
+            raw_ts = raw_ts.saturating_add(offset as u64);
+        }
+
+        const NON_TIMESTAMP_MASK: u64 = u64::MAX >> 44; // shift in zeroes from above so only timestamp bits are 0
+
+        // combine new timestamp with the old non-timestamp bits
+        NonZeroU64::new((NON_TIMESTAMP_MASK & value) | (raw_ts << 22)).map(Snowflake)
+    }
+
     #[inline]
     fn encrypt(self, key: aes::cipher::BlockCipherKey<aes::Aes128>) -> u128 {
         use aes::{BlockEncrypt, NewBlockCipher};

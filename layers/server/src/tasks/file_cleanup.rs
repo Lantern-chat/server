@@ -1,5 +1,6 @@
 use std::sync::atomic::Ordering;
-use std::time::Duration;
+
+use schema::{Snowflake, SnowflakeExt};
 
 use crate::Error;
 
@@ -17,7 +18,11 @@ pub fn add_orphaned_file_cleanup_task(state: &ServerState, runner: &TaskRunner) 
             log::trace!("Cleaning up orphaned files");
 
             let task = async {
-                // find orphaned files
+                // find orphaned files older than the last cleanup time
+
+                let last_run = Snowflake::now()
+                    .add(-time::Duration::try_from(state.config.upload.cleanup_interval).unwrap())
+                    .unwrap();
 
                 let db = state.db.read.get().await?;
                 let orphaned = db
@@ -26,13 +31,15 @@ pub fn add_orphaned_file_cleanup_task(state: &ServerState, runner: &TaskRunner) 
                             use schema::*;
                             use thorn::*;
 
-                            Query::select().from_table::<Files>().col(Files::Id).and_where(
-                                Files::Id.not_in_query(
+                            Query::select()
+                                .from_table::<Files>()
+                                .col(Files::Id)
+                                .and_where(Files::Id.less_than_equal(Var::of(Files::Id)))
+                                .and_where(Files::Id.not_in_query(
                                     Query::select().from_table::<AggUsedFiles>().col(AggUsedFiles::Id),
-                                ),
-                            )
+                                ))
                         },
-                        &[],
+                        &[&last_run],
                     )
                     .await?;
 
