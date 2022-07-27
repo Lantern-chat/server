@@ -1,1 +1,0 @@
-DROP TABLE IF EXISTS lantern.pin_tags CASCADE;

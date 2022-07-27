@@ -1,1 +1,0 @@
-DROP VIEW IF EXISTS lantern.agg_messages CASCADE;
