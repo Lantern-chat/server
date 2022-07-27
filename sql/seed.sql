@@ -1132,6 +1132,7 @@ FOR EACH ROW EXECUTE FUNCTION lantern.role_member_trigger();
 
 --
 
+-- emit role_deleted/created/updated events
 CREATE OR REPLACE FUNCTION lantern.role_trigger()
 RETURNS trigger
 LANGUAGE plpgsql AS
@@ -1163,6 +1164,8 @@ FOR EACH ROW EXECUTE FUNCTION lantern.role_trigger();
 
 --
 
+-- emit 'self_updated' or 'user_updated' events
+-- NOTE: Should be kept in-sync with user fields
 CREATE OR REPLACE FUNCTION lantern.user_trigger()
 RETURNS trigger
 LANGUAGE plpgsql AS
@@ -1199,6 +1202,7 @@ FOR EACH ROW EXECUTE FUNCTION lantern.user_trigger();
 
 --
 
+-- emit a 'user_updated' event when their profile changes
 CREATE OR REPLACE FUNCTION lantern.profile_trigger()
 RETURNS trigger
 LANGUAGE plpgsql AS
@@ -1235,6 +1239,8 @@ FOR EACH ROW EXECUTE FUNCTION lantern.party_member_delete_profile_trigger();
 
 --
 
+-- ensure referenced pin_tags are removed from the denormalized array.
+-- this acts like a foreign key with ON DELETE CASCADE
 CREATE OR REPLACE FUNCTION lantern.pin_tag_delete_trigger()
 RETURNS trigger
 LANGUAGE plpgsql AS
@@ -1576,7 +1582,7 @@ CREATE OR REPLACE VIEW lantern.agg_messages(
     message_flags,
     mention_kinds,
     mention_ids,
-    pin_ids,
+    pin_tags,
     content,
     role_tags,
     attachment_meta,
