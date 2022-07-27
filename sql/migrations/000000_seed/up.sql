@@ -1233,6 +1233,24 @@ $$;
 CREATE TRIGGER party_member_delete_profile_event AFTER DELETE ON lantern.party_member
 FOR EACH ROW EXECUTE FUNCTION lantern.party_member_delete_profile_trigger();
 
+--
+
+CREATE OR REPLACE FUNCTION lantern.pin_tag_delete_trigger()
+RETURNS trigger
+LANGUAGE plpgsql AS
+$$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        UPDATE lantern.messages SET pin_tags = array_remove(pin_tags, OLD.id)
+            WHERE pin_tags @> ARRAY[OLD.id];
+    END IF;
+
+    RETURN NEW;
+END
+$$;
+
+CREATE TRIGGER pin_tag_delete_event AFTER DELETE ON lantern.pin_tags
+FOR EACH ROW EXECUTE FUNCTION lantern.pin_tag_delete_trigger();
 
 -----------------------------------------
 ---------------- VIEWS ------------------
