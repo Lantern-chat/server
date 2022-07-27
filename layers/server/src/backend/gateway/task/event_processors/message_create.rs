@@ -54,6 +54,7 @@ pub async fn get_message(
             AggMessages::MessageFlags,
             AggMessages::Content,
             AggMessages::RoleIds,
+            AggMessages::PinTags,
             AggMessages::AttachmentMeta,
             AggMessages::AttachmentPreview,
             AggMessages::AvatarId,
@@ -161,6 +162,9 @@ pub async fn get_message(
         },
         embeds: Vec::new(),
         reactions: Vec::new(),
+        pins: row
+            .try_get::<_, Option<Vec<Snowflake>>>(Columns::pin_tags())?
+            .unwrap_or_default(),
     };
 
     let mention_kinds: Option<Vec<i32>> = row.try_get(Columns::mention_kinds())?;

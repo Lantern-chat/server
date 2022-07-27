@@ -192,6 +192,9 @@ pub async fn get_many(
                     None => Vec::new(),
                 },
                 embeds: Vec::new(),
+                pins: row
+                    .try_get::<_, Option<Vec<Snowflake>>>(Columns::pin_tags())?
+                    .unwrap_or_default(),
             };
 
             let mention_kinds: Option<Vec<i32>> = row.try_get(Columns::MentionKinds as usize)?;
@@ -247,6 +250,7 @@ mod q {
             AggMessages::ThreadId,
             AggMessages::Content,
             AggMessages::RoleIds,
+            AggMessages::PinTags,
             AggMessages::MentionIds,
             AggMessages::MentionKinds,
             AggMessages::AttachmentMeta,

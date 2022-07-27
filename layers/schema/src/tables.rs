@@ -261,6 +261,8 @@ thorn::tables! {
         Kind: Type::INT2,
         Flags: Type::INT2,
         Content: Type::TEXT,
+        Ts: Type::TS_VECTOR,
+        PinTags: SNOWFLAKE_ARRAY,
     }
 
     pub struct Mentions in Lantern {
@@ -288,5 +290,18 @@ thorn::tables! {
         Mime: Type::TEXT,
         Sha1: Type::BYTEA,
         Preview: Type::BYTEA,
+    }
+
+    pub struct PinTags in Lantern {
+        Id: SNOWFLAKE,
+        IconId: Emotes::Id,
+        Flags: Type::INT4,
+        Name: Type::TEXT,
+        Description: Type::TEXT,
+    }
+
+    pub struct MessagePins in Lantern {
+        TagId: PinTags::Id,
+        MsgId: Messages::Id,
     }
 }

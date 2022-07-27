@@ -126,6 +126,9 @@ pub(crate) fn parse_msg(state: &ServerState, row: &db::Row) -> Result<Message, E
         },
         embeds: Vec::new(),
         reactions: Vec::new(),
+        pins: row
+            .try_get::<_, Option<Vec<Snowflake>>>(Columns::pin_tags())?
+            .unwrap_or_default(),
     };
 
     let mention_kinds: Option<Vec<i32>> = row.try_get(Columns::mention_kinds())?;
@@ -171,6 +174,7 @@ thorn::indexed_columns! {
         AggMessages::Nickname,
         AggMessages::Content,
         AggMessages::RoleIds,
+        AggMessages::PinTags,
         AggMessages::MentionIds,
         AggMessages::MentionKinds,
         AggMessages::AttachmentMeta,

@@ -25,6 +25,7 @@ thorn::tables! {
         MessageFlags: Messages::Flags,
         Content: Messages::Content,
         RoleIds: SNOWFLAKE_ARRAY,
+        PinTags: SNOWFLAKE_ARRAY,
         AttachmentMeta: AggAttachments::Meta,
         AttachmentPreview: AggAttachments::Preview,
     }
