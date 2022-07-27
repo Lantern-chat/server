@@ -21,7 +21,6 @@ CREATE TABLE lantern.host (
 
     CONSTRAINT migration_primary_key PRIMARY KEY (migration)
 );
-ALTER TABLE lantern.host OWNER TO postgres;
 
 CREATE OR REPLACE FUNCTION lantern.array_diff(lhs anyarray, rhs anyarray)
     RETURNS anyarray
@@ -127,10 +126,12 @@ CREATE TABLE lantern.event_log (
     code        lantern.event_code  NOT NULL
 );
 
+ALTER SEQUENCE lantern.event_id OWNED BY lantern.event_log;
+
 -- Notification rate-limiting table
 CREATE TABLE lantern.event_log_last_notification (
-    last_notif timestamp NOT NULL DEFAULT now(),
-    max_interval interval NOT NULL DEFAULT INTERVAL '100 milliseconds'
+    last_notif      timestamp   NOT NULL DEFAULT now(),
+    max_interval    interval    NOT NULL DEFAULT INTERVAL '100 milliseconds'
 );
 
 CREATE TABLE lantern.rate_limits (
@@ -546,14 +547,14 @@ CREATE TABLE IF NOT EXISTS lantern.threads (
 );
 
 CREATE TABLE lantern.pin_tags (
-    id bigint NOT NULL,
+    id          bigint      NOT NULL,
 
-    icon_id bigint, -- emote id for icon
+    icon_id     bigint, -- emote id for icon
 
     -- might include color
-    flags int NOT NULL DEFAULT 0,
+    flags       int         NOT NULL DEFAULT 0,
 
-    name text NOT NULL,
+    name        text        NOT NULL,
     description text,
 
     CONSTRAINT pin_tags_pk PRIMARY KEY (id)
@@ -969,8 +970,7 @@ CREATE INDEX metrics_ts_idx                 ON lantern.metrics          USING bt
 ----------------------------------------
 
 -- setup event_log_last_notification so queries can return a value
-INSERT INTO lantern.event_log_last_notification (last_notif, max_interval)
-    VALUES (now(), '100 milliseconds');
+INSERT INTO lantern.event_log_last_notification DEFAULT VALUES;
 
 -- Create SYSTEM user for sending system messages
 INSERT INTO lantern.users (id, dob, flags, username, discriminator, email, passhash)
