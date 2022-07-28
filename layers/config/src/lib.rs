@@ -68,7 +68,7 @@ pub mod sections {
     pub mod web;
 }
 
-pub mod util;
+mod util;
 
 macro_rules! decl_config {
     ($(
@@ -103,15 +103,26 @@ decl_config! {
     db: sections::db::Database,
     /// User account configuration
     account: sections::account::Account,
+    /// Settings for individual messages
     message: sections::message::Message,
+    /// Settings for parties
     party: sections::party::Party,
     /// User uploads configuration
     upload: sections::upload::Upload,
+    /// Settings for services used by the backend
     services: sections::services::Services,
     /// Cryptographic keys
     keys: sections::keys::Keys,
     /// Web/HTTP Configuration
     web: sections::web::Web,
+}
+
+impl Config {
+    pub fn configure(&mut self) {
+        self.general.configure();
+        self.web.configure();
+        self.upload.configure();
+    }
 }
 
 enum Format {
@@ -155,12 +166,6 @@ impl Config {
             Format::TOML => toml::from_str(&file)?,
             Format::JSON => serde_json::from_str(&file)?,
         })
-    }
-
-    pub fn configure(&mut self) {
-        self.general.configure();
-        self.web.configure();
-        self.upload.configure();
     }
 
     pub async fn save(&self, path: impl AsRef<Path>) -> Result<(), ConfigError> {
