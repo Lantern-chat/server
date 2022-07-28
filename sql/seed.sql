@@ -1584,7 +1584,7 @@ CREATE OR REPLACE VIEW lantern.agg_messages(
     mention_ids,
     pin_tags,
     content,
-    role_tags,
+    role_ids,
     attachment_meta,
     attachment_preview
 ) AS
