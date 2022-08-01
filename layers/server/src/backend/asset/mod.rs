@@ -28,11 +28,12 @@ fn gen_formats(state: &ServerState, mode: AssetMode) -> Vec<(EncodingFormat, u8)
         AssetMode::Banner => &state.config.upload.banner_formats,
     };
 
+    // NOTE: JPEG must go at bottom/last, as it will premultiply any alpha channel
+    // NOTE 2: The formats are iterated on via .pop(), so it goes in reverse.
+    all_formats.extend(formats.jpeg.iter().copied().map(|q| (EncodingFormat::Jpeg, q)));
+
     all_formats.extend(formats.avif.iter().copied().map(|q| (EncodingFormat::Avif, q)));
     all_formats.extend(formats.png.iter().copied().map(|q| (EncodingFormat::Png, q)));
-
-    // NOTE: JPEG must go last, as it will premultiply any alpha channel
-    all_formats.extend(formats.jpeg.iter().copied().map(|q| (EncodingFormat::Jpeg, q)));
 
     all_formats
 }
