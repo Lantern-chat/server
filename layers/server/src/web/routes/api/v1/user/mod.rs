@@ -5,6 +5,7 @@ use crate::{web::auth::authorize, Error};
 use super::ApiResponse;
 
 //pub mod check;
+pub mod profile;
 pub mod register;
 
 pub mod me;
@@ -20,10 +21,13 @@ pub async fn user(mut route: Route<crate::ServerState>) -> ApiResponse {
         // ANY /api/v1/user/1234
         (_, Exact(segment)) => match segment.parse::<schema::Snowflake>() {
             Err(_) => Err(Error::BadRequest),
-            Ok(_user_id) => {
+            Ok(user_id) => {
                 let auth = authorize(&route).await?;
 
-                Err(Error::Unimplemented)
+                match route.next().method_segment() {
+                    (&Method::GET, Exact("profile")) => profile::profile(route, auth, user_id).await,
+                    _ => Err(Error::Unimplemented),
+                }
             }
         },
         _ => Err(Error::NotFound),

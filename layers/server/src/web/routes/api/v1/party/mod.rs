@@ -11,7 +11,12 @@ pub mod get;
 pub mod post;
 
 pub mod invites;
-pub mod members;
+pub mod members {
+    use super::ApiResponse;
+
+    pub mod get;
+    pub mod profile;
+}
 pub mod rooms;
 
 #[rustfmt::skip]
@@ -40,7 +45,19 @@ pub async fn party(mut route: Route<crate::ServerState>) -> ApiResponse {
                 (_, Exact("rooms")) => rooms::party_rooms(route, auth, party_id).await,
 
                 // GET /api/v1/party/1234/members
-                (&Method::GET, Exact("members")) => members::get_members(route, auth, party_id).await,
+                (&Method::GET, Exact("members")) => {
+                    match route.next().segment() {
+                        End => members::get::get_members(route, auth, party_id).await,
+                        Exact(segment) => match segment.parse::<Snowflake>() {
+                            Err(_) => Err(Error::BadRequest),
+                            Ok(member_id) => match route.next().segment() {
+                                End => Err(Error::Unimplemented),
+                                Exact("profile") => members::profile::get_profile(route, auth, member_id, party_id).await,
+                                _ => Err(Error::NotFound),
+                            }
+                        }
+                    }
+                },
 
                 _ => Err(Error::NotFound),
             },
