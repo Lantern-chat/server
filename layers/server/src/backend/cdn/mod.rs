@@ -54,7 +54,14 @@ pub async fn get_asset(
 
     let db = state.db.read.get().await?;
 
-    let params: &[&(dyn ToSql + Sync)] = &[&asset_id, &kind_id, &flags.bits()];
+    use query::{AssetParams, Parameters};
+
+    let params = AssetParams {
+        asset_id,
+        kind_id,
+        flags: flags.bits(),
+    };
+    let params = &params.as_params();
 
     // // boxing these is probably cheaper than the compiled state machines of all of them combined
     #[rustfmt::skip]
@@ -126,8 +133,8 @@ pub async fn get_attachment(
 use query::ParsedFile;
 
 mod query {
-    use schema::*;
-    use thorn::*;
+    pub use schema::*;
+    pub use thorn::*;
 
     use super::{AssetFlags, AssetKind};
 
@@ -175,28 +182,32 @@ mod query {
             .and_where(Messages::RoomId.equals(Var::of(Rooms::Id)))
     }
 
-    pub fn select_asset(kind: AssetKind) -> impl thorn::AnyQuery {
-        let asset_id = Var::at(UserAssetFiles::AssetId, 1);
-        let kind_id = Var::at(UserAssetFiles::AssetId, 2);
-        let var_flags = Var::at(UserAssetFiles::Flags, 3);
+    params! {
+        pub struct AssetParams {
+            pub asset_id: Snowflake = UserAssetFiles::AssetId,
+            pub kind_id: Snowflake = UserAssetFiles::AssetId,
+            pub flags: i16 = UserAssetFiles::Flags,
+        }
+    }
 
+    pub fn select_asset(kind: AssetKind) -> impl thorn::AnyQuery {
         let quality = UserAssetFiles::Flags.bit_and(AssetFlags::QUALITY.bits().lit());
 
         let q = Query::select()
             .cols(Columns::default())
-            .and_where(UserAssetFiles::AssetId.equals(asset_id))
+            .and_where(UserAssetFiles::AssetId.equals(AssetParams::asset_id()))
             // select files of at least the given quality
             .and_where(quality.greater_than_equal(Builtin::least((
-                var_flags.clone().bit_and(AssetFlags::QUALITY.bits().lit()),
+                AssetParams::flags().bit_and(AssetFlags::QUALITY.bits().lit()),
                 100i16.lit(),
             ))))
             .and_where(
                 UserAssetFiles::Flags
-                    .has_any_bits(var_flags.clone().bit_and(AssetFlags::FORMATS.bits().lit())),
+                    .has_any_bits(AssetParams::flags().bit_and(AssetFlags::FORMATS.bits().lit())),
             )
             .and_where(
                 UserAssetFiles::Flags
-                    .has_any_bits(var_flags.clone().bit_and(AssetFlags::FLAGS.bits().lit()))
+                    .has_any_bits(AssetParams::flags().bit_and(AssetFlags::FLAGS.bits().lit()))
                     .or(UserAssetFiles::Flags.has_no_bits(AssetFlags::FLAGS.bits().lit())),
             )
             .order_by(
@@ -216,22 +227,22 @@ mod query {
         let q = match kind {
             AssetKind::UserAvatar => q
                 .from(from.inner_join_table::<Profiles>().on(Profiles::AvatarId.equals(UserAssetFiles::AssetId)))
-                .and_where(Profiles::UserId.equals(kind_id)),
+                .and_where(Profiles::UserId.equals(AssetParams::kind_id())),
             AssetKind::UserBanner => q
                 .from(from.inner_join_table::<Profiles>().on(Profiles::BannerId.equals(UserAssetFiles::AssetId)))
-                .and_where(Profiles::UserId.equals(kind_id)),
+                .and_where(Profiles::UserId.equals(AssetParams::kind_id())),
             AssetKind::RoleAvatar => q
                 .from(from.inner_join_table::<Roles>().on(Roles::AvatarId.equals(UserAssetFiles::AssetId)))
-                .and_where(Roles::Id.equals(kind_id)),
+                .and_where(Roles::Id.equals(AssetParams::kind_id())),
             AssetKind::RoomAvatar => q
                 .from(from.inner_join_table::<Rooms>().on(Rooms::AvatarId.equals(UserAssetFiles::AssetId)))
-                .and_where(Rooms::Id.equals(kind_id)),
+                .and_where(Rooms::Id.equals(AssetParams::kind_id())),
             AssetKind::PartyAvatar => q
                 .from(from.inner_join_table::<Party>().on(Party::AvatarId.equals(UserAssetFiles::AssetId)))
-                .and_where(Party::Id.equals(kind_id)),
+                .and_where(Party::Id.equals(AssetParams::kind_id())),
             AssetKind::PartyBanner => q
                 .from(from.inner_join_table::<Party>().on(Party::BannerId.equals(UserAssetFiles::AssetId)))
-                .and_where(Party::Id.equals(kind_id)),
+                .and_where(Party::Id.equals(AssetParams::kind_id())),
         };
 
         q

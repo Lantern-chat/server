@@ -19,24 +19,34 @@ pub async fn trigger_typing(
 
     let db = state.db.read.get().await?;
 
+    mod q {
+        pub use schema::*;
+        pub use thorn::*;
+
+        thorn::tables! {
+            pub struct AggRoom {
+                PartyId: Rooms::PartyId,
+            }
+
+            pub struct AggRoles {
+                RoleIds: SNOWFLAKE_ARRAY,
+            }
+        }
+
+        thorn::params! {
+            pub struct Params {
+                pub user_id: Snowflake = Users::Id,
+                pub room_id: Snowflake = Rooms::Id,
+            }
+        }
+    }
+
+    use q::{Parameters, Params};
+
     let row = db
         .query_opt_cached_typed(
             || {
-                use schema::*;
-                use thorn::*;
-
-                tables! {
-                    struct AggRoom {
-                        PartyId: Rooms::PartyId,
-                    }
-
-                    struct AggRoles {
-                        RoleIds: SNOWFLAKE_ARRAY,
-                    }
-                }
-
-                let user_id_var = Var::at(Users::Id, 1);
-                let room_id_var = Var::at(Rooms::Id, 2);
+                use q::*;
 
                 Query::with()
                     .with(
@@ -44,7 +54,7 @@ pub async fn trigger_typing(
                             Query::select()
                                 .expr(Rooms::PartyId.alias_to(AggRoom::PartyId))
                                 .from_table::<Rooms>()
-                                .and_where(Rooms::Id.equals(room_id_var)),
+                                .and_where(Rooms::Id.equals(Params::room_id())),
                         )
                         .exclude(),
                     )
@@ -71,9 +81,13 @@ pub async fn trigger_typing(
                         )))
                         .on(true.lit()),
                     )
-                    .and_where(Users::Id.equals(user_id_var))
+                    .and_where(Users::Id.equals(Params::user_id()))
             },
-            &[&auth.user_id, &room_id],
+            &Params {
+                user_id: auth.user_id,
+                room_id,
+            }
+            .as_params(),
         )
         .await?;
 

@@ -1,4 +1,4 @@
-use sdk::models::{Snowflake, UserPresence};
+use sdk::models::{Snowflake, UserPresence, UserPresenceFlags};
 
 use crate::{Error, ServerState};
 
@@ -10,7 +10,15 @@ pub async fn set_presence(
 ) -> Result<(), Error> {
     let db = state.db.write.get().await?;
 
-    let activity: Option<serde_json::Value> = None;
+    use thorn::Parameters;
+    thorn::params! {
+        pub struct Params {
+            user_id: Snowflake = schema::UserPresence::UserId,
+            conn_id: Snowflake = schema::UserPresence::ConnId,
+            flags: UserPresenceFlags = schema::UserPresence::Flags,
+            activity: Option<serde_json::Value> = schema::UserPresence::Activity,
+        }
+    }
 
     db.execute_cached_typed(
         || {
@@ -18,13 +26,19 @@ pub async fn set_presence(
             use thorn::*;
 
             Query::call(Call::custom("lantern.set_presence").args((
-                Var::of(UserPresence::UserId),
-                Var::of(UserPresence::ConnId),
-                Var::of(UserPresence::Flags),
-                Var::of(UserPresence::Activity),
+                Params::user_id(),
+                Params::conn_id(),
+                Params::flags(),
+                Params::activity(),
             )))
         },
-        &[&user_id, &conn_id, &presence.flags, &activity],
+        &Params {
+            user_id,
+            conn_id,
+            flags: presence.flags,
+            activity: None,
+        }
+        .as_params(),
     )
     .await?;
 

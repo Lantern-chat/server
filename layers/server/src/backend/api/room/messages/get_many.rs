@@ -38,36 +38,34 @@ pub async fn get_many(
         None => 50,
     };
 
-    let mut params: ArrayVec<&(dyn ToSql + Sync), 5> = ArrayVec::from([
-        &room_id as _,
-        &msg_id as _,
-        &limit as _,
-        &auth.user_id as _,
-        &form.thread as _,
-    ]);
-
-    if form.thread.is_none() {
-        params.pop();
-    }
-
     #[rustfmt::skip]
     let query = {
         use MessageSearch::*;
         const NULL: Snowflake = Snowflake::null();
 
-        match (had_perms, form.thread, form.query) {
-            (true,  None,    None | Some(MessageSearch::Before(_))) => db.prepare_cached_typed(|| query(Before(NULL), false, false)).boxed(),
-            (true,  None,           Some(MessageSearch::After(_)))  => db.prepare_cached_typed(|| query(After(NULL), false, false)).boxed(),
-            (true,  Some(_), None | Some(MessageSearch::Before(_))) => db.prepare_cached_typed(|| query(Before(NULL), false, true)).boxed(),
-            (true,  Some(_),        Some(MessageSearch::After(_)))  => db.prepare_cached_typed(|| query(After(NULL), false, true)).boxed(),
-            (false, None,    None | Some(MessageSearch::Before(_))) => db.prepare_cached_typed(|| query(Before(NULL), true, false)).boxed(),
-            (false, None,           Some(MessageSearch::After(_)))  => db.prepare_cached_typed(|| query(After(NULL), true, false)).boxed(),
-            (false, Some(_), None | Some(MessageSearch::Before(_))) => db.prepare_cached_typed(|| query(Before(NULL), true, true)).boxed(),
-            (false, Some(_),        Some(MessageSearch::After(_)))  => db.prepare_cached_typed(|| query(After(NULL), true, true)).boxed(),
+        match (had_perms, form.query) {
+            (true,  None | Some(MessageSearch::Before(_))) => db.prepare_cached_typed(|| query(Before(NULL), false)).boxed(),
+            (true,         Some(MessageSearch::After(_)))  => db.prepare_cached_typed(|| query(After(NULL), false)).boxed(),
+            (false, None | Some(MessageSearch::Before(_))) => db.prepare_cached_typed(|| query(Before(NULL), true)).boxed(),
+            (false,        Some(MessageSearch::After(_)))  => db.prepare_cached_typed(|| query(After(NULL), true)).boxed(),
         }
     };
 
-    let stream = db.query_stream(&query.await?, &params).await?;
+    use q::{Parameters, Params};
+
+    let stream = db
+        .query_stream(
+            &query.await?,
+            &Params {
+                room_id,
+                msg_id,
+                limit,
+                user_id: auth.user_id,
+                thread_id: form.thread,
+            }
+            .as_params(),
+        )
+        .await?;
 
     // for many messages from the same user in a row, avoid duplicating work of encoding user things at the cost of cloning it
     let mut last_user: Option<User> = None;
@@ -224,7 +222,8 @@ pub async fn get_many(
 }
 
 mod q {
-    use schema::*;
+    pub use schema::*;
+    pub use thorn::*;
 
     thorn::tables! {
         pub struct TempReactions {
@@ -261,12 +260,20 @@ mod q {
             TempReactions::Reactions,
         }
     }
+
+    thorn::params! {
+        pub struct Params {
+            pub room_id: Snowflake = Rooms::Id,
+            pub msg_id: Snowflake = Messages::Id,
+            pub limit: i16 = Type::INT2,
+            pub user_id: Snowflake = Users::Id,
+            pub thread_id: Option<Snowflake> = Threads::Id,
+        }
+    }
 }
 
-fn query(mode: MessageSearch, check_perms: bool, thread: bool) -> impl thorn::AnyQuery {
+fn query(mode: MessageSearch, check_perms: bool) -> impl thorn::AnyQuery {
     use q::*;
-    use schema::*;
-    use thorn::*;
 
     tables! {
         struct AggNumberedMsg {
@@ -283,40 +290,30 @@ fn query(mode: MessageSearch, check_perms: bool, thread: bool) -> impl thorn::An
         }
     }
 
-    let room_id_var = Var::at(Rooms::Id, 1);
-    let msg_id_var = Var::at(Messages::Id, 2);
-    let limit_var = Var::at(Type::INT2, 3);
-    let user_id_var = Var::at(Users::Id, 4);
-    let thread_id_var = Var::at(Threads::Id, 5);
-
     let mut selected = Query::select()
         .expr(Messages::Id.alias_to(SelectedMessages::Id))
         .from_table::<Messages>()
-        .and_where(Messages::RoomId.equals(room_id_var.clone()))
+        .and_where(Messages::RoomId.equals(Params::room_id()))
         .and_where(
             // test if message is deleted
             Messages::Flags
                 .bit_and(MessageFlags::DELETED.bits().lit())
                 .equals(0i16.lit()),
         )
-        .limit(limit_var.clone());
-
-    if thread {
-        selected = selected.and_where(
-            thread_id_var
-                .clone()
+        .and_where(
+            Params::thread_id()
                 .is_null()
-                .or(Messages::ThreadId.equals(thread_id_var)),
-        );
-    }
+                .or(Messages::ThreadId.equals(Params::thread_id())),
+        )
+        .limit(Params::limit());
 
     selected = match mode {
         MessageSearch::After(_) => selected
-            .and_where(Messages::Id.greater_than(msg_id_var))
+            .and_where(Messages::Id.greater_than(Params::msg_id()))
             .order_by(Messages::Id.ascending()),
 
         MessageSearch::Before(_) => selected
-            .and_where(Messages::Id.less_than(msg_id_var))
+            .and_where(Messages::Id.less_than(Params::msg_id()))
             .order_by(Messages::Id.descending()),
     };
 
@@ -338,7 +335,7 @@ fn query(mode: MessageSearch, check_perms: bool, thread: bool) -> impl thorn::An
                                         .arg("emote".lit())
                                         .arg(Reactions::EmoteId)
                                         .arg("own".lit())
-                                        .arg(user_id_var.clone().equals(Builtin::any(Reactions::UserIds)))
+                                        .arg(Params::user_id().equals(Builtin::any(Reactions::UserIds)))
                                         .arg("count".lit())
                                         .arg(
                                             Call::custom("array_length")
@@ -362,8 +359,8 @@ fn query(mode: MessageSearch, check_perms: bool, thread: bool) -> impl thorn::An
                 Query::select()
                     .expr(AggRoomPerms::Perms.alias_to(AggPerm::Perms))
                     .from_table::<AggRoomPerms>()
-                    .and_where(AggRoomPerms::UserId.equals(user_id_var))
-                    .and_where(AggRoomPerms::RoomId.equals(room_id_var)),
+                    .and_where(AggRoomPerms::UserId.equals(Params::user_id()))
+                    .and_where(AggRoomPerms::RoomId.equals(Params::room_id())),
             ))
             .and_where(
                 AggPerm::Perms

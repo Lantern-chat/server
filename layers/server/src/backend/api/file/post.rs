@@ -89,11 +89,34 @@ pub async fn do_post_file(
 
     let db = state.db.write.get().await?;
 
+    mod post_file_query {
+        pub use schema::*;
+        pub use thorn::*;
+
+        use smol_str::SmolStr;
+
+        thorn::params! {
+            pub struct Params {
+                pub file_id: Snowflake = Files::Id,
+                pub user_id: Snowflake = Files::UserId,
+                pub nonce: i64 = Files::Nonce,
+                pub size: i32 = Files::Size,
+                pub width: Option<i32> = Files::Width,
+                pub height: Option<i32> = Files::Height,
+                pub flags: i16 = Files::Flags,
+                pub filename: SmolStr = Files::Name,
+                pub mime: Option<SmolStr> = Files::Mime,
+                pub preview: Option<Vec<u8>> = Files::Preview,
+            }
+        }
+    }
+
+    use post_file_query::{Parameters, Params};
+
     // TODO: Add flags
     db.execute_cached_typed(
         || {
-            use schema::*;
-            use thorn::*;
+            use post_file_query::*;
 
             Query::insert()
                 .into::<Files>()
@@ -110,30 +133,31 @@ pub async fn do_post_file(
                     Files::Preview,
                 ])
                 .values([
-                    Var::of(Files::Id),
-                    Var::of(Files::UserId),
-                    Var::of(Files::Nonce),
-                    Var::of(Files::Size),
-                    Var::of(Files::Width),
-                    Var::of(Files::Height),
-                    Var::of(Files::Flags),
-                    Var::of(Files::Name),
-                    Var::of(Files::Mime),
-                    Var::of(Files::Preview),
+                    Params::file_id(),
+                    Params::user_id(),
+                    Params::nonce(),
+                    Params::size(),
+                    Params::width(),
+                    Params::height(),
+                    Params::flags(),
+                    Params::filename(),
+                    Params::mime(),
+                    Params::preview(),
                 ])
         },
-        &[
-            &file_id,
-            &user_id,
-            &nonce,
-            &upload_size,
-            &width,
-            &height,
-            &FileFlags::PARTIAL.bits(),
-            &filename,
-            &mime,
-            &preview,
-        ],
+        &Params {
+            file_id,
+            user_id,
+            nonce,
+            size: upload_size,
+            width,
+            height,
+            flags: FileFlags::PARTIAL.bits(),
+            filename,
+            mime,
+            preview,
+        }
+        .as_params(),
     )
     .await?;
 

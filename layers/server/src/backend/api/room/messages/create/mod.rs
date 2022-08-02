@@ -114,19 +114,23 @@ pub(crate) async fn insert_message(
     if let Some(parent_msg_id) = body.parent {
         let thread_id = Snowflake::now();
 
+        use schema::*;
+        use thorn::*;
+
+        params! {
+            pub struct Params<'a> {
+                pub msg_id: Snowflake = Messages::Id,
+                pub user_id: Snowflake = Users::Id,
+                pub room_id: Snowflake = Rooms::Id,
+                pub parent_msg_id: Snowflake = Messages::Id,
+                pub thread_id: Snowflake = Threads::Id,
+                pub new_thread_flags: ThreadFlags = Threads::Flags,
+                pub content: Option<&'a str> = Messages::Content,
+            }
+        }
+
         t.execute_cached_typed(
             || {
-                use schema::*;
-                use thorn::*;
-
-                let msg_id_var = Var::at(Messages::Id, 1);
-                let user_id_var = Var::at(Users::Id, 2);
-                let room_id_var = Var::at(Rooms::Id, 3);
-                let parent_msg_id_var = Var::at(Messages::Id, 4);
-                let thread_id_var = Var::at(Threads::Id, 5);
-                let new_thread_flags_var = Var::at(Threads::Flags, 6);
-                let content_var = Var::at(Messages::Content, 7);
-
                 Query::insert()
                     .into::<Messages>()
                     .cols(&[
@@ -139,31 +143,46 @@ pub(crate) async fn insert_message(
                     .value(
                         Query::select()
                             .expr(Call::custom("lantern.create_thread").args((
-                                thread_id_var,
-                                parent_msg_id_var,
-                                new_thread_flags_var,
+                                Params::thread_id(),
+                                Params::parent_msg_id(),
+                                Params::new_thread_flags(),
                             )))
                             .as_value(),
                     )
-                    .values([msg_id_var, user_id_var, room_id_var, content_var])
+                    .values([
+                        Params::msg_id(),
+                        Params::user_id(),
+                        Params::room_id(),
+                        Params::content(),
+                    ])
             },
-            &[
-                &msg_id,
-                &auth.user_id,
-                &room_id,
-                &parent_msg_id,
-                &thread_id,
-                &ThreadFlags::empty(), // TODO
-                &content,
-            ],
+            &Params {
+                msg_id,
+                user_id: auth.user_id,
+                room_id,
+                parent_msg_id,
+                thread_id,
+                new_thread_flags: ThreadFlags::empty(), // TODO
+                content,
+            }
+            .as_params(),
         )
         .await?;
     } else {
+        use schema::*;
+        use thorn::*;
+
+        params! {
+            pub struct Params<'a> {
+                msg_id: Snowflake = Messages::Id,
+                user_id: Snowflake = Messages::UserId,
+                room_id: Snowflake = Messages::RoomId,
+                content: Option<&'a str> = Messages::Content,
+            }
+        }
+
         t.execute_cached_typed(
             || {
-                use schema::*;
-                use thorn::*;
-
                 Query::insert()
                     .into::<Messages>()
                     .cols(&[
@@ -173,36 +192,50 @@ pub(crate) async fn insert_message(
                         Messages::Content,
                     ])
                     .values([
-                        Var::of(Messages::Id),
-                        Var::of(Messages::UserId),
-                        Var::of(Messages::RoomId),
-                        Var::of(Messages::Content),
+                        Params::msg_id(),
+                        Params::user_id(),
+                        Params::room_id(),
+                        Params::content(),
                     ])
             },
-            &[&msg_id, &auth.user_id, &room_id, &content],
+            &Params {
+                msg_id,
+                user_id: auth.user_id,
+                room_id,
+                content,
+            }
+            .as_params(),
         )
         .await?;
     }
 
     if !body.attachments.is_empty() {
+        use schema::*;
+        use thorn::*;
+
+        params! {
+            pub struct Params<'a> {
+                msg_id: Snowflake = Messages::Id,
+                attachments: &'a [Snowflake] = SNOWFLAKE_ARRAY,
+            }
+        }
+
         t.execute_cached_typed(
             || {
-                use schema::*;
-                use thorn::*;
-
                 tables! {
                     struct AggIds {
                         Id: Files::Id,
                     }
                 }
 
-                let msg_id_var = Var::at(Messages::Id, 1);
-                let att_id_var = Var::at(SNOWFLAKE_ARRAY, 2);
-
                 Query::with()
                     .with(
                         AggIds::as_query(
-                            Query::select().expr(Call::custom("UNNEST").arg(att_id_var).alias_to(AggIds::Id)),
+                            Query::select().expr(
+                                Call::custom("UNNEST")
+                                    .arg(Params::attachments())
+                                    .alias_to(AggIds::Id),
+                            ),
                         )
                         .exclude(),
                     )
@@ -212,12 +245,16 @@ pub(crate) async fn insert_message(
                     .query(
                         Query::select()
                             .col(AggIds::Id)
-                            .expr(msg_id_var)
+                            .expr(Params::msg_id())
                             .from_table::<AggIds>()
                             .as_value(),
                     )
             },
-            &[&msg_id, &body.attachments],
+            &Params {
+                msg_id,
+                attachments: &body.attachments,
+            }
+            .as_params(),
         )
         .await?;
     }
