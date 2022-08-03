@@ -79,11 +79,11 @@ pub trait SnowflakeExt {
 
     fn add(self, duration: time::Duration) -> Option<Snowflake>;
 
-    fn encrypt(self, key: aes::cipher::BlockCipherKey<aes::Aes128>) -> u128;
+    fn encrypt(self, key: aes::cipher::Key<aes::Aes128>) -> u128;
 
     #[inline]
-    fn decrypt(block: u128, key: aes::cipher::BlockCipherKey<aes::Aes128>) -> Option<Snowflake> {
-        use aes::{BlockDecrypt, NewBlockCipher};
+    fn decrypt(block: u128, key: aes::cipher::Key<aes::Aes128>) -> Option<Snowflake> {
+        use aes::cipher::{BlockDecrypt, KeyInit};
 
         let mut block = unsafe { std::mem::transmute(block) };
 
@@ -118,8 +118,8 @@ impl SnowflakeExt for Snowflake {
     }
 
     #[inline]
-    fn encrypt(self, key: aes::cipher::BlockCipherKey<aes::Aes128>) -> u128 {
-        use aes::{BlockEncrypt, NewBlockCipher};
+    fn encrypt(self, key: aes::cipher::Key<aes::Aes128>) -> u128 {
+        use aes::cipher::{BlockEncrypt, KeyInit};
 
         let mut block = unsafe { std::mem::transmute([self, self]) };
 

@@ -10,7 +10,8 @@ sdk = { git = "https://github.com/Lantern-chat/client-sdk-rs", features = [], pa
 
 tokio = { version = "1", features = ["fs"] }
 async-trait = "0.1.53"
-aes = { version = "0.7", features = ["ctr"] }
+aes = "0.8"
+ctr = "0.9"
 pin-project-lite = "0.2.8"
 hex = "0.4.3"
 base64 = "0.13.0"

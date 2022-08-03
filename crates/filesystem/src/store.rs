@@ -3,8 +3,10 @@ use std::io;
 use std::path::Path;
 use std::pin::Pin;
 
-use aes::cipher::{BlockCipherKey, NewCipher, Nonce};
-use aes::{Aes256, Aes256Ctr};
+use aes::cipher::{Iv, Key, KeyIvInit};
+use aes::Aes256;
+
+pub type Aes256Ctr = ctr::Ctr64BE<Aes256>;
 
 use tokio::fs::{self, File as TkFile, OpenOptions};
 use tokio::io::{AsyncRead, AsyncSeek, AsyncWrite, BufWriter};
@@ -20,8 +22,8 @@ pub enum OpenMode {
 }
 
 pub struct CipherOptions {
-    pub key: BlockCipherKey<Aes256>,
-    pub nonce: Nonce<Aes256Ctr>,
+    pub key: Key<Aes256>,
+    pub nonce: Iv<Aes256Ctr>,
 }
 
 impl CipherOptions {
@@ -30,7 +32,7 @@ impl CipherOptions {
     }
 
     #[inline]
-    pub fn new_from_i64_nonce(key: BlockCipherKey<Aes256>, nonce: i64) -> Self {
+    pub fn new_from_i64_nonce(key: Key<Aes256>, nonce: i64) -> Self {
         CipherOptions {
             key,
             nonce: unsafe { std::mem::transmute([nonce, nonce]) },

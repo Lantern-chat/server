@@ -1,4 +1,4 @@
-use aes::{cipher::BlockCipherKey, Aes128, Aes256};
+use aes::{cipher::Key, Aes128, Aes256};
 use schema::auth::BotTokenKey;
 
 section! {
@@ -6,15 +6,15 @@ section! {
     pub struct Keys {
         /// File encryption key
         #[serde(with = "super::util::hex_key")]
-        pub file_key: BlockCipherKey<Aes256> = util::rng::gen_crypto_bytes().into() => "FS_KEY" | parse_hex_key,
+        pub file_key: Key<Aes256> = util::rng::gen_crypto_bytes().into() => "FS_KEY" | parse_hex_key,
 
         /// Multi-factor authentication encryption key
         #[serde(with = "super::util::hex_key")]
-        pub mfa_key: BlockCipherKey<Aes256> = util::rng::gen_crypto_bytes().into() => "MFA_KEY" | parse_hex_key,
+        pub mfa_key: Key<Aes256> = util::rng::gen_crypto_bytes().into() => "MFA_KEY" | parse_hex_key,
 
         /// Some snowflakes are encrypted as a form of reversable obfuscation.
         #[serde(with = "super::util::hex_key")]
-        pub sf_key: BlockCipherKey<Aes128> = util::rng::gen_crypto_bytes().into() => "SF_KEY" | parse_hex_key,
+        pub sf_key: Key<Aes128> = util::rng::gen_crypto_bytes().into() => "SF_KEY" | parse_hex_key,
 
         /// Bot Token Key
         ///

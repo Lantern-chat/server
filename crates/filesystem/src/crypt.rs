@@ -1,7 +1,6 @@
-use aes::{
-    cipher::{StreamCipher, StreamCipherSeek},
-    Aes256Ctr,
-};
+use aes::cipher::{StreamCipher, StreamCipherSeek};
+
+use crate::store::Aes256Ctr;
 
 use tokio::io::{AsyncRead, AsyncSeek, AsyncWrite, BufWriter, ReadBuf};
 

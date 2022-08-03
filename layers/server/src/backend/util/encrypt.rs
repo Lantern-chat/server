@@ -1,5 +1,4 @@
-use aes_gcm_siv::aead::{Aead, NewAead};
-use aes_gcm_siv::{Aes256GcmSiv, Nonce};
+use aes_gcm_siv::{aead::Aead, Aes256GcmSiv, KeyInit, Nonce};
 
 use sdk::models::Snowflake;
 
