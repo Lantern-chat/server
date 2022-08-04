@@ -47,34 +47,34 @@ pub async fn get_members(
 }
 
 pub fn parse_member(row: db::Row, state: &ServerState) -> Result<PartyMember, Error> {
-    use query::{MemberColumns, ProfileColumns, UserColumns};
+    use query::MemberColumns;
 
     Ok(PartyMember {
         user: Some(User {
-            id: row.try_get(UserColumns::id())?,
-            username: row.try_get(UserColumns::username())?,
-            discriminator: row.try_get(UserColumns::discriminator())?,
-            flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
+            id: row.try_get(MemberColumns::user_id())?,
+            username: row.try_get(MemberColumns::username())?,
+            discriminator: row.try_get(MemberColumns::discriminator())?,
+            flags: UserFlags::from_bits_truncate_public(row.try_get(MemberColumns::user_flags())?),
             email: None,
             preferences: None,
-            profile: match row.try_get(ProfileColumns::bits())? {
+            profile: match row.try_get(MemberColumns::profile_bits())? {
                 None => Nullable::Null,
                 Some(bits) => Nullable::Some(UserProfile {
                     bits,
-                    avatar: encrypt_snowflake_opt(state, row.try_get(ProfileColumns::avatar_id())?).into(),
+                    avatar: encrypt_snowflake_opt(state, row.try_get(MemberColumns::avatar_id())?).into(),
                     banner: Nullable::Undefined,
-                    status: row.try_get(ProfileColumns::custom_status())?,
+                    status: row.try_get(MemberColumns::custom_status())?,
                     bio: Nullable::Undefined,
                 }),
             },
         }),
         nick: row.try_get(MemberColumns::nickname())?,
-        presence: match row.try_get(UserColumns::presence_updated_at())? {
+        presence: match row.try_get(MemberColumns::presence_updated_at())? {
             None => None,
             Some(updated_at) => Some(UserPresence {
                 updated_at: Some(updated_at),
-                flags: row.try_get(UserColumns::presence_flags())?,
-                activity: match row.try_get(UserColumns::presence_activity())? {
+                flags: row.try_get(MemberColumns::presence_flags())?,
+                activity: match row.try_get(MemberColumns::presence_activity())? {
                     None => None,
                     Some(value) => Some(AnyActivity::Any(value)),
                 },
@@ -92,45 +92,30 @@ pub(crate) mod query {
     pub use super::parse_member;
 
     indexed_columns! {
-        pub enum UserColumns {
-            AggUsers::Id,
-            AggUsers::Discriminator,
-            AggUsers::Username,
-            AggUsers::Flags,
-            AggUsers::PresenceFlags,
-            AggUsers::PresenceUpdatedAt,
-            AggUsers::PresenceActivity,
-        }
-
-        pub enum MemberColumns continue UserColumns {
-            AggMembers::Nickname,
-            AggMembers::JoinedAt,
-            AggMembers::RoleIds,
-        }
-
-        pub enum ProfileColumns continue MemberColumns {
-            AggProfiles::AvatarId,
-            AggProfiles::Bits,
-            AggProfiles::CustomStatus,
+        pub enum MemberColumns {
+            AggMembersFull::UserId,
+            AggMembersFull::Discriminator,
+            AggMembersFull::Username,
+            AggMembersFull::UserFlags,
+            AggMembersFull::PresenceFlags,
+            AggMembersFull::PresenceUpdatedAt,
+            AggMembersFull::Nickname,
+            //AggMembersFull::MemberFlags,
+            AggMembersFull::JoinedAt,
+            AggMembersFull::AvatarId,
+            AggMembersFull::ProfileBits,
+            AggMembersFull::CustomStatus,
+            AggMembersFull::RoleIds,
+            AggMembersFull::PresenceActivity,
         }
     }
 
     pub fn select_members() -> query::SelectQuery {
         Query::select()
-            .cols(UserColumns::default())
             .cols(MemberColumns::default())
-            .cols(ProfileColumns::default())
-            .from(
-                AggUsers::inner_join_table::<AggMembers>()
-                    .on(AggMembers::UserId.equals(AggUsers::Id))
-                    .left_join_table::<AggProfiles>()
-                    .on(AggProfiles::UserId
-                        .equals(AggUsers::Id)
-                        // profiles.party_id is allowed to be NULL, just not false
-                        .and(AggProfiles::PartyId.equals(AggMembers::PartyId).is_not_false())),
-            )
-            .and_where(AggMembers::PartyId.equals(Var::of(Party::Id)))
+            .from_table::<AggMembersFull>()
+            .and_where(AggMembersFull::PartyId.equals(Var::of(Party::Id)))
             // not banned
-            .and_where(AggMembers::Flags.bit_and(1i16.lit()).equals(0i16.lit()))
+            .and_where(AggMembersFull::MemberFlags.bit_and(1i16.lit()).equals(0i16.lit()))
     }
 }

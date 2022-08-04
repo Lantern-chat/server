@@ -16,8 +16,8 @@ thorn::tables! {
         Username: Users::Username,
         Discriminator: Users::Discriminator,
         UserFlags: Users::Flags,
-        AvatarId: AggProfiles::AvatarId,
-        ProfileBits: AggProfiles::Bits,
+        AvatarId: Profiles::AvatarId,
+        ProfileBits: Profiles::Bits,
         ThreadId: Threads::Id,
         MentionKinds: AggMentions::Kinds,
         MentionIds: AggMentions::Ids,
@@ -42,16 +42,6 @@ thorn::tables! {
         PresenceActivity: UserPresence::Activity,
     }
 
-    pub struct AggProfiles in Lantern {
-        UserId: Profiles::UserId,
-        PartyId: Profiles::PartyId,
-        AvatarId: Profiles::AvatarId,
-        BannerId: Profiles::BannerId,
-        Bits: Profiles::Bits,
-        CustomStatus: Profiles::CustomStatus,
-        Biography: Profiles::Biography,
-    }
-
     pub struct AggMembers in Lantern {
         UserId: Users::Id,
         PartyId: Party::Id,
@@ -59,6 +49,24 @@ thorn::tables! {
         Flags: PartyMember::Flags,
         JoinedAt: PartyMember::JoinedAt,
         RoleIds: SNOWFLAKE_ARRAY,
+    }
+
+    pub struct AggMembersFull in Lantern {
+        PartyId: Party::Id,
+        UserId: Users::Id,
+        Discriminator: AggUsers::Discriminator,
+        Username: AggUsers::Username,
+        UserFlags: AggUsers::Flags,
+        PresenceFlags: AggUsers::PresenceFlags,
+        PresenceUpdatedAt: AggUsers::PresenceUpdatedAt,
+        Nickname: PartyMember::Nickname,
+        MemberFlags: PartyMember::Flags,
+        JoinedAt: PartyMember::JoinedAt,
+        AvatarId: Profiles::AvatarId,
+        ProfileBits: Profiles::Bits,
+        CustomStatus: Profiles::CustomStatus,
+        RoleIds: SNOWFLAKE_ARRAY,
+        PresenceActivity: AggUsers::PresenceActivity,
     }
 
     pub struct AggAssets in Lantern {

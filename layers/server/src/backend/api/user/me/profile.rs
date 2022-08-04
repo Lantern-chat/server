@@ -18,56 +18,66 @@ pub async fn patch_profile(
     party_id: Option<Snowflake>,
 ) -> Result<UserProfile, Error> {
     // if status/bio have a value, insert/update the profile
-
     let has_status = !new_profile.status.is_undefined();
     let has_bio = !new_profile.bio.is_undefined();
 
-    let db = if has_status || has_bio {
-        let db = state.db.write.get().await?;
+    let db = if has_status || has_bio { state.db.write.get().await? } else { state.db.read.get().await? };
 
-        // try to avoid as many triggers as possible by grouping together queries
-        match (has_status, has_bio) {
-            (true, true) => {
-                db.execute_cached_typed(
-                    || {
-                        insert_or_update_profile(&[
-                            Profiles::Bits,
-                            Profiles::CustomStatus,
-                            Profiles::Biography,
-                        ])
-                    },
-                    &[
-                        &auth.user_id,
-                        &party_id,
-                        &new_profile.bits,
-                        &new_profile.status,
-                        &new_profile.bio,
-                    ],
-                )
-                .await?;
-            }
-            (true, false) => {
-                db.execute_cached_typed(
-                    || insert_or_update_profile(&[Profiles::Bits, Profiles::CustomStatus]),
-                    &[&auth.user_id, &party_id, &new_profile.bits, &new_profile.status],
-                )
-                .await?;
-            }
-            (false, true) => {
-                db.execute_cached_typed(
-                    || insert_or_update_profile(&[Profiles::Bits, Profiles::Biography]),
-                    &[&auth.user_id, &party_id, &new_profile.bits, &new_profile.bio],
-                )
-                .await?;
-            }
-            _ => {}
+    if party_id.is_some() {
+        // TODO: Add permissions?
+        let is_member = db
+            .query_opt_cached_typed(
+                || {
+                    use schema::*;
+                    use thorn::*;
+
+                    Query::select()
+                        .expr(1.lit())
+                        .from_table::<PartyMember>()
+                        .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
+                        .and_where(PartyMember::PartyId.equals(Var::of(Party::Id)))
+                },
+                &[&auth.user_id, &party_id],
+            )
+            .await?
+            .is_some();
+
+        if !is_member {
+            return Err(Error::Unauthorized);
         }
+    }
 
-        db
-    } else {
-        // if we don't need to write now, just acquire a read connection for the next section
-        state.db.read.get().await?
-    };
+    // try to avoid as many triggers as possible by grouping together queries
+    match (has_status, has_bio) {
+        (true, true) => {
+            db.execute_cached_typed(
+                || insert_or_update_profile(&[Profiles::Bits, Profiles::CustomStatus, Profiles::Biography]),
+                &[
+                    &auth.user_id,
+                    &party_id,
+                    &new_profile.bits,
+                    &new_profile.status,
+                    &new_profile.bio,
+                ],
+            )
+            .await?;
+        }
+        (true, false) => {
+            db.execute_cached_typed(
+                || insert_or_update_profile(&[Profiles::Bits, Profiles::CustomStatus]),
+                &[&auth.user_id, &party_id, &new_profile.bits, &new_profile.status],
+            )
+            .await?;
+        }
+        (false, true) => {
+            db.execute_cached_typed(
+                || insert_or_update_profile(&[Profiles::Bits, Profiles::Biography]),
+                &[&auth.user_id, &party_id, &new_profile.bits, &new_profile.bio],
+            )
+            .await?;
+        }
+        _ => {}
+    }
 
     // using the existing database connection, go ahead and fetch the old file ids
 
@@ -191,11 +201,14 @@ fn insert_or_update_profile(cols: &[schema::Profiles]) -> impl thorn::AnyQuery {
     use thorn::table::ColumnExt;
     use thorn::*;
 
+    let user_id_var = Var::at(Profiles::UserId, 1);
+    let party_id_var = Var::at(Profiles::PartyId, 2);
+
     let mut q = Query::insert().into::<Profiles>();
 
     q = q.cols(&[Profiles::UserId, Profiles::PartyId]).cols(cols);
 
-    q = q.values([Var::at(Profiles::UserId, 1), Var::at(Profiles::PartyId, 2)]);
+    q = q.values([user_id_var, party_id_var]);
     q = q.values(cols.iter().enumerate().map(|(v, c)| Var::at(*c, v + 3)));
 
     // TODO: Make this more ergonomic...

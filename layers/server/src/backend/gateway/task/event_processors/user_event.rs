@@ -143,10 +143,15 @@ async fn user_per_party_update(
             }
 
             pub enum ProfileColumns continue UserColumns {
-                AggProfiles::AvatarId,
-                AggProfiles::Bits,
-                AggProfiles::CustomStatus,
+                Profiles::Bits,
+                Profiles::AvatarId,
+                Profiles::CustomStatus,
             }
+        }
+
+        decl_alias! {
+            pub BaseProfile = Profiles,
+            pub PartyProfile = Profiles
         }
     }
 
@@ -160,13 +165,28 @@ async fn user_per_party_update(
 
                 Query::select()
                     .cols(UserColumns::default())
-                    .cols(ProfileColumns::default())
+                    .expr(Call::custom("lantern.combine_profile_bits").args((
+                        BaseProfile::col(Profiles::Bits),
+                        PartyProfile::col(Profiles::Bits),
+                        PartyProfile::col(Profiles::AvatarId),
+                    )))
+                    .expr(Builtin::coalesce((
+                        PartyProfile::col(Profiles::AvatarId),
+                        BaseProfile::col(Profiles::AvatarId),
+                    )))
+                    .expr(Builtin::coalesce((
+                        PartyProfile::col(Profiles::CustomStatus),
+                        BaseProfile::col(Profiles::CustomStatus),
+                    )))
                     .from(
-                        Users::left_join_table::<AggProfiles>().on(AggProfiles::UserId
-                            .equals(Users::Id)
-                            // profiles.party_id is allowed to be NULL
-                            // NOTE: this isn't strictly necessary here, but will remain in case of changes
-                            .and(AggProfiles::PartyId.equals(party_id_var).is_not_false())),
+                        Users::left_join_table::<BaseProfile>()
+                            .on(BaseProfile::col(Profiles::UserId)
+                                .equals(Users::Id)
+                                .and(BaseProfile::col(Profiles::PartyId).is_null()))
+                            .left_join_table::<PartyProfile>()
+                            .on(PartyProfile::col(Profiles::UserId)
+                                .equals(Users::Id)
+                                .and(PartyProfile::col(Profiles::PartyId).equals(party_id_var))),
                     )
                     .and_where(Users::Id.equals(user_id_var))
             },

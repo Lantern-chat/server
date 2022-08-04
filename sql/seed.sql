@@ -108,6 +108,33 @@ CREATE TYPE lantern.event_code AS ENUM (
 
 CREATE SEQUENCE lantern.event_id;
 
+CREATE OR REPLACE FUNCTION lantern.combine_profile_bits(
+    base_bits int,
+    party_bits int,
+    party_avatar bigint
+) RETURNS int
+AS
+$$
+    SELECT CASE
+        WHEN party_bits IS NULL
+            THEN base_bits
+        ELSE
+        -- Select lower 7 avatar bits
+        (x'7F'::int & CASE
+            WHEN party_avatar IS NOT NULL
+                THEN party_bits
+            ELSE base_bits
+        END) |
+        -- Select higher 25 banner bits
+        (x'FFFFFF80'::int & CASE
+            -- pick out 8th bit, which signifies whether to override banner color
+            WHEN party_bits & 128 != 0
+                THEN party_bits
+            ELSE base_bits
+        END)
+    END
+$$ LANGUAGE SQL IMMUTABLE;
+
 ----------------------------------------
 -------------- TABLES ------------------
 ----------------------------------------
@@ -1298,47 +1325,6 @@ FROM
     RIGHT JOIN lantern.user_assets assets ON (asset_files.asset_id = assets.id)
 ;
 
-CREATE OR REPLACE VIEW lantern.agg_profiles(
-    user_id,
-    party_id,
-    avatar_id,
-    banner_id,
-    bits,
-    custom_status,
-    biography
-) AS
-SELECT
-    base_profile.user_id,
-    party_profile.party_id,
-    COALESCE(party_profile.avatar_id, base_profile.avatar_id),
-    COALESCE(party_profile.banner_id, base_profile.banner_id),
-    CASE
-        WHEN party_profile.party_id IS NULL
-            THEN COALESCE(base_profile.bits, 0)
-        ELSE
-
-        -- Select lower 7 avatar bits
-        (x'7F'::int & CASE
-            WHEN party_profile.avatar_id IS NOT NULL
-                THEN party_profile.bits
-            ELSE base_profile.bits
-        END) |
-        -- Select higher 25 banner bits
-        (x'FFFFFF80'::int & CASE
-            -- pick out 8th bit, which signifies whether to override banner color
-            WHEN party_profile.bits & 128 != 0
-                THEN party_profile.bits
-            ELSE base_profile.bits
-        END)
-    END,
-    COALESCE(party_profile.custom_status, base_profile.custom_status),
-    COALESCE(party_profile.biography, base_profile.biography)
-FROM
-    lantern.profiles base_profile LEFT JOIN lantern.profiles party_profile
-        ON (party_profile.user_id = base_profile.user_id AND party_profile.party_id IS NOT NULL)
-    WHERE base_profile.party_id IS NULL
-;
-
 CREATE OR REPLACE VIEW lantern.agg_original_profile_files(
     user_id,
     party_id,
@@ -1372,6 +1358,8 @@ CREATE OR REPLACE VIEW lantern.agg_friends(user_id, friend_id, flags, note) AS
 SELECT user_a_id, user_b_id, flags, note_a FROM lantern.friendlist
 UNION ALL
 SELECT user_b_id, user_a_id, flags, note_b FROM lantern.friendlist;
+
+--
 
 CREATE OR REPLACE VIEW lantern.agg_overwrites(room_id, user_id, role_id, user_allow, user_deny, allow, deny) AS
 
@@ -1414,6 +1402,7 @@ FROM
         ON roles.id = rooms.party_id AND roles.id = overwrites.role_id
     ON party_member.party_id = rooms.party_id;
 
+--
 
 CREATE OR REPLACE VIEW lantern.agg_room_perms(room_id, user_id, perms) AS
 SELECT
@@ -1434,7 +1423,8 @@ FROM
     ON agg_overwrites.room_id = rooms.id AND agg_overwrites.user_id = party_member.user_id
 GROUP BY party_member.user_id, rooms.id;
 
-DROP VIEW IF EXISTS agg_room_perms_full;
+--
+
 CREATE OR REPLACE VIEW lantern.agg_room_perms_full(party_id, owner_id, room_id, user_id, base_perms, deny, allow, user_deny, user_allow) AS
 SELECT
     party.id as party_id,
@@ -1454,6 +1444,7 @@ FROM
     INNER JOIN lantern.roles ON roles.id = party.id
     LEFT JOIN lantern.agg_overwrites ON agg_overwrites.room_id = rooms.id AND agg_overwrites.user_id = party_member.user_id;
 
+--
 
 CREATE OR REPLACE VIEW lantern.agg_attachments(
     msg_id,
@@ -1479,6 +1470,8 @@ GROUP BY
     msg_id
 ;
 
+--
+
 CREATE OR REPLACE VIEW lantern.agg_presence(
     user_id,
     flags,
@@ -1493,6 +1486,8 @@ SELECT DISTINCT ON (user_id)
    FROM lantern.user_presence
   ORDER BY user_id, updated_at DESC
 ;
+
+--
 
 CREATE OR REPLACE VIEW lantern.agg_users(
     id,
@@ -1520,6 +1515,8 @@ SELECT
 FROM
     lantern.users LEFT JOIN lantern.agg_presence ON agg_presence.user_id = users.id
 ;
+
+--
 
 CREATE OR REPLACE VIEW lantern.agg_members(
     user_id,
@@ -1549,12 +1546,67 @@ FROM
     ) agg_roles ON TRUE
 ;
 
+--
+
+CREATE OR REPLACE VIEW lantern.agg_members_full(
+    party_id,
+    user_id,
+    discriminator,
+    user_flags,
+    username,
+    presence_flags,
+    presence_updated_at,
+    nickname,
+    member_flags,
+    joined_at,
+    avatar_id,
+    profile_bits,
+    custom_status,
+    role_ids,
+    presence_activity
+) AS
+SELECT
+    party_member.party_id,
+    party_member.user_id,
+    agg_users.discriminator,
+    agg_users.flags,
+    agg_users.username,
+    agg_users.presence_flags,
+    agg_users.presence_updated_at,
+    party_member.nickname,
+    party_member.flags,
+    party_member.joined_at,
+    COALESCE(party_profile.avatar_id, base_profile.avatar_id),
+    lantern.combine_profile_bits(base_profile.bits, party_profile.bits, party_profile.avatar_id),
+    COALESCE(party_profile.custom_status, base_profile.custom_status),
+    agg_roles.roles,
+    agg_users.presence_activity
+FROM
+    lantern.party_member INNER JOIN lantern.agg_users ON (agg_users.id = party_member.user_id)
+    LEFT JOIN lantern.profiles base_profile ON (base_profile.user_id = party_member.user_id AND base_profile.party_id IS NULL)
+    LEFT JOIN lantern.profiles party_profile ON (party_profile.user_id = party_member.user_id AND party_profile.party_id = party_member.party_id)
+
+    LEFT JOIN LATERAL (
+        SELECT
+            ARRAY_AGG(role_id) as roles
+        FROM
+            lantern.role_members INNER JOIN lantern.roles
+            ON  roles.id = role_members.role_id
+            AND roles.party_id = party_member.party_id
+            AND role_members.user_id = party_member.user_id
+    ) agg_roles ON TRUE
+;
+
+--
+
 CREATE OR REPLACE VIEW lantern.agg_user_associations(user_id, other_id) AS
 SELECT user_id, friend_id FROM lantern.agg_friends
 UNION ALL
 SELECT my.user_id, o.user_id FROM
     lantern.party_member my INNER JOIN lantern.party_member o ON (o.party_id = my.party_id)
 ;
+
+--
 
 -- NOTE: Just search for `REFERENCES lantern.files` to find which tables should be here
 CREATE OR REPLACE VIEW lantern.agg_used_files(id) AS
@@ -1564,6 +1616,8 @@ SELECT file_id FROM lantern.user_asset_files
 UNION ALL
 SELECT file_id FROM lantern.attachments
 ;
+
+--
 
 CREATE OR REPLACE VIEW lantern.agg_messages(
     msg_id,
@@ -1598,8 +1652,8 @@ SELECT
     users.username,
     users.discriminator,
     users.flags,
-    profile.avatar_id,
-    profile.bits, -- Might be NULL if the user has no profile at all
+    COALESCE(party_profile.avatar_id, base_profile.avatar_id),
+    lantern.combine_profile_bits(base_profile.bits, party_profile.bits, party_profile.avatar_id),
     messages.thread_id,
     messages.edited_at,
     messages.flags,
@@ -1617,11 +1671,8 @@ lantern.messages
 INNER JOIN lantern.agg_users users ON users.id = messages.user_id
 INNER JOIN lantern.rooms ON rooms.id = messages.room_id
 
-LEFT JOIN lantern.agg_profiles profile ON (
-    profile.user_id = messages.user_id AND
-    -- NOTE: profile.party_id is allowed to be NULL
-    (profile.party_id = rooms.party_id IS NOT FALSE)
-)
+LEFT JOIN lantern.profiles base_profile ON (base_profile.user_id = messages.user_id AND base_profile.party_id IS NULL)
+LEFT JOIN lantern.profiles party_profile ON (party_profile.user_id = messages.user_id AND party_profile.party_id = rooms.party_id)
 
 LEFT JOIN lantern.agg_members member ON (member.user_id = messages.user_id AND member.party_id = rooms.party_id)
 LEFT JOIN lantern.agg_attachments ON agg_attachments.msg_id = messages.id

@@ -1,10 +1,7 @@
 use futures::{future::Either, TryFutureExt};
 use sdk::{api::commands::user::UpdateUserProfileBody, models::*};
 
-use crate::{
-    backend::{api::party::members::query::ProfileColumns, util::encrypted_asset::encrypt_snowflake_opt},
-    Authorization, Error, ServerState,
-};
+use crate::{Authorization, Error, ServerState};
 
 pub async fn get_profile(
     state: ServerState,
@@ -14,52 +11,138 @@ pub async fn get_profile(
 ) -> Result<UserProfile, Error> {
     let db = state.db.read.get().await?;
 
-    pub mod profile_query {
-        pub use schema::*;
-        pub use thorn::*;
-
-        thorn::indexed_columns! {
-            pub enum ProfileColumns {
-                AggProfiles::AvatarId,
-                AggProfiles::BannerId,
-                AggProfiles::Bits,
-                AggProfiles::CustomStatus,
-                AggProfiles::Biography,
-            }
-        }
-    }
-
-    let row = db
-        .query_opt_cached_typed(
+    let base_row_future = async {
+        db.query_opt_cached_typed(
             || {
-                use profile_query::*;
+                use q::*;
+                q::base_query()
+                    .and_where(Profiles::UserId.equals(Var::of(Profiles::UserId)))
+                    .and_where(Profiles::PartyId.is_null())
+            },
+            &[&user_id],
+        )
+        .await
+    };
 
-                Query::select()
-                    .from_table::<AggProfiles>()
-                    .cols(ProfileColumns::default())
-                    .and_where(AggProfiles::UserId.equals(Var::of(AggProfiles::UserId)))
-                    .and_where(
-                        AggProfiles::PartyId
-                            .equals(Var::of(AggProfiles::PartyId))
-                            .is_not_false(),
-                    )
+    let party_row_future = async {
+        if party_id.is_none() {
+            return Ok(None);
+        }
+
+        db.query_opt_cached_typed(
+            || {
+                use q::*;
+                q::base_query()
+                    .and_where(Profiles::UserId.equals(Var::of(Profiles::UserId)))
+                    .and_where(Profiles::PartyId.equals(Var::of(Profiles::PartyId)))
             },
             &[&user_id, &party_id],
         )
-        .await?;
-
-    let row = match row {
-        Some(row) => row,
-        None => return Ok(UserProfile::default()),
+        .await
     };
 
-    use profile_query::ProfileColumns;
+    let (base_row, party_row) = tokio::try_join!(base_row_future, party_row_future)?;
 
-    Ok(UserProfile {
-        bits: row.try_get(ProfileColumns::bits())?,
-        avatar: encrypt_snowflake_opt(&state, row.try_get(ProfileColumns::avatar_id())?).into(),
-        banner: encrypt_snowflake_opt(&state, row.try_get(ProfileColumns::banner_id())?).into(),
-        status: row.try_get(ProfileColumns::custom_status())?,
-        bio: row.try_get(ProfileColumns::biography())?,
+    Ok(match (base_row, party_row) {
+        (None, None) => UserProfile::default(),
+        (Some(row), None) | (None, Some(row)) => q::raw_profile_to_public(&state, q::parse_profile(row)?),
+        (Some(base_row), Some(party_row)) => {
+            let mut party = q::parse_profile(party_row)?;
+
+            let q::RawProfile {
+                avatar,
+                banner,
+                status,
+                bio,
+                bits,
+            } = q::parse_profile(base_row)?;
+
+            party.bits = {
+                let mut avatar_bits = party.bits;
+                let mut banner_bits = party.bits;
+
+                // if there is no party avatar, copy over the base avatar bits
+                if party.avatar.is_none() {
+                    avatar_bits = bits;
+                }
+
+                // likewise
+                if !party.bits.contains(UserProfileBits::OVERRIDE_COLOR) {
+                    banner_bits = bits;
+                }
+
+                (avatar_bits & UserProfileBits::AVATAR_ROUNDNESS)
+                    | (banner_bits & (UserProfileBits::OVERRIDE_COLOR | UserProfileBits::COLOR))
+            };
+
+            // these are eequivalent to `COALESCE(party.*, base.*)`
+            party.avatar = party.avatar.or(avatar);
+            party.banner = party.banner.or(banner);
+            party.status = party.status.or(status);
+            party.bio = party.bio.or(bio);
+
+            q::raw_profile_to_public(&state, party)
+        }
     })
+}
+
+mod q {
+    pub use schema::*;
+    pub use thorn::*;
+
+    thorn::indexed_columns! {
+        pub enum ProfileColumns {
+            Profiles::AvatarId,
+            Profiles::BannerId,
+            Profiles::Bits,
+            Profiles::CustomStatus,
+            Profiles::Biography,
+        }
+    }
+
+    thorn::params! {
+        pub struct ProfileParams {
+            pub user_id: Snowflake = Profiles::UserId,
+            pub party_id: Option<Snowflake> = Profiles::PartyId,
+        }
+    }
+
+    pub fn base_query() -> query::SelectQuery {
+        Query::select()
+            .from_table::<Profiles>()
+            .cols(ProfileColumns::default())
+    }
+
+    use sdk::models::{Snowflake, UserProfile, UserProfileBits};
+    use smol_str::SmolStr;
+
+    use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, ServerState};
+
+    pub struct RawProfile {
+        pub bits: UserProfileBits,
+        pub avatar: Option<Snowflake>,
+        pub banner: Option<Snowflake>,
+        pub status: Option<SmolStr>,
+        pub bio: Option<SmolStr>,
+    }
+
+    pub fn parse_profile(row: db::pg::Row) -> Result<RawProfile, db::pg::Error> {
+        Ok(RawProfile {
+            bits: row.try_get(ProfileColumns::bits())?,
+            avatar: row.try_get(ProfileColumns::avatar_id())?,
+            banner: row.try_get(ProfileColumns::banner_id())?,
+            status: row.try_get(ProfileColumns::custom_status())?,
+            bio: row.try_get(ProfileColumns::biography())?,
+        })
+    }
+
+    pub fn raw_profile_to_public(state: &ServerState, raw: RawProfile) -> UserProfile {
+        UserProfile {
+            bits: raw.bits,
+            avatar: encrypt_snowflake_opt(&state, raw.avatar).into(),
+            banner: encrypt_snowflake_opt(&state, raw.banner).into(),
+            status: raw.status.into(),
+            bio: raw.bio.into(),
+        }
+    }
 }
