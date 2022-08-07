@@ -13,6 +13,8 @@ pub async fn presence_updated(
     user_id: Snowflake,
     party_id: Option<Snowflake>,
 ) -> Result<(), Error> {
+    super::user_event::self_update(state, db, user_id, party_id).await?;
+
     let mut stream = match party_id {
         None => db
             .query_stream_cached_typed(
