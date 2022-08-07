@@ -402,9 +402,14 @@ impl MainFileCache {
                             min_age: c.account.min_age,
                             secure: c.web.secure,
                             limits: sdk::models::ServerLimits {
-                                max_avatar_pixels: c.upload.max_avatar_pixels,
-                                max_avatar_size: c.upload.max_avatar_size as u32,
                                 max_upload_size: c.upload.max_upload_size,
+                                max_avatar_size: c.upload.max_avatar_size as u32,
+                                max_banner_size: c.upload.max_banner_size as u32,
+                                max_avatar_pixels: c.upload.max_avatar_pixels,
+                                max_banner_pixels: c.upload.max_banner_pixels,
+                                avatar_width: c.upload.avatar_width,
+                                banner_width: c.upload.banner_width,
+                                banner_height: c.upload.banner_height,
                             },
                         },
                     )
