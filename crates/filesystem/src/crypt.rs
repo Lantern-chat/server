@@ -10,6 +10,8 @@ pin_project_lite::pin_project! {
         inner: F,
 
         cipher: Aes256Ctr,
+
+        write_buf: Vec<u8>,
     }
 }
 
@@ -19,7 +21,11 @@ use std::task::{Context, Poll};
 
 impl<F> EncryptedFile<F> {
     pub fn new(inner: F, cipher: Aes256Ctr) -> Self {
-        EncryptedFile { inner, cipher }
+        EncryptedFile {
+            inner,
+            cipher,
+            write_buf: Vec::new(),
+        }
     }
 
     pub fn new_write(inner: F, cipher: Aes256Ctr) -> EncryptedFile<BufWriter<F>>
@@ -62,8 +68,11 @@ impl<F: AsyncRead + Unpin> AsyncRead for EncryptedFile<F> {
             Poll::Pending => Poll::Pending,
             Poll::Ready(Err(e)) => Poll::Ready(Err(e)),
             Poll::Ready(Ok(())) => {
-                this.cipher
-                    .apply_keystream(&mut buf.filled_mut()[prev_filled_length..]);
+                this.cipher.apply_keystream(
+                    buf.filled_mut()
+                        .get_mut(prev_filled_length..)
+                        .expect("Error getting newly filled buffer"),
+                );
 
                 Poll::Ready(Ok(()))
             }
@@ -79,12 +88,14 @@ impl<F: io::Write> io::Write for EncryptedFile<F> {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         let pos: u64 = self.cipher.current_pos();
 
-        let mut buf = buf.to_vec();
-        self.cipher.apply_keystream(&mut buf);
+        self.write_buf.clear();
+        self.write_buf.extend_from_slice(&buf);
 
-        let bytes = self.inner.write(&buf)?;
+        self.cipher.apply_keystream(self.write_buf.as_mut_slice());
 
-        if bytes < buf.len() {
+        let bytes = self.inner.write(self.write_buf.as_slice())?;
+
+        if bytes < self.write_buf.len() {
             // partial rewind
             self.cipher.seek(pos + bytes as u64);
         }
@@ -97,19 +108,20 @@ impl<F: AsyncWrite + Unpin> AsyncWrite for EncryptedFile<F> {
     fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<io::Result<usize>> {
         let this = self.project();
 
+        this.write_buf.clear();
+        this.write_buf.extend_from_slice(&buf);
+
         let pos: u64 = this.cipher.current_pos();
+        this.cipher.apply_keystream(this.write_buf.as_mut_slice());
 
-        let mut buf = buf.to_vec();
-        this.cipher.apply_keystream(&mut buf);
-
-        match this.inner.poll_write(cx, &buf) {
+        match this.inner.poll_write(cx, this.write_buf.as_slice()) {
             Poll::Pending => {
                 // rewind cipher...
                 this.cipher.seek(pos);
                 Poll::Pending
             }
             Poll::Ready(Ok(bytes)) => {
-                if bytes < buf.len() {
+                if bytes < this.write_buf.len() {
                     // partial rewind...
                     this.cipher.seek(pos + bytes as u64);
                 }
