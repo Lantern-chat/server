@@ -69,6 +69,22 @@ thorn::tables! {
         PresenceActivity: AggUsers::PresenceActivity,
     }
 
+    pub struct AggMemberPresence in Lantern {
+        UserId: Users::Id,
+        Username: Users::Username,
+        Discriminator: Users::Discriminator,
+        UserFlags: Users::Flags,
+        PartyId: PartyMember::PartyId,
+        ProfileBits: Profiles::Bits,
+        AvatarId: Profiles::AvatarId,
+        BannerId: Profiles::BannerId,
+        CustomStatus: Profiles::CustomStatus,
+        Biography: Profiles::Biography,
+        UpdatedAt: UserPresence::UpdatedAt,
+        PresenceFlags: UserPresence::Flags,
+        PresenceActivity: UserPresence::Activity,
+    }
+
     pub struct AggAssets in Lantern {
         AssetId: UserAssets::Id,
         AssetFlags: UserAssetFiles::Flags,

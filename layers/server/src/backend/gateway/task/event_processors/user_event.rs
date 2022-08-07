@@ -13,13 +13,8 @@ pub async fn user_update(
     state: &ServerState,
     db: &db::pool::Client,
     user_id: Snowflake,
-    party_id: Option<Snowflake>,
 ) -> Result<(), Error> {
     self_update(state, db, user_id, None).await?;
-
-    if let Some(party_id) = party_id {
-        return user_per_party_update(state, db, user_id, party_id).await;
-    }
 
     let user_future = async {
         mod user_query {
@@ -62,6 +57,8 @@ pub async fn user_update(
         })
     };
 
+    // TODO: Use a union/view for these IDs
+
     let friends_future = async {
         let row = db
             .query_one_cached_typed(
@@ -83,10 +80,6 @@ pub async fn user_update(
     };
 
     let parties_future = async {
-        if let Some(party_id) = party_id {
-            return Ok(vec![party_id]);
-        }
-
         let row = db
             .query_one_cached_typed(
                 || {
@@ -110,7 +103,7 @@ pub async fn user_update(
 
     let event = Event::new(ServerMsg::new_user_update(user), None)?;
 
-    // shotgun the event to every relevant part
+    // shotgun the event to every relevant party
 
     for friend_id in friend_ids {
         state.gateway.broadcast_user_event(event.clone(), friend_id).await;
@@ -121,103 +114,6 @@ pub async fn user_update(
     }
 
     // TODO: Also include open DMs
-
-    Ok(())
-}
-
-async fn user_per_party_update(
-    state: &ServerState,
-    db: &db::pool::Client,
-    user_id: Snowflake,
-    party_id: Snowflake,
-) -> Result<(), Error> {
-    mod user_query {
-        pub use schema::*;
-        pub use thorn::*;
-
-        indexed_columns! {
-            pub enum UserColumns {
-                Users::Username,
-                Users::Discriminator,
-                Users::Flags,
-            }
-
-            pub enum ProfileColumns continue UserColumns {
-                Profiles::Bits,
-                Profiles::AvatarId,
-                Profiles::CustomStatus,
-            }
-        }
-
-        decl_alias! {
-            pub BaseProfile = Profiles,
-            pub PartyProfile = Profiles
-        }
-    }
-
-    let row = db
-        .query_one_cached_typed(
-            || {
-                use user_query::*;
-
-                let user_id_var = Var::at(Users::Id, 1);
-                let party_id_var = Var::at(Party::Id, 2);
-
-                Query::select()
-                    .cols(UserColumns::default())
-                    .expr(Call::custom("lantern.combine_profile_bits").args((
-                        BaseProfile::col(Profiles::Bits),
-                        PartyProfile::col(Profiles::Bits),
-                        PartyProfile::col(Profiles::AvatarId),
-                    )))
-                    .expr(Builtin::coalesce((
-                        PartyProfile::col(Profiles::AvatarId),
-                        BaseProfile::col(Profiles::AvatarId),
-                    )))
-                    .expr(Builtin::coalesce((
-                        PartyProfile::col(Profiles::CustomStatus),
-                        BaseProfile::col(Profiles::CustomStatus),
-                    )))
-                    .from(
-                        Users::left_join_table::<BaseProfile>()
-                            .on(BaseProfile::col(Profiles::UserId)
-                                .equals(Users::Id)
-                                .and(BaseProfile::col(Profiles::PartyId).is_null()))
-                            .left_join_table::<PartyProfile>()
-                            .on(PartyProfile::col(Profiles::UserId)
-                                .equals(Users::Id)
-                                .and(PartyProfile::col(Profiles::PartyId).equals(party_id_var))),
-                    )
-                    .and_where(Users::Id.equals(user_id_var))
-            },
-            &[&user_id, &party_id],
-        )
-        .await?;
-
-    use user_query::{ProfileColumns, UserColumns};
-
-    let user = User {
-        id: user_id,
-        username: row.try_get(UserColumns::username())?,
-        discriminator: row.try_get(UserColumns::discriminator())?,
-        flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
-        email: None,
-        preferences: None,
-        profile: match row.try_get(ProfileColumns::bits())? {
-            None => Nullable::Null,
-            Some(bits) => Nullable::Some(UserProfile {
-                bits,
-                avatar: encrypt_snowflake_opt(&state, row.try_get(ProfileColumns::avatar_id())?).into(),
-                banner: Nullable::Undefined,
-                status: row.try_get(ProfileColumns::custom_status())?,
-                bio: Nullable::Undefined,
-            }),
-        },
-    };
-
-    let event = Event::new(ServerMsg::new_user_update(user), None)?;
-
-    state.gateway.broadcast_event(event.clone(), party_id).await;
 
     Ok(())
 }

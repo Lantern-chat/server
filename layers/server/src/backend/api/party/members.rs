@@ -73,7 +73,9 @@ pub fn parse_member(row: db::Row, state: &ServerState) -> Result<PartyMember, Er
             None => None,
             Some(updated_at) => Some(UserPresence {
                 updated_at: Some(updated_at),
-                flags: row.try_get(MemberColumns::presence_flags())?,
+                flags: UserPresenceFlags::from_bits_truncate_public(
+                    row.try_get(MemberColumns::presence_flags())?,
+                ),
                 activity: match row.try_get(MemberColumns::presence_activity())? {
                     None => None,
                     Some(value) => Some(AnyActivity::Any(value)),

@@ -1229,17 +1229,16 @@ FOR EACH ROW EXECUTE FUNCTION lantern.user_trigger();
 
 --
 
--- emit a 'user_updated' event when their profile changes
+-- emit a 'presence_updated' event when their profile changes
 CREATE OR REPLACE FUNCTION lantern.profile_trigger()
 RETURNS trigger
 LANGUAGE plpgsql AS
 $$
 BEGIN
-    INSERT INTO lantern.event_log (id, party_id, code)
+    INSERT INTO lantern.event_log (id, code)
     VALUES (
         COALESCE(OLD.user_id, NEW.user_id),
-        COALESCE(OLD.party_id, NEW.party_id),
-        'user_updated'::lantern.event_code
+        'presence_updated'::lantern.event_code
     );
 
     RETURN NEW;
@@ -1484,7 +1483,7 @@ SELECT DISTINCT ON (user_id)
     updated_at,
     activity
    FROM lantern.user_presence
-  ORDER BY user_id, updated_at DESC
+  ORDER BY user_id, flags DESC, updated_at DESC
 ;
 
 --
@@ -1677,6 +1676,52 @@ LEFT JOIN lantern.profiles party_profile ON (party_profile.user_id = messages.us
 LEFT JOIN lantern.agg_members member ON (member.user_id = messages.user_id AND member.party_id = rooms.party_id)
 LEFT JOIN lantern.agg_attachments ON agg_attachments.msg_id = messages.id
 LEFT JOIN lantern.agg_mentions ON agg_mentions.msg_id = messages.id
+;
+
+--
+
+CREATE OR REPLACE VIEW lantern.agg_member_presence(
+    user_id,
+    discriminator,
+    username,
+    user_flags,
+
+    party_id,
+
+    profile_bits,
+    avatar_id,
+    banner_id,
+    custom_status,
+    biography,
+
+    updated_at,
+    presence_flags,
+    presence_activity
+) AS
+SELECT
+    users.id,
+    users.discriminator,
+    users.username,
+    users.flags,
+
+    party_member.party_id,
+
+    lantern.combine_profile_bits(base_profile.bits, party_profile.bits, party_profile.avatar_id),
+    COALESCE(party_profile.avatar_id, base_profile.avatar_id),
+    COALESCE(party_profile.banner_id, base_profile.banner_id),
+    COALESCE(party_profile.custom_status, base_profile.custom_status),
+    COALESCE(party_profile.biography, base_profile.biography),
+
+    presence.updated_at,
+    presence.flags,
+    presence.activity
+FROM
+    users INNER JOIN party_member ON party_member.user_id = users.id
+
+    LEFT JOIN lantern.agg_presence presence ON presence.user_id = users.id
+
+    LEFT JOIN lantern.profiles base_profile ON (base_profile.user_id = users.id AND base_profile.party_id IS NULL)
+    LEFT JOIN lantern.profiles party_profile ON (party_profile.user_id = users.id AND party_profile.party_id = party_member.party_id)
 ;
 
 -----------------------------------------

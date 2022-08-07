@@ -15,7 +15,7 @@ pub async fn set_presence(
         pub struct Params {
             user_id: Snowflake = schema::UserPresence::UserId,
             conn_id: Snowflake = schema::UserPresence::ConnId,
-            flags: UserPresenceFlags = schema::UserPresence::Flags,
+            flags: i16 = schema::UserPresence::Flags,
             activity: Option<serde_json::Value> = schema::UserPresence::Activity,
         }
     }
@@ -35,7 +35,7 @@ pub async fn set_presence(
         &Params {
             user_id,
             conn_id,
-            flags: presence.flags,
+            flags: presence.flags.bits(),
             activity: None,
         }
         .as_params(),
