@@ -10,7 +10,7 @@ use super::prelude::*;
 pub async fn presence_updated(
     state: &ServerState,
     db: &db::pool::Client,
-    id: Snowflake,
+    user_id: Snowflake,
     party_id: Option<Snowflake>,
 ) -> Result<(), Error> {
     let mut stream = match party_id {
@@ -20,7 +20,7 @@ pub async fn presence_updated(
                     use q::*;
                     base_query().and_where(AggMemberPresence::UserId.equals(Var::of(Users::Id)))
                 },
-                &[&id],
+                &[&user_id],
             )
             .await?
             .boxed(),
@@ -32,7 +32,7 @@ pub async fn presence_updated(
                         .and_where(AggMemberPresence::UserId.equals(Var::of(Users::Id)))
                         .and_where(AggMemberPresence::PartyId.equals(Var::of(Party::Id)))
                 },
-                &[&id, &party_id],
+                &[&user_id, &party_id],
             )
             .await?
             .boxed(),
@@ -47,7 +47,7 @@ pub async fn presence_updated(
 
         let inner = UserPresenceEvent {
             user: User {
-                id,
+                id: user_id,
                 username: row.try_get(Columns::username())?,
                 discriminator: row.try_get(Columns::discriminator())?,
                 flags: UserFlags::from_bits_truncate_public(row.try_get(Columns::user_flags())?),

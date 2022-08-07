@@ -134,7 +134,7 @@ impl FileStore<'_> {
         };
 
         log::trace!(
-            "Asynchronously opening file: {} in mode: {mode:?}",
+            "Asynchronously opening file: {} ({id}) in mode: {mode:?}",
             path.display()
         );
 
@@ -197,7 +197,10 @@ impl FileStore<'_> {
             OpenMode::Write => options.write(true).create(true),
         };
 
-        log::trace!("Synchronously opening file: {} in mode: {mode:?}", path.display());
+        log::trace!(
+            "Synchronously opening file: {} ({id}) in mode: {mode:?}",
+            path.display()
+        );
 
         options.open(path)
     }
