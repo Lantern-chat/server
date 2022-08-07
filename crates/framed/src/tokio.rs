@@ -271,23 +271,17 @@ impl<R: AsyncRead + Unpin> AsyncRead for AsyncFramedReader<R> {
 
         match Pin::new(&mut self.inner).poll_read(cx, &mut b2) {
             Poll::Ready(Ok(())) => {
-                let init_after = b2.initialized().len();
-                let filled_after = b2.filled().len();
+                let filled = b2.filled().len();
 
                 // buf.take() doesn't actually update the original ReadBuf positions,
                 // only writes to the *actual* underlying buffer, so update buf here or
                 // else the parent reader will think it EOFed.
                 unsafe {
-                    // filled is the baseline position where `take()` started,
-                    // as take returns the unfilled slice only. Therefore,
-                    // a conservative estimate initialized memory
-                    // is known-filled + newly initialized
-                    let filled = buf.filled().len();
-                    buf.assume_init(filled + init_after);
-                    buf.set_filled(filled + filled_after);
+                    buf.assume_init(filled);
+                    buf.advance(filled);
                 }
 
-                self.len -= filled_after as u64;
+                self.len -= filled as u64;
 
                 Poll::Ready(Ok(()))
             }
