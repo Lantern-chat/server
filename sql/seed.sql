@@ -1257,6 +1257,7 @@ LANGUAGE plpgsql AS
 $$
 BEGIN
     DELETE FROM lantern.profiles WHERE user_id = OLD.user_id AND party_id = OLD.party_id;
+    RETURN NEW;
 END
 $$;
 
