@@ -1,7 +1,6 @@
 use std::fs::Metadata;
 use std::io;
 use std::path::Path;
-use std::pin::Pin;
 
 use aes::cipher::{Iv, Key, KeyIvInit};
 use aes::Aes256;
@@ -9,7 +8,6 @@ use aes::Aes256;
 pub type Aes256Ctr = ctr::Ctr64BE<Aes256>;
 
 use tokio::fs::{self, File as TkFile, OpenOptions};
-use tokio::io::{AsyncRead, AsyncSeek, AsyncWrite, BufWriter};
 
 use sdk::Snowflake;
 
@@ -63,17 +61,6 @@ impl FileExt for TkFile {
 }
 
 #[async_trait::async_trait]
-impl FileExt for BufWriter<TkFile> {
-    async fn set_len(&self, size: u64) -> Result<(), io::Error> {
-        self.get_ref().set_len(size).await
-    }
-
-    async fn get_len(&self) -> Result<u64, io::Error> {
-        self.get_ref().get_len().await
-    }
-}
-
-#[async_trait::async_trait]
 impl<F: FileExt + Sync> FileExt for EncryptedFile<F> {
     async fn set_len(&self, size: u64) -> Result<(), io::Error> {
         self.get_ref().set_len(size).await
@@ -83,9 +70,6 @@ impl<F: FileExt + Sync> FileExt for EncryptedFile<F> {
         self.get_ref().get_len().await
     }
 }
-
-pub trait AsyncRWSeekStream: AsyncWrite + AsyncRead + AsyncSeek + FileExt + Send + Sync {}
-impl<T> AsyncRWSeekStream for T where T: AsyncWrite + AsyncRead + AsyncSeek + FileExt + Send + Sync {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
@@ -106,15 +90,11 @@ impl FileStore<'_> {
         id: Snowflake,
         mode: OpenMode,
         options: &CipherOptions,
-    ) -> io::Result<Pin<Box<dyn AsyncRWSeekStream>>> {
+    ) -> io::Result<EncryptedFile<TkFile>> {
         let cipher = options.create();
         let file = self.open(id, mode).await?;
 
-        Ok(match mode {
-            OpenMode::Read => Box::pin(EncryptedFile::new(file, cipher)),
-            // write-mode has some extra optimizations for buffering encrypted writes
-            OpenMode::Write => Box::pin(EncryptedFile::new_write(file, cipher)),
-        })
+        Ok(EncryptedFile::new(file, cipher))
     }
 
     pub async fn open(&self, id: Snowflake, mode: OpenMode) -> io::Result<TkFile> {
@@ -163,22 +143,22 @@ impl FileStore<'_> {
         &self,
         id: Snowflake,
         options: &CipherOptions,
-    ) -> io::Result<Box<dyn WriteSeekStream>> {
+    ) -> io::Result<EncryptedFile<std::fs::File>> {
         let cipher = options.create();
         let file = self.open_sync(id, OpenMode::Write)?;
 
-        Ok(Box::new(EncryptedFile::new_write_sync(file, cipher)))
+        Ok(EncryptedFile::new(file, cipher))
     }
 
     pub fn open_crypt_read_sync(
         &self,
         id: Snowflake,
         options: &CipherOptions,
-    ) -> io::Result<Box<dyn ReadSeekStream>> {
+    ) -> io::Result<EncryptedFile<std::fs::File>> {
         let cipher = options.create();
         let file = self.open_sync(id, OpenMode::Read)?;
 
-        Ok(Box::new(EncryptedFile::new(file, cipher)))
+        Ok(EncryptedFile::new(file, cipher))
     }
 
     pub fn open_sync(&self, id: Snowflake, mode: OpenMode) -> io::Result<std::fs::File> {

@@ -6,7 +6,7 @@ use ftl::{
     *,
 };
 
-use filesystem::store::{CipherOptions, OpenMode};
+use filesystem::store::{CipherOptions, FileExt, OpenMode};
 use futures::FutureExt;
 use headers::{
     AcceptRanges, ContentLength, ContentRange, ContentType, HeaderMap, HeaderMapExt, HeaderValue,

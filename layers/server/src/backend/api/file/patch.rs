@@ -1,7 +1,7 @@
 use std::{error::Error as _, io::SeekFrom};
 
 use bytes::Bytes;
-use filesystem::store::{AsyncRWSeekStream, CipherOptions, FileExt, OpenMode};
+use filesystem::store::{CipherOptions, FileExt, OpenMode};
 
 use crate::{Authorization, Error, ServerState};
 
@@ -105,12 +105,7 @@ pub async fn patch_file(
     }
 
     let mut res = loop {
-        // flush file to disk and get next chunk at the same time
-        let (chunk, flush_result) = tokio::join!(body.next(), file.flush());
-
-        if let Err(e) = flush_result {
-            break Some(e.into());
-        }
+        let chunk = body.next().await;
 
         match chunk {
             None => break None,
@@ -123,7 +118,7 @@ pub async fn patch_file(
                     Error::UploadError
                 });
             }
-            Some(Ok(mut bytes)) => {
+            Some(Ok(bytes)) => {
                 let num_bytes = bytes.len() as u64;
                 let new_bytes_written = bytes_written + num_bytes;
 
@@ -149,7 +144,7 @@ pub async fn patch_file(
                 // update crc before bytes are moved out
                 crc32.update(&bytes);
 
-                if let Err(e) = file.write_all_buf(&mut bytes).await {
+                if let Err(e) = file.write_buf(&bytes).await {
                     break Some(e.into());
                 }
 

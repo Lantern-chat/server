@@ -202,7 +202,7 @@ pub async fn add_asset(
                             Some(msg) => msg,
                         };
 
-                        let len = tokio::io::copy(msg, &mut file).await? as i32;
+                        let len = file.copy_from(msg).await? as i32;
                         drop(_fs_permit);
 
                         let db = state.db.write.get().await?;
