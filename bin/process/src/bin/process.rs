@@ -136,7 +136,13 @@ fn main() {
         eprintln!("Unable to set process priority");
     }
 
-    if let Err(e) = task() {
-        eprintln!("SUB ERROR: {}", e);
+    let res = std::panic::catch_unwind(|| {
+        if let Err(e) = task() {
+            eprintln!("SUB ERROR: {}", e);
+        }
+    });
+
+    if res.is_err() {
+        eprintln!("SUB PANIC");
     }
 }

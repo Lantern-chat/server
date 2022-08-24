@@ -67,65 +67,68 @@ pub enum Error {
     Other(String),
 }
 
-use processing::{process::ProcessingError, read_image::ImageReadError};
+#[cfg(feature = "binary")]
+const _: () = {
+    use processing::{process::ProcessingError, read_image::ImageReadError};
 
-impl From<bincode::Error> for Error {
-    fn from(_: bincode::Error) -> Self {
-        Error::SerializationError
-    }
-}
-
-impl From<ProcessingError> for Error {
-    fn from(err: ProcessingError) -> Self {
-        match err {
-            ProcessingError::IOError(err) => err.into(),
-            ProcessingError::Other(err) => Error::Other(err),
+    impl From<bincode::Error> for Error {
+        fn from(_: bincode::Error) -> Self {
+            Error::SerializationError
         }
     }
-}
 
-impl From<processing::image::ImageError> for Error {
-    fn from(err: processing::image::ImageError) -> Self {
-        use processing::image::ImageError;
-
-        match err {
-            ImageError::Decoding(err) => Error::DecodingError(err.to_string()),
-            ImageError::Encoding(err) => Error::EncodingError(err.to_string()),
-            _ => Error::Other(err.to_string()),
-        }
-    }
-}
-
-impl From<ImageReadError> for Error {
-    fn from(err: ImageReadError) -> Self {
-        match err {
-            ImageReadError::Io(err) => err.into(),
-            ImageReadError::ImageTooLarge => Error::ImageTooLarge,
-            ImageReadError::FileTooLarge => Error::FileTooLarge,
-            ImageReadError::InvalidImageFormat => Error::InvalidImageFormat,
-            ImageReadError::JpegDecodeError(_) | ImageReadError::PngDecodeError(_) => {
-                Error::DecodingError(err.to_string())
+    impl From<ProcessingError> for Error {
+        fn from(err: ProcessingError) -> Self {
+            match err {
+                ProcessingError::IOError(err) => err.into(),
+                ProcessingError::Other(err) => Error::Other(err),
             }
-            ImageReadError::Unsupported => Error::UnsupportedFormat,
-            ImageReadError::Image(err) => err.into(),
         }
     }
-}
 
-use std::io;
+    impl From<processing::image::ImageError> for Error {
+        fn from(err: processing::image::ImageError) -> Self {
+            use processing::image::ImageError;
 
-impl From<io::Error> for Error {
-    fn from(err: io::Error) -> Self {
-        Error::IoError(match err.kind() {
-            io::ErrorKind::BrokenPipe => IOErrorKind::BrokenPipe,
-            io::ErrorKind::InvalidData => IOErrorKind::InvalidData,
-            io::ErrorKind::InvalidInput => IOErrorKind::InvalidInput,
-            io::ErrorKind::UnexpectedEof => IOErrorKind::UnexpectedEof,
-            io::ErrorKind::OutOfMemory => IOErrorKind::OutOfMemory,
-            _ => IOErrorKind::Other(err.to_string()),
-        })
+            match err {
+                ImageError::Decoding(err) => Error::DecodingError(err.to_string()),
+                ImageError::Encoding(err) => Error::EncodingError(err.to_string()),
+                _ => Error::Other(err.to_string()),
+            }
+        }
     }
-}
+
+    impl From<ImageReadError> for Error {
+        fn from(err: ImageReadError) -> Self {
+            match err {
+                ImageReadError::Io(err) => err.into(),
+                ImageReadError::ImageTooLarge => Error::ImageTooLarge,
+                ImageReadError::FileTooLarge => Error::FileTooLarge,
+                ImageReadError::InvalidImageFormat => Error::InvalidImageFormat,
+                ImageReadError::JpegDecodeError(_) | ImageReadError::PngDecodeError(_) => {
+                    Error::DecodingError(err.to_string())
+                }
+                ImageReadError::Unsupported => Error::UnsupportedFormat,
+                ImageReadError::Image(err) => err.into(),
+            }
+        }
+    }
+
+    use std::io;
+
+    impl From<io::Error> for Error {
+        fn from(err: io::Error) -> Self {
+            Error::IoError(match err.kind() {
+                io::ErrorKind::BrokenPipe => IOErrorKind::BrokenPipe,
+                io::ErrorKind::InvalidData => IOErrorKind::InvalidData,
+                io::ErrorKind::InvalidInput => IOErrorKind::InvalidInput,
+                io::ErrorKind::UnexpectedEof => IOErrorKind::UnexpectedEof,
+                io::ErrorKind::OutOfMemory => IOErrorKind::OutOfMemory,
+                _ => IOErrorKind::Other(err.to_string()),
+            })
+        }
+    }
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum IOErrorKind {
