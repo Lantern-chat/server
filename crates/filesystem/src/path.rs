@@ -25,12 +25,16 @@ fn outer_perfect_shuffle(mut x: u64) -> u64 {
 pub fn id_to_path(id: Snowflake, buf: &mut PathBuf) {
     let id = id.to_u64();
 
-    let mut hasher = ahash::AHasher::new_with_keys(
-        0xb83d72c7cb466675af2fc624c16ef67d,
-        0x1e1f65d8c3f9e3477a6c09a2d6b86b86,
+    // OLD KEYS: 0xb83d72c7cb466675af2fc624c16ef67d, 0x1e1f65d8c3f9e3477a6c09a2d6b86b86
+    // converted to new keys via https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=25d9ef963dd82a5b0f9fdba168d7a3f3
+    let state = ahash::RandomState::with_seeds(
+        0xCE388D4A7C1DEDD9,
+        0x15709E26FCDF195D,
+        0x1EC91837365B0A8B,
+        0x29B54AF59AF086D9,
     );
-    hasher.write_u64(id);
-    let hash = hasher.finish().to_le_bytes();
+
+    let hash = state.hash_one(id).to_le_bytes();
 
     // take upper bits and use them for directories
     // using only 32 bits for this allows for up to 2^32 directories as 256 / 256 / 256 / 256

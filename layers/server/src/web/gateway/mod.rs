@@ -271,9 +271,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
             };
 
             match tokio::time::timeout(Duration::from_millis(45000), flush_and_send).await {
-                Ok(Ok(())) => {
-                    println!("Message sent!");
-                }
+                Ok(Ok(())) => {}
                 Ok(Err(e)) => {
                     log::error!("Handle errors from websocket: {e}");
                     break 'event_loop;
@@ -364,7 +362,7 @@ fn decompress_if(cond: bool, msg: &[u8]) -> Result<Cow<[u8]>, std::io::Error> {
 
     let err = match inflate::decompress_to_vec_zlib(msg) {
         Ok(decompressed) => return Ok(Cow::Owned(decompressed)),
-        Err(err) => match err {
+        Err(err) => match err.status {
             TINFLStatus::Done => unreachable!("TINFLStatus::Done"),
             TINFLStatus::FailedCannotMakeProgress => "Truncated Stream",
             TINFLStatus::BadParam => "Bad Param",
