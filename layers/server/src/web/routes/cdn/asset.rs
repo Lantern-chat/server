@@ -17,6 +17,8 @@ pub enum PlainAssetKind {
     Room,
     Party,
     Role,
+    Emote,
+    Sticker,
 }
 
 pub enum AssetSubKind {
@@ -34,6 +36,8 @@ pub async fn asset(mut route: Route<ServerState>) -> ApiResponse {
             "room" => PlainAssetKind::Room,
             "party" => PlainAssetKind::Party,
             "role" => PlainAssetKind::Role,
+            "emote" => PlainAssetKind::Emote,
+            "sticker" => PlainAssetKind::Sticker,
             _ => return Err(Error::NotFound),
         },
     };
@@ -43,28 +47,38 @@ pub async fn asset(mut route: Route<ServerState>) -> ApiResponse {
         _ => return Err(Error::BadRequest),
     };
 
-    let sub_kind = match route.next().segment() {
-        Exact("avatar") => AssetSubKind::Avatar,
-        Exact("banner") => AssetSubKind::Banner,
-        _ => return Err(Error::NotFound),
-    };
+    let mut asset_id = kind_id;
 
-    let kind = match (plain_kind, sub_kind) {
-        (PlainAssetKind::Role, AssetSubKind::Avatar) => AssetKind::RoleAvatar,
-        (PlainAssetKind::Party, AssetSubKind::Avatar) => AssetKind::PartyAvatar,
-        (PlainAssetKind::Party, AssetSubKind::Banner) => AssetKind::PartyBanner,
-        (PlainAssetKind::User, AssetSubKind::Avatar) => AssetKind::UserAvatar,
-        (PlainAssetKind::User, AssetSubKind::Banner) => AssetKind::UserBanner,
-        _ => return Err(Error::NotFound),
-    };
+    let kind = match plain_kind {
+        PlainAssetKind::Emote => AssetKind::Emote,
+        PlainAssetKind::Sticker => AssetKind::Sticker,
+        _ => {
+            let sub_kind = match route.next().segment() {
+                Exact("avatar") => AssetSubKind::Avatar,
+                Exact("banner") => AssetSubKind::Banner,
+                _ => return Err(Error::NotFound),
+            };
 
-    route.next();
-    let asset_id = match route.segment() {
-        Exact(avatar) => match decrypt_snowflake(&route.state, avatar) {
-            Some(id) => id,
-            None => return Err(Error::BadRequest),
-        },
-        _ => return Err(Error::BadRequest),
+            let kind = match (plain_kind, sub_kind) {
+                (PlainAssetKind::Role, AssetSubKind::Avatar) => AssetKind::RoleAvatar,
+                (PlainAssetKind::Party, AssetSubKind::Avatar) => AssetKind::PartyAvatar,
+                (PlainAssetKind::Party, AssetSubKind::Banner) => AssetKind::PartyBanner,
+                (PlainAssetKind::User, AssetSubKind::Avatar) => AssetKind::UserAvatar,
+                (PlainAssetKind::User, AssetSubKind::Banner) => AssetKind::UserBanner,
+                _ => return Err(Error::NotFound),
+            };
+
+            route.next();
+            asset_id = match route.segment() {
+                Exact(avatar) => match decrypt_snowflake(&route.state, avatar) {
+                    Some(id) => id,
+                    None => return Err(Error::BadRequest),
+                },
+                _ => return Err(Error::BadRequest),
+            };
+
+            kind
+        }
     };
 
     let is_head = route.method() == Method::HEAD;

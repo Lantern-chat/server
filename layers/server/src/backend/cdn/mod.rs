@@ -31,6 +31,8 @@ pub enum AssetKind {
     PartyAvatar,
     PartyBanner,
     RoomAvatar,
+    Emote,
+    Sticker,
 }
 
 pub async fn get_asset(
@@ -66,12 +68,14 @@ pub async fn get_asset(
     // // boxing these is probably cheaper than the compiled state machines of all of them combined
     #[rustfmt::skip]
     let row_future = match kind {
-        AssetKind::UserAvatar => db.query_opt_cached_typed(|| query::select_asset(AssetKind::UserAvatar), params).boxed(),
-        AssetKind::UserBanner => db.query_opt_cached_typed(|| query::select_asset(AssetKind::UserBanner), params).boxed(),
-        AssetKind::RoleAvatar => db.query_opt_cached_typed(|| query::select_asset(AssetKind::RoleAvatar), params).boxed(),
-        AssetKind::RoomAvatar => db.query_opt_cached_typed(|| query::select_asset(AssetKind::RoomAvatar), params).boxed(),
-        AssetKind::PartyAvatar => db.query_opt_cached_typed(|| query::select_asset(AssetKind::PartyAvatar), params).boxed(),
-        AssetKind::PartyBanner => db.query_opt_cached_typed(|| query::select_asset(AssetKind::PartyBanner), params).boxed(),
+        AssetKind::UserAvatar   => db.query_opt_cached_typed(|| query::select_asset(AssetKind::UserAvatar), params).boxed(),
+        AssetKind::UserBanner   => db.query_opt_cached_typed(|| query::select_asset(AssetKind::UserBanner), params).boxed(),
+        AssetKind::RoleAvatar   => db.query_opt_cached_typed(|| query::select_asset(AssetKind::RoleAvatar), params).boxed(),
+        AssetKind::RoomAvatar   => db.query_opt_cached_typed(|| query::select_asset(AssetKind::RoomAvatar), params).boxed(),
+        AssetKind::PartyAvatar  => db.query_opt_cached_typed(|| query::select_asset(AssetKind::PartyAvatar), params).boxed(),
+        AssetKind::PartyBanner  => db.query_opt_cached_typed(|| query::select_asset(AssetKind::PartyBanner), params).boxed(),
+        AssetKind::Emote        => db.query_opt_cached_typed(|| query::select_asset(AssetKind::Emote), params).boxed(),
+        AssetKind::Sticker      => db.query_opt_cached_typed(|| query::select_asset(AssetKind::Sticker), params).boxed(),
     };
 
     let row = match row_future.await {
@@ -193,9 +197,8 @@ mod query {
     pub fn select_asset(kind: AssetKind) -> impl thorn::AnyQuery {
         let quality = UserAssetFiles::Flags.bit_and(AssetFlags::QUALITY.bits().lit());
 
-        let q = Query::select()
+        let mut q = Query::select()
             .cols(Columns::default())
-            .and_where(UserAssetFiles::AssetId.equals(AssetParams::asset_id()))
             // select files of at least the given quality
             .and_where(quality.greater_than_equal(Builtin::least((
                 AssetParams::flags().bit_and(AssetFlags::QUALITY.bits().lit()),
@@ -223,6 +226,10 @@ mod query {
 
         let from = UserAssetFiles::inner_join_table::<Files>().on(Files::Id.equals(UserAssetFiles::FileId));
 
+        if !matches!(kind, AssetKind::Emote | AssetKind::Sticker) {
+            q = q.and_where(UserAssetFiles::AssetId.equals(AssetParams::asset_id()));
+        }
+
         #[rustfmt::skip]
         let q = match kind {
             AssetKind::UserAvatar => q
@@ -243,6 +250,14 @@ mod query {
             AssetKind::PartyBanner => q
                 .from(from.inner_join_table::<Party>().on(Party::BannerId.equals(UserAssetFiles::AssetId)))
                 .and_where(Party::Id.equals(AssetParams::kind_id())),
+            AssetKind::Emote | AssetKind::Sticker => q
+                .from(
+                    Emotes::inner_join_table::<UserAssetFiles>().on(UserAssetFiles::AssetId.equals(Emotes::AssetId))
+                    .inner_join_table::<Files>().on(Files::Id.equals(UserAssetFiles::FileId)))
+                .and_where(Emotes::Id.equals(AssetParams::kind_id()))
+                .and_where(AssetParams::asset_id().is_not_null()) // make sure this parameter is used
+
+            // TODO: Also validate emotes/stickers for their emote/sticker flags
         };
 
         q

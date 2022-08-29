@@ -20,7 +20,7 @@ pub async fn cdn(mut route: Route<ServerState>) -> ApiResponse {
 
     match route.next().segment() {
         Exact("attachments") => attachments::attachments(route).boxed().await,
-        Exact("user" | "room" | "party" | "role") => asset::asset(route).boxed().await,
+        Exact("user" | "room" | "party" | "role" | "emote" | "sticker") => asset::asset(route).boxed().await,
         _ => Err(Error::NotFound),
     }
 }

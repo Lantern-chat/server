@@ -1,4 +1,4 @@
-use std::{hash::Hasher, path::PathBuf};
+use std::path::PathBuf;
 
 use sdk::Snowflake;
 
