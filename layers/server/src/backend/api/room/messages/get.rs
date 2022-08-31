@@ -444,6 +444,36 @@ where
             let party_id: Option<Snowflake> = row.try_get(PartyColumns::id())?;
             let msg_id = row.try_get(MessageColumns::id())?;
 
+            let mut user_mentions = Vec::new();
+            let mut role_mentions = Vec::new();
+            let mut room_mentions = Vec::new();
+
+            let mention_kinds: Option<Vec<i32>> = row.try_get(MentionColumns::kinds())?;
+
+            match mention_kinds {
+                Some(mention_kinds) if !mention_kinds.is_empty() => {
+                    let mention_ids: Vec<Snowflake> = row.try_get(MentionColumns::ids())?;
+
+                    if mention_kinds.len() != mention_ids.len() {
+                        return Err(Error::InternalErrorStatic(
+                            "Mismatch in number of mention ids and mention kinds",
+                        ));
+                    }
+
+                    for (kind, id) in mention_kinds.into_iter().zip(mention_ids) {
+                        let mentions = match kind {
+                            1 => &mut user_mentions,
+                            2 => &mut role_mentions,
+                            3 => &mut room_mentions,
+                            _ => unreachable!(),
+                        };
+
+                        mentions.push(id);
+                    }
+                }
+                _ => {}
+            }
+
             let mut msg = Message {
                 id: msg_id,
                 party_id,
@@ -502,9 +532,9 @@ where
                     }),
                 },
                 thread_id: row.try_get(MessageColumns::ThreadId as usize)?,
-                user_mentions: Vec::new(),
-                role_mentions: Vec::new(),
-                room_mentions: Vec::new(),
+                user_mentions,
+                role_mentions,
+                room_mentions,
                 attachments: {
                     let mut attachments = Vec::new();
 
