@@ -152,7 +152,7 @@ pub async fn edit_message(
 
     tokio::try_join!(add_attachments, orphan_attachments, update_message)?;
 
-    let msg = super::get::get_one_transactional(state, msg_id, &t).await?;
+    let msg = super::get::get_one_transactional(state, msg_id, room_id, &t).await?;
 
     t.commit().await?;
 

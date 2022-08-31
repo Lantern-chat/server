@@ -101,12 +101,13 @@ pub async fn get_many(
 pub async fn get_one_transactional(
     state: ServerState,
     msg_id: Snowflake,
+    room_id: Snowflake,
     t: &db::pool::Transaction<'_>,
 ) -> Result<Message, Error> {
     use q::{Parameters, Params};
 
     let params = Params {
-        room_id: None,
+        room_id: Some(room_id),
         msg_id,
         limit: 1,
         user_id: None,
@@ -115,7 +116,7 @@ pub async fn get_one_transactional(
 
     parse_first(
         state,
-        t.query_stream_cached_typed(p::exact_no_perm_no_room, &params.as_params())
+        t.query_stream_cached_typed(p::exact_no_perm, &params.as_params())
             .await?,
     )
     .await
