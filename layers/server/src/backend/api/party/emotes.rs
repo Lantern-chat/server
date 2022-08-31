@@ -63,7 +63,7 @@ pub async fn get_custom_emotes_raw<'a>(
         Ok(row) => Ok(CustomEmote {
             id: row.try_get(0)?,
             party_id: row.try_get(1)?,
-            file: row.try_get(2)?,
+            asset: row.try_get(2)?,
             name: row.try_get(3)?,
             flags: row.try_get(4)?,
             aspect_ratio: row.try_get(5)?,

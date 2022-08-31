@@ -153,7 +153,7 @@ CREATE TABLE lantern.event_log (
     code        lantern.event_code  NOT NULL
 );
 
-ALTER SEQUENCE lantern.event_id OWNED BY lantern.event_log;
+ALTER SEQUENCE lantern.event_id OWNED BY lantern.event_log.counter;
 
 -- Notification rate-limiting table
 CREATE TABLE lantern.event_log_last_notification (
@@ -270,15 +270,15 @@ CREATE TABLE lantern.party_member (
 );
 
 CREATE TABLE lantern.rooms (
-    id          bigint      NOT NULL,
-    party_id    bigint,
-    avatar_id   bigint,
-    parent_id   bigint,
-    deleted_at  timestamp,
-    position    smallint    NOT NULL,
-    flags       smallint    NOT NULL    DEFAULT 0,
-    name        text        NOT NULL,
-    topic       text,
+    id              bigint      NOT NULL,
+    party_id        bigint,
+    avatar_id       bigint,
+    parent_id       bigint,
+    deleted_at      timestamp,
+    position        smallint    NOT NULL,
+    flags           smallint    NOT NULL    DEFAULT 0,
+    name            text        NOT NULL,
+    topic           text,
 
     CONSTRAINT room_pk PRIMARY KEY (id)
 );
@@ -1496,7 +1496,12 @@ CREATE OR REPLACE VIEW lantern.agg_attachments(
     meta,
     preview
 ) AS
-
+-- query this first with ORDER BY to ensure attachment order
+WITH f AS (
+    SELECT files.id, files.size, files.flags, files.name, files.mime, files.width, files.height, files.preview
+    FROM lantern.files
+    ORDER BY files.id
+)
 SELECT
     message_id as msg_id,
     jsonb_agg(jsonb_build_object(
@@ -1510,7 +1515,7 @@ SELECT
     )) AS meta,
     array_agg(files.preview) AS preview
 FROM
-    lantern.attachments INNER JOIN lantern.files ON files.id = attachments.file_id
+    lantern.attachments INNER JOIN f files ON files.id = attachments.file_id
 GROUP BY
     msg_id
 ;
@@ -1577,10 +1582,7 @@ SELECT
     party_member.nickname,
     party_member.flags,
     party_member.joined_at,
-    agg_roles.roles
-FROM
-    lantern.party_member
-    LEFT JOIN LATERAL (
+    (
         SELECT
             ARRAY_AGG(role_id) as roles
         FROM
@@ -1588,7 +1590,9 @@ FROM
             ON  roles.id = role_members.role_id
             AND roles.party_id = party_member.party_id
             AND role_members.user_id = party_member.user_id
-    ) agg_roles ON TRUE
+    )
+FROM
+    lantern.party_member
 ;
 
 --

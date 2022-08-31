@@ -107,17 +107,17 @@ pub struct CacheEntry {
     last_checked: SystemTime,
 }
 
-#[cfg(debug_assertions)]
-impl Drop for CacheEntry {
-    fn drop(&mut self) {
-        let count = Arc::strong_count(&self.iden)
-            + Arc::strong_count(&self.brotli)
-            + Arc::strong_count(&self.gzip)
-            + Arc::strong_count(&self.deflate);
+// #[cfg(debug_assertions)]
+// impl Drop for CacheEntry {
+//     fn drop(&mut self) {
+//         let count = Arc::strong_count(&self.iden)
+//             + Arc::strong_count(&self.brotli)
+//             + Arc::strong_count(&self.gzip)
+//             + Arc::strong_count(&self.deflate);
 
-        log::debug!("Dropping cached file! References: {count}");
-    }
-}
+//         log::debug!("Dropping cached file! References: {count}");
+//     }
+// }
 
 #[derive(Default)]
 pub struct MainFileCache {
