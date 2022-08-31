@@ -193,9 +193,19 @@ thorn::tables! {
         Alt: Type::TEXT,
     }
 
+    pub struct Emojis in Lantern {
+        Id: Type::INT4,
+        Flags: Type::INT2,
+        Emoji: Type::TEXT,
+        Aliases: Type::TEXT,
+        Tags: Type::TEXT,
+    }
+
     pub struct Reactions in Lantern {
-        EmoteId: Emotes::Id,
         MsgId: Messages::Id,
+        EmoteId: Emotes::Id,
+        EmojiId: Emojis::Id,
+        Reacted: Type::TIMESTAMP,
         UserIds: SNOWFLAKE_ARRAY,
     }
 

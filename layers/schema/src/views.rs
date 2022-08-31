@@ -2,32 +2,9 @@ use super::*;
 
 thorn::tables! {
     pub struct AggMentions in Lantern {
+        MsgId: Messages::Id,
         Kinds: Type::INT4_ARRAY,
         Ids: SNOWFLAKE_ARRAY,
-    }
-
-    pub struct AggMessages in Lantern {
-        MsgId: Messages::Id,
-        UserId: Messages::UserId,
-        RoomId: Messages::RoomId,
-        PartyId: Rooms::PartyId,
-        Kind: Messages::Kind,
-        Nickname: PartyMember::Nickname,
-        Username: Users::Username,
-        Discriminator: Users::Discriminator,
-        UserFlags: Users::Flags,
-        AvatarId: Profiles::AvatarId,
-        ProfileBits: Profiles::Bits,
-        ThreadId: Threads::Id,
-        MentionKinds: AggMentions::Kinds,
-        MentionIds: AggMentions::Ids,
-        EditedAt: Messages::EditedAt,
-        MessageFlags: Messages::Flags,
-        Content: Messages::Content,
-        RoleIds: SNOWFLAKE_ARRAY,
-        PinTags: SNOWFLAKE_ARRAY,
-        AttachmentMeta: AggAttachments::Meta,
-        AttachmentPreview: AggAttachments::Preview,
     }
 
     pub struct AggUsers in Lantern {
@@ -139,6 +116,14 @@ thorn::tables! {
     pub struct AggUserAssociations in Lantern {
         UserId: Users::Id,
         OtherId: Users::Id,
+    }
+
+    pub struct AggReactions in Lantern {
+        MsgId: Messages::Id,
+        EmoteId: Emotes::Id,
+        EmojiId: Emojis::Id,
+        Reacted: Type::TIMESTAMP,
+        UserIds: SNOWFLAKE_ARRAY,
     }
 }
 

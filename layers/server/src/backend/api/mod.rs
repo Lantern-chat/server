@@ -50,6 +50,7 @@ pub mod room {
         pub mod create;
         pub mod delete;
         pub mod edit;
+        pub mod get;
         pub mod get_many;
         pub mod get_one;
     }

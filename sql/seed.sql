@@ -408,6 +408,22 @@ CREATE TABLE lantern.emotes (
     CONSTRAINT emotes_pk PRIMARY KEY (id)
 );
 
+CREATE SEQUENCE lantern.emoji_id;
+
+CREATE TABLE lantern.emojis (
+    id          int         NOT NULL DEFAULT nextval('lantern.emoji_id'),
+
+    -- like whether it supports skin tones
+    flags       smallint    NOT NULL,
+    emoji       text        NOT NULL,
+    aliases     text,
+    tags        text,
+
+    CONSTRAINT emojis_pk PRIMARY KEY (id)
+);
+
+ALTER SEQUENCE lantern.emoji_id OWNED BY lantern.emojis.id;
+
 CREATE TABLE lantern.roles (
     id              bigint      NOT NULL,
     party_id        bigint      NOT NULL,
@@ -505,11 +521,15 @@ CREATE TABLE lantern.user_status (
 );
 
 CREATE TABLE lantern.reactions (
-    emote_id    bigint      NOT NULL,
     msg_id      bigint      NOT NULL,
-    user_ids    bigint[]    NOT NULL,
+    emote_id    bigint,
 
-    CONSTRAINT reactions_pk PRIMARY KEY (emote_id, msg_id)
+    reacted     timestamp   NOT NULL DEFAULT now(),
+
+    -- placed lower due to alignment
+    emoji_id    int,
+
+    user_ids    bigint[]    NOT NULL
 );
 
 CREATE TABLE lantern.mentions (
@@ -786,16 +806,20 @@ ALTER TABLE lantern.overwrites ADD CONSTRAINT user_id_fk FOREIGN KEY (user_id)
     REFERENCES lantern.users (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE lantern.user_status ADD CONSTRAINT user_fk FOREIGN KEY(user_id)
-    REFERENCES lantern.users (id) MATCH FULL
+ALTER TABLE lantern.reactions ADD CONSTRAINT msg_id_fk FOREIGN KEY (msg_id)
+    REFERENCES lantern.messages (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE lantern.reactions ADD CONSTRAINT emote_fk FOREIGN KEY (emote_id)
+ALTER TABLE lantern.reactions ADD CONSTRAINT emote_id_fk FOREIGN KEY (emote_id)
     REFERENCES lantern.emotes (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE lantern.reactions ADD CONSTRAINT msg_fk FOREIGN KEY (msg_id)
-    REFERENCES lantern.messages (id) MATCH FULL
+ALTER TABLE lantern.reactions ADD CONSTRAINT emoji_id_fk FOREIGN KEY (emoji_id)
+    REFERENCES lantern.emojis (id) MATCH FULL
+    ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE lantern.user_status ADD CONSTRAINT user_fk FOREIGN KEY(user_id)
+    REFERENCES lantern.users (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE lantern.mentions ADD CONSTRAINT msg_fk FOREIGN KEY (msg_id)
@@ -919,6 +943,14 @@ CREATE UNIQUE INDEX overwrites_room_role_idx ON lantern.overwrites
     USING btree(room_id, role_id) WHERE role_id IS NOT NULL;
 CREATE UNIQUE INDEX overwrites_room_user_idx ON lantern.overwrites
     USING btree(room_id, user_id) WHERE user_id IS NOT NULL;
+
+CREATE UNIQUE INDEX reactions_emote_idx ON lantern.reactions
+    USING btree(msg_id, emote_id) WHERE emote_id IS NOT NULL;
+CREATE UNIQUE INDEX reactions_emoji_idx ON lantern.reactions
+    USING btree(msg_id, emoji_id) WHERE emoji_id IS NOT NULL;
+
+CREATE UNIQUE INDEX emoji_idx ON lantern.emojis
+    USING btree(emoji);
 
 ----------------------------------------
 -------------- INDICES -----------------
@@ -1325,6 +1357,8 @@ FROM
     RIGHT JOIN lantern.user_assets assets ON (asset_files.asset_id = assets.id)
 ;
 
+---
+
 CREATE OR REPLACE VIEW lantern.agg_original_profile_files(
     user_id,
     party_id,
@@ -1344,6 +1378,8 @@ FROM
     LEFT JOIN lantern.user_assets banner_asset ON banner_asset.id = profiles.banner_id
 ;
 
+---
+
 CREATE OR REPLACE VIEW lantern.agg_mentions AS
 SELECT mentions.msg_id,
        array_agg(CASE WHEN mentions.user_id IS NOT NULL THEN 1
@@ -1353,6 +1389,7 @@ SELECT mentions.msg_id,
        array_agg(COALESCE(mentions.user_id, mentions.role_id, mentions.room_id)) AS ids
 FROM lantern.mentions GROUP BY msg_id;
 
+---
 
 CREATE OR REPLACE VIEW lantern.agg_friends(user_id, friend_id, flags, note) AS
 SELECT user_a_id, user_b_id, flags, note_a FROM lantern.friendlist
@@ -1361,7 +1398,15 @@ SELECT user_b_id, user_a_id, flags, note_b FROM lantern.friendlist;
 
 --
 
-CREATE OR REPLACE VIEW lantern.agg_overwrites(room_id, user_id, role_id, user_allow, user_deny, allow, deny) AS
+CREATE OR REPLACE VIEW lantern.agg_overwrites(
+    room_id,
+    user_id,
+    role_id,
+    user_allow,
+    user_deny,
+    allow,
+    deny
+) AS
 
 -- simple per-user overwrites
 SELECT
@@ -1619,65 +1664,22 @@ SELECT file_id FROM lantern.attachments
 
 --
 
-CREATE OR REPLACE VIEW lantern.agg_messages(
+-- provided solely for the ORDER BY clause
+CREATE OR REPLACE VIEW lantern.agg_reactions(
     msg_id,
-    user_id,
-    room_id,
-    party_id,
-    kind,
-    nickname,
-    username,
-    discriminator,
-    user_flags,
-    avatar_id,
-    profile_bits,
-    thread_id,
-    edited_at,
-    message_flags,
-    mention_kinds,
-    mention_ids,
-    pin_tags,
-    content,
-    role_ids,
-    attachment_meta,
-    attachment_preview
+    emote_id,
+    reacted,
+    emoji_id,
+    user_ids
 ) AS
 SELECT
-    messages.id,
-    messages.user_id,
-    messages.room_id,
-    rooms.party_id,
-    messages.kind,
-    member.nickname,
-    users.username,
-    users.discriminator,
-    users.flags,
-    COALESCE(party_profile.avatar_id, base_profile.avatar_id),
-    lantern.combine_profile_bits(base_profile.bits, party_profile.bits, party_profile.avatar_id),
-    messages.thread_id,
-    messages.edited_at,
-    messages.flags,
-    agg_mentions.kinds,
-    agg_mentions.ids,
-    messages.pin_tags,
-    messages.content,
-    member.role_ids,
-    agg_attachments.meta,
-    agg_attachments.preview
-FROM
-
-lantern.messages
-
-INNER JOIN lantern.agg_users users ON users.id = messages.user_id
-INNER JOIN lantern.rooms ON rooms.id = messages.room_id
-
-LEFT JOIN lantern.profiles base_profile ON (base_profile.user_id = messages.user_id AND base_profile.party_id IS NULL)
-LEFT JOIN lantern.profiles party_profile ON (party_profile.user_id = messages.user_id AND party_profile.party_id = rooms.party_id)
-
-LEFT JOIN lantern.agg_members member ON (member.user_id = messages.user_id AND member.party_id = rooms.party_id)
-LEFT JOIN lantern.agg_attachments ON agg_attachments.msg_id = messages.id
-LEFT JOIN lantern.agg_mentions ON agg_mentions.msg_id = messages.id
-;
+    msg_id,
+    emote_id,
+    reacted,
+    emoji_id,
+    user_ids
+FROM lantern.reactions
+ORDER BY reacted ASC;
 
 --
 

@@ -259,13 +259,7 @@ pub(crate) async fn insert_message(
         .await?;
     }
 
-    let msg = {
-        let row = t
-            .query_one_cached_typed(|| super::get_one::get_one_without_perms(), &[&room_id, &msg_id])
-            .await?;
-
-        super::get_one::parse_msg(&state, &row)?
-    };
+    let msg = super::get::get_one_transactional(state, msg_id, &t).await?;
 
     t.commit().await?;
 
