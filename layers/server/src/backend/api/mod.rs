@@ -51,8 +51,6 @@ pub mod room {
         pub mod delete;
         pub mod edit;
         pub mod get;
-        pub mod get_many;
-        pub mod get_one;
     }
 
     pub mod threads {

@@ -532,7 +532,7 @@ where
                         flags: None,
                     }),
                 },
-                thread_id: row.try_get(MessageColumns::ThreadId as usize)?,
+                thread_id: row.try_get(MessageColumns::thread_id())?,
                 user_mentions,
                 role_mentions,
                 room_mentions,
@@ -582,7 +582,7 @@ where
 
                     attachments
                 },
-                reactions: match row.try_get(ReactionColumns::Reactions as usize)? {
+                reactions: match row.try_get(ReactionColumns::reactions())? {
                     Some(Json(reactions)) => reactions,
                     None => Vec::new(),
                 },

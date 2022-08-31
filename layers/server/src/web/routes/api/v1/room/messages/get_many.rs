@@ -15,8 +15,7 @@ pub async fn get_many(
         Some(form) => form?,
     };
 
-    let msgs =
-        crate::backend::api::room::messages::get_many::get_many(route.state, auth, room_id, form).await?;
+    let msgs = crate::backend::api::room::messages::get::get_many(route.state, auth, room_id, form).await?;
 
     Ok(reply::json::array_stream(msgs).into_response())
 }
