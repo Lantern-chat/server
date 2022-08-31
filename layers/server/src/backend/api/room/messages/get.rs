@@ -583,8 +583,28 @@ where
                     attachments
                 },
                 reactions: match row.try_get(ReactionColumns::reactions())? {
-                    Some(Json(reactions)) => reactions,
-                    None => Vec::new(),
+                    Some(Json::<Vec<RawReaction>>(raw)) if !raw.is_empty() => {
+                        let mut reactions = Vec::with_capacity(raw.len());
+
+                        for r in raw {
+                            reactions.push(Reaction::Shorthand(ReactionShorthand {
+                                own: r.own,
+                                count: r.count,
+                                emote: match (r.emote_id, r.emoji_id) {
+                                    (Some(emote), None) => EmoteOrEmoji::Emote { emote },
+                                    (None, Some(emoji)) => unimplemented!(),
+                                    _ => {
+                                        log::error!("Invalid state for reactions on message {}", msg_id);
+
+                                        continue; // just skip the invalid one
+                                    }
+                                },
+                            }));
+                        }
+
+                        reactions
+                    }
+                    _ => Vec::new(),
                 },
                 embeds: Vec::new(),
                 pins: row
@@ -616,4 +636,13 @@ where
             Ok(msg)
         }
     })
+}
+
+#[derive(Default, Debug, Clone, Copy, Deserialize)]
+#[serde(default)]
+struct RawReaction {
+    pub emoji_id: Option<i32>,
+    pub emote_id: Option<Snowflake>,
+    pub own: bool,
+    pub count: i64,
 }
