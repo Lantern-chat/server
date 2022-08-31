@@ -1,5 +1,6 @@
 use ftl::*;
 
+use futures::FutureExt;
 use schema::Snowflake;
 
 use super::ApiResponse;
@@ -44,11 +45,17 @@ pub async fn party(mut route: Route<crate::ServerState>) -> ApiResponse {
                 // ANY /api/v1/party/1234/rooms
                 (_, Exact("rooms")) => rooms::party_rooms(route, auth, party_id).await,
 
-                // GET /api/v1/party/1234/members
-                (&Method::GET, Exact("members")) => {
-                    match route.next().segment() {
-                        End => members::get::get_members(route, auth, party_id).await,
-                        Exact(segment) => match segment.parse::<Snowflake>() {
+                // ANY /api/v1/party/1234/members
+                (_, Exact("members")) => {
+                    match route.next().method_segment() {
+                        // GET /api/v1/party/1234/members
+                        (&Method::GET, End) => members::get::get_members(route, auth, party_id).await,
+
+                        // PATCH /api/v1/party/1234/members/profile
+                        (&Method::PATCH, Exact("profile")) => members::profile::patch_profile(route, auth, party_id).boxed().await,
+
+                        // GET /api/v1/party/1234/members/5678/profile
+                        (&Method::GET, Exact(segment)) => match segment.parse::<Snowflake>() {
                             Err(_) => Err(Error::BadRequest),
                             Ok(member_id) => match route.next().segment() {
                                 End => Err(Error::Unimplemented),
@@ -56,6 +63,7 @@ pub async fn party(mut route: Route<crate::ServerState>) -> ApiResponse {
                                 _ => Err(Error::NotFound),
                             }
                         }
+                        _ => Err(Error::NotFound),
                     }
                 },
 
