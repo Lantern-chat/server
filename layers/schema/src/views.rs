@@ -118,12 +118,13 @@ thorn::tables! {
         OtherId: Users::Id,
     }
 
+    /// Only difference between this and `Reactions` is that this is sorted by `reacted`
     pub struct AggReactions in Lantern {
-        MsgId: Messages::Id,
-        EmoteId: Emotes::Id,
-        EmojiId: Emojis::Id,
-        Reacted: Type::TIMESTAMP,
-        UserIds: SNOWFLAKE_ARRAY,
+        MsgId: Reactions::MsgId,
+        EmoteId: Reactions::EmoteId,
+        EmojiId: Reactions::EmojiId,
+        Reacted: Reactions::Reacted,
+        UserIds: Reactions::UserIds,
     }
 }
 

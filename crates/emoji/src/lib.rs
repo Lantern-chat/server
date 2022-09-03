@@ -3,6 +3,7 @@ use regex::{Match, Regex, RegexBuilder};
 
 include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
 
+/// Takes any valid form (and some invalid) of an emoji and returns the fully-qualified form
 pub fn find(e: &str) -> Option<&'static str> {
     match FORMS_TO_INDEX.get(e) {
         Some(&idx) => {
@@ -16,6 +17,7 @@ pub fn find(e: &str) -> Option<&'static str> {
     }
 }
 
+/// Iterates through all fully-qualified emojis
 pub fn iter() -> impl Iterator<Item = &'static str> {
     EMOJI_INDICES
         .windows(2)
@@ -24,7 +26,7 @@ pub fn iter() -> impl Iterator<Item = &'static str> {
 
 /// NOTE: This will match `^[*#0-9]$` as well, so double-check results
 ///
-/// https://www.unicode.org/reports/tr51/tr51-22.html#EBNF_and_Regex
+/// <https://www.unicode.org/reports/tr51/tr51-22.html#EBNF_and_Regex>
 pub static EMOJI_RE: Lazy<Regex> = Lazy::new(|| {
     RegexBuilder::new(
         r#"

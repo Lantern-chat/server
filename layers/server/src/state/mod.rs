@@ -8,21 +8,28 @@ use std::{
 
 use config::Config;
 use filesystem::store::FileStore;
+use futures::StreamExt;
 use schema::Snowflake;
 use tokio::sync::{Mutex, OwnedMutexGuard, Semaphore};
 use util::cmap::CHashMap;
 
-use crate::backend::{
-    cache::permission_cache::PermissionCache, cache::session_cache::SessionCache, db::DatabasePools,
-    gateway::Gateway, queues::Queues, services::Services,
+use crate::{
+    backend::{
+        cache::permission_cache::PermissionCache, cache::session_cache::SessionCache, db::DatabasePools,
+        gateway::Gateway, queues::Queues, services::Services,
+    },
+    Error,
 };
 
 use crate::web::{file_cache::MainFileCache, rate_limit::RateLimitTable};
 
+pub mod emoji;
+pub mod id_lock;
+
 pub struct InnerServerState {
     pub db: DatabasePools,
     pub config: Config,
-    pub id_lock: IdLockMap,
+    pub id_lock: id_lock::IdLockMap,
     /// Each permit represents 1 Kibibyte
     pub mem_semaphore: Semaphore,
     pub cpu_semaphore: Semaphore,
@@ -34,6 +41,7 @@ pub struct InnerServerState {
     pub gateway: Gateway,
     pub rate_limit: RateLimitTable,
     pub file_cache: MainFileCache,
+    pub emoji: self::emoji::EmojiMap,
 }
 
 #[derive(Clone)]
@@ -51,7 +59,7 @@ impl ServerState {
     pub fn new(config: Config, db: DatabasePools) -> Self {
         ServerState(Arc::new(InnerServerState {
             db,
-            id_lock: IdLockMap::default(),
+            id_lock: Default::default(),
             mem_semaphore: Semaphore::new(config.general.memory_limit as usize),
             cpu_semaphore: Semaphore::new(config.general.cpu_limit as usize),
             fs_semaphore: Semaphore::new(1024),
@@ -62,6 +70,7 @@ impl ServerState {
             gateway: Gateway::default(),
             rate_limit: RateLimitTable::new(),
             file_cache: MainFileCache::default(),
+            emoji: Default::default(),
             config,
         }))
     }
@@ -73,19 +82,53 @@ impl ServerState {
     }
 }
 
-/// Simple concurrent map structure containing locks for any particular snowflake ID
-#[derive(Default, Debug)]
-pub struct IdLockMap {
-    pub map: CHashMap<Snowflake, Arc<Mutex<()>>>,
-}
+impl ServerState {
+    pub async fn refresh_emojis(&self) -> Result<(), Error> {
+        let db = self.db.read.get().await?;
 
-impl IdLockMap {
-    pub async fn lock(&self, id: Snowflake) -> OwnedMutexGuard<()> {
-        let lock = self.map.get_or_default(&id).await.clone();
-        Mutex::lock_owned(lock).await
-    }
+        mod q {
+            pub use schema::*;
+            pub use thorn::*;
 
-    pub async fn cleanup(&self) {
-        self.map.retain(|_, lock| Arc::strong_count(lock) > 1).await
+            thorn::indexed_columns! {
+                pub enum EmojisColumns {
+                    Emojis::Id,
+                    Emojis::Emoji,
+                }
+            }
+        }
+
+        let stream = db
+            .query_stream_cached_typed(
+                || {
+                    use q::*;
+                    Query::select()
+                        .cols(EmojisColumns::default())
+                        .from_table::<Emojis>()
+                },
+                &[],
+            )
+            .await?;
+
+        futures::pin_mut!(stream);
+
+        use self::emoji::EmojiEntry;
+        use q::EmojisColumns;
+
+        let mut emojis = Vec::new();
+
+        while let Some(row) = stream.next().await {
+            let row = row?;
+
+            emojis.push(EmojiEntry {
+                id: row.try_get(EmojisColumns::id())?,
+                emoji: row.try_get(EmojisColumns::emoji())?,
+                ..EmojiEntry::default()
+            });
+        }
+
+        self.emoji.refresh(emojis);
+
+        Ok(())
     }
 }

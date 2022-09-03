@@ -592,7 +592,14 @@ where
                                 count: r.count,
                                 emote: match (r.emote_id, r.emoji_id) {
                                     (Some(emote), None) => EmoteOrEmoji::Emote { emote },
-                                    (None, Some(emoji)) => unimplemented!(),
+                                    (None, Some(id)) => match state.emoji.id_to_emoji(id) {
+                                        Some(emoji) => EmoteOrEmoji::Emoji { emoji },
+                                        None => {
+                                            log::warn!("Emoji not found for id {id} -- skipping");
+
+                                            continue;
+                                        }
+                                    },
                                     _ => {
                                         log::error!("Invalid state for reactions on message {}", msg_id);
 
@@ -638,11 +645,11 @@ where
     })
 }
 
-#[derive(Default, Debug, Clone, Copy, Deserialize)]
+#[derive(Default, Debug, Clone, Deserialize)]
 #[serde(default)]
 struct RawReaction {
-    pub emoji_id: Option<i32>,
     pub emote_id: Option<Snowflake>,
+    pub emoji_id: Option<i32>,
     pub own: bool,
     pub count: i64,
 }

@@ -107,6 +107,9 @@ async fn main() -> anyhow::Result<()> {
 
     let state = server::ServerState::new(config, db);
 
+    log::info!("Running startup tasks...");
+    server::tasks::startup::run_startup_tasks(&state).await;
+
     log::info!("Starting tasks...");
     let runner = TaskRunner::new();
     server::tasks::add_tasks(&state, &runner);

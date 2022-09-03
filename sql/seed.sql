@@ -414,10 +414,11 @@ CREATE TABLE lantern.emojis (
     id          int         NOT NULL DEFAULT nextval('lantern.emoji_id'),
 
     -- like whether it supports skin tones
-    flags       smallint    NOT NULL,
+    flags       smallint    NOT NULL    DEFAULT 0,
     emoji       text        NOT NULL,
-    aliases     text,
-    tags        text,
+    description text                    DEFAULT NULL,
+    aliases     text                    DEFAULT NULL,
+    tags        text                    DEFAULT NULL,
 
     CONSTRAINT emojis_pk PRIMARY KEY (id)
 );
@@ -526,8 +527,8 @@ CREATE TABLE lantern.reactions (
 
     reacted     timestamp   NOT NULL DEFAULT now(),
 
-    -- placed lower due to alignment
-    emoji_id    int,
+    -- placed here due to alignment of int4
+    emoji_id    integer,
 
     user_ids    bigint[]    NOT NULL
 );
@@ -1901,31 +1902,36 @@ $$;
 
 --
 
-CREATE OR REPLACE PROCEDURE lantern.add_reaction(
-    _emote_id bigint,
-    _msg_id bigint,
-    _user_id bigint
-)
-LANGUAGE sql AS
-$$
-    INSERT INTO lantern.reactions AS r(emote_id, msg_id, user_ids)
-    VALUES (_emote_id, _msg_id, ARRAY[_user_id])
-    ON CONFLICT ON CONSTRAINT reactions_pk
-        DO UPDATE SET user_ids = array_append(r.user_ids, _user_id);
-$$;
+-- CREATE OR REPLACE PROCEDURE lantern.add_reaction(
+--     _emote_id bigint,
+--     _emoji_id int,
+--     _msg_id bigint,
+--     _user_id bigint
+-- )
+-- LANGUAGE sql AS
+-- $$
+--     INSERT INTO lantern.reactions AS r(msg_id, emote_id, emoji_id, user_ids)
+--     VALUES (_msg_id, _emote_id, _emoji_id, ARRAY[_user_id])
+--     ON CONFLICT DO UPDATE SET user_ids = array_append(r.user_ids, _user_id);
+-- $$;
 
-CREATE OR REPLACE PROCEDURE lantern.remove_reaction(
-    _emote_id bigint,
-    _msg_id bigint,
-    _user_id bigint
-)
-LANGUAGE sql AS
-$$
-    UPDATE lantern.reactions AS r
-        SET user_ids = array_remove(r.user_ids, _user_id)
-    WHERE
-        emote_id = _emote_id AND msg_id = _msg_id;
-$$;
+-- CREATE OR REPLACE PROCEDURE lantern.remove_reaction(
+--     _emote_id bigint,
+--     _emoji_id int,
+--     _msg_id bigint,
+--     _user_id bigint
+-- )
+-- LANGUAGE sql AS
+-- $$
+--     UPDATE lantern.reactions AS r
+--         SET user_ids = array_remove(r.user_ids, _user_id)
+--     WHERE
+--         msg_id = _msg_id
+--     AND (emote_id = _emote_id OR emoji_id = _emoji_id)
+--     --AND (emote_id = _emote_id OR (_emote_id IS NULL AND emote_id IS NULL))
+--     --AND (emoji_id = _emoji_id OR (_emoji_id IS NULL AND emoji_id IS NULL));
+--     ;
+-- $$;
 
 --
 

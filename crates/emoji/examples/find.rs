@@ -10,6 +10,8 @@ fn main() {
 
         print_chars(emoji.chars());
     }
+
+    println!("Total emojis: {}", emoji::iter().count());
 }
 
 fn print_chars(c: std::str::Chars) {
