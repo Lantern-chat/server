@@ -349,7 +349,7 @@ mod q {
                                 .arg(AggReactions::EmoteId)
                                 .arg("emoji_id".lit())
                                 .arg(AggReactions::EmojiId)
-                                .arg("own".lit())
+                                .arg("me".lit())
                                 .arg(Params::user_id().equals(Builtin::any(AggReactions::UserIds)))
                                 .arg("count".lit())
                                 .arg(
@@ -588,7 +588,7 @@ where
 
                         for r in raw {
                             reactions.push(Reaction::Shorthand(ReactionShorthand {
-                                own: r.own,
+                                me: r.me,
                                 count: r.count,
                                 emote: match (r.emote_id, r.emoji_id) {
                                     (Some(emote), None) => EmoteOrEmoji::Emote { emote },
@@ -650,6 +650,6 @@ where
 struct RawReaction {
     pub emote_id: Option<Snowflake>,
     pub emoji_id: Option<i32>,
-    pub own: bool,
+    pub me: bool,
     pub count: i64,
 }
