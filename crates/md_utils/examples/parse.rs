@@ -42,18 +42,18 @@ fn main() {
     println!("--------\n{}\n--------", INPUT);
 
     for span in &parsed {
-        let sub = std::str::from_utf8(&INPUT.as_bytes()[span.start..span.end]).unwrap();
+        let sub = std::str::from_utf8(&INPUT.as_bytes()[span.range()]).unwrap();
 
         let kind = format!(
             "{:?}{}",
-            span.kind,
-            if span.kind != SpanType::Spoiler && md_utils::is_spoilered(&parsed, span.start) {
+            span.kind(),
+            if span.kind() != SpanType::Spoiler && md_utils::is_spoilered(&parsed, span.start()) {
                 " *"
             } else {
                 ""
             }
         );
 
-        println!("{:15} {:5}..{:<5} -> {:?}", kind, span.start, span.end, sub);
+        println!("{:15} {:5}..{:<5} -> {:?}", kind, span.start(), span.end(), sub);
     }
 }

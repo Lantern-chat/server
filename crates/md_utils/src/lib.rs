@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,16 +19,38 @@ pub enum SpanType {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Span {
-    pub start: usize,
-    pub end: usize,
-    pub kind: SpanType,
+    start: usize,
+    len: u16,
+    kind: SpanType,
 }
 
-pub type SpanList = SmallVec<[Span; 16]>;
+impl Span {
+    pub const fn start(&self) -> usize {
+        self.start
+    }
+
+    pub const fn end(&self) -> usize {
+        self.start() + self.len()
+    }
+
+    pub const fn len(&self) -> usize {
+        self.len as usize
+    }
+
+    pub const fn range(&self) -> Range<usize> {
+        self.start..self.end()
+    }
+
+    pub const fn kind(&self) -> SpanType {
+        self.kind
+    }
+}
+
+pub type SpanList = SmallVec<[Span; 32]>;
 
 pub fn is_spoilered(spans: &[Span], idx: usize) -> bool {
     for span in spans {
-        if span.kind == SpanType::Spoiler && span.start <= idx && idx < span.end {
+        if span.kind == SpanType::Spoiler && span.range().contains(&idx) {
             return true;
         }
     }
@@ -78,12 +102,10 @@ fn scan_markdown_recursive<const S: bool>(input: &str, offset: usize, spans: &mu
     macro_rules! new_span {
         ($prefix_len: expr, $start:expr, $len:expr, $kind:expr) => {{
             let start = $start + offset + $prefix_len;
-            let end = start + $len;
 
-            //println!("Span {}..{} of {:?}", start, end, $kind);
             spans.push(Span {
                 start,
-                end,
+                len: $len as u16,
                 kind: $kind,
             });
         }};
@@ -98,7 +120,9 @@ fn scan_markdown_recursive<const S: bool>(input: &str, offset: usize, spans: &mu
             continue;
         }
 
-        let slice = &bytes[i..];
+        // SAFETY: This is a known valid index (given by `.char_indices()`)
+        // inside `input` and therefore into `bytes`
+        let slice = unsafe { bytes.get_unchecked(i..) };
 
         let skip = match slice {
             // start of code block, and not two zero-length inline codes
@@ -212,8 +236,12 @@ fn scan_substr_inner(
         }
     };
 
+    // SAFETY: This *should* be safe, given that the slice given in
+    // calling functions is constructed from char_indices or ASCII slice matching
     #[cfg(not(debug_assertions))]
     let input = unsafe { std::str::from_utf8_unchecked(input) };
+
+    let has_until = until.is_some();
 
     let bytes = input.as_bytes();
     let mut escaped = false;
@@ -227,21 +255,24 @@ fn scan_substr_inner(
         }
 
         if let Some(until) = until {
-            if bytes[i..].starts_with(until.as_bytes()) {
+            // SAFETY: This is a known valid index (given by `.char_indices()`)
+            // inside `input` and therefore into `bytes`
+            let slice = unsafe { bytes.get_unchecked(i..) };
+            if slice.starts_with(until.as_bytes()) {
                 return on_found(i);
             }
         }
 
         if !valid(&c) {
-            if until.is_some() {
-                break;
-            } else {
-                return on_found(i);
+            if !has_until {
+                on_found(i);
             }
+
+            return;
         }
     }
 
-    if until.is_none() {
+    if !has_until {
         on_found(input.len());
     }
 }
