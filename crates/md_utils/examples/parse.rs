@@ -10,7 +10,7 @@ fn test() {
 }
 ```
 <http://escaped.com>
-https://test.com
+shttps://test.com
 
 <http://whatever.com>
 

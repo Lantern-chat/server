@@ -110,11 +110,17 @@ fn scan_markdown_recursive<const S: bool>(input: &str, offset: usize, spans: &mu
             });
         }};
     }
+
+    let mut last_char = 0 as char;
+
     while let Some((i, c)) = chars.next() {
         if escaped || c == '\\' {
             escaped ^= true;
             continue;
         }
+
+        let lc = last_char;
+        last_char = c;
 
         if !c.is_ascii() {
             continue;
@@ -165,11 +171,15 @@ fn scan_markdown_recursive<const S: bool>(input: &str, offset: usize, spans: &mu
                     scan_substr(1 + 4 + 3, &rest[3..], Some(">"), valid_url, |_, _| {})
                 }
                 _ => 0,
+                // TODO: Investigate this again?
+                // skip anything within <...> if it doesn't have whitespace
+                //_ => scan_substr(1, rest, Some(">"), |c| !c.is_whitespace(), |_, _| {}),
             },
 
             // link
             [b'h', b't', b't', b'p', rest @ ..]
-                if matches!(rest, [b's', b':', b'/', b'/', ..] | [b':', b'/', b'/', ..]) =>
+                if !lc.is_alphanumeric() // enforce word-bounary rules
+                    && matches!(rest, [b's', b':', b'/', b'/', ..] | [b':', b'/', b'/', ..]) =>
             {
                 scan_substr(4 + 3, &rest[3..], None, valid_url, |len, _| {
                     new_span!(0, i, len + 4 + 3, SpanType::Url)
@@ -242,6 +252,7 @@ fn scan_substr_inner(
     let input = unsafe { std::str::from_utf8_unchecked(input) };
 
     let has_until = until.is_some();
+    let until_bytes = until.map(|u| u.as_bytes());
 
     let bytes = input.as_bytes();
     let mut escaped = false;
@@ -254,11 +265,11 @@ fn scan_substr_inner(
             continue;
         }
 
-        if let Some(until) = until {
+        if let Some(until) = until_bytes {
             // SAFETY: This is a known valid index (given by `.char_indices()`)
             // inside `input` and therefore into `bytes`
             let slice = unsafe { bytes.get_unchecked(i..) };
-            if slice.starts_with(until.as_bytes()) {
+            if slice.starts_with(until) {
                 return on_found(i);
             }
         }
