@@ -123,32 +123,32 @@ fn scan_markdown_recursive<const S: bool>(input: &str, offset: usize, spans: &mu
             ),
 
             // mention
-            [b'<', n, rest @ ..] => {
-                if b":@#".contains(n) {
+            [b'<', rest @ ..] => match rest {
+                [n @ (b':' | b'@' | b'#'), rest @ ..] => {
                     scan_substr(2, rest, Some(">"), char::is_ascii_digit, |len, _| {
-                        new_span!(
-                            2,
-                            i,
-                            len,
-                            match n {
-                                b':' => SpanType::CustomEmote,
-                                b'@' => SpanType::UserMention,
-                                b'#' => SpanType::RoomMention,
-                                _ => unreachable!(),
-                            }
-                        )
+                        let kind = match n {
+                            b':' => SpanType::CustomEmote,
+                            b'@' => SpanType::UserMention,
+                            b'#' => SpanType::RoomMention,
+                            _ => unsafe { std::hint::unreachable_unchecked() },
+                        };
+                        new_span!(2, i, len, kind);
                     })
-                } else if *n == b'h' && rest.starts_with(b"ttp") {
-                    scan_substr(1, &slice[1..], Some(">"), valid_url, |_, _| {})
-                } else {
-                    0
                 }
-            }
+                [b'h', b't', b't', b'p', rest @ ..]
+                    if matches!(rest, [b's', b':', b'/', b'/', ..] | [b':', b'/', b'/', ..]) =>
+                {
+                    scan_substr(1 + 4 + 3, &rest[3..], Some(">"), valid_url, |_, _| {})
+                }
+                _ => 0,
+            },
 
             // link
-            [b'h', b't', b't', b'p', s, ..] if b"s:".contains(s) => {
-                scan_substr(0, slice, None, valid_url, |len, _| {
-                    new_span!(0, i, len, SpanType::Url)
+            [b'h', b't', b't', b'p', rest @ ..]
+                if matches!(rest, [b's', b':', b'/', b'/', ..] | [b':', b'/', b'/', ..]) =>
+            {
+                scan_substr(4 + 3, &rest[3..], None, valid_url, |len, _| {
+                    new_span!(0, i, len + 4 + 3, SpanType::Url)
                 })
             }
 
