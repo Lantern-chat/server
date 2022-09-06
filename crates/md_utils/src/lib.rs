@@ -1,6 +1,5 @@
 use smallvec::SmallVec;
 
-/// By definition, these are all non-overlapping spans
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum SpanType {
