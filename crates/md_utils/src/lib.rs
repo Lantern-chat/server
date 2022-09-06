@@ -178,7 +178,7 @@ fn scan_markdown_recursive<const S: bool>(input: &str, offset: usize, spans: &mu
 
             // link
             [b'h', b't', b't', b'p', rest @ ..]
-                if !lc.is_alphanumeric() // enforce word-bounary rules
+                if !lc.is_alphanumeric() // enforce word-boundary rules
                     && matches!(rest, [b's', b':', b'/', b'/', ..] | [b':', b'/', b'/', ..]) =>
             {
                 scan_substr(4 + 3, &rest[3..], None, valid_url, |len, _| {
