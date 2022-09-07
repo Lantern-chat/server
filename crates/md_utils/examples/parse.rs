@@ -34,6 +34,10 @@ https://google.com
 ||`spoilered_code`||||second-spoiler||
 
 <@12345><@12345>
+
+<:test:1234>
+<:test:1234455:>
+<:tewsdtsdgsdg>
 "#;
 
 fn main() {

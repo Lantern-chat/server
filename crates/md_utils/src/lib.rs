@@ -154,7 +154,7 @@ fn scan_markdown_recursive<const S: bool>(input: &str, offset: usize, spans: &mu
 
             // mention
             [b'<', rest @ ..] => match rest {
-                [n @ (b':' | b'@' | b'#'), rest @ ..] => {
+                [n @ (b'@' | b'#'), rest @ ..] => {
                     scan_substr(2, rest, Some(">"), char::is_ascii_digit, |len, _| {
                         let kind = match n {
                             b':' => SpanType::CustomEmote,
@@ -164,6 +164,36 @@ fn scan_markdown_recursive<const S: bool>(input: &str, offset: usize, spans: &mu
                         };
                         new_span!(2, i, len, kind);
                     })
+                }
+                [b':', rest @ ..] => {
+                    use std::cell::Cell;
+
+                    let hit_sep = Cell::new(false);
+                    let has_id = Cell::new(false);
+
+                    let valid = |c: &char| -> bool {
+                        match c {
+                            'a'..='z' | 'A'..='Z' if !hit_sep.get() => true,
+                            ':' => !hit_sep.replace(true), // if we hit : already, then this is invalid
+                            '0'..='9' => {
+                                has_id.set(hit_sep.get());
+
+                                true
+                            }
+                            _ => false,
+                        }
+                    };
+
+                    let skip = scan_substr(2, rest, Some(">"), valid, |len, _| {
+                        if hit_sep.get() && has_id.get() {
+                            new_span!(2, i, len, SpanType::CustomEmote);
+                        }
+                    });
+
+                    match hit_sep.get() && has_id.get() {
+                        true => skip,
+                        false => 0,
+                    }
                 }
                 [b'h', b't', b't', b'p', rest @ ..]
                     if matches!(rest, [b's', b':', b'/', b'/', ..] | [b':', b'/', b'/', ..]) =>
