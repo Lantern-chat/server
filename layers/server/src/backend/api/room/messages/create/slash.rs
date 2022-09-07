@@ -43,7 +43,7 @@ enum Align {
     Right,
 }
 
-pub fn process_slash(content: &str, active: bool) -> Result<Option<Cow<str>>, Error> {
+pub fn process_slash(content: &str, _active: bool) -> Result<Option<Cow<str>>, Error> {
     let unchanged = Ok(Some(Cow::Borrowed(content)));
 
     if !content.starts_with('/') {

@@ -1,9 +1,7 @@
 use sdk::models::Snowflake;
 
-pub fn process_embeds(msg_id: Snowflake, msg: &str) {
-    let urls = embed_parser::msg::find_urls(msg);
+use crate::ServerState;
 
-    if urls.is_empty() {
-        return; // TODO
-    }
-}
+use md_utils::{Span, SpanList, SpanType};
+
+pub fn process_embeds(state: ServerState, msg_id: Snowflake, spans: &[Span]) {}

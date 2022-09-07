@@ -8,6 +8,7 @@ use sdk::models::*;
 pub mod embed;
 pub mod slash;
 pub mod trim;
+pub mod verify;
 
 use sdk::api::commands::room::CreateMessageBody;
 
@@ -61,8 +62,6 @@ pub async fn create_message(
         }
     };
 
-    let msg_id = Snowflake::now();
-
     // check this before acquiring database connection
     if !body.attachments.is_empty() && !perm.contains(RoomPermissions::ATTACH_FILES) {
         return Err(Error::Unauthorized);
@@ -78,18 +77,29 @@ pub async fn create_message(
         Err(e) => return Err(e),
     };
 
+    let spans = md_utils::scan_markdown(&modified_content);
+
+    let msg_id = Snowflake::now();
+
     // message is good to go, so fire off the embed processing
     if !modified_content.is_empty() && perm.contains(RoomPermissions::EMBED_LINKS) {
-        embed::process_embeds(msg_id, &modified_content);
+        embed::process_embeds(state.clone(), msg_id, &spans);
     }
 
     // if we avoided getting a database connection until now, do it now
-    let db = match maybe_db {
+    let mut db = match maybe_db {
         Some(db) => db,
         None => state.db.write.get().await?,
     };
 
-    let res = insert_message(db, state, auth, room_id, msg_id, &body, &modified_content)
+    // TODO: Determine if repeatable-read is needed?
+    let t = db.transaction().await?;
+
+    // NOTE: This can potentially modify the content, hence why it takes ownership. Do not assume
+    // spans are valid after this call
+    let modified_content = verify::verify(&t, &state, auth, room_id, perm, modified_content, &spans).await?;
+
+    let res = insert_message(t, state, auth, room_id, msg_id, &body, &modified_content)
         .boxed()
         .await;
 
@@ -97,7 +107,7 @@ pub async fn create_message(
 }
 
 pub(crate) async fn insert_message(
-    mut db: db::pool::Object,
+    t: db::pool::Transaction<'_>,
     state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
@@ -105,9 +115,6 @@ pub(crate) async fn insert_message(
     body: &CreateMessageBody,
     content: &str,
 ) -> Result<Message, Error> {
-    // TODO: Determine if repeatable-read is needed?
-    let t = db.transaction().await?;
-
     // allow it to be null
     let content = if content.is_empty() { None } else { Some(content) };
 
@@ -231,11 +238,8 @@ pub(crate) async fn insert_message(
                 Query::with()
                     .with(
                         AggIds::as_query(
-                            Query::select().expr(
-                                Call::custom("UNNEST")
-                                    .arg(Params::attachments())
-                                    .alias_to(AggIds::Id),
-                            ),
+                            Query::select()
+                                .expr(Builtin::unnest((Params::attachments(),)).alias_to(AggIds::Id)),
                         )
                         .exclude(),
                     )
