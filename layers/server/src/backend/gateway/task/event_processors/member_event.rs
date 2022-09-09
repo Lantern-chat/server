@@ -101,7 +101,7 @@ pub async fn member_event(
                         use schema::*;
                         use thorn::*;
 
-                        select_members().and_where(AggMembers::UserId.equals(Var::of(Users::Id)))
+                        select_members().and_where(AggMembersFull::UserId.equals(Var::of(Users::Id)))
                     },
                     &[&party_id, &user_id],
                 )

@@ -157,7 +157,6 @@ fn scan_markdown_recursive<const S: bool>(input: &str, offset: usize, spans: &mu
                 [n @ (b'@' | b'#'), rest @ ..] => {
                     scan_substr(2, rest, Some(">"), char::is_ascii_digit, |len, _| {
                         let kind = match n {
-                            b':' => SpanType::CustomEmote,
                             b'@' => SpanType::UserMention,
                             b'#' => SpanType::RoomMention,
                             _ => unsafe { std::hint::unreachable_unchecked() },
