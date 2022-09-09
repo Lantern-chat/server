@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use arc_swap::ArcSwap;
+use sdk::{models::EmoteOrEmoji, Snowflake};
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use std::collections::HashMap;
@@ -24,13 +25,41 @@ struct EmojiMapInner {
 #[derive(Debug, Default)]
 pub struct EmojiMap(ArcSwap<EmojiMapInner>);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EmoteOrEmojiId {
+    Emote(Snowflake),
+    Emoji(i32),
+}
+
+impl EmoteOrEmojiId {
+    pub const fn emote(self) -> Option<Snowflake> {
+        match self {
+            EmoteOrEmojiId::Emote(id) => Some(id),
+            _ => None,
+        }
+    }
+
+    pub const fn emoji(self) -> Option<i32> {
+        match self {
+            EmoteOrEmojiId::Emoji(id) => Some(id),
+            _ => None,
+        }
+    }
+}
+
 impl EmojiMap {
     pub fn refresh(&self, entries: impl IntoIterator<Item = EmojiEntry>) {
         self.0.store(Arc::new(EmojiMapInner::new(entries)));
     }
 
+    /// Maps a fully-qualified emoji to its database ID
     pub fn emoji_to_id(&self, emoji: &str) -> Option<i32> {
         self.0.load().emoji_to_id.get(emoji).copied()
+    }
+
+    /// Maps any possible emoji as its fully-qualified to database ID
+    pub fn any_emoji_to_id(&self, emoji: &str) -> Option<i32> {
+        emoji::find(emoji).and_then(|e| self.emoji_to_id(e))
     }
 
     pub fn id_to_emoji(&self, id: i32) -> Option<SmolStr> {
@@ -42,6 +71,13 @@ impl EmojiMap {
         F: FnOnce(&EmojiEntry) -> U,
     {
         self.0.load().id_to_entry.get(&id).map(f)
+    }
+
+    pub fn resolve(&self, e: EmoteOrEmoji) -> Option<EmoteOrEmojiId> {
+        match e {
+            EmoteOrEmoji::Emote { emote } => Some(EmoteOrEmojiId::Emote(emote)),
+            EmoteOrEmoji::Emoji { emoji } => self.any_emoji_to_id(&emoji).map(EmoteOrEmojiId::Emoji),
+        }
     }
 }
 

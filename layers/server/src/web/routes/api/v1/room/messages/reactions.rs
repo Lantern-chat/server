@@ -1,13 +1,14 @@
 use ftl::*;
 
+use futures::FutureExt;
 use schema::Snowflake;
 use sdk::models::EmoteOrEmoji;
 
 use super::ApiResponse;
-use crate::{Authorization, Error};
+use crate::{state::emoji::EmoteOrEmojiId, Authorization, Error, ServerState};
 
 pub async fn reactions(
-    mut route: Route<crate::ServerState>,
+    mut route: Route<ServerState>,
     auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,
@@ -15,18 +16,17 @@ pub async fn reactions(
     match route.next().method_segment() {
         (&Method::DELETE, End) => todo!("Delete all reactions"),
         (_, Exact(_)) => match route.param::<EmoteOrEmoji>() {
-            Some(Ok(e)) => {
-                match e {
-                    // if emoji is not in emoji state, then reject it
-                    EmoteOrEmoji::Emoji { emoji } if route.state.emoji.emoji_to_id(&emoji).is_none() => {
-                        return Err(Error::BadRequest);
-                    }
-                    _ => {}
-                }
+            Some(Ok(emote)) => {
+                let emote = match route.state.emoji.resolve(emote) {
+                    Some(emote) => emote,
+                    None => return Err(Error::BadRequest),
+                };
 
                 match route.next().method_segment() {
                     (&Method::GET, End) => todo!("Get reactions"),
-                    (&Method::PUT, Exact("@me")) => todo!("Put new reaction"),
+                    (&Method::PUT, Exact("@me")) => {
+                        put_reaction(route, auth, room_id, msg_id, emote).boxed().await
+                    }
                     (&Method::DELETE, Exact("@me")) => todo!("Delete own reaction"),
                     (&Method::DELETE, Exact(_)) => match route.param::<Snowflake>() {
                         Some(Ok(user_id)) => todo!("Delete user reaction"),
@@ -39,4 +39,23 @@ pub async fn reactions(
         },
         (_, End) => Err(Error::MethodNotAllowed),
     }
+}
+
+async fn put_reaction(
+    route: Route<ServerState>,
+    auth: Authorization,
+    room_id: Snowflake,
+    msg_id: Snowflake,
+    emote: EmoteOrEmojiId,
+) -> ApiResponse {
+    crate::backend::api::room::messages::reaction::add::add_reaction(
+        route.state,
+        auth,
+        room_id,
+        msg_id,
+        emote,
+    )
+    .await?;
+
+    Ok(StatusCode::NO_CONTENT.into_response())
 }

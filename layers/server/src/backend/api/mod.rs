@@ -51,6 +51,11 @@ pub mod room {
         pub mod delete;
         pub mod edit;
         pub mod get;
+
+        pub mod reaction {
+            pub mod add;
+            pub mod remove;
+        }
     }
 
     pub mod threads {
