@@ -43,7 +43,9 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
 
         (&Method::GET | &Method::HEAD, Exact("cdn")) => cdn::cdn(route).boxed().await.into_response(),
 
-        _ if BAD_PATTERNS.is_match(route.path()) => StatusCode::IM_A_TEAPOT.into_response(),
+        _ if BAD_PATTERNS.is_match(route.path()) || route.path().ends_with(".php") => {
+            StatusCode::IM_A_TEAPOT.into_response()
+        }
 
         (&Method::GET | &Method::HEAD, Exact("static")) => {
             fs::dir(&route, paths.web_path.join("dist"), &route.state.file_cache)
@@ -100,8 +102,8 @@ use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 
 lazy_static::lazy_static! {
     static ref BAD_PATTERNS: AhoCorasick = AhoCorasickBuilder::new().dfa(true).build(&[
-        "wp-includes", "wp-admin", "wp-login", "wp-content", "wordpress", "php",
-        "wlwmanifest", ".git", "drupal", "ajax", "claro", "wp-json", "tinymce", "kcfinder",
+        "wp-includes", "wp-admin", "wp-login", "wp-content", "wordpress",
+        "wlwmanifest", ".git", ".env", "drupal", "ajax", "claro", "wp-json", "tinymce", "kcfinder",
         "filemanager", "alfa", "eval"
     ]);
 }
