@@ -1,6 +1,6 @@
 #![allow(deprecated)]
 
-use criterion::{criterion_group, criterion_main, Criterion, ParameterizedBenchmark};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 static INPUT: &str = r#"
 ```rust
@@ -37,14 +37,11 @@ https://google.com
 "#;
 
 fn criterion_benchmark(c: &mut Criterion) {
-    c.bench(
-        "find_urls",
-        ParameterizedBenchmark::new(
-            "newest",
-            |b, x| b.iter(|| md_utils::scan_markdown(x)),
-            vec![INPUT],
-        ),
-    );
+    let mut g = c.benchmark_group("find_urls");
+
+    g.bench_with_input("newest", INPUT, |b, x| b.iter(|| md_utils::scan_markdown(x)));
+
+    g.finish();
 }
 
 criterion_group!(benches, criterion_benchmark);

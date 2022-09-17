@@ -1,6 +1,6 @@
 #![allow(deprecated)]
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, ParameterizedBenchmark};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 static INPUT: &str = r#"
 ```rust
@@ -28,23 +28,19 @@ static LINK_HEADER: &str = r#"<https://lantern.chat/api/v1/oembed?format=xml&url
 use embed_parser::{html, msg, oembed};
 
 fn criterion_benchmark(c: &mut Criterion) {
-    c.bench(
-        "find_urls",
-        ParameterizedBenchmark::new(
-            "newest",
-            |b, x| {
-                b.iter(|| msg::find_urls(x));
-            },
-            vec![INPUT],
-        )
-        .with_function("aho_corasick", |b, x| {
-            b.iter(|| msg::find_urls_aho_corasick(x));
-        })
-        .with_function("multiple_memchr", |b, x| {
-            b.iter(|| msg::find_urls_multiple_memchr(x));
-        })
-        .with_function("regex_only", |b, x| b.iter(|| msg::find_urls_regex_only(x))),
-    );
+    let mut g = c.benchmark_group("find_urls");
+    g.bench_with_input("newest", INPUT, |b, x| b.iter(|| msg::find_urls(x)));
+
+    g.bench_with_input("aho_corasick", INPUT, |b, x| {
+        b.iter(|| msg::find_urls_aho_corasick(x))
+    });
+    g.bench_with_input("multiple_memchr", INPUT, |b, x| {
+        b.iter(|| msg::find_urls_multiple_memchr(x))
+    });
+    g.bench_with_input("regex_only", INPUT, |b, x| {
+        b.iter(|| msg::find_urls_regex_only(x))
+    });
+    g.finish();
 
     //c.bench_function("html_meta", |b| {
     //    let input = black_box(HTML_FIXTURE);

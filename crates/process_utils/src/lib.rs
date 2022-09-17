@@ -72,27 +72,20 @@ pub fn get_sysinfo() -> Option<SysInfo> {
 
 #[cfg(windows)]
 pub fn get_sysinfo() -> Option<SysInfo> {
-    use std::mem::MaybeUninit;
-
     use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
 
-    unsafe {
-        let mut mse: MaybeUninit<MEMORYSTATUSEX> = MaybeUninit::zeroed();
+    let mut mse = MEMORYSTATUSEX::default();
 
-        {
-            // must write dwLength before call
-            let length: *const u32 = memoffset::raw_field!(mse.as_mut_ptr(), MEMORYSTATUSEX, dwLength);
-            (length as *mut u32).write(std::mem::size_of::<MEMORYSTATUSEX>() as u32);
-        }
+    // must write dwLength before call
+    // https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/ns-sysinfoapi-memorystatusex
+    mse.dwLength = std::mem::size_of::<MEMORYSTATUSEX>() as u32;
 
-        if GlobalMemoryStatusEx(mse.as_mut_ptr()).as_bool() {
-            let mse = mse.assume_init();
-            Some(SysInfo {
-                total_memory: mse.ullTotalPhys,
-            })
-        } else {
-            None
-        }
+    if unsafe { GlobalMemoryStatusEx(&mut mse).as_bool() } {
+        Some(SysInfo {
+            total_memory: mse.ullTotalPhys,
+        })
+    } else {
+        None
     }
 }
 

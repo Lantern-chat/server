@@ -32,7 +32,7 @@ time = { version = "0.3", features = ["macros"] }
 # specialized-div-rem = { version = "1.0.1", default_features = false, features = ["implement", "std"] }
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = "0.4"
 
 [[bench]]
 name = "utils"

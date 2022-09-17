@@ -1,6 +1,6 @@
 #![allow(deprecated)]
 
-use criterion::{criterion_group, criterion_main, Criterion, ParameterizedBenchmark};
+use criterion::{criterion_group, criterion_main, Criterion};
 
 static INPUT: &str = r#"
 Both 👬 dense 😍 and sparse DFAs can 🦎 be 😉 serialized to raw ☠️😅 bytes, and then 🤔 cheaply deserialized.
@@ -60,15 +60,9 @@ fn criterion_benchmark(c: &mut Criterion) {
         find_emojis_regex(INPUT).count()
     );
 
-    c.bench(
-        "find_emojis",
-        ParameterizedBenchmark::new(
-            "automata",
-            |b, x| b.iter(|| emoji::find_emojis(x).count()),
-            vec![INPUT],
-        )
-        .with_function("regex", |b, x| b.iter(|| find_emojis_regex(x).count())),
-    );
+    let mut g = c.benchmark_group("find_emojis");
+    g.bench_with_input("automata", INPUT, |b, x| b.iter(|| emoji::find_emojis(x).count()));
+    g.finish();
 }
 
 criterion_group!(benches, criterion_benchmark);
