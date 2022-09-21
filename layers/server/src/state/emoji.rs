@@ -79,6 +79,13 @@ impl EmojiMap {
             EmoteOrEmoji::Emoji { emoji } => self.any_emoji_to_id(&emoji).map(EmoteOrEmojiId::Emoji),
         }
     }
+
+    pub fn lookup(&self, e: EmoteOrEmojiId) -> Option<EmoteOrEmoji> {
+        match e {
+            EmoteOrEmojiId::Emoji(id) => self.id_to_emoji(id).map(|emoji| EmoteOrEmoji::Emoji { emoji }),
+            EmoteOrEmojiId::Emote(id) => Some(EmoteOrEmoji::Emote { emote: id }),
+        }
+    }
 }
 
 impl EmojiMapInner {
