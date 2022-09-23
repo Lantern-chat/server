@@ -13,6 +13,7 @@ pub async fn add_reaction(
     msg_id: Snowflake,
     emote: EmoteOrEmojiId,
 ) -> Result<(), Error> {
+    // TODO: Merge permission check into below CTEs
     let permissions =
         crate::backend::api::perm::get_cached_room_permissions(&state, auth.user_id, room_id).await?;
 
@@ -241,7 +242,7 @@ mod q {
                         Reactions::UserIds,
                         Builtin::array_append((Reactions::UserIds, Params::user_id())),
                     )
-                    .and_where(Params::user_id().not_equals(Builtin::any((Reactions::UserIds,)))),
+                    .and_where(Params::user_id().not_equals(Builtin::all((Reactions::UserIds,)))),
             )
             .returning(Reactions::MsgId.alias_to(Inserted::MsgId));
 
