@@ -319,7 +319,7 @@ mod q {
 
         #[rustfmt::skip]
         let mut query = Query::select()
-            .with(SelectedMessages::as_query(selected).exclude())
+            .with(SelectedMessages::as_query(selected.materialized()).exclude())
             .with(TempParty::as_query(party).exclude())
             .cols(MessageColumns::default())
             .cols(PartyColumns::default())
@@ -353,9 +353,7 @@ mod q {
                                 .arg(Params::user_id().equals(Builtin::any(AggReactions::UserIds)))
                                 .arg("count".lit())
                                 .arg(
-                                    Call::custom("array_length")
-                                        .arg(AggReactions::UserIds)
-                                        .arg(1i16.lit()),
+                                    Builtin::coalesce((Builtin::array_length((AggReactions::UserIds, 1.lit())), 0.lit()))
                                 ),
                         ),
                     )
@@ -587,6 +585,10 @@ where
                         let mut reactions = Vec::with_capacity(raw.len());
 
                         for r in raw {
+                            if r.count == 0 {
+                                continue;
+                            }
+
                             reactions.push(Reaction::Shorthand(ReactionShorthand {
                                 me: r.me,
                                 count: r.count,
