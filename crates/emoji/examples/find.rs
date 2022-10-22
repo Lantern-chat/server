@@ -13,6 +13,10 @@ fn main() {
         print_chars(emoji.chars());
     }
 
+    if let Some(emoji) = emoji::find("\u{1F1FD}") {
+        print_chars(emoji.chars());
+    }
+
     println!("Total emojis: {}", emoji::iter().count());
 
     println!(

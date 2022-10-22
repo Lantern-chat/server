@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
-use std::collections::hash_map::{Entry, HashMap};
+use indexmap::map::{Entry, IndexMap};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Qualified {
@@ -47,9 +47,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut file = BufWriter::new(File::create(&path)?);
 
     let src = include_str!("./emoji-test.txt");
-    let mut emojis = HashMap::new();
+    let mut emojis = IndexMap::new();
 
-    for line in src.lines() {
+    for line in src.lines().chain(EXTRA.lines()) {
         if line.starts_with('#') || line.is_empty() {
             continue;
         }
@@ -111,8 +111,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let mut forms_to_full: HashMap<Cow<'_, str>, &str> = HashMap::new();
-    let mut emoji_to_idx: HashMap<&str, usize> = HashMap::new();
+    let mut forms_to_full: IndexMap<Cow<'_, str>, &str> = IndexMap::new();
+    let mut emoji_to_idx: IndexMap<&str, usize> = IndexMap::new();
     let mut indices: Vec<usize> = Vec::new();
     let mut merged = String::new();
 
@@ -169,3 +169,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+static EXTRA: &'static str = "
+1F1E6 ; fully-qualified # \u{1F1E6} E6.0 Regional Indicator Symbol Letter A
+1F1E7 ; fully-qualified # \u{1F1E7} E6.0 Regional Indicator Symbol Letter B
+1F1E8 ; fully-qualified # \u{1F1E8} E6.0 Regional Indicator Symbol Letter C
+1F1E9 ; fully-qualified # \u{1F1E9} E6.0 Regional Indicator Symbol Letter D
+1F1EA ; fully-qualified # \u{1F1EA} E6.0 Regional Indicator Symbol Letter E
+1F1EB ; fully-qualified # \u{1F1EB} E6.0 Regional Indicator Symbol Letter F
+1F1EC ; fully-qualified # \u{1F1EC} E6.0 Regional Indicator Symbol Letter G
+1F1ED ; fully-qualified # \u{1F1ED} E6.0 Regional Indicator Symbol Letter H
+1F1EE ; fully-qualified # \u{1F1EE} E6.0 Regional Indicator Symbol Letter I
+1F1EF ; fully-qualified # \u{1F1EF} E6.0 Regional Indicator Symbol Letter J
+1F1F0 ; fully-qualified # \u{1F1F0} E6.0 Regional Indicator Symbol Letter K
+1F1F1 ; fully-qualified # \u{1F1F1} E6.0 Regional Indicator Symbol Letter L
+1F1F2 ; fully-qualified # \u{1F1F2} E6.0 Regional Indicator Symbol Letter M
+1F1F3 ; fully-qualified # \u{1F1F3} E6.0 Regional Indicator Symbol Letter N
+1F1F4 ; fully-qualified # \u{1F1F4} E6.0 Regional Indicator Symbol Letter O
+1F1F5 ; fully-qualified # \u{1F1F5} E6.0 Regional Indicator Symbol Letter P
+1F1F6 ; fully-qualified # \u{1F1F6} E6.0 Regional Indicator Symbol Letter Q
+1F1F7 ; fully-qualified # \u{1F1F7} E6.0 Regional Indicator Symbol Letter R
+1F1F8 ; fully-qualified # \u{1F1F8} E6.0 Regional Indicator Symbol Letter S
+1F1F9 ; fully-qualified # \u{1F1F9} E6.0 Regional Indicator Symbol Letter T
+1F1FA ; fully-qualified # \u{1F1FA} E6.0 Regional Indicator Symbol Letter U
+1F1FB ; fully-qualified # \u{1F1FB} E6.0 Regional Indicator Symbol Letter V
+1F1FC ; fully-qualified # \u{1F1FC} E6.0 Regional Indicator Symbol Letter W
+1F1FD ; fully-qualified # \u{1F1FD} E6.0 Regional Indicator Symbol Letter X
+1F1FE ; fully-qualified # \u{1F1FE} E6.0 Regional Indicator Symbol Letter Y
+1F1FF ; fully-qualified # \u{1F1FF} E6.0 Regional Indicator Symbol Letter Z
+";
