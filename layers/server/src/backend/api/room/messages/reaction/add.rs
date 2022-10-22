@@ -239,6 +239,16 @@ mod q {
                 },
                 DoUpdate
                     .set(
+                        // If user_ids is empty, treat this as a fresh reaction and reset the timestamp
+                        Reactions::Reacted,
+                        Case::default()
+                            .when_condition(
+                                Builtin::array_length((Reactions::UserIds, 1.lit())).is_null(),
+                                Builtin::now(()),
+                            )
+                            .otherwise(Reactions::Reacted),
+                    )
+                    .set(
                         Reactions::UserIds,
                         Builtin::array_append((Reactions::UserIds, Params::user_id())),
                     )
