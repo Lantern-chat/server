@@ -147,15 +147,12 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                         }
 
                         match event.msg {
-                            ServerMsg::Hello { .. } => {}
-                            ServerMsg::InvalidSession { .. } => {
+                            ServerMsg::Hello(_) => {}
+                            ServerMsg::InvalidSession(_) => {
                                 // this will ensure the stream ends after this event
                                 events.clear();
                             }
-                            ServerMsg::Ready {
-                                payload: ReadyPayload { inner: ref ready },
-                                ..
-                            } => {
+                            ServerMsg::Ready(ReadyPayload { inner: ref ready }) => {
                                 user_id = Some(ready.user.id);
 
                                 register_subs(
@@ -194,12 +191,12 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                                     }
 
                                     match event.msg {
-                                        ServerMsg::PartyCreate { ref payload, .. } => register_subs(
+                                        ServerMsg::PartyCreate(ref payload) => register_subs(
                                             &mut events,
                                             &mut listener_table,
                                             state.gateway.sub_and_activate_connection(user_id, conn.clone(), &[payload.inner.id]).await,
                                         ),
-                                        ServerMsg::PartyDelete { ref payload, .. } => {
+                                        ServerMsg::PartyDelete(ref payload) => {
                                             // by cancelling a stream, it will be removed from the SelectStream automatically
                                             if let Some(event_stream) = listener_table.get(&payload.id) {
                                                 event_stream.abort();
@@ -221,18 +218,18 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                 Item::Msg(msg) => match msg {
                     Ok(msg) => match msg {
                         // Respond to heartbeats immediately.
-                        ClientMsg::Heartbeat { .. } => Ok(HEARTBEAT_ACK.clone()),
-                        ClientMsg::Identify { payload, .. } => {
+                        ClientMsg::Heartbeat(_) => Ok(HEARTBEAT_ACK.clone()),
+                        ClientMsg::Identify(payload) => {
                             // this will send a ready event on success
                             tokio::spawn(identify::identify(state.clone(), conn.clone(), payload.inner.auth, payload.inner.intent));
                             intent = payload.inner.intent;
                             continue;
                         }
-                        ClientMsg::Resume { .. } => {
+                        ClientMsg::Resume(_) => {
                             log::error!("Attempted to resume connection");
                             break 'event_loop;
                         }
-                        ClientMsg::SetPresence { payload, .. } => {
+                        ClientMsg::SetPresence(payload) => {
                             match user_id {
                                 None => {
                                     log::warn!("Attempted to set presence before identification");
@@ -245,7 +242,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
 
                             continue 'event_loop; // no reply, so continue event loop
                         }
-                        ClientMsg::Subscribe { .. } | ClientMsg::Unsubscribe { .. } => {
+                        ClientMsg::Subscribe(_) | ClientMsg::Unsubscribe(_) => {
                             log::error!("Unimplemented sub/unsub");
                             continue 'event_loop; // no reply
                         }
