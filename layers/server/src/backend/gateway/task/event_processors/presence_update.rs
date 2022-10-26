@@ -57,6 +57,7 @@ pub async fn presence_updated(
                     None => Nullable::Null,
                     Some(bits) => Nullable::Some(UserProfile {
                         bits,
+                        nick: row.try_get(Columns::nickname())?,
                         avatar: encrypt_snowflake_opt(state, row.try_get(Columns::avatar_id())?).into(),
                         banner: Nullable::Undefined,
                         status: row.try_get(Columns::custom_status())?,
@@ -101,6 +102,7 @@ mod q {
             AggMemberPresence::UserFlags,
             AggMemberPresence::PartyId,
             AggMemberPresence::ProfileBits,
+            AggMemberPresence::Nickname,
             AggMemberPresence::AvatarId,
             AggMemberPresence::CustomStatus,
             AggMemberPresence::UpdatedAt,

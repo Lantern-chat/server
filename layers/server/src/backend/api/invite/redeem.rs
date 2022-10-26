@@ -67,36 +67,24 @@ pub async fn redeem_invite(
     };
 
     let invite_id: Snowflake = row.try_get(0)?;
+    let party_id: Snowflake = row.try_get(1)?;
 
     let mut update_member = Either::Left(futures::future::ok::<_, Error>(()));
 
-    if body.nickname.is_some() {
+    if let Some(nickname) = body.nickname {
+        use sdk::api::commands::user::UpdateUserProfileBody;
+
         update_member = Either::Right(async {
-            let rows = t
-                .execute_cached_typed(
-                    || {
-                        use schema::*;
-                        use thorn::*;
-
-                        let user_id = Var::at(Users::Id, 1);
-                        let invite_id = Var::at(Invite::Id, 2);
-                        let nickname = Var::at(PartyMember::Nickname, 3);
-
-                        Query::update()
-                            .table::<PartyMember>()
-                            .set(PartyMember::Nickname, nickname)
-                            .from_table::<Invite>()
-                            .and_where(Invite::Id.equals(invite_id))
-                            .and_where(PartyMember::PartyId.equals(Invite::PartyId))
-                            .and_where(PartyMember::UserId.equals(user_id))
-                    },
-                    &[&auth.user_id, &invite_id, &body.nickname],
-                )
-                .await?;
-
-            if rows != 1 {
-                return Err(Error::InternalErrorStatic("Modified too many rows"));
-            }
+            crate::backend::api::user::me::profile::patch_profile(
+                state.clone(),
+                auth,
+                UpdateUserProfileBody {
+                    nick: Nullable::Some(nickname),
+                    ..UpdateUserProfileBody::default()
+                },
+                Some(party_id),
+            )
+            .await?;
 
             Ok(())
         });

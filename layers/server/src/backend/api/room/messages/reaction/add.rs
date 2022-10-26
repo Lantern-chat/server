@@ -82,6 +82,7 @@ pub async fn add_reaction(
                         None => Nullable::Null,
                         Some(bits) => Nullable::Some(UserProfile {
                             bits,
+                            nick: row.try_get(Columns::nickname())?,
                             avatar: encrypt_snowflake_opt(&state, row.try_get(Columns::avatar_id())?).into(),
                             banner: Nullable::Undefined,
                             status: Nullable::Undefined,
@@ -89,7 +90,6 @@ pub async fn add_reaction(
                         }),
                     },
                 }),
-                nick: row.try_get(Columns::nickname())?,
                 roles: row.try_get(Columns::role_ids())?,
                 presence: None,
                 flags: None,
@@ -142,7 +142,7 @@ mod q {
         pub struct ReactionEvent {
             MsgId: Inserted::MsgId,
             PartyId: Rooms::PartyId,
-            Nickname: AggMembers::Nickname,
+            Nickname: Profiles::Nickname,
             Username: Users::Username,
             Discriminator: Users::Discriminator,
             UserFlags: Users::Flags,
@@ -168,10 +168,10 @@ mod q {
             pub enum Columns continue ValuesColumns {
                 ReactionEvent::MsgId,
                 ReactionEvent::PartyId,
-                ReactionEvent::Nickname,
                 ReactionEvent::Username,
                 ReactionEvent::Discriminator,
                 ReactionEvent::UserFlags,
+                ReactionEvent::Nickname,
                 ReactionEvent::AvatarId,
                 ReactionEvent::ProfileBits,
                 ReactionEvent::RoleIds,
@@ -260,16 +260,20 @@ mod q {
         let fetch = Query::select()
             .expr(Inserted::MsgId.alias_to(ReactionEvent::MsgId))
             .expr(Values::PartyId.alias_to(ReactionEvent::PartyId))
-            .exprs([
-                AggMembers::Nickname.alias_to(ReactionEvent::Nickname),
-                AggMembers::RoleIds.alias_to(ReactionEvent::RoleIds),
-            ])
+            .exprs([AggMembers::RoleIds.alias_to(ReactionEvent::RoleIds)])
             .exprs([
                 Users::Username.alias_to(ReactionEvent::Username),
                 Users::Discriminator.alias_to(ReactionEvent::Discriminator),
                 Users::Flags.alias_to(ReactionEvent::UserFlags),
             ])
             // ProfileColumns
+            .expr(
+                Builtin::coalesce((
+                    PartyProfile::col(Profiles::Nickname),
+                    BaseProfile::col(Profiles::Nickname),
+                ))
+                .alias_to(ReactionEvent::Nickname),
+            )
             .expr(
                 Builtin::coalesce((
                     PartyProfile::col(Profiles::AvatarId),

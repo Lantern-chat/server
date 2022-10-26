@@ -1,4 +1,5 @@
-use futures::{future::Either, TryFutureExt};
+use arrayvec::ArrayVec;
+use futures::{future::Either, FutureExt, TryFutureExt};
 use sdk::{api::commands::user::UpdateUserProfileBody, models::*};
 
 use crate::{
@@ -20,6 +21,7 @@ pub async fn patch_profile(
     // if status/bio have a value, insert/update the profile
     let has_status = !new_profile.status.is_undefined();
     let has_bio = !new_profile.bio.is_undefined();
+    let has_nick = !new_profile.nick.is_undefined();
 
     let db = if has_status || has_bio { state.db.write.get().await? } else { state.db.read.get().await? };
 
@@ -48,36 +50,39 @@ pub async fn patch_profile(
     }
 
     // try to avoid as many triggers as possible by grouping together queries
-    match (has_status, has_bio) {
-        (true, true) => {
-            db.execute_cached_typed(
-                || insert_or_update_profile(&[Profiles::Bits, Profiles::CustomStatus, Profiles::Biography]),
-                &[
-                    &auth.user_id,
-                    &party_id,
-                    &new_profile.bits,
-                    &new_profile.status,
-                    &new_profile.bio,
-                ],
-            )
-            .await?;
-        }
-        (true, false) => {
-            db.execute_cached_typed(
-                || insert_or_update_profile(&[Profiles::Bits, Profiles::CustomStatus]),
-                &[&auth.user_id, &party_id, &new_profile.bits, &new_profile.status],
-            )
-            .await?;
-        }
-        (false, true) => {
-            db.execute_cached_typed(
-                || insert_or_update_profile(&[Profiles::Bits, Profiles::Biography]),
-                &[&auth.user_id, &party_id, &new_profile.bits, &new_profile.bio],
-            )
-            .await?;
-        }
-        _ => {}
+    #[rustfmt::skip]
+    let prepared_stmt = match (has_status, has_bio, has_nick) {
+        (true,  true,  false) => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::Bits, Profiles::CustomStatus, Profiles::Biography])).boxed(),
+        (true,  false, false) => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::Bits, Profiles::CustomStatus])).boxed(),
+        (false, true,  false) => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::Bits, Profiles::Biography])).boxed(),
+        (true,  true,  true)  => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::Bits, Profiles::CustomStatus, Profiles::Biography, Profiles::Nickname])).boxed(),
+        (true,  false, true)  => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::Bits, Profiles::CustomStatus, Profiles::Nickname])).boxed(),
+        (false, true,  true)  => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::Bits, Profiles::Biography, Profiles::Nickname])).boxed(),
+        (false, false, true)  => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::Bits, Profiles::Nickname])).boxed(),
+        (false, false, false) => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::Bits])).boxed(),
+    };
+
+    let mut params = ArrayVec::<&(dyn db::pg::types::ToSql + Sync), 6>::new();
+
+    params.push(&auth.user_id);
+    params.push(&party_id);
+    params.push(&new_profile.bits);
+
+    if has_status {
+        params.push(&new_profile.status);
     }
+
+    if has_bio {
+        params.push(&new_profile.bio);
+    }
+
+    if has_nick {
+        params.push(&new_profile.nick);
+    }
+
+    db.execute(&prepared_stmt.await?, &params).await?;
+
+    drop(params);
 
     // using the existing database connection, go ahead and fetch the old file ids
 
@@ -128,66 +133,68 @@ pub async fn patch_profile(
         }
     }
 
-    // initialize with the avatar/banner file IDs, because if they are Some it will be overwritten, but otherwise inherit the None/Undefined values
-    let mut new_avatar_id_future = Either::Left(futures::future::ok(new_profile.avatar));
-    let mut new_banner_id_future = Either::Left(futures::future::ok(new_profile.banner));
+    let (new_avatar_id, new_banner_id) = if !new_profile.avatar.is_undefined()
+        || !new_profile.banner.is_undefined()
+    {
+        // initialize with the avatar/banner file IDs, because if they are Some it will be overwritten, but otherwise inherit the None/Undefined values
+        let mut new_avatar_id_future = Either::Left(futures::future::ok(new_profile.avatar));
+        let mut new_banner_id_future = Either::Left(futures::future::ok(new_profile.banner));
 
-    if let Nullable::Some(file_id) = new_profile.avatar {
-        new_avatar_id_future =
-            Either::Right(add_asset(&state, AssetMode::Avatar, auth.user_id, file_id).map_ok(Nullable::Some));
-    }
-
-    if let Nullable::Some(file_id) = new_profile.banner {
-        new_banner_id_future =
-            Either::Right(add_asset(&state, AssetMode::Banner, auth.user_id, file_id).map_ok(Nullable::Some));
-    }
-
-    let (new_avatar_id, new_banner_id) = tokio::try_join!(new_avatar_id_future, new_banner_id_future)?;
-
-    let db = state.db.write.get().await?;
-
-    // NOTE: This is kind of in reverse order from the status/bio combinations due to the wildcard matching
-    match (new_avatar_id, new_banner_id) {
-        (Nullable::Undefined, Nullable::Undefined) if !has_status && !has_bio => {
-            // just set bits...
-            db.execute_cached_typed(
-                || insert_or_update_profile(&[Profiles::Bits]),
-                &[&auth.user_id, &party_id, &new_profile.bits],
-            )
-            .await?;
+        if let Nullable::Some(file_id) = new_profile.avatar {
+            new_avatar_id_future = Either::Right(
+                add_asset(&state, AssetMode::Avatar, auth.user_id, file_id).map_ok(Nullable::Some),
+            );
         }
-        (Nullable::Undefined, Nullable::Undefined) => {}
-        (avatar_id, Nullable::Undefined) => {
-            db.execute_cached_typed(
-                || insert_or_update_profile(&[Profiles::AvatarId, Profiles::Bits]),
-                &[&auth.user_id, &party_id, &avatar_id, &new_profile.bits],
-            )
-            .await?;
+
+        if let Nullable::Some(file_id) = new_profile.banner {
+            new_banner_id_future = Either::Right(
+                add_asset(&state, AssetMode::Banner, auth.user_id, file_id).map_ok(Nullable::Some),
+            );
         }
-        (Nullable::Undefined, banner_id) => {
-            db.execute_cached_typed(
-                || insert_or_update_profile(&[Profiles::BannerId, Profiles::Bits]),
-                &[&auth.user_id, &party_id, &banner_id, &new_profile.bits],
-            )
-            .await?;
+
+        let (new_avatar_id, new_banner_id) = tokio::try_join!(new_avatar_id_future, new_banner_id_future)?;
+
+        let db = state.db.write.get().await?;
+
+        match (new_avatar_id, new_banner_id) {
+            (Nullable::Undefined, Nullable::Undefined) => {}
+            (avatar_id, Nullable::Undefined) => {
+                db.execute_cached_typed(
+                    || insert_or_update_profile(&[Profiles::AvatarId, Profiles::Bits]),
+                    &[&auth.user_id, &party_id, &avatar_id, &new_profile.bits],
+                )
+                .await?;
+            }
+            (Nullable::Undefined, banner_id) => {
+                db.execute_cached_typed(
+                    || insert_or_update_profile(&[Profiles::BannerId, Profiles::Bits]),
+                    &[&auth.user_id, &party_id, &banner_id, &new_profile.bits],
+                )
+                .await?;
+            }
+            (avatar_id, banner_id) => {
+                db.execute_cached_typed(
+                    || insert_or_update_profile(&[Profiles::AvatarId, Profiles::BannerId, Profiles::Bits]),
+                    &[
+                        &auth.user_id,
+                        &party_id,
+                        &avatar_id,
+                        &banner_id,
+                        &new_profile.bits,
+                    ],
+                )
+                .await?;
+            }
         }
-        (avatar_id, banner_id) => {
-            db.execute_cached_typed(
-                || insert_or_update_profile(&[Profiles::AvatarId, Profiles::BannerId, Profiles::Bits]),
-                &[
-                    &auth.user_id,
-                    &party_id,
-                    &avatar_id,
-                    &banner_id,
-                    &new_profile.bits,
-                ],
-            )
-            .await?;
-        }
-    }
+
+        (new_avatar_id, new_banner_id)
+    } else {
+        (new_profile.avatar, new_profile.banner)
+    };
 
     Ok(UserProfile {
         bits: new_profile.bits,
+        nick: new_profile.nick,
         status: new_profile.status,
         bio: new_profile.bio,
         avatar: new_avatar_id.map(|id| encrypt_snowflake(&state, id)),

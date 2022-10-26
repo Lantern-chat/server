@@ -39,6 +39,7 @@ pub async fn member_event(
                     }
 
                     pub enum ProfileColumns continue UserColumns {
+                        Profiles::Nickname,
                         Profiles::AvatarId,
                         Profiles::Bits,
                     }
@@ -76,6 +77,7 @@ pub async fn member_event(
                         None => Nullable::Null,
                         Some(bits) => Nullable::Some(UserProfile {
                             bits,
+                            nick: row.try_get(ProfileColumns::nickname())?,
                             avatar: encrypt_snowflake_opt(state, row.try_get(ProfileColumns::avatar_id())?)
                                 .into(),
                             banner: Nullable::Undefined,
@@ -86,7 +88,6 @@ pub async fn member_event(
                     email: None,
                     preferences: None,
                 }),
-                nick: None,
                 roles: None,
                 presence: None,
                 flags: None,

@@ -261,9 +261,6 @@ CREATE TABLE lantern.party_member (
     flags       smallint    NOT NULL    DEFAULT 0,
     position    smallint    NOT NULL    DEFAULT 0,
 
-    -- same as for user, but per-party
-    nickname        text,
-
     -- Composite primary key
     CONSTRAINT party_member_pk PRIMARY KEY (party_id, user_id)
 );
@@ -359,6 +356,7 @@ CREATE TABLE lantern.profiles (
     avatar_id       bigint,
     banner_id       bigint,
     bits            int NOT NULL DEFAULT 0,
+    nickname        text,
     custom_status   text,
     biography       text
 );
@@ -1628,7 +1626,7 @@ SELECT
     agg_users.username,
     agg_users.presence_flags,
     agg_users.presence_updated_at,
-    party_member.nickname,
+    COALESCE(party_profile.nickname, base_profile.nickname),
     party_member.flags,
     party_member.joined_at,
     COALESCE(party_profile.avatar_id, base_profile.avatar_id),
@@ -1702,6 +1700,7 @@ CREATE OR REPLACE VIEW lantern.agg_member_presence(
     party_id,
 
     profile_bits,
+    nickname,
     avatar_id,
     banner_id,
     custom_status,
@@ -1720,6 +1719,7 @@ SELECT
     party_member.party_id,
 
     lantern.combine_profile_bits(base_profile.bits, party_profile.bits, party_profile.avatar_id),
+    COALESCE(party_profile.nickname, base_profile.nickname),
     COALESCE(party_profile.avatar_id, base_profile.avatar_id),
     COALESCE(party_profile.banner_id, base_profile.banner_id),
     COALESCE(party_profile.custom_status, base_profile.custom_status),

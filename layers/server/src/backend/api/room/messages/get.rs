@@ -204,19 +204,16 @@ mod q {
                 TempParty::Id,
             }
 
-            pub enum MemberColumns continue PartyColumns {
-                AggMembers::Nickname,
-            }
-
-            pub enum UserColumns continue MemberColumns {
+            pub enum UserColumns continue PartyColumns {
                 Users::Username,
                 Users::Discriminator,
                 Users::Flags,
             }
 
             pub enum ProfileColumns continue UserColumns {
-                Profiles::AvatarId,
                 Profiles::Bits,
+                Profiles::AvatarId,
+                Profiles::Nickname,
             }
 
             pub enum MentionColumns continue ProfileColumns {
@@ -323,17 +320,20 @@ mod q {
             .with(TempParty::as_query(party).exclude())
             .cols(MessageColumns::default())
             .cols(PartyColumns::default())
-            .cols(MemberColumns::default())
             .cols(UserColumns::default())
-            // ProfileColumns
-            .expr(Builtin::coalesce((
-                PartyProfile::col(Profiles::AvatarId),
-                BaseProfile::col(Profiles::AvatarId),
-            )))
+            // ProfileColumns, must follow order as listed above
             .expr(Call::custom("lantern.combine_profile_bits").args((
                 BaseProfile::col(Profiles::Bits),
                 PartyProfile::col(Profiles::Bits),
                 PartyProfile::col(Profiles::AvatarId),
+            )))
+            .expr(Builtin::coalesce((
+                PartyProfile::col(Profiles::AvatarId),
+                BaseProfile::col(Profiles::AvatarId),
+            )))
+            .expr(Builtin::coalesce((
+                PartyProfile::col(Profiles::Nickname),
+                BaseProfile::col(Profiles::Nickname),
             )))
             .cols(MentionColumns::default())
             .cols(DynamicMsgColumns::default())
@@ -502,6 +502,7 @@ where
                                     None => Nullable::Null,
                                     Some(bits) => Nullable::Some(UserProfile {
                                         bits,
+                                        nick: row.try_get(ProfileColumns::nickname())?,
                                         avatar: encrypt_snowflake_opt(
                                             &state,
                                             row.try_get(ProfileColumns::avatar_id())?,
@@ -524,7 +525,6 @@ where
                     None => None,
                     Some(_) => Some(PartyMember {
                         user: None,
-                        nick: row.try_get(MemberColumns::nickname())?,
                         roles: row.try_get(RoleColumns::role_ids())?,
                         presence: None,
                         flags: None,

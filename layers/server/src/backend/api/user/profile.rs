@@ -54,6 +54,7 @@ pub async fn get_profile(
                 banner,
                 status,
                 bio,
+                nick,
                 bits,
             } = q::parse_profile(base_row)?;
 
@@ -76,6 +77,7 @@ pub async fn get_profile(
             };
 
             // these are eequivalent to `COALESCE(party.*, base.*)`
+            party.nick = party.nick.or(nick);
             party.avatar = party.avatar.or(avatar);
             party.banner = party.banner.or(banner);
             party.status = party.status.or(status);
@@ -92,6 +94,7 @@ mod q {
 
     thorn::indexed_columns! {
         pub enum ProfileColumns {
+            Profiles::Nickname,
             Profiles::AvatarId,
             Profiles::BannerId,
             Profiles::Bits,
@@ -120,6 +123,7 @@ mod q {
 
     pub struct RawProfile {
         pub bits: UserProfileBits,
+        pub nick: Option<SmolStr>,
         pub avatar: Option<Snowflake>,
         pub banner: Option<Snowflake>,
         pub status: Option<SmolStr>,
@@ -129,6 +133,7 @@ mod q {
     pub fn parse_profile(row: db::pg::Row) -> Result<RawProfile, db::pg::Error> {
         Ok(RawProfile {
             bits: row.try_get(ProfileColumns::bits())?,
+            nick: row.try_get(ProfileColumns::nickname())?,
             avatar: row.try_get(ProfileColumns::avatar_id())?,
             banner: row.try_get(ProfileColumns::banner_id())?,
             status: row.try_get(ProfileColumns::custom_status())?,
@@ -139,6 +144,7 @@ mod q {
     pub fn raw_profile_to_public(state: &ServerState, raw: RawProfile) -> UserProfile {
         UserProfile {
             bits: raw.bits,
+            nick: raw.nick.into(),
             avatar: encrypt_snowflake_opt(&state, raw.avatar).into(),
             banner: encrypt_snowflake_opt(&state, raw.banner).into(),
             status: raw.status.into(),

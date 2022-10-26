@@ -1,6 +1,7 @@
 use schema::Snowflake;
 use sdk::models::*;
 
+use crate::backend::util::encrypted_asset::encrypt_snowflake_opt;
 use crate::backend::{api::perm::get_cached_room_permissions, gateway::Event};
 use crate::{Authorization, Error, ServerState};
 
@@ -33,10 +34,37 @@ pub async fn trigger_typing(
             }
         }
 
+        thorn::decl_alias! {
+            pub BaseProfile = Profiles,
+            pub PartyProfile = Profiles
+        }
+
         thorn::params! {
             pub struct Params {
                 pub user_id: Snowflake = Users::Id,
                 pub room_id: Snowflake = Rooms::Id,
+            }
+        }
+
+        thorn::indexed_columns! {
+            pub enum RoomColumns {
+                AggRoom::PartyId,
+            }
+
+            pub enum UserColumns continue RoomColumns {
+                Users::Username,
+                Users::Discriminator,
+                Users::Flags,
+            }
+
+            pub enum ProfileColumns continue UserColumns {
+                Profiles::Bits,
+                Profiles::AvatarId,
+                Profiles::Nickname,
+            }
+
+            pub enum RoleColumns continue ProfileColumns {
+                AggRoles::RoleIds,
             }
         }
     }
@@ -48,27 +76,48 @@ pub async fn trigger_typing(
             || {
                 use q::*;
 
+                // find the party_id from the given room_id
+                let room_agg = AggRoom::as_query(
+                    Query::select()
+                        .expr(Rooms::PartyId.alias_to(AggRoom::PartyId))
+                        .from_table::<Rooms>()
+                        .and_where(Rooms::Id.equals(Params::room_id())),
+                );
+
                 Query::with()
-                    .with(
-                        AggRoom::as_query(
-                            Query::select()
-                                .expr(Rooms::PartyId.alias_to(AggRoom::PartyId))
-                                .from_table::<Rooms>()
-                                .and_where(Rooms::Id.equals(Params::room_id())),
-                        )
-                        .exclude(),
-                    )
+                    .with(room_agg.exclude())
                     .select()
-                    .col(AggRoom::PartyId)
-                    .col(PartyMember::Nickname)
-                    .cols(&[Users::Username, Users::Discriminator, Users::Flags])
-                    .col(AggRoles::RoleIds)
+                    .cols(RoomColumns::default())
+                    .cols(UserColumns::default())
+                    // ProfileColumns, must follow order as listed above
+                    .expr(Call::custom("lantern.combine_profile_bits").args((
+                        BaseProfile::col(Profiles::Bits),
+                        PartyProfile::col(Profiles::Bits),
+                        PartyProfile::col(Profiles::AvatarId),
+                    )))
+                    .expr(Builtin::coalesce((
+                        PartyProfile::col(Profiles::AvatarId),
+                        BaseProfile::col(Profiles::AvatarId),
+                    )))
+                    .expr(Builtin::coalesce((
+                        PartyProfile::col(Profiles::Nickname),
+                        BaseProfile::col(Profiles::Nickname),
+                    )))
+                    .cols(RoleColumns::default())
                     .from(
                         Users::left_join(
                             PartyMember::inner_join_table::<AggRoom>()
                                 .on(PartyMember::PartyId.equals(AggRoom::PartyId)),
                         )
                         .on(PartyMember::UserId.equals(Users::Id))
+                        .left_join_table::<BaseProfile>()
+                        .on(BaseProfile::col(Profiles::UserId)
+                            .equals(Messages::UserId)
+                            .and(BaseProfile::col(Profiles::PartyId).is_null()))
+                        .left_join_table::<PartyProfile>()
+                        .on(PartyProfile::col(Profiles::UserId)
+                            .equals(Messages::UserId)
+                            .and(PartyProfile::col(Profiles::PartyId).equals(AggRoom::PartyId)))
                         .left_join(Lateral(AggRoles::as_query(
                             Query::select()
                                 .expr(Builtin::array_agg(RoleMembers::RoleId).alias_to(AggRoles::RoleIds))
@@ -96,34 +145,45 @@ pub async fn trigger_typing(
         Some(row) => row,
     };
 
-    let party_id: Option<Snowflake> = row.try_get(0)?;
+    use q::{ProfileColumns, RoleColumns, RoomColumns, UserColumns};
+
+    let party_id: Option<Snowflake> = row.try_get(RoomColumns::party_id())?;
 
     let user = User {
         id: auth.user_id,
-        username: row.try_get(2)?,
-        discriminator: row.try_get(3)?,
-        flags: UserFlags::from_bits_truncate_public(row.try_get(4)?),
+        username: row.try_get(UserColumns::username())?,
+        discriminator: row.try_get(UserColumns::discriminator())?,
+        flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
         email: None,
         preferences: None,
-        profile: Nullable::Undefined,
+        profile: match row.try_get(ProfileColumns::bits())? {
+            None => Nullable::Null,
+            Some(bits) => Nullable::Some(UserProfile {
+                bits,
+                nick: row.try_get(ProfileColumns::nickname())?,
+                avatar: encrypt_snowflake_opt(&state, row.try_get(ProfileColumns::avatar_id())?).into(),
+                banner: Nullable::Undefined,
+                status: Nullable::Undefined,
+                bio: Nullable::Undefined,
+            }),
+        },
     };
 
     match party_id {
         Some(party_id) => {
             let member = PartyMember {
-                nick: row.try_get(1)?,
                 user: Some(user),
-                roles: row.try_get(5)?,
+                roles: row.try_get(RoleColumns::role_ids())?,
                 presence: None,
                 flags: None,
             };
 
-            let event = ServerMsg::new_typing_start(Box::new(events::TypingStart {
+            let event = ServerMsg::new_typing_start(events::TypingStart {
                 room: room_id,
                 user: auth.user_id,
                 party: Some(party_id),
                 member: Some(member),
-            }));
+            });
 
             state
                 .gateway
@@ -135,27 +195,3 @@ pub async fn trigger_typing(
 
     Ok(())
 }
-
-/*
-use thorn::*;
-fn query() -> impl AnyQuery {
-    use schema::*;
-
-    let user_id_var = Var::at(Users::Id, 1);
-    let room_id_var = Var::at(Rooms::Id, 2);
-
-    Query::insert()
-        .into::<EventLog>()
-        .cols(&[EventLog::Code, EventLog::Id, EventLog::PartyId, EventLog::RoomId])
-        .query(
-            Query::select()
-                .from(Rooms::left_join_table::<Party>().on(Party::Id.equals(Rooms::PartyId)))
-                .expr(EventCode::TypingStarted)
-                .expr(user_id_var)
-                .expr(Party::Id)
-                .expr(Rooms::Id)
-                .and_where(Rooms::Id.equals(room_id_var))
-                .as_value(),
-        )
-}
- */

@@ -22,6 +22,7 @@ mod friend_query {
         }
 
         pub enum ProfileColumns continue UserColumns {
+            Profiles::Nickname,
             Profiles::AvatarId,
             Profiles::Bits,
             Profiles::CustomStatus,
@@ -76,6 +77,7 @@ pub async fn friends(
                     None => Nullable::Null,
                     Some(bits) => Nullable::Some(UserProfile {
                         bits,
+                        nick: row.try_get(ProfileColumns::nickname())?,
                         avatar: encrypt_snowflake_opt(&state, row.try_get(ProfileColumns::avatar_id())?)
                             .into(),
                         status: row.try_get(ProfileColumns::custom_status())?,

@@ -18,9 +18,10 @@ pub async fn get_full(state: &ServerState, user_id: Snowflake) -> Result<User, E
             }
 
             pub enum ProfileColumns continue UserColumns {
+                Profiles::Bits,
+                Profiles::Nickname,
                 Profiles::AvatarId,
                 Profiles::BannerId,
-                Profiles::Bits,
                 Profiles::CustomStatus,
                 Profiles::Biography,
             }
@@ -64,6 +65,7 @@ pub async fn get_full(state: &ServerState, user_id: Snowflake) -> Result<User, E
             None => Nullable::Null,
             Some(bits) => Nullable::Some(UserProfile {
                 bits,
+                nick: row.try_get(ProfileColumns::nickname())?,
                 avatar: encrypt_snowflake_opt(&state, row.try_get(ProfileColumns::avatar_id())?).into(),
                 banner: encrypt_snowflake_opt(&state, row.try_get(ProfileColumns::banner_id())?).into(),
                 status: row.try_get(ProfileColumns::custom_status())?,

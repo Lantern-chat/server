@@ -105,6 +105,7 @@ thorn::tables! {
         AvatarId: UserAssets::Id,
         BannerId: UserAssets::Id,
         Bits: Type::INT4,
+        Nickname: Type::TEXT,
         CustomStatus: Type::TEXT,
         Biography: Type::TEXT,
     }
@@ -149,7 +150,6 @@ thorn::tables! {
         JoinedAt: Type::TIMESTAMP,
         Flags: Type::INT2,
         Position: Type::INT2,
-        Nickname: Type::TEXT,
     }
 
     pub struct PartyBans in Lantern {
