@@ -1575,7 +1575,6 @@ FROM
 CREATE OR REPLACE VIEW lantern.agg_members(
     user_id,
     party_id,
-    nickname,
     flags,
     joined_at,
     role_ids
@@ -1583,7 +1582,6 @@ CREATE OR REPLACE VIEW lantern.agg_members(
 SELECT
     party_member.user_id,
     party_member.party_id,
-    party_member.nickname,
     party_member.flags,
     party_member.joined_at,
     (
