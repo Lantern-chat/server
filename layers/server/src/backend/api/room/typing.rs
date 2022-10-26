@@ -112,11 +112,11 @@ pub async fn trigger_typing(
                         .on(PartyMember::UserId.equals(Users::Id))
                         .left_join_table::<BaseProfile>()
                         .on(BaseProfile::col(Profiles::UserId)
-                            .equals(Messages::UserId)
+                            .equals(Users::Id)
                             .and(BaseProfile::col(Profiles::PartyId).is_null()))
                         .left_join_table::<PartyProfile>()
                         .on(PartyProfile::col(Profiles::UserId)
-                            .equals(Messages::UserId)
+                            .equals(Users::Id)
                             .and(PartyProfile::col(Profiles::PartyId).equals(AggRoom::PartyId)))
                         .left_join(Lateral(AggRoles::as_query(
                             Query::select()
