@@ -356,6 +356,7 @@ CREATE TABLE lantern.profiles (
     avatar_id       bigint,
     banner_id       bigint,
     bits            int NOT NULL DEFAULT 0,
+    extra           int,
     nickname        text,
     custom_status   text,
     biography       text

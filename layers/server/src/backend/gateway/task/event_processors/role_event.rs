@@ -2,8 +2,6 @@ use schema::EventCode;
 
 use crate::backend::util::encrypted_asset::encrypt_snowflake_opt;
 
-use sdk::models::gateway::{events::RoleDeleteEvent, message::ServerMsg};
-
 use super::prelude::*;
 
 pub async fn role_event(

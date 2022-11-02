@@ -194,6 +194,7 @@ pub async fn patch_profile(
 
     Ok(UserProfile {
         bits: new_profile.bits,
+        extra: Default::default(),
         nick: new_profile.nick,
         status: new_profile.status,
         bio: new_profile.bio,

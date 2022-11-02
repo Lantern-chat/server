@@ -1,7 +1,3 @@
-use crate::backend::gateway::Event;
-
-use sdk::models::gateway::{events::MessageDeleteEvent, message::ServerMsg};
-
 use super::prelude::*;
 
 pub async fn message_delete(

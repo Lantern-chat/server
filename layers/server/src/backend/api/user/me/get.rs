@@ -65,6 +65,7 @@ pub async fn get_full(state: &ServerState, user_id: Snowflake) -> Result<User, E
             None => Nullable::Null,
             Some(bits) => Nullable::Some(UserProfile {
                 bits,
+                extra: Default::default(),
                 nick: row.try_get(ProfileColumns::nickname())?,
                 avatar: encrypt_snowflake_opt(&state, row.try_get(ProfileColumns::avatar_id())?).into(),
                 banner: encrypt_snowflake_opt(&state, row.try_get(ProfileColumns::banner_id())?).into(),

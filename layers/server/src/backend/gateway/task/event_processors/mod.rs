@@ -5,7 +5,10 @@ use crate::{Error, ServerState};
 
 pub mod prelude {
     pub use schema::Snowflake;
-    pub use sdk::models::*;
+    pub use sdk::models::{
+        gateway::{events::*, message::ServerMsg, Intent},
+        *,
+    };
     pub use thorn::*;
 
     pub use crate::backend::gateway::Event;

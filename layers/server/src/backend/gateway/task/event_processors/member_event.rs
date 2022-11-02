@@ -3,9 +3,7 @@ use std::sync::Arc;
 use futures::future::Either;
 use schema::EventCode;
 
-use sdk::models::gateway::{events::PartyMemberEvent, message::ServerMsg};
-
-use crate::backend::{gateway::Event, util::encrypted_asset::encrypt_snowflake_opt};
+use crate::backend::util::encrypted_asset::encrypt_snowflake_opt;
 
 use super::prelude::*;
 
@@ -77,6 +75,7 @@ pub async fn member_event(
                         None => Nullable::Null,
                         Some(bits) => Nullable::Some(UserProfile {
                             bits,
+                            extra: Default::default(),
                             nick: row.try_get(ProfileColumns::nickname())?,
                             avatar: encrypt_snowflake_opt(state, row.try_get(ProfileColumns::avatar_id())?)
                                 .into(),

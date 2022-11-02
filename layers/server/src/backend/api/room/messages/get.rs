@@ -502,6 +502,7 @@ where
                                     None => Nullable::Null,
                                     Some(bits) => Nullable::Some(UserProfile {
                                         bits,
+                                        extra: Default::default(),
                                         nick: row.try_get(ProfileColumns::nickname())?,
                                         avatar: encrypt_snowflake_opt(
                                             &state,

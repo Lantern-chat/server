@@ -61,6 +61,7 @@ pub fn parse_member(row: db::Row, state: &ServerState) -> Result<PartyMember, Er
                 None => Nullable::Null,
                 Some(bits) => Nullable::Some(UserProfile {
                     bits,
+                    extra: Default::default(),
                     nick: row.try_get(MemberColumns::nickname())?,
                     avatar: encrypt_snowflake_opt(state, row.try_get(MemberColumns::avatar_id())?).into(),
                     banner: Nullable::Undefined,

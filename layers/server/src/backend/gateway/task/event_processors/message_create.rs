@@ -3,22 +3,12 @@ use thorn::pg::Json;
 
 use crate::backend::{
     api::room::messages::get::get_one_from_client,
-    gateway::Event,
     util::encrypted_asset::{encrypt_snowflake, encrypt_snowflake_opt},
-};
-
-use sdk::{
-    api::commands::room::{GetMessagesQuery, MessageSearch},
-    models::gateway::message::ServerMsg,
 };
 
 use super::prelude::*;
 
-pub async fn message_create(
-    state: &ServerState,
-    db: &db::pool::Client,
-    id: Snowflake,
-) -> Result<(), Error> {
+pub async fn message_create(state: &ServerState, db: &db::pool::Client, id: Snowflake) -> Result<(), Error> {
     let msg = get_one_from_client(state.clone(), id, db).await?;
 
     if let Some(party_id) = msg.party_id {

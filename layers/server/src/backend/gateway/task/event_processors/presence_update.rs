@@ -1,9 +1,7 @@
+use futures::StreamExt;
 use std::sync::Arc;
 
-use crate::backend::{gateway::Event, util::encrypted_asset::encrypt_snowflake_opt};
-
-use futures::StreamExt;
-use sdk::models::gateway::{events::UserPresenceEvent, message::ServerMsg};
+use crate::backend::util::encrypted_asset::encrypt_snowflake_opt;
 
 use super::prelude::*;
 
@@ -57,6 +55,7 @@ pub async fn presence_updated(
                     None => Nullable::Null,
                     Some(bits) => Nullable::Some(UserProfile {
                         bits,
+                        extra: Default::default(),
                         nick: row.try_get(Columns::nickname())?,
                         avatar: encrypt_snowflake_opt(state, row.try_get(Columns::avatar_id())?).into(),
                         banner: Nullable::Undefined,

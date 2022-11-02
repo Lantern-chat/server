@@ -73,7 +73,7 @@ pub async fn get_profile(
                 }
 
                 (avatar_bits & UserProfileBits::AVATAR_ROUNDNESS)
-                    | (banner_bits & (UserProfileBits::OVERRIDE_COLOR | UserProfileBits::COLOR))
+                    | (banner_bits & (UserProfileBits::OVERRIDE_COLOR | UserProfileBits::PRIMARY_COLOR))
             };
 
             // these are eequivalent to `COALESCE(party.*, base.*)`
@@ -144,6 +144,7 @@ mod q {
     pub fn raw_profile_to_public(state: &ServerState, raw: RawProfile) -> UserProfile {
         UserProfile {
             bits: raw.bits,
+            extra: Default::default(),
             nick: raw.nick.into(),
             avatar: encrypt_snowflake_opt(&state, raw.avatar).into(),
             banner: encrypt_snowflake_opt(&state, raw.banner).into(),

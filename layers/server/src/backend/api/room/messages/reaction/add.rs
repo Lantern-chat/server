@@ -82,6 +82,7 @@ pub async fn add_reaction(
                         None => Nullable::Null,
                         Some(bits) => Nullable::Some(UserProfile {
                             bits,
+                            extra: Default::default(),
                             nick: row.try_get(Columns::nickname())?,
                             avatar: encrypt_snowflake_opt(&state, row.try_get(Columns::avatar_id())?).into(),
                             banner: Nullable::Undefined,

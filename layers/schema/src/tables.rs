@@ -105,6 +105,7 @@ thorn::tables! {
         AvatarId: UserAssets::Id,
         BannerId: UserAssets::Id,
         Bits: Type::INT4,
+        Extra: Type::INT4,
         Nickname: Type::TEXT,
         CustomStatus: Type::TEXT,
         Biography: Type::TEXT,
