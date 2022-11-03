@@ -46,6 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = Path::new(&env::var("OUT_DIR")?).join("codegen.rs");
     let mut file = BufWriter::new(File::create(&path)?);
 
+    println!("cargo:rerun-if-changed=emoji-test.txt");
     let src = include_str!("./emoji-test.txt");
     let mut emojis = IndexMap::new();
 
