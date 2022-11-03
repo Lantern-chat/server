@@ -10,3 +10,6 @@ WORKERS_RS_VERSION = "0.0.11"
 
 [build]
 command = "worker-build --release"
+
+[env]
+CAMO_SIGNING_KEY = "your_hexadecimal_signing_key"
