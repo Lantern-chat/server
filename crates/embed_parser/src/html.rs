@@ -68,15 +68,7 @@ pub type HeaderList<'a> = smallvec::SmallVec<[Header<'a>; 32]>;
 
 use memchr::memmem::find;
 
-use regex_automata::{DenseDFA, Regex, RegexBuilder};
-
-lazy_static::lazy_static! {
-    static ref ATTRIBUTE_RE: Regex<DenseDFA<Vec<u16>, u16>> = RegexBuilder::new()
-        .minimize(true)
-        // r#"(\w+)\s*=\s*"((?:\\"|[^"])*[^\\])""# original with captures + unicode
-        .build_with_size::<u16>(r#"[a-zA-Z_][0-9a-zA-Z\\-_]+\s*=\s*"(?:\\"|[^"])*[^\\]""#)
-        .unwrap();
-}
+pub use crate::regexes::ATTRIBUTE_RE;
 
 /// Returns `None` on invalid HTML
 pub fn parse_meta<'a>(mut input: &'a str) -> Option<HeaderList<'a>> {

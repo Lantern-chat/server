@@ -12,3 +12,9 @@ pub mod oembed;
 fn trim_quotes(s: &str) -> &str {
     s.trim_matches(|c| c == '"' || c == '\'')
 }
+
+pub mod regexes {
+    use regex_automata::{DenseDFA, Regex};
+
+    include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
+}

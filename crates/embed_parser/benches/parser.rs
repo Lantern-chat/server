@@ -31,15 +31,15 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut g = c.benchmark_group("find_urls");
     g.bench_with_input("newest", INPUT, |b, x| b.iter(|| msg::find_urls(x)));
 
-    g.bench_with_input("aho_corasick", INPUT, |b, x| {
-        b.iter(|| msg::find_urls_aho_corasick(x))
-    });
-    g.bench_with_input("multiple_memchr", INPUT, |b, x| {
-        b.iter(|| msg::find_urls_multiple_memchr(x))
-    });
-    g.bench_with_input("regex_only", INPUT, |b, x| {
-        b.iter(|| msg::find_urls_regex_only(x))
-    });
+    // g.bench_with_input("aho_corasick", INPUT, |b, x| {
+    //     b.iter(|| msg::find_urls_aho_corasick(x))
+    // });
+    // g.bench_with_input("multiple_memchr", INPUT, |b, x| {
+    //     b.iter(|| msg::find_urls_multiple_memchr(x))
+    // });
+    // g.bench_with_input("regex_only", INPUT, |b, x| {
+    //     b.iter(|| msg::find_urls_regex_only(x))
+    // });
     g.finish();
 
     //c.bench_function("html_meta", |b| {
