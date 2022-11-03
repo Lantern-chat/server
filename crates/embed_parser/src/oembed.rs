@@ -35,9 +35,8 @@ pub fn parse_link_header<'a>(header: &'a str) -> LinkList<'a> {
 
         //while let Some(part) = parts.next() {
         for part in parts {
-            let (left, right) = match part.split_once('=') {
-                Some(v) => v,
-                None => continue 'links,
+            let Some((left, right)) = part.split_once('=') else {
+                continue 'links
             };
 
             if left == "type" && right.contains("xml") {

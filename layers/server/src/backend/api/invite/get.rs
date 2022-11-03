@@ -34,10 +34,7 @@ pub async fn get_invite(state: &ServerState, code: SmolStr) -> Result<Invite, Er
         )
         .await?;
 
-    let row = match row {
-        Some(row) => row,
-        None => return Err(Error::NotFound),
-    };
+    let Some(row) = row else { return Err(Error::NotFound); };
 
     let vanity: Option<SmolStr> = row.try_get(InviteColumns::Vanity as usize)?;
 

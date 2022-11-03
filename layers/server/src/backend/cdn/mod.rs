@@ -115,10 +115,7 @@ pub async fn get_attachment(
         .query_opt_cached_typed(|| query::select_attachment(), &[&file_id, &room_id])
         .await?;
 
-    let row = match row {
-        Some(row) => row,
-        None => return Err(Error::NotFound),
-    };
+    let Some(row) = row else { return Err(Error::NotFound); };
 
     drop(db);
 

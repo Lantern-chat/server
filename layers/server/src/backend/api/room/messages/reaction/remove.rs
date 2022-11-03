@@ -41,10 +41,7 @@ pub async fn remove_reaction(
         false => db.query_opt_cached_typed(|| q::query(false), params_p).boxed(),
     };
 
-    let row = match res.await? {
-        None => return Ok(()),
-        Some(row) => row,
-    };
+    let Some(row) = res.await? else { return Ok(()); };
 
     let party_id = row.try_get(0)?;
 

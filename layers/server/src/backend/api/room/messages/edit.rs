@@ -58,10 +58,7 @@ pub async fn edit_message(
         .query_opt_cached_typed(|| query_existing_message(), &[&msg_id, &room_id])
         .await?;
 
-    let row = match prev {
-        Some(row) => row,
-        None => return Err(Error::NotFound),
-    };
+    let Some(row) = prev else { return Err(Error::NotFound); };
 
     let author_id: Snowflake = row.try_get(0)?;
 

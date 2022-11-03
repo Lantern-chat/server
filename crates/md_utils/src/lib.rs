@@ -267,12 +267,9 @@ fn scan_substr_inner(
     on_found: impl FnOnce(usize),
 ) {
     #[cfg(debug_assertions)]
-    let input = match std::str::from_utf8(input) {
-        Ok(input) => input,
-        Err(_) => {
-            eprintln!("Input is not valid UTF8!");
-            return;
-        }
+    let Ok(input) = std::str::from_utf8(input) else {
+        eprintln!("Input is not valid UTF8!");
+        return;
     };
 
     // SAFETY: This *should* be safe, given that the slice given in

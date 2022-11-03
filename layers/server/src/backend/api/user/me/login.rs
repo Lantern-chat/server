@@ -44,10 +44,7 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) ->
         )
         .await?;
 
-    let user = match user {
-        Some(user) => user,
-        None => return Err(Error::InvalidCredentials),
-    };
+    let Some(user) = user else { return Err(Error::InvalidCredentials); };
 
     let user_id: Snowflake = user.try_get(0)?;
     let flags = UserFlags::from_bits_truncate(user.try_get(1)?);
@@ -100,13 +97,10 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) ->
     }
 
     if let (Some(secret), Some(backup)) = (secret, backup) {
-        match form.totp {
-            None => return Err(Error::TOTPRequired),
-            Some(token) => {
-                if !process_2fa(&state, user_id, secret, backup, &token).await? {
-                    return Err(Error::InvalidCredentials);
-                }
-            }
+        let Some(token) = form.totp else { return Err(Error::TOTPRequired); };
+
+        if !process_2fa(&state, user_id, secret, backup, &token).await? {
+            return Err(Error::InvalidCredentials);
         }
     }
 

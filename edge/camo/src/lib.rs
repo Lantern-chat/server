@@ -15,8 +15,6 @@ fn log_request(req: &Request) {
 
 #[event(fetch)]
 pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Response> {
-    utils::set_panic_hook();
-
     if req.method() != Method::Get {
         return Response::error("Method Not Allowed", 405);
     }
@@ -29,10 +27,11 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
     }
 
     // separate encoded url and encoded signature
-    let (raw_url, raw_sig) = match path["/camo/".len()..].split_once('/') {
-        Some((url, sig)) => (url, sig),
-        None => return Response::error("Missing signature", 400),
+    let Some((raw_url, raw_sig)) = path["/camo/".len()..].split_once('/') else {
+        return Response::error("Missing signature", 400);
     };
+
+    utils::set_panic_hook();
 
     // decode url
     let url = match base64::decode_config(&raw_url, base64::URL_SAFE_NO_PAD) {
@@ -49,9 +48,8 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
     }
 
     // decode signature
-    let sig = match base64::decode_config(&raw_sig, base64::URL_SAFE_NO_PAD) {
-        Ok(sig) => sig,
-        Err(_) => return Response::error("Invalid Encoding", 400),
+    let Ok(sig) = base64::decode_config(&raw_sig, base64::URL_SAFE_NO_PAD) else {
+        return Response::error("Invalid Encoding", 400);
     };
 
     // parse key and build hmac
