@@ -26,7 +26,7 @@ pub async fn main(req: Request, _env: Env, _ctx: worker::Context) -> Result<Resp
         return Response::error("Not Found", 404);
     }
 
-    let url = match base64::decode_config(&path["/cama/".len()..], base64::URL_SAFE_NO_PAD) {
+    let url = match base64::decode_config(&path["/camo/".len()..], base64::URL_SAFE_NO_PAD) {
         Ok(bytes) => match String::from_utf8(bytes) {
             Ok(url) => url,
             Err(_) => return Response::error("Invalid UTF-8", 400),
