@@ -167,9 +167,8 @@ pub async fn process_2fa(
         .unwrap()
         .as_secs();
 
-    let secret = match decrypt_user_message(&state.config.keys.mfa_key, user_id, secret) {
-        Ok(secret) => secret,
-        Err(_) => return Err(Error::InternalErrorStatic("Decrypt Error!")),
+    let Ok(secret) = decrypt_user_message(&state.config.keys.mfa_key, user_id, secret) else {
+        return Err(Error::InternalErrorStatic("Decrypt Error!"));
     };
 
     match token.len() {

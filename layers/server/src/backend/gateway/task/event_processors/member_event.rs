@@ -137,9 +137,8 @@ pub async fn member_event(
     let msg = match event {
         EventCode::MemberUpdated => ServerMsg::new_member_update(inner),
         EventCode::MemberJoined => {
-            let party = match party {
-                Some(party) => party,
-                None => return Err(Error::InternalErrorStatic("Member Joined to non-existent party")),
+            let Some(party) = party else {
+                return Err(Error::InternalErrorStatic("Member Joined to non-existent party"));
             };
 
             // Send user the party information

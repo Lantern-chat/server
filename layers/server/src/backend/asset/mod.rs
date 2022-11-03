@@ -197,9 +197,8 @@ pub async fn add_asset(
                     // put all of the file-writing in a try-block so if an error occurs then
                     // the file can be immediately deleted
                     let do_file = async {
-                        let msg = match output.next_msg().await? {
-                            None => return Err(Error::InternalErrorStatic("Failed to read encoded image")),
-                            Some(msg) => msg,
+                        let Some(msg) = output.next_msg().await? else {
+                            return Err(Error::InternalErrorStatic("Failed to read encoded image"));
                         };
 
                         let len = file.copy_from(msg).await? as i32;
@@ -207,9 +206,8 @@ pub async fn add_asset(
 
                         let db = state.db.write.get().await?;
 
-                        let processed = match processed_response {
-                            Some(ref p) => p,
-                            None => return Err(Error::InternalErrorStatic("Never received processed image")),
+                        let Some(ref processed) = processed_response else {
+                            return Err(Error::InternalErrorStatic("Never received processed image"));
                         };
 
                         let ProcessedResponse { width, height, .. } = *processed;
@@ -299,9 +297,8 @@ pub async fn add_asset(
     drop(child);
     drop(_cpu_permit);
 
-    let processed = match processed_response {
-        Some(p) => p,
-        None => return Err(Error::InternalErrorStatic("Never received processed image")),
+    let Some(processed) = processed_response else {
+        return Err(Error::InternalErrorStatic("Never received processed image"));
     };
 
     let asset_id = Snowflake::now();

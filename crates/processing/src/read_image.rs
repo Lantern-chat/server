@@ -120,9 +120,8 @@ fn read_generic<'a, D: ImageDecoder<'a>>(
         return Err(ImageReadError::ImageTooLarge);
     }
 
-    let image = match DynamicImage::from_decoder(decoder) {
-        Ok(image) => image,
-        Err(_) => return Err(ImageReadError::InvalidImageFormat),
+    let Ok(image) = DynamicImage::from_decoder(decoder) else {
+        return Err(ImageReadError::InvalidImageFormat);
     };
 
     Ok(Image {

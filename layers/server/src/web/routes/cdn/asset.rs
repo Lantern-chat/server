@@ -42,10 +42,7 @@ pub async fn asset(mut route: Route<ServerState>) -> ApiResponse {
         },
     };
 
-    let kind_id = match route.next().param::<Snowflake>() {
-        Some(Ok(id)) => id,
-        _ => return Err(Error::BadRequest),
-    };
+    let Some(Ok(kind_id)) = route.next().param::<Snowflake>() else { return Err(Error::BadRequest) };
 
     let mut asset_id = kind_id;
 

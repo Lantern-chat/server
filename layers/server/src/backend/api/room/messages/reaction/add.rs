@@ -46,10 +46,7 @@ pub async fn add_reaction(
         (true, true) => db.query_opt_cached_typed(|| q::query(true, true), params_p).boxed(),
     };
 
-    let row = match res.await? {
-        None => return Err(Error::Unauthorized),
-        Some(row) => row,
-    };
+    let Some(row) = res.await? else { return Err(Error::Unauthorized) };
 
     use q::columns::Columns;
 

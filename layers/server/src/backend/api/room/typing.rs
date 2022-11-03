@@ -140,10 +140,7 @@ pub async fn trigger_typing(
         )
         .await?;
 
-    let row = match row {
-        None => return Ok(()),
-        Some(row) => row,
-    };
+    let Some(row) = row else { return Ok(()) };
 
     use q::{ProfileColumns, RoleColumns, RoomColumns, UserColumns};
 

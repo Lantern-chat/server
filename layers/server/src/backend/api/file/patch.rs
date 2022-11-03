@@ -47,10 +47,7 @@ pub async fn patch_file(
         )
         .await?;
 
-    let row = match row {
-        Some(row) => row,
-        None => return Err(Error::NotFound),
-    };
+    let Some(row) = row else { return Err(Error::NotFound) };
 
     let size = row.try_get::<_, i32>(0)? as u64;
     let mut flags: FileFlags = FileFlags::from_bits_truncate(row.try_get(1)?);

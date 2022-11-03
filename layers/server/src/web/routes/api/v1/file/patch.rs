@@ -1,5 +1,5 @@
 use ftl::*;
-use headers::HeaderValue;
+use headers::{ContentLength, HeaderValue};
 use sdk::models::Snowflake;
 
 use super::ApiResponse;
@@ -18,18 +18,11 @@ pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: 
         Some(ct) => return Err(Error::UnsupportedMediaType(ct)),
     }
 
-    let upload_offset: u32 = match route.parse_raw_header("Upload-Offset") {
-        Some(Ok(Ok(upload_offset))) => upload_offset,
-        _ => return Err(Error::BadRequest),
-    };
+    let Some(Ok(Ok(upload_offset))) = route.parse_raw_header("Upload-Offset") else { return Err(Error::BadRequest) };
+    let Some(ContentLength(content_length)) = route.header::<headers::ContentLength>() else { return Err(Error::BadRequest) };
 
     let checksum = match route.raw_header("Upload-Checksum") {
         Some(checksum_header) => parse_checksum_header(checksum_header)?,
-        _ => return Err(Error::BadRequest),
-    };
-
-    let content_length = match route.header::<headers::ContentLength>() {
-        Some(cl) => cl.0,
         _ => return Err(Error::BadRequest),
     };
 
@@ -69,10 +62,7 @@ fn parse_checksum_header(header: &HeaderValue) -> Result<u32, Error> {
         return Err(Error::ChecksumMismatch);
     }
 
-    let checksum_encoded = match parts.next() {
-        Some(s) => s,
-        None => return Err(Error::ChecksumMismatch),
-    };
+    let Some(checksum_encoded) = parts.next() else { return Err(Error::ChecksumMismatch) };
 
     let mut out = [0u8; 4];
     if 4 != base64::decode_config_slice(checksum_encoded, base64::STANDARD, &mut out)? {

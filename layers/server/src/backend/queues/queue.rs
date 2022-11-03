@@ -25,10 +25,7 @@ impl Queue {
     }
 
     pub fn try_push<W: WorkItem>(&self, work: W) -> Result<JoinHandle<()>, W> {
-        let permit = match self.limit.clone().try_acquire_owned() {
-            Ok(permit) => permit,
-            Err(_) => return Err(work),
-        };
+        let Ok(permit) = self.limit.clone().try_acquire_owned() else { return Err(work) };
 
         Ok(tokio::spawn(async move {
             if let Err(e) = work.run().await {

@@ -12,10 +12,7 @@ pub fn encrypt_snowflake(state: &ServerState, id: Snowflake) -> SmolStr {
 }
 
 pub fn decrypt_snowflake(state: &ServerState, s: &str) -> Option<Snowflake> {
-    let block = match util::base64::decode_u128(s) {
-        Ok(block) => block,
-        Err(_) => return None,
-    };
+    let Ok(block) = util::base64::decode_u128(s) else { return None };
 
     Snowflake::decrypt(block, state.config.keys.sf_key)
 }
