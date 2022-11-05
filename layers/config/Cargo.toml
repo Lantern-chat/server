@@ -24,6 +24,8 @@ tracing = { version = "0.1", default_features = false }
 hex = "0.4.2"
 num_cpus = "1.13"
 aes = "0.8"
+sha1 = "0.10.5"
+hmac = "0.12.1"
 thiserror = "1"
 uuid = { version = "1.1.2", features = ["v4", "serde"] }
 paste = "1"
