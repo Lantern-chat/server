@@ -401,6 +401,7 @@ impl MainFileCache {
                             cdn: c.web.cdn_domain.clone(),
                             min_age: c.account.min_age,
                             secure: c.web.secure,
+                            camo: c.web.camo,
                             limits: sdk::models::ServerLimits {
                                 max_upload_size: c.upload.max_upload_size,
                                 max_avatar_size: c.upload.max_avatar_size as u32,
