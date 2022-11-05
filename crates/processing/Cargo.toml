@@ -15,8 +15,7 @@ png = "0.17"
 thiserror = "1.0.30"
 jpeg-decoder = { version = "0.3", default-features = false }
 jpeg-encoder = "0.5.1"
-oxipng = { git = "https://github.com/Lantern-chat/oxipng", default-features = false, features = ["libdeflater", "zopfli"] }
+oxipng = { git = "https://github.com/shssoichiro/oxipng", default-features = false, features = ["zopfli"] }
 mozjpeg = { version = "0.9.3" }
-
 ravif = { git = "https://github.com/kornelski/cavif-rs" }
 rgb = "0.8"
