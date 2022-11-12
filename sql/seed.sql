@@ -1237,9 +1237,9 @@ LANGUAGE plpgsql AS
 $$
 BEGIN
     IF
-        OLD.mfa_secret != NEW.mfa_secret OR
-        OLD.mfa_backup != NEW.mfa_backup OR
-        OLD.passhash != NEW.passhash
+        OLD.mfa_secret IS DISTINCT FROM NEW.mfa_secret OR
+        OLD.mfa_backup IS DISTINCT FROM NEW.mfa_backup OR
+        OLD.passhash IS DISTINCT FROM NEW.passhash
     THEN
         -- don't emit events on authorization changes
         RETURN NEW;
@@ -1272,12 +1272,21 @@ RETURNS trigger
 LANGUAGE plpgsql AS
 $$
 BEGIN
-    INSERT INTO lantern.event_log (id, party_id, code)
-    VALUES (
-        COALESCE(OLD.user_id, NEW.user_id),
-        COALESCE(OLD.party_id, NEW.party_id),
-        'profile_updated'::lantern.event_code
-    );
+    -- If updating or any values we care about for profile_updated are the same
+    IF TG_OP != 'UPDATE' OR (
+        OLD.bits != NEW.bits OR
+        (OLD.extra IS DISTINCT FROM NEW.extra) OR
+        (OLD.custom_status IS DISTINCT FROM NEW.custom_status) OR
+        (OLD.nickname IS DISTINCT FROM NEW.nickname) OR
+        (OLD.avatar_id IS DISTINCT FROM NEW.avatar_id)
+    ) THEN
+        INSERT INTO lantern.event_log (id, party_id, code)
+        VALUES (
+            COALESCE(OLD.user_id, NEW.user_id),
+            COALESCE(OLD.party_id, NEW.party_id),
+            'profile_updated'::lantern.event_code
+        );
+    END IF;
 
     RETURN NEW;
 END
