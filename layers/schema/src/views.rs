@@ -7,6 +7,14 @@ thorn::tables! {
         Ids: SNOWFLAKE_ARRAY,
     }
 
+    /// Returns the single most recent/priority presence
+    pub struct AggPresence in Lantern {
+        UserId: UserPresence::UserId,
+        Flags: UserPresence::Flags,
+        UpdatedAt: UserPresence::UpdatedAt,
+        Activity: UserPresence::Activity,
+    }
+
     pub struct AggUsers in Lantern {
         Id: Users::Id,
         Discriminator: Users::Discriminator,

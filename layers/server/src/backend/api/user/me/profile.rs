@@ -23,7 +23,7 @@ pub async fn patch_profile(
     let has_bio = !new_profile.bio.is_undefined();
     let has_nick = !new_profile.nick.is_undefined();
 
-    let db = if has_status || has_bio { state.db.write.get().await? } else { state.db.read.get().await? };
+    let db = state.db.write.get().await?;
 
     if party_id.is_some() {
         // TODO: Add permissions?
@@ -160,28 +160,22 @@ pub async fn patch_profile(
             (Nullable::Undefined, Nullable::Undefined) => {}
             (avatar_id, Nullable::Undefined) => {
                 db.execute_cached_typed(
-                    || insert_or_update_profile(&[Profiles::AvatarId, Profiles::Bits]),
-                    &[&auth.user_id, &party_id, &avatar_id, &new_profile.bits],
+                    || insert_or_update_profile(&[Profiles::AvatarId]),
+                    &[&auth.user_id, &party_id, &avatar_id],
                 )
                 .await?;
             }
             (Nullable::Undefined, banner_id) => {
                 db.execute_cached_typed(
-                    || insert_or_update_profile(&[Profiles::BannerId, Profiles::Bits]),
-                    &[&auth.user_id, &party_id, &banner_id, &new_profile.bits],
+                    || insert_or_update_profile(&[Profiles::BannerId]),
+                    &[&auth.user_id, &party_id, &banner_id],
                 )
                 .await?;
             }
             (avatar_id, banner_id) => {
                 db.execute_cached_typed(
-                    || insert_or_update_profile(&[Profiles::AvatarId, Profiles::BannerId, Profiles::Bits]),
-                    &[
-                        &auth.user_id,
-                        &party_id,
-                        &avatar_id,
-                        &banner_id,
-                        &new_profile.bits,
-                    ],
+                    || insert_or_update_profile(&[Profiles::AvatarId, Profiles::BannerId]),
+                    &[&auth.user_id, &party_id, &avatar_id, &banner_id],
                 )
                 .await?;
             }

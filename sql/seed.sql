@@ -103,7 +103,8 @@ CREATE TYPE lantern.event_code AS ENUM (
     'role_deleted',
     'invite_create',
     'message_react',
-    'message_unreact'
+    'message_unreact',
+    'profile_updated'
 );
 
 CREATE SEQUENCE lantern.event_id;
@@ -1266,16 +1267,16 @@ FOR EACH ROW EXECUTE FUNCTION lantern.user_trigger();
 
 --
 
--- emit a 'presence_updated' event when their profile changes
 CREATE OR REPLACE FUNCTION lantern.profile_trigger()
 RETURNS trigger
 LANGUAGE plpgsql AS
 $$
 BEGIN
-    INSERT INTO lantern.event_log (id, code)
+    INSERT INTO lantern.event_log (id, party_id, code)
     VALUES (
         COALESCE(OLD.user_id, NEW.user_id),
-        'presence_updated'::lantern.event_code
+        COALESCE(OLD.party_id, NEW.party_id),
+        'profile_updated'::lantern.event_code
     );
 
     RETURN NEW;

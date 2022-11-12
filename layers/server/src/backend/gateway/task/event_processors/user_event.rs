@@ -14,7 +14,7 @@ pub async fn user_update(
     db: &db::pool::Client,
     user_id: Snowflake,
 ) -> Result<(), Error> {
-    self_update(state, db, user_id, None).await?;
+    let self_future = self_update(state, db, user_id, None);
 
     let user_future = async {
         mod user_query {
@@ -99,7 +99,8 @@ pub async fn user_update(
         Ok::<_, Error>(party_ids)
     };
 
-    let (user, friend_ids, party_ids) = tokio::try_join!(user_future, friends_future, parties_future)?;
+    let (_, user, friend_ids, party_ids) =
+        tokio::try_join!(self_future, user_future, friends_future, parties_future)?;
 
     let event = Event::new(ServerMsg::new_user_update(user), None)?;
 

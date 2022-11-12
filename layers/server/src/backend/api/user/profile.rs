@@ -3,6 +3,7 @@ use sdk::{api::commands::user::UpdateUserProfileBody, models::*};
 
 use crate::{Authorization, Error, ServerState};
 
+// TODO: Check if the user's profile is visible to auth.user_id
 pub async fn get_profile(
     state: ServerState,
     auth: Authorization,

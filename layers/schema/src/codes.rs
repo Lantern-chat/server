@@ -46,6 +46,8 @@ thorn::enums! {
 
         MessageReact,
         MessageUnreact,
+
+        ProfileUpdated,
     }
 }
 

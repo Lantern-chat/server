@@ -11,81 +11,63 @@ pub async fn presence_updated(
     user_id: Snowflake,
     party_id: Option<Snowflake>,
 ) -> Result<(), Error> {
-    super::user_event::self_update(state, db, user_id, party_id).await?;
+    let do_update = async {
+        use q::{Parameters, Params, PartyColumns, PresenceColumns, UserColumns};
 
-    let mut stream = match party_id {
-        None => db
-            .query_stream_cached_typed(
-                || {
-                    use q::*;
-                    base_query().and_where(AggMemberPresence::UserId.equals(Var::of(Users::Id)))
+        let params = Params { user_id, party_id };
+
+        #[rustfmt::skip]
+        let stream = db.query_stream_cached_typed(|| q::query(), &params.as_params()).await?;
+
+        futures::pin_mut!(stream);
+
+        // TODO: Accumulate events then shotgun them or do one broadcast per iteration?
+        while let Some(row_res) = stream.next().await {
+            let row = row_res?;
+
+            let party_id: Option<Snowflake> = row.try_get(PartyColumns::party_id())?;
+            // TODO: Get other broadcast ids
+
+            let inner = UserPresenceEvent {
+                user: User {
+                    id: user_id,
+                    username: row.try_get(UserColumns::username())?,
+                    discriminator: row.try_get(UserColumns::discriminator())?,
+                    flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
+                    profile: Nullable::Undefined,
+                    email: None,
+                    preferences: None,
                 },
-                &[&user_id],
-            )
-            .await?
-            .boxed(),
-        Some(party_id) => db
-            .query_stream_cached_typed(
-                || {
-                    use q::*;
-                    base_query()
-                        .and_where(AggMemberPresence::UserId.equals(Var::of(Users::Id)))
-                        .and_where(AggMemberPresence::PartyId.equals(Var::of(Party::Id)))
+                presence: match row.try_get(PresenceColumns::updated_at())? {
+                    Some(updated_at) => UserPresence {
+                        flags: UserPresenceFlags::from_bits_truncate_public(
+                            row.try_get(PresenceColumns::flags())?,
+                        ),
+                        updated_at: Some(updated_at),
+                        activity: None,
+                    },
+                    None => UserPresence {
+                        flags: UserPresenceFlags::empty(),
+                        updated_at: None,
+                        activity: None,
+                    },
                 },
-                &[&user_id, &party_id],
-            )
-            .await?
-            .boxed(),
+            };
+
+            if let Some(party_id) = party_id {
+                let event = Event::new(ServerMsg::new_presence_update(party_id, inner), None)?;
+
+                state.gateway.broadcast_event(event, party_id).await;
+            }
+        }
+
+        Ok(())
     };
 
-    use q::Columns;
-
-    while let Some(row_res) = stream.next().await {
-        let row = row_res?;
-
-        let party_id = row.try_get(Columns::party_id())?;
-
-        let inner = UserPresenceEvent {
-            user: User {
-                id: user_id,
-                username: row.try_get(Columns::username())?,
-                discriminator: row.try_get(Columns::discriminator())?,
-                flags: UserFlags::from_bits_truncate_public(row.try_get(Columns::user_flags())?),
-                profile: match row.try_get(Columns::profile_bits())? {
-                    None => Nullable::Null,
-                    Some(bits) => Nullable::Some(UserProfile {
-                        bits,
-                        extra: Default::default(),
-                        nick: row.try_get(Columns::nickname())?,
-                        avatar: encrypt_snowflake_opt(state, row.try_get(Columns::avatar_id())?).into(),
-                        banner: Nullable::Undefined,
-                        status: row.try_get(Columns::custom_status())?,
-                        bio: Nullable::Undefined,
-                    }),
-                },
-                email: None,
-                preferences: None,
-            },
-            presence: match row.try_get(Columns::updated_at())? {
-                Some(updated_at) => UserPresence {
-                    flags: UserPresenceFlags::from_bits_truncate_public(
-                        row.try_get(Columns::presence_flags())?,
-                    ),
-                    updated_at: Some(updated_at),
-                    activity: None,
-                },
-                None => UserPresence {
-                    flags: UserPresenceFlags::empty(),
-                    updated_at: None,
-                    activity: None,
-                },
-            },
-        };
-
-        let event = Event::new(ServerMsg::new_presence_update(party_id, inner), None)?;
-
-        state.gateway.broadcast_event(event, party_id).await;
-    }
+    tokio::try_join!(
+        super::user_event::self_update(state, db, user_id, None),
+        do_update
+    )?;
 
     Ok(())
 }
@@ -94,25 +76,47 @@ mod q {
     pub use schema::*;
     pub use thorn::*;
 
-    indexed_columns! {
-        pub enum Columns {
-            AggMemberPresence::Username,
-            AggMemberPresence::Discriminator,
-            AggMemberPresence::UserFlags,
-            AggMemberPresence::PartyId,
-            AggMemberPresence::ProfileBits,
-            AggMemberPresence::Nickname,
-            AggMemberPresence::AvatarId,
-            AggMemberPresence::CustomStatus,
-            AggMemberPresence::UpdatedAt,
-            AggMemberPresence::PresenceFlags,
-            AggMemberPresence::PresenceActivity,
+    thorn::params! {
+        pub struct Params {
+            pub user_id: Snowflake = Users::Id,
+            pub party_id: Option<Snowflake> = PartyMember::PartyId,
         }
     }
 
-    pub fn base_query() -> query::SelectQuery {
+    thorn::indexed_columns! {
+        pub enum UserColumns {
+            Users::Username,
+            Users::Discriminator,
+            Users::Flags,
+        }
+
+        pub enum PartyColumns continue UserColumns {
+            PartyMember::PartyId,
+        }
+
+        pub enum PresenceColumns continue PartyColumns {
+            AggPresence::UpdatedAt,
+            AggPresence::Flags,
+            //AggPresence::Activity,
+        }
+    }
+
+    pub fn query() -> query::SelectQuery {
         Query::select()
-            .from_table::<AggMemberPresence>()
-            .cols(Columns::default())
+            .cols(UserColumns::default())
+            .cols(PartyColumns::default())
+            .cols(PresenceColumns::default())
+            .and_where(Users::Id.equals(Params::user_id()))
+            .and_where(
+                PartyMember::PartyId
+                    .equals(Params::party_id())
+                    .or(Params::party_id().is_null()),
+            )
+            .from(
+                Users::inner_join_table::<PartyMember>()
+                    .on(PartyMember::UserId.equals(Users::Id))
+                    .left_join_table::<AggPresence>()
+                    .on(AggPresence::UserId.equals(Users::Id)),
+            )
     }
 }

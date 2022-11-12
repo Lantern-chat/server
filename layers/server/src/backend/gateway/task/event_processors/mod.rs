@@ -20,6 +20,7 @@ pub mod message_create;
 pub mod message_delete;
 pub mod message_update;
 pub mod presence_update;
+pub mod profile_event;
 pub mod role_event;
 pub mod user_event;
 
@@ -56,6 +57,7 @@ pub async fn process(
         }
         EventCode::SelfUpdated => user_event::self_update(state, db, id, party_id).await,
         EventCode::UserUpdated => user_event::user_update(state, db, id).await,
+        EventCode::ProfileUpdated => profile_event::profile_updated(state, db, id, party_id).await,
         _ => Err(Error::Unimplemented),
     }
 }
