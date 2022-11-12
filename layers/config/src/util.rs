@@ -9,7 +9,41 @@ pub fn parse<T: FromStr>(s: &str, default: T) -> T {
 }
 
 pub mod hex_key {
+    use std::borrow::Cow;
+
     use super::*;
+
+    pub fn parse_hex_key_inner(key: &mut [u8], value: &str, strict: bool) -> Result<(), Cow<'static, str>> {
+        let hex_len = value.len();
+        let raw_len = hex_len / 2;
+
+        if hex_len < 32 {
+            return Err("Don't use key sizes under 128-bits".into());
+        }
+
+        if strict && key.len() * 2 != hex_len {
+            return Err(format!("Length mismatch for {}-bit key", key.len() * 8).into());
+        }
+
+        match hex::decode_to_slice(value, &mut key[..raw_len]) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(format!("Invalid hexidecimal {}-bit encryption key: {e}", key.len() * 8).into()),
+        }
+    }
+
+    pub mod loose {
+        use super::*;
+
+        pub use super::serialize;
+
+        pub fn deserialize<'de, T, D>(deserializer: D) -> Result<T, D::Error>
+        where
+            D: Deserializer<'de>,
+            T: Default + AsMut<[u8]>,
+        {
+            super::deserialize_inner(deserializer, false)
+        }
+    }
 
     pub fn serialize<S, T: AsRef<[u8]>>(key: T, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -23,7 +57,15 @@ pub mod hex_key {
         D: Deserializer<'de>,
         T: Default + AsMut<[u8]>,
     {
-        struct Visitor<T: Default + AsMut<[u8]>>(PhantomData<T>);
+        deserialize_inner(deserializer, true)
+    }
+
+    fn deserialize_inner<'de, T, D>(deserializer: D, strict: bool) -> Result<T, D::Error>
+    where
+        D: Deserializer<'de>,
+        T: Default + AsMut<[u8]>,
+    {
+        struct Visitor<T: Default + AsMut<[u8]>>(bool, PhantomData<T>);
 
         impl<'de, T: Default + AsMut<[u8]>> de::Visitor<'de> for Visitor<T> {
             type Value = T;
@@ -38,20 +80,14 @@ pub mod hex_key {
             {
                 let mut key = T::default();
 
-                let len = key.as_mut().len();
-
-                if value.len() != key.as_mut().len() * 2 {
-                    return Err(E::custom(format!("Length mismatch for {}-bit key", len * 8)));
-                }
-
-                match hex::decode_to_slice(value, key.as_mut()) {
+                match parse_hex_key_inner(key.as_mut(), value, self.0) {
                     Ok(_) => Ok(key),
                     Err(e) => Err(E::custom(e)),
                 }
             }
         }
 
-        deserializer.deserialize_str(Visitor::<T>(PhantomData))
+        deserializer.deserialize_str(Visitor::<T>(strict, PhantomData))
     }
 }
 
