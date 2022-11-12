@@ -177,9 +177,9 @@ pub async fn trigger_typing(
             };
 
             let event = ServerMsg::new_typing_start(events::TypingStart {
-                room: room_id,
-                user: auth.user_id,
-                party: Some(party_id),
+                room_id,
+                user_id: auth.user_id,
+                party_id: Some(party_id),
                 member: Some(member),
             });
 
