@@ -4,6 +4,7 @@ use sdk::{api::commands::user::UpdateUserProfileBody, models::*};
 use crate::{Authorization, Error, ServerState};
 
 // TODO: Check if the user's profile is visible to auth.user_id
+// One idea is to select from visibility, then left-join base and party profiles each, doing all this logic in SQL
 pub async fn get_profile(
     state: ServerState,
     auth: Authorization,

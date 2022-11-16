@@ -4,32 +4,6 @@ use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Authorization
 
 use sdk::models::*;
 
-mod friend_query {
-    pub use schema::*;
-    pub use thorn::*;
-
-    indexed_columns! {
-        pub enum FriendColumns {
-            AggFriends::FriendId,
-            AggFriends::Note,
-            AggFriends::Flags,
-        }
-
-        pub enum UserColumns continue FriendColumns {
-            Users::Username,
-            Users::Flags,
-            Users::Discriminator,
-        }
-
-        pub enum ProfileColumns continue UserColumns {
-            Profiles::Nickname,
-            Profiles::AvatarId,
-            Profiles::Bits,
-            Profiles::CustomStatus,
-        }
-    }
-}
-
 pub async fn friends(
     state: ServerState,
     auth: Authorization,
@@ -37,29 +11,10 @@ pub async fn friends(
     let db = state.db.read.get().await?;
 
     let stream = db
-        .query_stream_cached_typed(
-            || {
-                use friend_query::*;
-
-                Query::select()
-                    .cols(FriendColumns::default())
-                    .cols(UserColumns::default())
-                    .cols(ProfileColumns::default())
-                    .from(
-                        AggFriends::inner_join_table::<Users>()
-                            .on(Users::Id.equals(AggFriends::FriendId))
-                            .left_join_table::<Profiles>()
-                            .on(Profiles::UserId
-                                .equals(AggFriends::FriendId)
-                                .and(Profiles::PartyId.is_null())),
-                    )
-                    .and_where(AggFriends::UserId.equals(Var::of(Users::Id)))
-            },
-            &[&auth.user_id],
-        )
+        .query_stream_cached_typed(|| q::query(), &[&auth.user_id])
         .await?;
 
-    use friend_query::{FriendColumns, ProfileColumns, UserColumns};
+    use q::{FriendColumns, ProfileColumns, UserColumns};
 
     Ok(stream.map(move |res| match res {
         Err(e) => Err(e.into()),
@@ -69,7 +24,7 @@ pub async fn friends(
             user: User {
                 id: row.try_get(FriendColumns::friend_id())?,
                 username: row.try_get(UserColumns::username())?,
-                flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::discriminator())?),
+                flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
                 discriminator: row.try_get(UserColumns::discriminator())?,
                 email: None,
                 preferences: None,
@@ -89,4 +44,46 @@ pub async fn friends(
             },
         }),
     }))
+}
+
+mod q {
+    pub use schema::*;
+    pub use thorn::*;
+
+    thorn::indexed_columns! {
+        pub enum FriendColumns {
+            AggFriends::FriendId,
+            AggFriends::Note,
+            AggFriends::Flags,
+        }
+
+        pub enum UserColumns continue FriendColumns {
+            Users::Username,
+            Users::Flags,
+            Users::Discriminator,
+        }
+
+        pub enum ProfileColumns continue UserColumns {
+            Profiles::Nickname,
+            Profiles::AvatarId,
+            Profiles::Bits,
+            Profiles::CustomStatus,
+        }
+    }
+
+    pub fn query() -> impl AnyQuery {
+        Query::select()
+            .cols(FriendColumns::default())
+            .cols(UserColumns::default())
+            .cols(ProfileColumns::default())
+            .from(
+                AggFriends::inner_join_table::<Users>()
+                    .on(Users::Id.equals(AggFriends::FriendId))
+                    .left_join_table::<Profiles>()
+                    .on(Profiles::UserId
+                        .equals(AggFriends::FriendId)
+                        .and(Profiles::PartyId.is_null())),
+            )
+            .and_where(AggFriends::UserId.equals(Var::of(Users::Id)))
+    }
 }

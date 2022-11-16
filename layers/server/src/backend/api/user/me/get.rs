@@ -4,52 +4,11 @@ use thorn::pg::Json;
 use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Authorization, Error, ServerState};
 
 pub async fn get_full(state: &ServerState, user_id: Snowflake) -> Result<User, Error> {
-    mod self_query {
-        pub use schema::*;
-        pub use thorn::*;
-
-        indexed_columns! {
-            pub enum UserColumns {
-                Users::Username,
-                Users::Discriminator,
-                Users::Flags,
-                Users::Email,
-                Users::Preferences,
-            }
-
-            pub enum ProfileColumns continue UserColumns {
-                Profiles::Bits,
-                Profiles::Nickname,
-                Profiles::AvatarId,
-                Profiles::BannerId,
-                Profiles::CustomStatus,
-                Profiles::Biography,
-            }
-        }
-    }
-
     let db = state.db.read.get().await?;
 
-    let row = db
-        .query_one_cached_typed(
-            || {
-                use self_query::*;
+    let row = db.query_one_cached_typed(|| q::query(), &[&user_id]).await?;
 
-                Query::select()
-                    .cols(UserColumns::default())
-                    .cols(ProfileColumns::default())
-                    .from(
-                        Users::left_join_table::<Profiles>().on(Profiles::UserId
-                            .equals(Users::Id)
-                            .and(Profiles::PartyId.is_null())),
-                    )
-                    .and_where(Users::Id.equals(Var::of(Users::Id)))
-            },
-            &[&user_id],
-        )
-        .await?;
-
-    use self_query::{ProfileColumns, UserColumns};
+    use q::{ProfileColumns, UserColumns};
 
     Ok(User {
         id: user_id,
@@ -74,4 +33,40 @@ pub async fn get_full(state: &ServerState, user_id: Snowflake) -> Result<User, E
             }),
         },
     })
+}
+
+mod q {
+    pub use schema::*;
+    pub use thorn::*;
+
+    thorn::indexed_columns! {
+        pub enum UserColumns {
+            Users::Username,
+            Users::Discriminator,
+            Users::Flags,
+            Users::Email,
+            Users::Preferences,
+        }
+
+        pub enum ProfileColumns continue UserColumns {
+            Profiles::Bits,
+            Profiles::Nickname,
+            Profiles::AvatarId,
+            Profiles::BannerId,
+            Profiles::CustomStatus,
+            Profiles::Biography,
+        }
+    }
+
+    pub fn query() -> impl AnyQuery {
+        Query::select()
+            .cols(UserColumns::default())
+            .cols(ProfileColumns::default())
+            .from(
+                Users::left_join_table::<Profiles>().on(Profiles::UserId
+                    .equals(Users::Id)
+                    .and(Profiles::PartyId.is_null())),
+            )
+            .and_where(Users::Id.equals(Var::of(Users::Id)))
+    }
 }
