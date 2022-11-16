@@ -1406,10 +1406,11 @@ FROM lantern.mentions GROUP BY msg_id;
 
 ---
 
-CREATE OR REPLACE VIEW lantern.agg_friends(user_id, friend_id, flags, note) AS
-SELECT user_a_id, user_b_id, flags, note_a FROM lantern.friendlist
+CREATE OR REPLACE VIEW lantern.agg_friends(user_id, friend_id, which, flags, note) AS
+SELECT user_a_id, user_b_id, 0::int2, flags, note_a FROM lantern.friendlist
 UNION ALL
-SELECT user_b_id, user_a_id, flags, note_b FROM lantern.friendlist;
+-- Set PENDING flag to true if ACCEPTED flag is false, only applicable for b->a requests
+SELECT user_b_id, user_a_id, 1::int2, flags | ((1::int2 # (1::int2 & flags)) << 1), note_b FROM lantern.friendlist;
 
 --
 

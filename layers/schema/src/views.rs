@@ -99,6 +99,8 @@ thorn::tables! {
     pub struct AggFriends in Lantern {
         UserId: Users::Id,
         FriendId: Users::Id,
+        /// 0 if a->b, 1 if b->a
+        Which: Type::INT2,
         Flags: Type::INT2,
         Note: Type::VARCHAR,
     }
