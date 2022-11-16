@@ -63,7 +63,10 @@ pub async fn profile_updated(
                 },
             };
 
-            let event = Event::new(ServerMsg::new_profile_update(party_id, user), None)?;
+            let event = Event::new(
+                ServerMsg::new_profile_update(ProfileUpdateEvent { party_id, user }),
+                None,
+            )?;
 
             match party_id {
                 Some(party_id) => state.gateway.broadcast_event(event, party_id).await,
