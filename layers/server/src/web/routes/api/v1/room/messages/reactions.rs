@@ -17,7 +17,9 @@ pub async fn reactions(
         (&Method::DELETE, End) => todo!("Delete all reactions"),
         (_, Exact(_)) => match route.param::<EmoteOrEmoji>() {
             Some(Ok(emote)) => {
-                let Some(emote) = route.state.emoji.resolve(emote) else { return Err(Error::BadRequest) };
+                let Some(emote) = route.state.emoji.resolve(emote) else {
+                    return Err(Error::BadRequest)
+                };
 
                 match route.next().method_segment() {
                     (&Method::GET, End) => todo!("Get reactions"),

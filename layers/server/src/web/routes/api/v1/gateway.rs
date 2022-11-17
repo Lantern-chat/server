@@ -4,9 +4,8 @@ use super::ApiResponse;
 use crate::Error;
 
 pub fn gateway(route: Route<crate::ServerState>) -> ApiResponse {
-    let addr = match real_ip::get_real_ip(&route) {
-        Ok(addr) => addr,
-        Err(_) => return Err(Error::BadRequest),
+    let Ok(addr) = real_ip::get_real_ip(&route) else {
+        return Err(Error::BadRequest);
     };
 
     let query = match route.query() {

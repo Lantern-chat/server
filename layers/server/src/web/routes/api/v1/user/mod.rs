@@ -1,4 +1,5 @@
 use ftl::*;
+use sdk::Snowflake;
 
 use crate::{web::auth::authorize, Error};
 
@@ -19,17 +20,18 @@ pub async fn user(mut route: Route<crate::ServerState>) -> ApiResponse {
         (_, Exact("@me")) => me::me(route).await,
 
         // ANY /api/v1/user/1234
-        (_, Exact(segment)) => match segment.parse::<schema::Snowflake>() {
-            Err(_) => Err(Error::BadRequest),
-            Ok(user_id) => {
-                let auth = authorize(&route).await?;
+        (_, Exact(segment)) => {
+            let Ok(user_id) = segment.parse::<Snowflake>() else {
+                return Err(Error::BadRequest);
+            };
 
-                match route.next().method_segment() {
-                    (&Method::GET, Exact("profile")) => profile::profile(route, auth, user_id).await,
-                    _ => Err(Error::Unimplemented),
-                }
+            let auth = authorize(&route).await?;
+
+            match route.next().method_segment() {
+                (&Method::GET, Exact("profile")) => profile::profile(route, auth, user_id).await,
+                _ => Err(Error::Unimplemented),
             }
-        },
+        }
         _ => Err(Error::NotFound),
     }
 }
