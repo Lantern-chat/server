@@ -16,6 +16,8 @@ pub async fn add_friend(state: ServerState, auth: Authorization, user_id: Snowfl
     use q::{Parameters, Params};
 
     let params = Params {
+        from_id: auth.user_id,
+        to_id: user_id,
         user_a_id,
         user_b_id,
         flags,
@@ -38,22 +40,42 @@ mod q {
     use super::FriendFlags;
 
     pub use schema::*;
+    use sdk::models::UserFlags;
     pub use thorn::*;
 
     thorn::params! {
         pub struct Params {
+            pub from_id: Snowflake = Friends::UserAId,
+            pub to_id: Snowflake = Friends::UserBId,
             pub user_a_id: Snowflake = Friends::UserAId,
             pub user_b_id: Snowflake = Friends::UserBId,
             pub flags: FriendFlags = Friends::Flags,
         }
     }
 
-    // TODO: Check for user blocking
     pub fn query() -> impl AnyQuery {
         Query::insert()
             .into::<Friends>()
             .cols(&[Friends::UserAId, Friends::UserBId, Friends::Flags])
-            .values([Params::user_a_id(), Params::user_b_id(), Params::flags()])
+            .query(
+                Query::select()
+                    .exprs([Params::user_a_id(), Params::user_b_id(), Params::flags()])
+                    .from(
+                        Users::left_join_table::<UserBlocks>().on(UserBlocks::UserId
+                            .equals(Users::Id)
+                            .and(UserBlocks::BlockId.equals(Params::from_id()))),
+                    )
+                    .and_where(Users::Id.equals(Params::to_id()))
+                    .and_where(
+                        // and where user is a regular user (no bots, staff, system, etc.)
+                        Users::Flags
+                            .bit_and(UserFlags::ELEVATION.bits().lit())
+                            .equals(0.lit()),
+                    )
+                    // and where not blocked
+                    .and_where(UserBlocks::BlockedAt.is_null())
+                    .as_value(),
+            )
             .on_conflict(
                 [Friends::UserAId, Friends::UserBId],
                 DoUpdate

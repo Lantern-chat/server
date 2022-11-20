@@ -31,6 +31,12 @@ pub struct Authorization {
     pub flags: UserFlags,
 }
 
+impl Authorization {
+    pub fn is_bot(&self) -> bool {
+        matches!(self.token, RawAuthToken::Bot(_))
+    }
+}
+
 use crate::Error;
 
 pub async fn do_auth(state: &ServerState, token: RawAuthToken) -> Result<Authorization, Error> {
