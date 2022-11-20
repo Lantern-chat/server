@@ -26,21 +26,35 @@ pub async fn add_friend(state: ServerState, auth: Authorization, user_id: Snowfl
     let db = state.db.write.get().await?;
 
     let res = db
-        .execute_cached_typed(|| q::query(), &params.as_params())
+        .query_opt_cached_typed(|| q::query(), &params.as_params())
         .await?;
 
-    if res == 0 {
+    let Some(row) = res else {
+        return Err(Error::NotFound);
+    };
+
+    let is_regular_user: bool = row.try_get(0)?;
+    let is_not_blocked: bool = row.try_get(1)?;
+    let flags: Option<FriendFlags> = row.try_get(2)?;
+
+    if !is_not_blocked {
+        return Err(Error::Blocked);
+    }
+
+    if !is_regular_user {
         return Err(Error::Unauthorized);
     }
 
-    Ok(())
+    match flags {
+        None => Err(Error::BadRequest),
+        _ => Ok(()),
+    }
 }
 
 mod q {
-    use super::FriendFlags;
+    use super::{FriendFlags, UserFlags};
 
     pub use schema::*;
-    use sdk::models::UserFlags;
     pub use thorn::*;
 
     thorn::params! {
@@ -53,48 +67,86 @@ mod q {
         }
     }
 
+    thorn::tables! {
+        pub struct SelectUsers {
+            UserAId: Friends::UserAId,
+            UserBId: Friends::UserBId,
+            Flags: Friends::Flags,
+            IsRegularUser: Type::BOOL,
+            IsNotBlocked: Type::BOOL,
+        }
+
+        pub struct AddFriend {
+            Flags: Friends::Flags,
+        }
+    }
+
     pub fn query() -> impl AnyQuery {
-        Query::insert()
-            .into::<Friends>()
-            .cols(&[Friends::UserAId, Friends::UserBId, Friends::Flags])
-            .query(
-                Query::select()
-                    .exprs([Params::user_a_id(), Params::user_b_id(), Params::flags()])
-                    .from(
-                        Users::left_join_table::<UserBlocks>().on(UserBlocks::UserId
-                            .equals(Users::Id)
-                            .and(UserBlocks::BlockId.equals(Params::from_id()))),
-                    )
-                    .and_where(Users::Id.equals(Params::to_id()))
-                    .and_where(
-                        // and where user is a regular user (no bots, staff, system, etc.)
-                        Users::Flags
-                            .bit_and(UserFlags::ELEVATION.bits().lit())
-                            .equals(0.lit()),
-                    )
-                    // and where not blocked
-                    .and_where(UserBlocks::BlockedAt.is_null())
-                    .as_value(),
-            )
-            .on_conflict(
-                [Friends::UserAId, Friends::UserBId],
-                DoUpdate
-                    .set(Friends::Flags, Friends::Flags.bit_or(1.lit()))
-                    .set_default(Friends::UpdatedAt)
-                    .and_where(
-                        // and where not accepted
-                        Friends::Flags
-                            .bit_and(FriendFlags::ACCEPTED.bits().lit())
-                            .equals(0.lit()),
-                    )
-                    .and_where(
-                        // and where the confirmation is from the other user, see note below
-                        Params::flags()
-                            .bit_xor(Friends::Flags)
-                            .bit_and(FriendFlags::ADDED_BY.bits().lit())
-                            .not_equals(0.lit()),
-                    ),
-            )
+        let select_users = SelectUsers::as_query(
+            Query::select()
+                .from(
+                    Users::left_join_table::<UserBlocks>().on(UserBlocks::UserId
+                        .equals(Users::Id)
+                        .and(UserBlocks::BlockId.equals(Params::from_id()))),
+                )
+                .exprs([
+                    Params::user_a_id().alias_to(SelectUsers::UserAId),
+                    Params::user_b_id().alias_to(SelectUsers::UserBId),
+                    Params::flags().alias_to(SelectUsers::Flags),
+                ])
+                .expr(
+                    Users::Flags
+                        .bit_and(UserFlags::ELEVATION.bits().lit())
+                        .equals(0.lit())
+                        .alias_to(SelectUsers::IsRegularUser),
+                )
+                .expr(
+                    UserBlocks::BlockedAt
+                        .is_null()
+                        .alias_to(SelectUsers::IsNotBlocked),
+                )
+                .and_where(Users::Id.equals(Params::to_id())),
+        );
+
+        let add_friend = AddFriend::as_query(
+            Query::insert()
+                .into::<Friends>()
+                .cols(&[Friends::UserAId, Friends::UserBId, Friends::Flags])
+                .query(
+                    Query::select()
+                        .from_table::<SelectUsers>()
+                        .cols(&[SelectUsers::UserAId, SelectUsers::UserBId, SelectUsers::Flags])
+                        .and_where(SelectUsers::IsNotBlocked.and(SelectUsers::IsRegularUser))
+                        .as_value(),
+                )
+                .on_conflict(
+                    [Friends::UserAId, Friends::UserBId],
+                    DoUpdate
+                        .set(Friends::Flags, Friends::Flags.bit_or(1.lit()))
+                        .set_default(Friends::UpdatedAt)
+                        .and_where(
+                            // and where not accepted
+                            Friends::Flags
+                                .bit_and(FriendFlags::ACCEPTED.bits().lit())
+                                .equals(0.lit()),
+                        )
+                        .and_where(
+                            // and where the confirmation is from the other user, see note below
+                            Params::flags()
+                                .bit_xor(Friends::Flags)
+                                .bit_and(FriendFlags::ADDED_BY.bits().lit())
+                                .not_equals(0.lit()),
+                        ),
+                )
+                .returning(Friends::Flags.alias_to(AddFriend::Flags)),
+        );
+
+        Query::select()
+            .with(select_users.exclude())
+            .with(add_friend.exclude())
+            .from(SelectUsers::left_join_table::<AddFriend>().on(true.lit()))
+            .cols(&[SelectUsers::IsRegularUser, SelectUsers::IsNotBlocked])
+            .col(AddFriend::Flags)
     }
 }
 

@@ -72,6 +72,9 @@ pub enum Error {
     #[error("Already Exists")]
     AlreadyExists,
 
+    #[error("Blocked")]
+    Blocked,
+
     #[error("Username Unavailable")]
     UsernameUnavailable,
 
@@ -318,6 +321,7 @@ impl Error {
             Error::CaptchaError(_)          => ApiErrorCode::InvalidCaptcha,
             Error::Base85DecodeError(_)     => ApiErrorCode::Base85DecodeError,
             Error::WsError(_)               => ApiErrorCode::WebsocketError,
+            Error::Blocked                  => ApiErrorCode::Blocked,
 
             // HTTP-like error codes
             Error::BadRequest               => ApiErrorCode::BadRequest,
@@ -356,17 +360,12 @@ impl Error {
 
         macro_rules! impl_cached {
             ($($name:ident),*) => {{
-                lazy_static::lazy_static! {
-                    $(
-                        static ref $name: Json = Error::$name.into_json();
-                    )*
-                }
+                lazy_static::lazy_static! {$(
+                    static ref $name: Json = Error::$name.into_json();
+                )*}
 
                 match self {
-                    $(
-                        Error::$name => $name.clone(),
-                    )*
-
+                    $(Error::$name => $name.clone(),)*
                     _ => self.into_json(),
                 }
             }}
@@ -377,7 +376,8 @@ impl Error {
             BadRequest,
             NoSession,
             InvalidCredentials,
-            AlreadyExists
+            AlreadyExists,
+            Blocked
         }
     }
 }
