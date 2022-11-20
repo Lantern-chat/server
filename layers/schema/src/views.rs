@@ -99,10 +99,9 @@ thorn::tables! {
     pub struct AggFriends in Lantern {
         UserId: Users::Id,
         FriendId: Users::Id,
-        /// 0 if a->b, 1 if b->a
-        Which: Type::INT2,
         Flags: Type::INT2,
         Note: Type::VARCHAR,
+        UpdatedAt: Type::TIMESTAMP,
     }
 
     pub struct AggRoomPerms in Lantern {
@@ -126,6 +125,7 @@ thorn::tables! {
     pub struct AggUserAssociations in Lantern {
         UserId: Users::Id,
         OtherId: Users::Id,
+        PartyId: Party::Id,
     }
 
     /// Only difference between this and `Reactions` is that this is sorted by `reacted`

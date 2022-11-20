@@ -540,9 +540,10 @@ CREATE TABLE lantern.mentions (
     room_id     bigint
 );
 
-CREATE TABLE lantern.friendlist (
+CREATE TABLE lantern.friends (
     user_a_id   bigint      NOT NULL,
     user_b_id   bigint      NOT NULL,
+    updated_at  timestamp   NOT NULL DEFAULT now(),
     flags       smallint    NOT NULL DEFAULT 0,
     note_a      text,
     note_b      text
@@ -838,11 +839,11 @@ ALTER TABLE lantern.mentions ADD CONSTRAINT room_fk FOREIGN KEY (room_id)
     REFERENCES lantern.rooms (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE lantern.friendlist ADD CONSTRAINT user_a_fk FOREIGN KEY(user_a_id)
+ALTER TABLE lantern.friends ADD CONSTRAINT user_a_fk FOREIGN KEY(user_a_id)
     REFERENCES lantern.users (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE lantern.friendlist ADD CONSTRAINT user_b_fk FOREIGN KEY(user_b_id)
+ALTER TABLE lantern.friends ADD CONSTRAINT user_b_fk FOREIGN KEY(user_b_id)
     REFERENCES lantern.users (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -918,6 +919,9 @@ ALTER TABLE lantern.ip_bans ADD CONSTRAINT addr_check CHECK (
 -- Messages can only be the parent of a single thread
 ALTER TABLE lantern.threads ADD CONSTRAINT parent_uq UNIQUE (parent_id);
 
+-- ensure proper ordering of friend columns
+ALTER TABLE lantern.friends ADD CONSTRAINT ch_friend_order CHECK (user_a_id < user_b_id);
+
 ----------------------------------------
 ------- CONSTRAINT-LIKE INDICES --------
 ----------------------------------------
@@ -957,6 +961,9 @@ CREATE UNIQUE INDEX reactions_emoji_idx ON lantern.reactions
 
 CREATE UNIQUE INDEX emoji_idx ON lantern.emojis
     USING btree(emoji);
+
+CREATE UNIQUE INDEX friend_idx ON lantern.friends
+    USING btree(user_a_id, user_b_id);
 
 ----------------------------------------
 -------------- INDICES -----------------
@@ -1022,8 +1029,8 @@ CREATE INDEX mention_role_idx               ON lantern.mentions         USING bt
 CREATE INDEX rate_limit_idx                 ON lantern.rate_limits      USING btree(addr);
 CREATE INDEX ip_bans_address_idx            ON lantern.ip_bans          USING btree(address) WHERE address IS NOT NULL;
 CREATE INDEX ip_bans_network_idx            ON lantern.ip_bans          USING GIST(network inet_ops) WHERE network IS NOT NULL;
-CREATE INDEX friend_a_idx                   ON lantern.friendlist       USING btree(user_a_id);
-CREATE INDEX friend_b_idx                   ON lantern.friendlist       USING btree(user_b_id);
+CREATE INDEX friend_a_idx                   ON lantern.friends          USING btree(user_a_id);
+CREATE INDEX friend_b_idx                   ON lantern.friends          USING btree(user_b_id);
 CREATE INDEX user_presence_conn_idx         ON lantern.user_presence    USING btree(conn_id);
 CREATE INDEX user_presence_idx              ON lantern.user_presence    USING btree(user_id, updated_at);
 
@@ -1406,11 +1413,11 @@ FROM lantern.mentions GROUP BY msg_id;
 
 ---
 
-CREATE OR REPLACE VIEW lantern.agg_friends(user_id, friend_id, which, flags, note) AS
-SELECT user_a_id, user_b_id, 0::int2, flags, note_a FROM lantern.friendlist
+CREATE OR REPLACE VIEW lantern.agg_friends(user_id, friend_id, updated_at, flags, note) AS
+SELECT user_a_id, user_b_id, updated_at, flags, note_a FROM lantern.friends
 UNION ALL
--- Set PENDING flag to true if ACCEPTED flag is false, only applicable for b->a requests
-SELECT user_b_id, user_a_id, 1::int2, flags | ((1::int2 # (1::int2 & flags)) << 1), note_b FROM lantern.friendlist;
+-- xor the ADDED_BY flag if the order is reversed
+SELECT user_b_id, user_a_id, updated_at, flags # 2::int2, note_b FROM lantern.friends;
 
 --
 
@@ -1662,10 +1669,20 @@ FROM
 
 --
 
-CREATE OR REPLACE VIEW lantern.agg_user_associations(user_id, other_id) AS
-SELECT user_id, friend_id FROM lantern.agg_friends
+CREATE OR REPLACE VIEW lantern.agg_broadcast_visibility(user_id, other_id, party_id) AS
+SELECT user_id, friend_id, NULL FROM lantern.agg_friends
 UNION ALL
-SELECT my.user_id, o.user_id FROM
+SELECT p.user_id, NULL, p.party_id FROM lantern.party_member p
+-- UNION ALL
+-- Select users from DMs that are subscribed (open) by the other members
+;
+
+--
+
+CREATE OR REPLACE VIEW lantern.agg_user_associations(user_id, other_id, party_id) AS
+SELECT user_id, friend_id, NULL FROM lantern.agg_friends f WHERE f.flags & 1 = 1
+UNION ALL
+SELECT my.user_id, o.user_id, my.party_id FROM
     lantern.party_member my INNER JOIN lantern.party_member o ON (o.party_id = my.party_id)
 ;
 

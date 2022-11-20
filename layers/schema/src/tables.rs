@@ -118,12 +118,13 @@ thorn::tables! {
         Token: Type::BYTEA,
     }
 
-    pub struct Friendlist in Lantern {
+    pub struct Friends in Lantern {
         UserAId: Users::Id,
         UserBId: Users::Id,
+        UpdatedAt: Type::TIMESTAMP,
         Flags: Type::INT2,
         NoteA: Type::TEXT,
-        NoteB: Type::TEXT
+        NoteB: Type::TEXT,
     }
 
     pub struct UserBlocks in Lantern {

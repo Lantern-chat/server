@@ -7,17 +7,12 @@ use crate::{web::auth::authorize, Error};
 
 pub mod account;
 pub mod billing;
+pub mod friends;
 pub mod login;
 pub mod logout;
 pub mod prefs;
 pub mod profile;
 pub mod sessions;
-
-pub mod friends {
-    use super::ApiResponse;
-
-    pub mod get;
-}
 
 #[rustfmt::skip]
 pub async fn me(mut route: Route<crate::ServerState>) -> ApiResponse {
@@ -36,15 +31,15 @@ pub async fn me(mut route: Route<crate::ServerState>) -> ApiResponse {
                 (&Method::PATCH, Exact("account")) => account::patch_account(route, auth).await,
                 (&Method::PATCH, Exact("profile")) => profile::patch_profile(route, auth).await,
                 (_, Exact("friends")) => match route.next().method_segment() {
-                    (&Method::GET, End) => friends::get::friends(route, auth).await,
+                    (&Method::GET, End) => friends::get(route, auth).await,
                     (_, Exact(_)) => {
                         let Some(Ok(user_id)) = route.param::<Snowflake>() else {
                             return Err(Error::BadRequest);
                         };
 
                         match route.method() {
-                            &Method::POST => todo!("AddFriend"),
-                            &Method::DELETE => todo!("RemoveFriend"),
+                            &Method::POST => friends::post(route, auth, user_id).await,
+                            &Method::DELETE => friends::del(route, auth, user_id).await,
                             &Method::PATCH => todo!("PatchFriend"),
                             _ => Err(Error::MethodNotAllowed)
                         }

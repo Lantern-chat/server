@@ -20,13 +20,18 @@ pub mod user {
 
     pub mod me {
         pub mod account;
-        pub mod friends;
         pub mod get;
         pub mod login;
         pub mod logout;
         pub mod prefs;
         pub mod profile;
         pub mod sessions;
+
+        pub mod friends {
+            pub mod add;
+            pub mod get;
+            pub mod remove;
+        }
     }
 }
 
