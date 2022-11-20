@@ -16,8 +16,8 @@ SELECT pg_reload_conf();
 
 -- host table tracks migrations
 CREATE TABLE lantern.host (
-    migration int NOT NULL,
-    migrated  timestamp NOT NULL,
+    migration int           NOT NULL,
+    migrated  timestamptz   NOT NULL,
 
     CONSTRAINT migration_primary_key PRIMARY KEY (migration)
 );
@@ -158,7 +158,7 @@ ALTER SEQUENCE lantern.event_id OWNED BY lantern.event_log.counter;
 
 -- Notification rate-limiting table
 CREATE TABLE lantern.event_log_last_notification (
-    last_notif      timestamp   NOT NULL DEFAULT now(),
+    last_notif      timestamptz NOT NULL DEFAULT now(),
     max_interval    interval    NOT NULL DEFAULT INTERVAL '100 milliseconds'
 );
 
@@ -168,13 +168,13 @@ CREATE TABLE lantern.rate_limits (
 );
 
 CREATE TABLE lantern.ip_bans (
-    expires     timestamp,
+    expires     timestamptz,
     address     inet,
     network     cidr
 );
 
 CREATE TABLE IF NOT EXISTS lantern.metrics (
-    ts      timestamp   NOT NULL DEFAULT now(),
+    ts      timestamptz   NOT NULL DEFAULT now(),
 
     -- allocated memory usage, in bytes
     mem     bigint      NOT NULL,
@@ -201,7 +201,7 @@ CREATE TABLE IF NOT EXISTS lantern.metrics (
 CREATE TABLE lantern.users (
     --- Snowflake id
     id              bigint              NOT NULL,
-    deleted_at      timestamp,
+    deleted_at      timestamptz,
     dob             date                NOT NULL,
     flags           int                 NOT NULL    DEFAULT 0,
     -- 2-byte integer that can be displayed as 4 hex digits,
@@ -230,7 +230,7 @@ CREATE TABLE lantern.user_freelist (
 CREATE TABLE lantern.user_tokens (
     id          bigint      NOT NULL,
     user_id     bigint      NOT NULL,
-    expires     timestamp   NOT NULL,
+    expires     timestamptz   NOT NULL,
     kind        smallint    NOT NULL,
     token       bytea       NOT NULL,
 
@@ -246,7 +246,7 @@ CREATE TABLE lantern.party (
     flags           bigint      NOT NULL DEFAULT 0,
     avatar_id       bigint,
     banner_id       bigint,
-    deleted_at      timestamp,
+    deleted_at      timestamptz,
     name            text        NOT NULL,
     description     text,
 
@@ -258,9 +258,7 @@ CREATE TABLE lantern.party_member (
     party_id    bigint      NOT NULL,
     user_id     bigint      NOT NULL,
     invite_id   bigint,
-    joined_at   timestamp   NOT NULL    DEFAULT now(),
-    flags       smallint    NOT NULL    DEFAULT 0,
-    position    smallint    NOT NULL    DEFAULT 0,
+    joined_at   timestamptz     NOT NULL    DEFAULT now(),
 
     -- Composite primary key
     CONSTRAINT party_member_pk PRIMARY KEY (party_id, user_id)
@@ -271,7 +269,7 @@ CREATE TABLE lantern.rooms (
     party_id        bigint,
     avatar_id       bigint,
     parent_id       bigint,
-    deleted_at      timestamp,
+    deleted_at      timestamptz,
     position        smallint    NOT NULL,
     flags           smallint    NOT NULL    DEFAULT 0,
     name            text        NOT NULL,
@@ -286,7 +284,7 @@ CREATE TABLE lantern.subscriptions (
     room_id         bigint      NOT NULL,
 
     -- If NULL, there is no mute
-    mute_expires    timestamp,
+    mute_expires    timestamptz,
 
     flags           smallint    NOT NULL DEFAULT 0,
 
@@ -369,8 +367,8 @@ CREATE TABLE lantern.messages (
     user_id     bigint      NOT NULL,
     room_id     bigint      NOT NULL,
     thread_id   bigint,
-    updated_at  timestamp               DEFAULT now(),
-    edited_at   timestamp,
+    updated_at  timestamptz             DEFAULT now(),
+    edited_at   timestamptz,
     kind        smallint    NOT NULL    DEFAULT 0,
     flags       smallint    NOT NULL    DEFAULT 0,
     content     text,
@@ -451,7 +449,7 @@ CREATE TABLE lantern.invite (
     id          bigint      NOT NULL,
     party_id    bigint      NOT NULL,
     user_id     bigint      NOT NULL,
-    expires     timestamp   NOT NULL,
+    expires     timestamptz   NOT NULL,
     uses        int         NOT NULL    DEFAULT 0,
     max_uses    int         NOT NULL    DEFAULT 1,
     description text        NOT NULL,
@@ -462,7 +460,7 @@ CREATE TABLE lantern.invite (
 
 CREATE TABLE lantern.sessions (
     user_id bigint      NOT NULL,
-    expires timestamp   NOT NULL,
+    expires timestamptz NOT NULL,
     addr    inet        NOT NULL,
     token   bytea       NOT NULL
 );
@@ -514,7 +512,7 @@ CREATE TABLE lantern.overwrites (
 
 CREATE TABLE lantern.user_status (
     user_id         bigint      NOT NULL,
-    updated         timestamp   NOT NULL DEFAULT now(),
+    updated         timestamptz NOT NULL DEFAULT now(),
     active          smallint    NOT NULL DEFAULT 0,
 
     CONSTRAINT user_status_pk PRIMARY KEY (user_id)
@@ -524,7 +522,7 @@ CREATE TABLE lantern.reactions (
     msg_id      bigint      NOT NULL,
     emote_id    bigint,
 
-    reacted     timestamp   NOT NULL DEFAULT now(),
+    reacted     timestamptz NOT NULL DEFAULT now(),
 
     -- placed here due to alignment of int4
     emoji_id    integer,
@@ -543,7 +541,7 @@ CREATE TABLE lantern.mentions (
 CREATE TABLE lantern.friends (
     user_a_id   bigint      NOT NULL,
     user_b_id   bigint      NOT NULL,
-    updated_at  timestamp   NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now(),
     flags       smallint    NOT NULL DEFAULT 0,
     note_a      text,
     note_b      text
@@ -553,7 +551,7 @@ CREATE TABLE lantern.user_presence (
     user_id     bigint      NOT NULL,
     -- Connection ID, only really seen on the server layer
     conn_id     bigint      NOT NULL,
-    updated_at  timestamp   NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now(),
     flags       smallint    NOT NULL,
     activity    jsonb,
 
@@ -561,20 +559,20 @@ CREATE TABLE lantern.user_presence (
 );
 
 CREATE TABLE IF NOT EXISTS lantern.party_bans (
-    party_id    bigint NOT NULL,
-    user_id     bigint NOT NULL,
+    party_id    bigint      NOT NULL,
+    user_id     bigint      NOT NULL,
 
-    banned_at   timestamp NOT NULL DEFAULT now(),
+    banned_at   timestamptz NOT NULL DEFAULT now(),
     reason      text,
 
     CONSTRAINT party_bans_pk PRIMARY KEY (party_id, user_id)
 );
 
 CREATE TABLE IF NOT EXISTS lantern.user_blocks (
-    user_id     bigint NOT NULL,
-    block_id    bigint NOT NULL,
+    user_id     bigint      NOT NULL,
+    block_id    bigint      NOT NULL,
 
-    blocked_at  timestamp NOT NULL DEFAULT now(),
+    blocked_at  timestamptz NOT NULL DEFAULT now(),
 
     CONSTRAINT user_blocks_pk PRIMARY KEY (user_id, block_id)
 );
@@ -1058,9 +1056,9 @@ RETURNS trigger
 LANGUAGE plpgsql AS
 $$
 DECLARE
-    _last_notif timestamp;
+    _last_notif timestamptz;
     _max_interval interval;
-    _now timestamp := now();
+    _now timestamptz := now();
 BEGIN
     SELECT
         last_notif, max_interval
@@ -1898,8 +1896,8 @@ CREATE OR REPLACE PROCEDURE lantern.upsert_msg(
     _room_id bigint,
     _thread_id bigint,
     _editor_id bigint,
-    _updated_at timestamp,
-    _deleted_at timestamp,
+    _updated_at timestamptz,
+    _deleted_at timestamptz,
     _content text,
     _pinned bool
 )
@@ -1924,7 +1922,7 @@ CREATE OR REPLACE PROCEDURE lantern.set_user_status(
 LANGUAGE plpgsql AS
 $$
 DECLARE
-    _now timestamp := now();
+    _now timestamptz := now();
 BEGIN
     INSERT INTO lantern.user_status (id, updated, active) VALUES (_user_id, _now, _active)
     ON CONFLICT ON CONSTRAINT user_status_pk DO
