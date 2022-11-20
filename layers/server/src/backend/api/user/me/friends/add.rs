@@ -64,7 +64,36 @@ mod q {
                         Friends::Flags
                             .bit_and(FriendFlags::ACCEPTED.bits().lit())
                             .equals(0.lit()),
+                    )
+                    .and_where(
+                        // and where the confirmation is from the other user, see note below
+                        Params::flags()
+                            .bit_xor(Friends::Flags)
+                            .bit_and(FriendFlags::ADDED_BY.bits().lit())
+                            .not_equals(0.lit()),
                     ),
             )
     }
 }
+
+/*
+ * NOTES: Showing the ADDED_BY flag xor trick
+ * where only if the other users confirms the friend request will the xor equal 1
+ *
+ * (user_a_id, user_b_id, added_by_flag)
+ *
+ * User 1 adds 2, insert (1, 2, 0)
+ * User 2 adds 1, update (1, 2, 1 ^ 0)
+ *
+ * User 2 adds 1, insert (1, 2, 1)
+ * User 1 adds 2, update (1, 2, 0 ^ 1)
+ *
+ * Attempts to do multiple friend-adds
+ *
+ * User 1 adds 2, insert (1, 2, 0)
+ * User 1 adds 2, update (1, 2, 0 ^ 0)
+ *
+ * User 2 adds 1, insert (1, 2, 1)
+ * User 2 adds 1, update (1, 2, 1 ^ 1)
+ *
+ */
