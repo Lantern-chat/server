@@ -17,7 +17,7 @@ pub enum Error {
     InternalErrorStatic(&'static str),
 
     #[error("Database Error {0}")]
-    DbError(#[from] DbError),
+    DbError(DbError),
     #[error("Join Error {0}")]
     JoinError(#[from] tokio::task::JoinError),
     #[error("Semaphore Error: {0}")]
@@ -391,5 +391,23 @@ impl ftl::Reply for Error {
 impl ftl::ReplyError for Error {
     fn status(&self) -> StatusCode {
         self.http_status()
+    }
+}
+
+impl From<DbError> for Error {
+    fn from(e: DbError) -> Self {
+        if let Some(e) = e.as_db_error() {
+            use db::pg::error::SqlState;
+
+            // TODO: Improve this with names of specific constraints
+            match e.code() {
+                &SqlState::FOREIGN_KEY_VIOLATION => return Error::NotFound,
+                &SqlState::CHECK_VIOLATION => return Error::BadRequest,
+                &SqlState::UNIQUE_VIOLATION => return Error::BadRequest,
+                _ => {}
+            }
+        }
+
+        Error::DbError(e)
     }
 }

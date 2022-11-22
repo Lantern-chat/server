@@ -20,6 +20,7 @@ pub mod user {
 
     pub mod me {
         pub mod account;
+        pub mod block;
         pub mod get;
         pub mod login;
         pub mod logout;
