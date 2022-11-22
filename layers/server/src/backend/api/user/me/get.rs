@@ -68,5 +68,6 @@ mod q {
                     .and(Profiles::PartyId.is_null())),
             )
             .and_where(Users::Id.equals(Var::of(Users::Id)))
+            .and_where(Users::DeletedAt.is_null())
     }
 }

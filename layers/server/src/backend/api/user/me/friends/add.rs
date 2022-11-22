@@ -105,7 +105,8 @@ mod q {
                         .is_null()
                         .alias_to(SelectUsers::IsNotBlocked),
                 )
-                .and_where(Users::Id.equals(Params::to_id())),
+                .and_where(Users::Id.equals(Params::to_id()))
+                .and_where(Users::DeletedAt.is_null()),
         );
 
         let add_friend = AddFriend::as_query(

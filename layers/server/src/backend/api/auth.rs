@@ -75,6 +75,7 @@ pub async fn do_user_auth(
                     .col(Users::Flags)
                     .from(Sessions::inner_join_table::<Users>().on(Users::Id.equals(Sessions::UserId)))
                     .and_where(Sessions::Token.equals(Var::of(Sessions::Token)))
+                    .and_where(Users::DeletedAt.is_null())
             },
             &[&bytes],
         )
