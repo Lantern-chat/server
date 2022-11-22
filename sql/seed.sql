@@ -920,6 +920,9 @@ ALTER TABLE lantern.threads ADD CONSTRAINT parent_uq UNIQUE (parent_id);
 -- ensure proper ordering of friend columns
 ALTER TABLE lantern.friends ADD CONSTRAINT ch_friend_order CHECK (user_a_id < user_b_id);
 
+-- user cannot block themselves
+ALTER TABLE lantern.user_blocks ADD CONSTRAINT ch_user_blocks CHECK (user_id <> block_id);
+
 ----------------------------------------
 ------- CONSTRAINT-LIKE INDICES --------
 ----------------------------------------
@@ -962,6 +965,9 @@ CREATE UNIQUE INDEX emoji_idx ON lantern.emojis
 
 CREATE UNIQUE INDEX friend_idx ON lantern.friends
     USING btree(user_a_id, user_b_id);
+
+CREATE UNIQUE INDEX user_blocks_idx ON lantern.user_blocks
+    USING btree(user_id, block_id);
 
 ----------------------------------------
 -------------- INDICES -----------------
