@@ -131,7 +131,7 @@ pub async fn redeem_invite(
 
     tokio::try_join!(update_member, welcome_message)?;
 
-    let _ = t.commit().await?;
+    t.commit().await?;
 
     Ok(())
 }

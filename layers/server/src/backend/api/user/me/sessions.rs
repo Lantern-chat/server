@@ -1,4 +1,5 @@
 use futures::stream::{Stream, StreamExt};
+use schema::auth::RawAuthToken;
 
 use crate::{Authorization, Error, ServerState};
 
@@ -32,4 +33,29 @@ pub async fn list_sessions(
             expires: row.try_get(0)?,
         }),
     }))
+}
+
+pub async fn clear_other_sessions(state: ServerState, auth: Authorization) -> Result<u64, Error> {
+    let RawAuthToken::Bearer(bytes) = auth.token else {
+        return Err(Error::Unauthorized);
+    };
+
+    let db = state.db.write.get().await?;
+
+    let num_deleted = db
+        .execute_cached_typed(
+            || {
+                use schema::*;
+                use thorn::*;
+
+                Query::delete()
+                    .from::<Sessions>()
+                    .and_where(Sessions::UserId.equals(Var::of(Users::Id)))
+                    .and_where(Sessions::Token.not_equals(Var::of(Sessions::Token)))
+            },
+            &[&auth.user_id, &&bytes[..]],
+        )
+        .await?;
+
+    Ok(num_deleted)
 }

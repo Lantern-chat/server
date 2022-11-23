@@ -75,6 +75,9 @@ pub enum Error {
     #[error("Blocked")]
     Blocked,
 
+    #[error("Banned")]
+    Banned,
+
     #[error("Username Unavailable")]
     UsernameUnavailable,
 
@@ -322,6 +325,7 @@ impl Error {
             Error::Base85DecodeError(_)     => ApiErrorCode::Base85DecodeError,
             Error::WsError(_)               => ApiErrorCode::WebsocketError,
             Error::Blocked                  => ApiErrorCode::Blocked,
+            Error::Banned                   => ApiErrorCode::Banned,
 
             // HTTP-like error codes
             Error::BadRequest               => ApiErrorCode::BadRequest,
@@ -374,10 +378,14 @@ impl Error {
         impl_cached! {
             NotFound,
             BadRequest,
+            MethodNotAllowed,
+            Unauthorized,
             NoSession,
             InvalidCredentials,
             AlreadyExists,
-            Blocked
+            Blocked,
+            Banned,
+            Conflict
         }
     }
 }

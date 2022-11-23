@@ -70,12 +70,12 @@ pub async fn do_user_auth(
                 use schema::*;
                 use thorn::*;
 
+                // NOTE: User-deletion process will delete session tokens, too.
                 Query::select()
                     .cols(&[Sessions::UserId, Sessions::Expires])
                     .col(Users::Flags)
                     .from(Sessions::inner_join_table::<Users>().on(Users::Id.equals(Sessions::UserId)))
                     .and_where(Sessions::Token.equals(Var::of(Sessions::Token)))
-                    .and_where(Users::DeletedAt.is_null())
             },
             &[&bytes],
         )

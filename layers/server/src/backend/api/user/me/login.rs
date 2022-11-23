@@ -66,6 +66,10 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) ->
         return Err(Error::NotFound);
     }
 
+    if flags.contains(UserFlags::BANNED) {
+        return Err(Error::Banned);
+    }
+
     if secret.is_some() != backup.is_some() {
         return Err(Error::InternalErrorStatic("Secret/Backup Mismatch!"));
     }

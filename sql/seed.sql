@@ -1987,3 +1987,28 @@ BEGIN
     RETURN _thread_id;
 END
 $$;
+
+--
+
+CREATE OR REPLACE PROCEDURE lantern.soft_delete_user(
+    _user_id bigint,
+    _new_username text
+)
+LANGUAGE plpgsql AS
+$$
+BEGIN
+    UPDATE lantern.users SET deleted_at = now() WHERE id = _user_id;
+    CALL lantern.update_user(_user_id, _new_username);
+    DELETE FROM lantern.sessions WHERE user_id = _user_id;
+    DELETE FROM lantern.user_tokens WHERE user_id = _user_id;
+    DELETE FROM lantern.user_presence WHERE user_id = _user_id;
+    DELETE FROM lantern.profiles WHERE user_id = _user_id;
+    DELETE FROM lantern.friends WHERE user_a_id = _user_id OR user_b_id = _user_id;
+    DELETE FROM lantern.user_blocks WHERE user_id = _user_id OR block_id = _user_id;
+    DELETE FROM lantern.room_members WHERE user_id = _user_id;
+    DELETE FROM lantern.party_bans WHERE user_id = _user_id;
+    DELETE FROM lantern.overrides WHERE user_id = _user_id;
+    DELETE FROM lantern.role_members WHERE user_id = _user_id;
+    DELETE FROM lantern.party_member WHERE user_id = _user_id;
+END
+$$;

@@ -59,11 +59,15 @@ pub async fn block_user(state: ServerState, auth: Authorization, user_id: Snowfl
         .await
     };
 
-    let (could_block, _) = tokio::try_join!(do_block_user, unfriend_user)?;
+    let (could_block, ..) = tokio::try_join!(do_block_user, unfriend_user)?;
 
     if could_block == 0 {
+        t.rollback().await?;
+
         return Err(Error::Unauthorized);
     }
+
+    t.commit().await?;
 
     Ok(())
 }
