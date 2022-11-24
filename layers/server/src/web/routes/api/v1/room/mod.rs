@@ -1,4 +1,5 @@
 use ftl::*;
+use futures::FutureExt;
 use schema::Snowflake;
 
 use super::ApiResponse;
@@ -16,8 +17,8 @@ pub async fn room(mut route: Route<ServerState>) -> ApiResponse {
     // ANY /api/v1/room/1234
     match route.next().param::<Snowflake>() {
         Some(Ok(room_id)) => match route.next().method_segment() {
-            (&Method::GET, End) => get::get_room(route, auth, room_id).await,
-            (&Method::POST, Exact("typing")) => typing::trigger_typing(route, auth, room_id).await,
+            (&Method::GET, End) => get::get_room(route, auth, room_id).boxed().await,
+            (&Method::POST, Exact("typing")) => typing::trigger_typing(route, auth, room_id).boxed().await,
 
             (_, Exact("messages")) => messages::messages(route, auth, room_id).await,
             (_, Exact("threads")) => threads::threads(route, auth, room_id).await,

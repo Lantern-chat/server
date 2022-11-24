@@ -107,19 +107,13 @@ pub async fn add_asset(
         .kill_on_drop(true)
         .spawn()?;
 
-    let mut input = AsyncFramedWriter::new(
-        child
-            .stdin
-            .take()
-            .ok_or_else(|| Error::InternalErrorStatic("Could not acquire child process stream"))?,
-    );
+    let mut input = AsyncFramedWriter::new(child.stdin.take().ok_or(Error::InternalErrorStatic(
+        "Could not acquire child process stream",
+    ))?);
 
-    let mut output = AsyncFramedReader::new(
-        child
-            .stdout
-            .take()
-            .ok_or_else(|| Error::InternalErrorStatic("Could not acquire child process stream"))?,
-    );
+    let mut output = AsyncFramedReader::new(child.stdout.take().ok_or(Error::InternalErrorStatic(
+        "Could not acquire child process stream",
+    ))?);
 
     let mut formats = gen_formats(state, mode);
     let mut current = formats.pop();

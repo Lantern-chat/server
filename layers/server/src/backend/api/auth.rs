@@ -2,6 +2,7 @@ use std::fmt;
 use std::str::FromStr;
 use std::time::SystemTime;
 
+use futures::FutureExt;
 use schema::auth::{AuthToken, RawAuthToken, SplitBotToken};
 
 pub trait AuthTokenExt {
@@ -43,10 +44,10 @@ pub async fn do_auth(state: &ServerState, token: RawAuthToken) -> Result<Authori
     let auth = match state.session_cache.get(&token).await {
         Some(auth) => Some(auth),
         None => match token {
-            RawAuthToken::Bearer(bytes) => do_user_auth(state, &bytes, token).await?,
+            RawAuthToken::Bearer(bytes) => do_user_auth(state, &bytes, token).boxed().await?,
             RawAuthToken::Bot(token) => match token.verify(&state.config.keys.bt_key) {
                 false => return Err(Error::Unauthorized),
-                true => do_bot_auth(state, token).await?,
+                true => do_bot_auth(state, token).boxed().await?,
             },
         },
     };

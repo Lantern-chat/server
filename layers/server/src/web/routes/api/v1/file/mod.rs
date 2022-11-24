@@ -1,3 +1,4 @@
+use futures::FutureExt;
 use http::{HeaderMap, HeaderValue, Method, StatusCode};
 
 use ftl::*;
@@ -34,9 +35,9 @@ pub async fn file(mut route: Route<ServerState>) -> ApiResponse {
     let auth = crate::web::auth::authorize(&route).await?;
 
     match route.next().method_segment() {
-        (&Method::OPTIONS, End) => options::options(route, auth).await,
+        (&Method::OPTIONS, End) => options::options(route, auth).boxed().await,
 
-        (&Method::POST, End) => post::post(route, auth).await,
+        (&Method::POST, End) => post::post(route, auth).boxed().await,
 
         (&Method::HEAD | &Method::PATCH | &Method::DELETE, Exact(_)) => {
             match route.param::<Snowflake>() {
@@ -47,8 +48,8 @@ pub async fn file(mut route: Route<ServerState>) -> ApiResponse {
                     }
 
                     match route.method() {
-                        &Method::HEAD => head::head(route, auth, file_id).await,
-                        &Method::PATCH => patch::patch(route, auth, file_id).await,
+                        &Method::HEAD => head::head(route, auth, file_id).boxed().await,
+                        &Method::PATCH => patch::patch(route, auth, file_id).boxed().await,
 
                         _ => Err(Error::MethodNotAllowed),
                     }

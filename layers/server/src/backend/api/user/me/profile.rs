@@ -136,49 +136,53 @@ pub async fn patch_profile(
     let (new_avatar_id, new_banner_id) = if !new_profile.avatar.is_undefined()
         || !new_profile.banner.is_undefined()
     {
-        // initialize with the avatar/banner file IDs, because if they are Some it will be overwritten, but otherwise inherit the None/Undefined values
-        let mut new_avatar_id_future = Either::Left(futures::future::ok(new_profile.avatar));
-        let mut new_banner_id_future = Either::Left(futures::future::ok(new_profile.banner));
+        let new_avatar_id_future = async {
+            match new_profile.avatar {
+                Nullable::Some(file_id) => add_asset(&state, AssetMode::Avatar, auth.user_id, file_id)
+                    .boxed()
+                    .await
+                    .map(Nullable::Some),
+                _ => Ok(new_profile.avatar), // fallback to None/Undefined
+            }
+        };
 
-        if let Nullable::Some(file_id) = new_profile.avatar {
-            new_avatar_id_future = Either::Right(
-                add_asset(&state, AssetMode::Avatar, auth.user_id, file_id).map_ok(Nullable::Some),
-            );
-        }
-
-        if let Nullable::Some(file_id) = new_profile.banner {
-            new_banner_id_future = Either::Right(
-                add_asset(&state, AssetMode::Banner, auth.user_id, file_id).map_ok(Nullable::Some),
-            );
-        }
+        let new_banner_id_future = async {
+            match new_profile.banner {
+                Nullable::Some(file_id) => add_asset(&state, AssetMode::Banner, auth.user_id, file_id)
+                    .boxed()
+                    .await
+                    .map(Nullable::Some),
+                _ => Ok(new_profile.banner), // fallback to None/Undefined
+            }
+        };
 
         let (new_avatar_id, new_banner_id) = tokio::try_join!(new_avatar_id_future, new_banner_id_future)?;
 
         let db = state.db.write.get().await?;
 
-        match (new_avatar_id, new_banner_id) {
-            (Nullable::Undefined, Nullable::Undefined) => {}
-            (avatar_id, Nullable::Undefined) => {
-                db.execute_cached_typed(
-                    || insert_or_update_profile(&[Profiles::AvatarId]),
-                    &[&auth.user_id, &party_id, &avatar_id],
-                )
-                .await?;
+        'do_thing: {
+            #[rustfmt::skip]
+            let prepared_stmt = match (new_avatar_id, new_banner_id) {
+                (Nullable::Undefined, Nullable::Undefined) => break 'do_thing,
+                (_, Nullable::Undefined) => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::AvatarId])).boxed(),
+                (Nullable::Undefined, _) => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::BannerId])).boxed(),
+                (_, _) => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::AvatarId, Profiles::BannerId])).boxed()
+            };
+
+            let mut params = ArrayVec::<&(dyn db::pg::types::ToSql + Sync), 4>::new();
+
+            params.push(&auth.user_id);
+            params.push(&party_id);
+
+            if !new_avatar_id.is_undefined() {
+                params.push(&new_avatar_id);
             }
-            (Nullable::Undefined, banner_id) => {
-                db.execute_cached_typed(
-                    || insert_or_update_profile(&[Profiles::BannerId]),
-                    &[&auth.user_id, &party_id, &banner_id],
-                )
-                .await?;
+
+            if !new_banner_id.is_undefined() {
+                params.push(&new_banner_id);
             }
-            (avatar_id, banner_id) => {
-                db.execute_cached_typed(
-                    || insert_or_update_profile(&[Profiles::AvatarId, Profiles::BannerId]),
-                    &[&auth.user_id, &party_id, &avatar_id, &banner_id],
-                )
-                .await?;
-            }
+
+            db.execute(&prepared_stmt.await?, &params).await?;
         }
 
         (new_avatar_id, new_banner_id)

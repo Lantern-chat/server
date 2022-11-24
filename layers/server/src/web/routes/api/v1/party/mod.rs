@@ -32,7 +32,7 @@ pub async fn party(mut route: Route<crate::ServerState>) -> ApiResponse {
         (_, Exact(_)) => match route.param::<Snowflake>() {
             Some(Ok(party_id)) => match route.next().method_segment() {
                 // GET /api/v1/party/1234
-                (&Method::GET, End) => get::get(route, auth, party_id).await,
+                (&Method::GET, End) => get::get(route, auth, party_id).boxed().await,
 
                 // PATCH /api/v1/party/1234
                 //(&Method::PATCH, End) => patch::patch(route, auth, party_id).await,

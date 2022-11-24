@@ -29,13 +29,24 @@ pub async fn service(
 
     let start = route.start;
 
-    let mut resp = compression::wrap_route(false, route, |r| routes::entry(r)).await;
+    let mut resp = routes::entry(route).await;
 
     let elapsed = start.elapsed();
     let elapsedf = elapsed.as_secs_f64() * 1_000.0;
 
     log::debug!("{info} -> {} {:.4}ms", resp.status(), elapsedf);
-    if let Ok(value) = HeaderValue::from_str(&format!("resp;dur={:.4}", elapsedf)) {
+    if let Ok(value) = HeaderValue::from_str({
+        use std::fmt::Write;
+
+        // reuse the info string to avoid another allocation
+        info.clear();
+
+        if let Err(e) = write!(info, "resp;dur={:.4}", elapsedf) {
+            log::error!("Error formatting response duration: {e}");
+        }
+
+        &info
+    }) {
         resp.headers_mut().insert("Server-Timing", value);
     }
 

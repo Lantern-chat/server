@@ -1,5 +1,5 @@
 use db::pg::error::SqlState;
-use futures::future::Either;
+use futures::{future::Either, FutureExt, TryFutureExt};
 
 use schema::{Snowflake, SnowflakeExt};
 use smol_str::SmolStr;
@@ -74,7 +74,7 @@ pub async fn redeem_invite(
     if let Some(nickname) = body.nickname {
         use sdk::api::commands::user::UpdateUserProfileBody;
 
-        update_member = Either::Right(async {
+        update_member = Either::Right(
             crate::backend::api::user::me::profile::patch_profile(
                 state.clone(),
                 auth,
@@ -84,10 +84,9 @@ pub async fn redeem_invite(
                 },
                 Some(party_id),
             )
-            .await?;
-
-            Ok(())
-        });
+            .map_ok(|_| ())
+            .boxed(),
+        );
     }
 
     let welcome_message = async {
@@ -114,7 +113,7 @@ pub async fn redeem_invite(
                     ])
                     .query(
                         Query::select()
-                            .exprs(vec![msg_id, user_id, msg_kind])
+                            .exprs([msg_id, user_id, msg_kind])
                             .expr("".lit())
                             .col(Party::DefaultRoom)
                             .from(Invite::inner_join_table::<Party>().on(Party::Id.equals(Invite::PartyId)))

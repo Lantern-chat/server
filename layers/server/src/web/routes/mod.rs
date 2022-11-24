@@ -41,7 +41,7 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
         .await
         .into_response(),
 
-        (&Method::GET | &Method::HEAD, Exact("cdn")) => cdn::cdn(route).boxed().await.into_response(),
+        (&Method::GET | &Method::HEAD, Exact("cdn")) => cdn::cdn(route).await.into_response(),
 
         _ if BAD_PATTERNS.is_match(route.path()) || route.path().ends_with(".php") => {
             StatusCode::IM_A_TEAPOT.into_response()

@@ -132,7 +132,7 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
                     .for_each_concurrent(None, |(party_id, events)| async move {
                         for event in events {
                             if let Err(e) =
-                                super::event_processors::process(&state, db, event, Some(party_id)).await
+                                super::event_processors::process(state, db, event, Some(party_id)).await
                             {
                                 log::error!("Error processing party event: {event:?} {e}");
                                 // TODO: Disconnect party
