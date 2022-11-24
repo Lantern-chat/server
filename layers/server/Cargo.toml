@@ -39,7 +39,7 @@ mime_db = { git = "https://github.com/Lantern-chat/mime_db" }
 thorn = { git = "https://github.com/Lantern-chat/thorn" }
 async-chashmap = { git = "https://github.com/novacrazy/async-chashmap" }
 
-timestamp = { package = "iso8601-timestamp", version = "0.1", features = ["pg"] }
+timestamp = { package = "iso8601-timestamp", version = "0.2", features = ["pg"] }
 
 serde = { version = "1", features = ["derive", "rc"] }
 serde_urlencoded = "0.7"
@@ -53,7 +53,7 @@ tokio-rustls = "0.23.0"
 async-stream = "0.3"
 async-trait = "0.1.50"
 async-compression = { version = "0.3.8", features = ["brotli", "deflate", "gzip", "tokio"] }
-hashbrown = { version = "0.12", features = ["inline-more"] }
+hashbrown = { version = "0.13", features = ["inline-more"] }
 futures = "0.3"
 hyper = { version = "0.14.4", features = ["http1", "http2", "server", "stream", "runtime"] }
 tokio-tungstenite = { version = "0.17", default-features = false, features = ["connect"] }

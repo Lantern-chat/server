@@ -174,7 +174,7 @@ impl IpSet {
             ipv4: Vec::new(),
             ipv6: Vec::new(),
             set: RawTable::new(),
-            hash_builder: DefaultHashBuilder::new(),
+            hash_builder: DefaultHashBuilder::default(),
         };
 
         this.refresh(ips);

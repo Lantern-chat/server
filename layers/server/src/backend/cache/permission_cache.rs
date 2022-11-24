@@ -60,7 +60,7 @@ impl PermissionCache {
         PermissionCache {
             map: CHashMap::with_hasher(
                 CHashMap::<(), ()>::default_num_shards(),
-                SharedBuildHasher(Arc::new(DefaultHashBuilder::new())),
+                SharedBuildHasher(Arc::new(DefaultHashBuilder::default())),
             ),
         }
     }
