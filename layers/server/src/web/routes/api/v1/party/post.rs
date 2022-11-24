@@ -3,6 +3,7 @@ use ftl::*;
 use super::ApiResponse;
 use crate::{Authorization, ServerState};
 
+#[async_recursion]
 pub async fn post(
     mut route: Route<ServerState>,
     auth: Authorization,

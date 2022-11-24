@@ -10,10 +10,7 @@ use crate::{
 
 use ftl::*;
 
-pub async fn delete(
-    route: Route<ServerState>,
-    auth: Authorization,
-    party_id: Snowflake,
-) -> Response {
+#[async_recursion]
+pub async fn delete(route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> Response {
     "Unimplemented".into_response()
 }

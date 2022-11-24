@@ -3,6 +3,7 @@ use ftl::*;
 use super::ApiResponse;
 use crate::{Authorization, ServerState};
 
+#[async_recursion]
 pub async fn options(route: Route<ServerState>, auth: Authorization) -> ApiResponse {
     let options = crate::backend::api::file::options::file_options(&route.state, auth).await?;
 

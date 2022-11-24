@@ -3,6 +3,7 @@ use ftl::*;
 use super::ApiResponse;
 use crate::ServerState;
 
+#[async_recursion]
 pub async fn login(mut route: Route<ServerState>) -> ApiResponse {
     let form = body::any(&mut route).await?;
 

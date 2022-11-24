@@ -11,6 +11,7 @@ lazy_static::lazy_static! {
         headers::ContentType::from("application/offset+octet-stream".parse::<mime::Mime>().unwrap());
 }
 
+#[async_recursion]
 pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: Snowflake) -> ApiResponse {
     match route.header::<headers::ContentType>() {
         None => return Err(Error::MissingContentTypeHeader),

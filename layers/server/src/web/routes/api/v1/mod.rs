@@ -1,5 +1,3 @@
-use futures::FutureExt;
-
 use ftl::*;
 
 use crate::Error;
@@ -29,12 +27,12 @@ pub async fn api_v1(mut route: Route<crate::ServerState>) -> ApiResponse {
         (_, Exact("invite")) => invite::invite(route).await,
         (_, Exact("gateway")) => gateway::gateway(route),
         (&Method::GET, Exact("build")) => build::build(route),
-        (&Method::GET, Exact("metrics")) => metrics::metrics(route).boxed().await,
-        (&Method::GET, Exact("oembed")) => oembed::oembed(route).boxed().await,
+        (&Method::GET, Exact("metrics")) => metrics::metrics(route).await,
+        (&Method::GET, Exact("oembed")) => oembed::oembed(route).await,
         (_, Exact("admin")) => admin::admin(route).await,
 
         #[cfg(debug_assertions)]
-        (_, Exact("debug")) => debug::debug(route).boxed().await,
+        (_, Exact("debug")) => debug::debug(route).await,
 
         _ => Err(Error::NotFound),
     }

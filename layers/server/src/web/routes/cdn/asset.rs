@@ -28,6 +28,7 @@ pub enum AssetSubKind {
 
 // cdn.lanternchat.net/user/user_id/banner/banner_id
 
+#[async_recursion]
 pub async fn asset(mut route: Route<ServerState>) -> ApiResponse {
     let plain_kind = match route.segment() {
         End => unreachable!(),

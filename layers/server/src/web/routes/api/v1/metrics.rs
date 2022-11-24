@@ -10,6 +10,7 @@ use ftl::*;
 use crate::backend::api::metrics::MetricsOptions;
 use crate::{Error, ServerState};
 
+#[async_recursion]
 pub async fn metrics(route: Route<ServerState>) -> Result<Response, Error> {
     let options = match route.query::<MetricsOptions>() {
         Some(res) => res?,

@@ -4,6 +4,7 @@ use smol_str::SmolStr;
 use super::ApiResponse;
 use crate::{Authorization, ServerState};
 
+#[async_recursion]
 pub async fn redeem(mut route: Route<ServerState>, auth: Authorization, code: SmolStr) -> ApiResponse {
     let form = body::any(&mut route).await?;
 

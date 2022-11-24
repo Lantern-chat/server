@@ -5,6 +5,7 @@ use schema::Snowflake;
 use super::ApiResponse;
 use crate::{Authorization, ServerState};
 
+#[async_recursion]
 pub async fn patch(
     mut route: Route<ServerState>,
     auth: Authorization,

@@ -9,6 +9,7 @@ pub async fn debug(mut route: Route<ServerState>) -> Result<Response, Error> {
     }
 }
 
+#[async_recursion]
 async fn test_exception(state: ServerState) -> Result<Response, Error> {
     let db = state.db.read.get().await.unwrap();
 

@@ -5,6 +5,7 @@ use sdk::models::Snowflake;
 use super::ApiResponse;
 use crate::{Error, ServerState};
 
+#[async_recursion]
 pub async fn attachments(mut route: Route<ServerState>) -> ApiResponse {
     let Some(Ok(room_id)) = route.next().param::<Snowflake>() else { return Err(Error::BadRequest) };
     let Some(Ok(attachment_id)) = route.next().param::<Snowflake>() else { return Err(Error::BadRequest) };

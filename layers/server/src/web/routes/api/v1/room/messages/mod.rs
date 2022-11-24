@@ -1,6 +1,5 @@
 use ftl::*;
 
-use futures::FutureExt;
 use schema::Snowflake;
 
 use super::ApiResponse;
@@ -20,22 +19,22 @@ pub async fn messages(
 ) -> ApiResponse {
     match route.next().method_segment() {
         // POST /api/v1/room/1234/messages
-        (&Method::POST, End) => post::post(route, auth, room_id).boxed().await,
+        (&Method::POST, End) => post::post(route, auth, room_id).await,
 
         // GET /api/v1/room/1234/messages
-        (&Method::GET, End) => get_many::get_many(route, auth, room_id).boxed().await,
+        (&Method::GET, End) => get_many::get_many(route, auth, room_id).await,
 
         // ANY /api/v1/room/1234/messages/5678
         (_, Exact(_)) => match route.param::<Snowflake>() {
             Some(Ok(msg_id)) => match route.next().method_segment() {
                 // GET /api/v1/room/1234/messages/5678
-                (&Method::GET, End) => get_one::get_one(route, auth, room_id, msg_id).boxed().await,
+                (&Method::GET, End) => get_one::get_one(route, auth, room_id, msg_id).await,
 
                 // PATCH /api/v1/room/1234/messages/5678
-                (&Method::PATCH, End) => patch::patch(route, auth, room_id, msg_id).boxed().await,
+                (&Method::PATCH, End) => patch::patch(route, auth, room_id, msg_id).await,
 
                 // DELETE /api/v1/room/1234/messages/5678
-                (&Method::DELETE, End) => delete::delete(route, auth, room_id, msg_id).boxed().await,
+                (&Method::DELETE, End) => delete::delete(route, auth, room_id, msg_id).await,
 
                 (_, Exact("reactions")) => reactions::reactions(route, auth, room_id, msg_id).await,
 

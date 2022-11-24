@@ -5,6 +5,7 @@ use schema::Snowflake;
 use super::ApiResponse;
 use crate::{Authorization, ServerState};
 
+#[async_recursion]
 pub async fn delete(
     route: Route<ServerState>,
     auth: Authorization,

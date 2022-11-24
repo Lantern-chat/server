@@ -1,6 +1,5 @@
 use ftl::*;
 
-use futures::FutureExt;
 use schema::Snowflake;
 
 use super::ApiResponse;
@@ -32,7 +31,7 @@ pub async fn party(mut route: Route<crate::ServerState>) -> ApiResponse {
         (_, Exact(_)) => match route.param::<Snowflake>() {
             Some(Ok(party_id)) => match route.next().method_segment() {
                 // GET /api/v1/party/1234
-                (&Method::GET, End) => get::get(route, auth, party_id).boxed().await,
+                (&Method::GET, End) => get::get(route, auth, party_id).await,
 
                 // PATCH /api/v1/party/1234
                 //(&Method::PATCH, End) => patch::patch(route, auth, party_id).await,
@@ -52,7 +51,7 @@ pub async fn party(mut route: Route<crate::ServerState>) -> ApiResponse {
                         (&Method::GET, End) => members::get::get_members(route, auth, party_id).await,
 
                         // PATCH /api/v1/party/1234/members/profile
-                        (&Method::PATCH, Exact("profile")) => members::profile::patch_profile(route, auth, party_id).boxed().await,
+                        (&Method::PATCH, Exact("profile")) => members::profile::patch_profile(route, auth, party_id).await,
 
                         // GET /api/v1/party/1234/members/5678/profile
                         (&Method::GET, Exact(segment)) => match segment.parse::<Snowflake>() {

@@ -5,6 +5,7 @@ use schema::Snowflake;
 use super::ApiResponse;
 use crate::{Authorization, ServerState};
 
+#[async_recursion]
 pub async fn post(mut route: Route<ServerState>, auth: Authorization, room_id: Snowflake) -> ApiResponse {
     let form = body::any(&mut route).await?;
 

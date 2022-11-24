@@ -3,6 +3,7 @@ use ftl::*;
 use super::ApiResponse;
 use crate::{Authorization, Error, ServerState};
 
+#[async_recursion]
 pub async fn patch_profile(mut route: Route<ServerState>, auth: Authorization) -> ApiResponse {
     let form = body::any(&mut route).await?;
 

@@ -5,6 +5,7 @@ use crate::{Authorization, ServerState};
 
 use sdk::api::commands::party::CreatePartyInviteBody;
 
+#[async_recursion]
 pub async fn post(
     mut route: Route<ServerState>,
     auth: Authorization,

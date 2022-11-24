@@ -4,6 +4,7 @@ use sdk::Snowflake;
 use super::ApiResponse;
 use crate::{Authorization, Error, ServerState};
 
+#[async_recursion]
 pub async fn profile(route: Route<ServerState>, auth: Authorization, user_id: Snowflake) -> ApiResponse {
     let profile = crate::backend::api::user::profile::get_profile(route.state, auth, user_id, None).await?;
 

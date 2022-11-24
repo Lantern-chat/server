@@ -5,6 +5,7 @@ use schema::Snowflake;
 use super::ApiResponse;
 use crate::Authorization;
 
+#[async_recursion]
 pub async fn trigger_typing(
     route: Route<crate::ServerState>,
     auth: Authorization,

@@ -5,6 +5,7 @@ use sdk::models::Snowflake;
 use super::ApiResponse;
 use crate::{backend::api::file::head::UploadHead, util::TupleClone, Authorization, ServerState};
 
+#[async_recursion]
 pub async fn head(route: Route<ServerState>, auth: Authorization, file_id: Snowflake) -> ApiResponse {
     let head = crate::backend::api::file::head::head(route.state, auth, file_id).await?;
 

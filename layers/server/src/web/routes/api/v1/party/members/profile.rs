@@ -4,6 +4,7 @@ use schema::Snowflake;
 use super::ApiResponse;
 use crate::{Authorization, ServerState};
 
+#[async_recursion]
 pub async fn get_profile(
     route: Route<ServerState>,
     auth: Authorization,
@@ -16,6 +17,7 @@ pub async fn get_profile(
     .into_response())
 }
 
+#[async_recursion]
 pub async fn patch_profile(
     route: Route<ServerState>,
     auth: Authorization,

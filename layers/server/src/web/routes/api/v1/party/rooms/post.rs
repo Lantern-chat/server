@@ -18,6 +18,7 @@ pub struct RoomCreateForm {
     parent_id: Option<Snowflake>,
 }
 
+#[async_recursion]
 pub async fn post_room(
     mut route: Route<ServerState>,
     auth: Authorization,

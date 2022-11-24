@@ -15,6 +15,7 @@ struct PatchPartyForm {
     owner_id: Option<Snowflake>,
 }
 
+#[async_recursion]
 pub async fn patch(
     mut route: Route<ServerState>,
     auth: Authorization,

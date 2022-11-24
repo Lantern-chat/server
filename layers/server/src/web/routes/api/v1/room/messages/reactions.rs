@@ -1,6 +1,5 @@
 use ftl::*;
 
-use futures::FutureExt;
 use schema::Snowflake;
 use sdk::models::EmoteOrEmoji;
 
@@ -23,11 +22,9 @@ pub async fn reactions(
 
                 match route.next().method_segment() {
                     (&Method::GET, End) => todo!("Get reactions"),
-                    (&Method::PUT, Exact("@me")) => {
-                        put_reaction(route, auth, room_id, msg_id, emote).boxed().await
-                    }
+                    (&Method::PUT, Exact("@me")) => put_reaction(route, auth, room_id, msg_id, emote).await,
                     (&Method::DELETE, Exact("@me")) => {
-                        delete_reaction(route, auth, room_id, msg_id, emote).boxed().await
+                        delete_reaction(route, auth, room_id, msg_id, emote).await
                     }
                     (&Method::DELETE, Exact(_)) => match route.param::<Snowflake>() {
                         Some(Ok(user_id)) => todo!("Delete user reaction"),
@@ -42,6 +39,7 @@ pub async fn reactions(
     }
 }
 
+#[async_recursion]
 async fn put_reaction(
     route: Route<ServerState>,
     auth: Authorization,
@@ -61,6 +59,7 @@ async fn put_reaction(
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 
+#[async_recursion]
 async fn delete_reaction(
     route: Route<ServerState>,
     auth: Authorization,

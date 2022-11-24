@@ -3,7 +3,6 @@ pub mod redeem;
 pub mod revoke;
 
 use ftl::*;
-use futures::FutureExt;
 use smol_str::SmolStr;
 
 use super::ApiResponse;
@@ -15,9 +14,9 @@ pub async fn invite(mut route: Route<ServerState>) -> ApiResponse {
     match route.next().segment() {
         Exact(_) => match route.param::<SmolStr>() {
             Some(Ok(code)) => match route.next().method_segment() {
-                (&Method::GET, End) => get::get_invite(route, auth, code).boxed().await,
-                (&Method::POST, Exact("redeem")) => redeem::redeem(route, auth, code).boxed().await,
-                (&Method::DELETE, Exact("revoke")) => revoke::revoke(route, auth, code).boxed().await,
+                (&Method::GET, End) => get::get_invite(route, auth, code).await,
+                (&Method::POST, Exact("redeem")) => redeem::redeem(route, auth, code).await,
+                (&Method::DELETE, Exact("revoke")) => revoke::revoke(route, auth, code).await,
 
                 _ => Err(Error::NotFound),
             },

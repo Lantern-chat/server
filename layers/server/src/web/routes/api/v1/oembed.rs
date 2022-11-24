@@ -5,6 +5,7 @@ use crate::{
     Error, ServerState,
 };
 
+#[async_recursion]
 pub async fn oembed(route: Route<ServerState>) -> Result<Response, Error> {
     let req = match route.query::<OEmbedRequest>() {
         Some(res) => res?,
