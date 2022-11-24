@@ -101,7 +101,7 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 
 lazy_static::lazy_static! {
-    static ref BAD_PATTERNS: AhoCorasick = AhoCorasickBuilder::new().dfa(true).build(&[
+    static ref BAD_PATTERNS: AhoCorasick = AhoCorasickBuilder::new().dfa(true).build([
         "wp-includes", "wp-admin", "wp-login", "wp-content", "wordpress",
         "wlwmanifest", ".git", ".env", "drupal", "ajax", "claro", "wp-json", "tinymce", "kcfinder",
         "filemanager", "alfa", "eval"

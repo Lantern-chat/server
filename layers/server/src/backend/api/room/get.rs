@@ -30,9 +30,9 @@ pub async fn get_room(state: ServerState, auth: Authorization, room_id: Snowflak
         }
     }
 
-    return get_room_full(state, db, auth.user_id, room_id, perms)
+    get_room_full(state, db, auth.user_id, room_id, perms)
         .boxed()
-        .await;
+        .await
 }
 
 /// Simple version for regular users with cached permissions saying they cannot view overwrites

@@ -27,7 +27,7 @@ pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: 
     };
 
     if content_length > (route.state.config.upload.max_upload_chunk_size as u64) {
-        return Err(Error::RequestEntityTooLarge.into());
+        return Err(Error::RequestEntityTooLarge);
     }
 
     let params = FilePatchParams {
@@ -66,7 +66,7 @@ fn parse_checksum_header(header: &HeaderValue) -> Result<u32, Error> {
 
     let mut out = [0u8; 4];
     if 4 != base64::decode_config_slice(checksum_encoded, base64::STANDARD, &mut out)? {
-        return Err(Error::ChecksumMismatch.into());
+        return Err(Error::ChecksumMismatch);
     }
 
     Ok(u32::from_be_bytes(out))

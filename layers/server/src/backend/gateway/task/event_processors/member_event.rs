@@ -108,7 +108,7 @@ pub async fn member_event(
                 .await?;
 
             match row {
-                Some(row) => parse_member(row, &state).map(Some),
+                Some(row) => parse_member(row, state).map(Some),
                 None => Ok(None),
             }
         }),
@@ -120,7 +120,7 @@ pub async fn member_event(
         EventCode::MemberJoined => Either::Left(async {
             crate::backend::api::party::get::get_party_inner(state.clone(), db, user_id, party_id)
                 .await
-                .map(|party| Some(party))
+                .map(Some)
         }),
         _ => Either::Right(futures::future::ok::<Option<Party>, Error>(None)),
     };

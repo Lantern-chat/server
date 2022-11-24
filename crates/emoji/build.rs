@@ -36,7 +36,7 @@ pub struct ParsedEmoji<'a> {
 /// Removes any `\u{FE0F}` variation selectors for a more compact representation
 pub fn minimize<'a>(s: &'a str) -> Cow<'a, str> {
     if !s.contains('\u{200D}') {
-        s.replace("\u{FE0F}", "").into()
+        s.replace('\u{FE0F}', "").into()
     } else {
         s.into()
     }
@@ -144,10 +144,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let idx_ty = if merged.len() < u16::MAX as usize { "u16" } else { "u32" };
 
-    write!(file, "static EMOJIS: &'static str = \"{}\";\n", merged)?;
-    write!(
+    writeln!(file, "static EMOJIS: &'static str = \"{}\";", merged)?;
+    writeln!(
         file,
-        "static EMOJI_INDICES: [{idx_ty}; {}] = {:?};\n",
+        "static EMOJI_INDICES: [{idx_ty}; {}] = {:?};",
         indices.len(),
         indices
     )?;
@@ -162,9 +162,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         forms_to_full_map.entry(form.as_ref(), &idx.to_string());
     }
 
-    write!(
+    writeln!(
         file,
-        "static FORMS_TO_INDEX: phf::Map<&'static str, u16> = {};\n",
+        "static FORMS_TO_INDEX: phf::Map<&'static str, u16> = {};",
         forms_to_full_map.build()
     )?;
 

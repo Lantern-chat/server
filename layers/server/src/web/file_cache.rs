@@ -188,10 +188,10 @@ impl FileCache<ServerState> for MainFileCache {
                         last_modified: file.last_modified,
                         encoding,
                         buf: match encoding {
-                            ContentCoding::BROTLI => file.brotli.clone(),
-                            ContentCoding::DEFLATE => file.deflate.clone(),
-                            ContentCoding::GZIP => file.gzip.clone(),
-                            ContentCoding::IDENTITY => file.iden.clone(),
+                            ContentCoding::BROTLI => file.brotli,
+                            ContentCoding::DEFLATE => file.deflate,
+                            ContentCoding::GZIP => file.gzip,
+                            ContentCoding::IDENTITY => file.iden,
                             ContentCoding::COMPRESS => unreachable!(),
                         },
                     };
@@ -360,7 +360,7 @@ impl FileCache<ServerState> for MainFileCache {
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 
 lazy_static::lazy_static! {
-    static ref VARIABLE_PATTERNS: AhoCorasick = AhoCorasickBuilder::new().dfa(true).build(&[
+    static ref VARIABLE_PATTERNS: AhoCorasick = AhoCorasickBuilder::new().dfa(true).build([
         /*0*/ "__CONFIG__",
         /*1*/ "__BASE_URL__",
         /*2*/ "__SERVER_NAME__",

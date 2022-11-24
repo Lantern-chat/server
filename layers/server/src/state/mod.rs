@@ -51,7 +51,7 @@ impl Deref for ServerState {
     type Target = InnerServerState;
 
     fn deref(&self) -> &InnerServerState {
-        &*self.0
+        &self.0
     }
 }
 

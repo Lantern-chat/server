@@ -20,10 +20,10 @@ pub fn parse(s: &str) -> Result<AssetQuery, AssetQueryParseError> {
         match &*key {
             "f" | "flags" => {
                 return Ok(AssetQuery::Flags {
-                    flags: if value.starts_with("0b") {
-                        u16::from_str_radix(&value[2..], 2)?
-                    } else if value.starts_with("0x") {
-                        u16::from_str_radix(&value[2..], 16)?
+                    flags: if let Some(value) = value.strip_suffix("0b") {
+                        u16::from_str_radix(value, 2)?
+                    } else if let Some(value) = value.strip_prefix("0x") {
+                        u16::from_str_radix(value, 16)?
                     } else {
                         u16::from_str_radix(&value, 10)?
                     },

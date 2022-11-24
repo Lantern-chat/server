@@ -9,7 +9,7 @@ pub fn decode_str(input: &str) -> Result<Result<SmolStr, std::str::Utf8Error>, b
 
 pub fn encode_u128(input: u128) -> SmolStr {
     let mut buf = [0u8; 22];
-    base64::encode_config_slice(&input.to_be_bytes(), base64::URL_SAFE_NO_PAD, &mut buf);
+    base64::encode_config_slice(input.to_be_bytes(), base64::URL_SAFE_NO_PAD, &mut buf);
     SmolStr::new_inline(unsafe { std::str::from_utf8_unchecked(&buf) })
 }
 

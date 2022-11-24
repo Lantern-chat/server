@@ -130,7 +130,7 @@ pub async fn self_update(
         return party_position_update(state, db, user_id, party_id).await;
     }
 
-    let user = crate::backend::api::user::me::get::get_full(&state, user_id).await?;
+    let user = crate::backend::api::user::me::get::get_full(state, user_id).await?;
 
     state
         .gateway

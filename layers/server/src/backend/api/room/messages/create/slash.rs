@@ -52,7 +52,7 @@ pub fn process_slash(content: &str, _active: bool) -> Result<Option<Cow<str>>, E
 
     let bytes = &content.as_bytes()[1..];
 
-    if let Some(m) = SLASH_PATTERNS.earliest_find(&bytes) {
+    if let Some(m) = SLASH_PATTERNS.earliest_find(bytes) {
         let mut end_idx = m.end();
         let mut do_command = false;
 
@@ -98,5 +98,5 @@ pub fn process_slash(content: &str, _active: bool) -> Result<Option<Cow<str>>, E
         return Ok(Some(format!("{left} {right}").into()));
     }
 
-    return unchanged;
+    unchanged
 }

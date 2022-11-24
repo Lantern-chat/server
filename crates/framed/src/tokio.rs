@@ -43,7 +43,7 @@ impl<W: AsyncWrite + Unpin> AsyncFramedWriter<W> {
                 // don't let AsyncMessageWriter drop...
                 std::mem::forget(msg.into_inner());
 
-                Err(io::Error::from(e).into())
+                Err(e.into())
             }
         }
     }

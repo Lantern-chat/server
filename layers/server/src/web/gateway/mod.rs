@@ -122,7 +122,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
 
         // Push Hello event to begin stream and forward ws_rx/conn_rx into events
         events.push(stream::once(future::ready(Item::Event(Ok(HELLO_EVENT.clone())))).boxed());
-        events.push(ws_rx.map(|msg| Item::Msg(msg)).boxed());
+        events.push(ws_rx.map(Item::Msg).boxed());
         events.push(conn_rx.map(|msg| Item::Event(Ok(msg))).boxed());
 
         // Make the new connection known to the gateway
@@ -368,7 +368,7 @@ fn decompress_if(cond: bool, msg: &[u8]) -> Result<Cow<[u8]>, std::io::Error> {
         },
     };
 
-    return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, err));
+    Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, err))
 }
 
 async fn refresh_and_retry(state: ServerState, conn: GatewayConnection, event: Event, user_id: Snowflake, room_id: Snowflake) {

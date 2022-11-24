@@ -39,7 +39,7 @@ pub async fn create_message(
     }
 
     // do full trimming
-    let trimmed_content = trim::trim_message(&state, &trimmed_content)?;
+    let trimmed_content = trim::trim_message(&state, trimmed_content)?;
 
     // since acquiring the database connection may be expensive,
     // defer it until we need it, such as if the permissions cache didn't have a value

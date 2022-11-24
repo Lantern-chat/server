@@ -53,7 +53,7 @@ impl ApiMetrics {
     pub fn add_req(&self, status: u16, duration: Duration) {
         self.reqs.add(1);
 
-        if !(100 <= status && status < 500) {
+        if !(100..500).contains(&status) {
             self.errs.add(1);
         }
 

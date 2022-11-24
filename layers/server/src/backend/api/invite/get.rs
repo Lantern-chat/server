@@ -8,7 +8,7 @@ use crate::{
 use sdk::models::*;
 
 pub async fn get_invite(state: &ServerState, code: SmolStr) -> Result<Invite, Error> {
-    let id = decrypt_snowflake(&state, &code);
+    let id = decrypt_snowflake(state, &code);
 
     let db = state.db.read.get().await?;
 
@@ -41,7 +41,7 @@ pub async fn get_invite(state: &ServerState, code: SmolStr) -> Result<Invite, Er
     Ok(Invite {
         code: match vanity {
             Some(vanity) => vanity,
-            None => encrypt_snowflake(&state, row.try_get(InviteColumns::Id as usize)?),
+            None => encrypt_snowflake(state, row.try_get(InviteColumns::Id as usize)?),
         },
         party: PartialParty {
             id: row.try_get(InviteColumns::PartyId as usize)?,

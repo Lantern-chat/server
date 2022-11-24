@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = Path::new(&env::var("OUT_DIR")?).join("codegen.rs");
     let mut file = BufWriter::new(File::create(&path)?);
 
-    write!(file, "lazy_static::lazy_static! {{\n")?;
+    writeln!(file, "lazy_static::lazy_static! {{")?;
     write_regex(ATTRIBUTE_RE, "ATTRIBUTE_RE", &mut file)?;
     write_regex(URL, "URL", &mut file)?;
     write!(file, "\n}}")?;

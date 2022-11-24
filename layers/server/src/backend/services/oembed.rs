@@ -68,7 +68,7 @@ async fn read_head<'a>(
     while let Some(chunk) = resp.chunk().await? {
         html.extend(chunk);
 
-        if memchr::memmem::rfind(&html, b"</head").is_some() {
+        if memchr::memmem::rfind(html, b"</head").is_some() {
             break;
         }
 

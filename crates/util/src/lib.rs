@@ -16,6 +16,6 @@ pub fn parse_boolean(value: &str) -> Result<bool, std::num::ParseIntError> {
     } else if value.eq_ignore_ascii_case("false") {
         false
     } else {
-        1 == u8::from_str_radix(&value, 2)?
+        1 == u8::from_str_radix(value, 2)?
     })
 }

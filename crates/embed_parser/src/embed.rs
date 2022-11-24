@@ -171,14 +171,13 @@ pub fn parse_oembed_to_embed(embed: &mut Embed, o: OEmbed) -> ExtraFields {
     if let Some(html) = o.html {
         match mime {
             Some(ref mime) if mime == "text/html" => {}
-            _ => match parse_embed_html_src(&html) {
-                Some(src) => {
+            _ => {
+                if let Some(src) = parse_embed_html_src(&html) {
                     media.url = src;
                     mime = Some(parse_embed_html_type(&html).unwrap_or(SmolStr::new_inline("text/html")));
                     overwrite = true;
                 }
-                _ => {}
-            },
+            }
         }
     } else if let Some(url) = o.url {
         media.url = url;

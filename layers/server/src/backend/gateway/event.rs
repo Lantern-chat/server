@@ -35,7 +35,7 @@ impl Deref for Event {
 
     #[inline(always)]
     fn deref(&self) -> &Self::Target {
-        &*self.0
+        &self.0
     }
 }
 

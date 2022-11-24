@@ -186,7 +186,7 @@ impl HeadEndFinder {
     }
 
     pub fn found(&self) -> Option<usize> {
-        (self.needle == NEEDLE.len()).then(|| self.pos)
+        (self.needle == NEEDLE.len()).then_some(self.pos)
     }
 
     pub fn increment(&mut self, input: &[u8]) {
