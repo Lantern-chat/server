@@ -57,7 +57,7 @@ async-recursion = "1"
 hashbrown = { version = "0.13", features = ["inline-more"] }
 futures = "0.3"
 hyper = { version = "0.14.4", features = ["http1", "http2", "server", "stream", "runtime"] }
-tokio-tungstenite = { version = "0.17", default-features = false, features = ["connect"] }
+tokio-tungstenite = { version = "0.18", default-features = false, features = ["connect"] }
 mime = "0.3.16"
 http = "0.2.3"
 reqwest = { version = "0.11", default-features = false, features = ["gzip", "deflate", "brotli", "rustls-tls"] }
