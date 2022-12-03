@@ -8,6 +8,8 @@ use tracing_subscriber::{
 pub mod allocator;
 pub mod cli;
 
+mod verify;
+
 use task_runner::TaskRunner;
 
 #[tokio::main(flavor = "multi_thread")]
@@ -104,6 +106,11 @@ async fn main() -> anyhow::Result<()> {
             read: Pool::new(pool_config.readonly(), NoTls),
         }
     };
+
+    if args.verify_schema {
+        verify::verify_schema(&db).await?;
+        return Ok(());
+    }
 
     let state = server::ServerState::new(config, db);
 
