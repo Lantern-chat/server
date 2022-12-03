@@ -1,9 +1,9 @@
 #![allow(deprecated)]
 
-use postgres_types::{Kind, Type};
+use postgres_types::Type;
 
 lazy_static::lazy_static! {
-    pub static ref EVENT_CODE: Type = Type::new("event_code".to_owned(), 0, Kind::Enum(Vec::new()), "lantern".to_owned());
+    pub static ref EVENT_CODE: Type = <EventCode as thorn::enums::EnumType>::ty(0);
 }
 
 thorn::enums! {
