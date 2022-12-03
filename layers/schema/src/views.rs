@@ -1,5 +1,7 @@
 use super::*;
 
+// NOTE: Remember to update crate::verify when tables are added/removed
+
 thorn::tables! {
     pub struct AggMentions in Lantern {
         MsgId: Messages::Id,
@@ -89,8 +91,8 @@ thorn::tables! {
     pub struct AggAttachments in Lantern {
         MsgId: Messages::Id,
 
-        /// `Vec<`[`AggAttachmentsMeta`]`>`
-        Meta: Type::JSONB_ARRAY,
+        /// `Jsonb<Vec<`[`AggAttachmentsMeta`]`>>`
+        Meta: Type::JSONB,
 
         /// Vec<Option<Vec<u8>>>
         Preview: Type::BYTEA_ARRAY,
@@ -100,8 +102,8 @@ thorn::tables! {
         UserId: Users::Id,
         FriendId: Users::Id,
         Flags: Type::INT2,
-        Note: Type::VARCHAR,
-        UpdatedAt: Type::TIMESTAMP,
+        Note: Type::TEXT,
+        UpdatedAt: Type::TIMESTAMPTZ,
     }
 
     pub struct AggRoomPerms in Lantern {

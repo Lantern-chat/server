@@ -2,14 +2,16 @@ use super::*;
 
 pub const UINT2: Type = Type::INT4;
 
+// NOTE: Remember to update crate::verify when tables are added/removed
+
 thorn::tables! {
     pub struct Host in Lantern {
-        Migration: Type::INT8,
-        Migrated: Type::TIMESTAMP,
+        Migration: Type::INT4,
+        Migrated: Type::TIMESTAMPTZ,
     }
 
     pub struct Metrics in Lantern {
-        Ts: Type::TIMESTAMP,
+        Ts: Type::TIMESTAMPTZ,
 
         Mem: Type::INT8,
         Upload: Type::INT8,
@@ -28,7 +30,7 @@ thorn::tables! {
         /// Incrementing counter for sorting
         Counter: Type::INT8,
         /// Event code
-        Code: Type::INT2,
+        Code: codes::EVENT_CODE.clone(),
         /// Associated Snowflake for whatever the event points to
         Id: SNOWFLAKE,
         /// If the event is for a party, have this to sort with
@@ -38,7 +40,7 @@ thorn::tables! {
     }
 
     pub struct EventLogLastNotification in Lantern {
-        LastNotif: Type::TIMESTAMP,
+        LastNotif: Type::TIMESTAMPTZ,
         MaxInterval: Type::INTERVAL,
     }
 
@@ -48,13 +50,13 @@ thorn::tables! {
     }
 
     pub struct IpBans in Lantern {
-        Expires: Type::TIMESTAMP,
+        Expires: Type::TIMESTAMPTZ,
         Addr: Type::INET,
     }
 
     pub struct Users in Lantern {
         Id: SNOWFLAKE,
-        DeletedAt: Type::TIMESTAMP,
+        DeletedAt: Type::TIMESTAMPTZ,
         Dob: Type::DATE,
         Flags: Type::INT4,
         Discriminator: UINT2,
@@ -74,7 +76,7 @@ thorn::tables! {
     pub struct UserTokens in Lantern {
         Id: SNOWFLAKE,
         UserId: Users::Id,
-        Expires: Type::TIMESTAMP,
+        Expires: Type::TIMESTAMPTZ,
         Kind: Type::INT2,
         Token: Type::BYTEA,
     }
@@ -82,7 +84,7 @@ thorn::tables! {
     pub struct UserPresence in Lantern {
         UserId: Users::Id,
         ConnId: SNOWFLAKE,
-        UpdatedAt: Type::TIMESTAMP,
+        UpdatedAt: Type::TIMESTAMPTZ,
         Flags: Type::INT2,
         Activity: Type::JSONB,
     }
@@ -113,7 +115,7 @@ thorn::tables! {
 
     pub struct Sessions in Lantern {
         UserId: Users::Id,
-        Expires: Type::TIMESTAMP,
+        Expires: Type::TIMESTAMPTZ,
         Addr: Type::INET,
         Token: Type::BYTEA,
     }
@@ -121,7 +123,7 @@ thorn::tables! {
     pub struct Friends in Lantern {
         UserAId: Users::Id,
         UserBId: Users::Id,
-        UpdatedAt: Type::TIMESTAMP,
+        UpdatedAt: Type::TIMESTAMPTZ,
         Flags: Type::INT2,
         NoteA: Type::TEXT,
         NoteB: Type::TEXT,
@@ -130,7 +132,7 @@ thorn::tables! {
     pub struct UserBlocks in Lantern {
         UserId: Users::Id,
         BlockId: Users::Id,
-        BlockedAt: Type::TIMESTAMP,
+        BlockedAt: Type::TIMESTAMPTZ,
     }
 
     pub struct Party in Lantern {
@@ -140,7 +142,7 @@ thorn::tables! {
         AvatarId: UserAssets::Id,
         BannerId: UserAssets::Id,
         Flags: Type::INT8,
-        DeletedAt: Type::TIMESTAMP,
+        DeletedAt: Type::TIMESTAMPTZ,
         Name: Type::TEXT,
         Description: Type::TEXT,
     }
@@ -149,7 +151,7 @@ thorn::tables! {
         PartyId: Party::Id,
         UserId: Users::Id,
         InviteId: Invite::Id,
-        JoinedAt: Type::TIMESTAMP,
+        JoinedAt: Type::TIMESTAMPTZ,
         Flags: Type::INT2,
         Position: Type::INT2,
     }
@@ -157,14 +159,14 @@ thorn::tables! {
     pub struct PartyBans in Lantern {
         PartyId: Party::Id,
         UserId: Users::Id,
-        BannedAt: Type::TIMESTAMP,
+        BannedAt: Type::TIMESTAMPTZ,
         Reason: Type::TEXT,
     }
 
     pub struct Subscriptions in Lantern {
         UserId: Users::Id,
         RoomId: Rooms::Id,
-        MuteExpires: Type::TIMESTAMP,
+        MuteExpires: Type::TIMESTAMPTZ,
         Flags: Type::INT2,
     }
 
@@ -207,7 +209,7 @@ thorn::tables! {
         MsgId: Messages::Id,
         EmoteId: Emotes::Id,
         EmojiId: Emojis::Id,
-        Reacted: Type::TIMESTAMP,
+        Reacted: Type::TIMESTAMPTZ,
         UserIds: SNOWFLAKE_ARRAY,
     }
 
@@ -215,7 +217,7 @@ thorn::tables! {
         Id: SNOWFLAKE,
         PartyId: Party::Id,
         UserId: Users::Id,
-        Expires: Type::TIMESTAMP,
+        Expires: Type::TIMESTAMPTZ,
         Uses: Type::INT2,
         Description: Type::TEXT,
         Vanity: Type::TEXT,
@@ -226,7 +228,7 @@ thorn::tables! {
         PartyId: SNOWFLAKE,
         AvatarId: SNOWFLAKE,
         ParentId: Rooms::Id,
-        DeletedAt: Type::TIMESTAMP,
+        DeletedAt: Type::TIMESTAMPTZ,
         Position: Type::INT2,
         Flags: Type::INT2,
         Name: Type::TEXT,
@@ -268,8 +270,8 @@ thorn::tables! {
         UserId: Users::Id,
         RoomId: Rooms::Id,
         ThreadId: Threads::Id,
-        UpdatedAt: Type::TIMESTAMP,
-        EditedAt: Type::TIMESTAMP,
+        UpdatedAt: Type::TIMESTAMPTZ,
+        EditedAt: Type::TIMESTAMPTZ,
         Kind: Type::INT2,
         Flags: Type::INT2,
         Content: Type::TEXT,

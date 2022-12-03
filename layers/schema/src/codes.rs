@@ -1,5 +1,11 @@
 #![allow(deprecated)]
 
+use postgres_types::{Kind, Type};
+
+lazy_static::lazy_static! {
+    pub static ref EVENT_CODE: Type = Type::new("event_code".to_owned(), 0, Kind::Enum(Vec::new()), "lantern".to_owned());
+}
+
 thorn::enums! {
     /// **NOTE**: This must match `lantern.event_code` in the database **EXACTLY**, or it will fail.
     ///
