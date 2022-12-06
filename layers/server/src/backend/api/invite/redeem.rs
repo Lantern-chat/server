@@ -34,11 +34,11 @@ pub async fn redeem_invite(
                 use schema::*;
                 use thorn::*;
 
-                Query::call(Call::custom("lantern.redeem_invite").args((
+                Query::call(schema::redeem_invite(
                     Var::of(Users::Id),
                     Var::of(Invite::Id),
                     Var::of(Invite::Vanity),
-                )))
+                ))
             },
             &[&auth.user_id, &maybe_id, &code],
         )

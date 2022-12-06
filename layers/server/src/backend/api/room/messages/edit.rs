@@ -204,10 +204,8 @@ fn add_attachments_query() -> impl thorn::AnyQuery {
 
     Query::with()
         .with(
-            AggIds::as_query(
-                Query::select().expr(Call::custom("UNNEST").arg(att_id_var).alias_to(AggIds::Id)),
-            )
-            .exclude(),
+            AggIds::as_query(Query::select().expr(Builtin::unnest((att_id_var,)).alias_to(AggIds::Id)))
+                .exclude(),
         )
         .insert()
         .into::<Attachments>()

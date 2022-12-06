@@ -180,12 +180,12 @@ pub async fn modify_account(
             use schema::*;
             use thorn::*;
 
-            Query::call(Call::custom("lantern.update_user").args((
+            Query::call(schema::update_user(
                 Var::of(Users::Id),
                 Var::of(Users::Username),
                 Var::of(Users::Email),
                 Var::of(Users::Passhash),
-            )))
+            ))
         },
         &[&auth.user_id, &u, &e, &p],
     )

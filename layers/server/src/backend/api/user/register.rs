@@ -89,13 +89,13 @@ pub async fn register_user(
                 use schema::*;
                 use thorn::*;
 
-                Query::call(Call::custom("lantern.register_user").args((
+                Query::call(schema::register_user(
                     Var::of(Users::Id),
                     Var::of(Users::Username),
                     Var::of(Users::Email),
                     Var::of(Users::Passhash),
                     Var::of(Users::Dob),
-                )))
+                ))
             },
             &[&id, &username, &form.email, &password_hash, &dob],
         )

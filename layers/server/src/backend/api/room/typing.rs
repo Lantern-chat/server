@@ -90,11 +90,11 @@ pub async fn trigger_typing(
                     .cols(RoomColumns::default())
                     .cols(UserColumns::default())
                     // ProfileColumns, must follow order as listed above
-                    .expr(Call::custom("lantern.combine_profile_bits").args((
+                    .expr(schema::combine_profile_bits(
                         BaseProfile::col(Profiles::Bits),
                         PartyProfile::col(Profiles::Bits),
                         PartyProfile::col(Profiles::AvatarId),
-                    )))
+                    ))
                     .expr(Builtin::coalesce((
                         PartyProfile::col(Profiles::AvatarId),
                         BaseProfile::col(Profiles::AvatarId),

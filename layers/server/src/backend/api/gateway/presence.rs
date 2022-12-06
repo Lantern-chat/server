@@ -25,12 +25,12 @@ pub async fn set_presence(
             use schema::*;
             use thorn::*;
 
-            Query::call(Call::custom("lantern.set_presence").args((
+            Query::call(schema::set_presence(
                 Params::user_id(),
                 Params::conn_id(),
                 Params::flags(),
                 Params::activity(),
-            )))
+            ))
         },
         &Params {
             user_id,

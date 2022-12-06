@@ -16,9 +16,10 @@ pub async fn delete_user(state: ServerState, user_id: Snowflake) -> Result<(), E
             use schema::*;
             use thorn::*;
 
-            Query::call(
-                Call::custom("lantern.soft_delete_user").args((Var::of(Users::Id), Var::of(Users::Username))),
-            )
+            Query::call(schema::soft_delete_user(
+                Var::of(Users::Id),
+                Var::of(Users::Username),
+            ))
         },
         &[&user_id, &new_username],
     )

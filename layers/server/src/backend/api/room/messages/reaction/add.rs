@@ -280,13 +280,12 @@ mod q {
                 .alias_to(ReactionEvent::AvatarId),
             )
             .expr(
-                Call::custom("lantern.combine_profile_bits")
-                    .args((
-                        BaseProfile::col(Profiles::Bits),
-                        PartyProfile::col(Profiles::Bits),
-                        PartyProfile::col(Profiles::AvatarId),
-                    ))
-                    .alias_to(ReactionEvent::ProfileBits),
+                schema::combine_profile_bits(
+                    BaseProfile::col(Profiles::Bits),
+                    PartyProfile::col(Profiles::Bits),
+                    PartyProfile::col(Profiles::AvatarId),
+                )
+                .alias_to(ReactionEvent::ProfileBits),
             )
             .from(
                 Values::inner_join_table::<Inserted>()
