@@ -31,7 +31,7 @@ pub struct RawEvent {
     pub code: EventCode,
 }
 
-use schema::codes::EventCode;
+use schema::EventCode;
 
 #[allow(unused_variables)]
 pub async fn process(
