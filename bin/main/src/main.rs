@@ -1,5 +1,5 @@
 extern crate tracing as log;
-use db::pg::NoTls;
+use db::{pg::NoTls, DatabasePools};
 use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter},
     FmtSubscriber,
@@ -7,8 +7,6 @@ use tracing_subscriber::{
 
 pub mod allocator;
 pub mod cli;
-
-mod verify;
 
 use task_runner::TaskRunner;
 
@@ -92,25 +90,17 @@ async fn main() -> anyhow::Result<()> {
     let db = {
         use db::pool::{Pool, PoolConfig};
 
-        let mut db_config = config.db.db_str.parse::<db::pg::Config>()?;
-        db_config.dbname("lantern");
-
-        let pool_config = PoolConfig::new(db_config);
+        let pool_config = config.db.db_str.parse::<PoolConfig>()?;
 
         let write_pool = Pool::new(pool_config.clone(), NoTls);
 
         db::migrate::migrate(write_pool.clone(), &config.db.migrations).await?;
 
-        server::backend::db::DatabasePools {
+        DatabasePools {
             write: write_pool,
             read: Pool::new(pool_config.readonly(), NoTls),
         }
     };
-
-    if args.verify_schema {
-        verify::verify_schema(&db).await?;
-        return Ok(());
-    }
 
     let state = server::ServerState::new(config, db);
 

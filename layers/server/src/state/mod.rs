@@ -15,8 +15,8 @@ use util::cmap::CHashMap;
 
 use crate::{
     backend::{
-        cache::permission_cache::PermissionCache, cache::session_cache::SessionCache, db::DatabasePools,
-        gateway::Gateway, queues::Queues, services::Services,
+        cache::permission_cache::PermissionCache, cache::session_cache::SessionCache, gateway::Gateway,
+        queues::Queues, services::Services,
     },
     Error,
 };
@@ -27,7 +27,7 @@ pub mod emoji;
 pub mod id_lock;
 
 pub struct InnerServerState {
-    pub db: DatabasePools,
+    pub db: db::DatabasePools,
     pub config: Config,
     pub id_lock: id_lock::IdLockMap,
     /// Each permit represents 1 Kibibyte
@@ -56,7 +56,7 @@ impl Deref for ServerState {
 }
 
 impl ServerState {
-    pub fn new(config: Config, db: DatabasePools) -> Self {
+    pub fn new(config: Config, db: db::DatabasePools) -> Self {
         ServerState(Arc::new(InnerServerState {
             db,
             id_lock: Default::default(),

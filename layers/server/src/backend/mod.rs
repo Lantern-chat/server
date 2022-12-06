@@ -1,4 +1,3 @@
-pub mod db;
 pub mod queues;
 
 pub mod api;

@@ -7,8 +7,6 @@ pub use tables::*;
 pub mod views;
 pub use views::*;
 
-pub mod verify;
-
 pub use thorn::pg::Type;
 
 pub const SNOWFLAKE: Type = Type::INT8;

@@ -1,33 +1,19 @@
 [package]
-name = "main"
+name = "print_schema"
 version = "0.1.0"
-authors = ["novacrazy <novacrazy@gmail.com>"]
 edition = "2021"
-publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[features]
-# nightly = ["web/nightly"]
-# armv8 = ["nightly", "web/armv8"]
-memory_metrics = ["tikv-jemallocator"]
-default = ["memory_metrics"]
-
 [dependencies]
-server = { path = "../../layers/server" }
-
-task_runner = { path = "../../crates/task_runner" }
 db = { path = "../../crates/db" }
-util = { path = "../../crates/util" }
+
+thorn = { git = "https://github.com/Lantern-chat/thorn", features = ["generate"] }
 
 tokio = { version = "1", features = ["full", "parking_lot"] }
 futures = "0.3"
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
 tracing-futures = { version = "0.2.4", default-features = false, features = ["std-future"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-dotenv = "0.15.0"
 anyhow = "1"
 pico-args = "0.5.0"
-
-[target.'cfg(unix)'.dependencies]
-tikv-jemallocator = { version = "0.5", optional = true }

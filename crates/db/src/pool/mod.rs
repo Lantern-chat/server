@@ -515,6 +515,12 @@ pub struct Client {
     pub stmt_cache: Arc<StatementCache>,
 }
 
+impl AsRef<PgClient> for Client {
+    fn as_ref(&self) -> &PgClient {
+        &self.client
+    }
+}
+
 pub struct Transaction<'a> {
     t: PgTransaction<'a>,
     id: u64,

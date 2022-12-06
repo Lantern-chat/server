@@ -115,3 +115,11 @@ impl PoolConfig {
         self
     }
 }
+
+impl std::str::FromStr for PoolConfig {
+    type Err = <PgConfig as std::str::FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(PoolConfig::new)
+    }
+}

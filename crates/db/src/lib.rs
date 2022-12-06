@@ -8,3 +8,9 @@ pub mod migrate;
 pub mod pool;
 
 pub use pg::Row;
+
+#[derive(Clone)]
+pub struct DatabasePools {
+    pub read: pool::Pool,
+    pub write: pool::Pool,
+}
