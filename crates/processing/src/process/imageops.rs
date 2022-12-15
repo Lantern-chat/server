@@ -7,7 +7,7 @@ fn sinc(mut a: f32) -> f32 {
     a.sin() / a
 }
 
-fn lanczos(x: f32, t: f32) -> f32 {
+pub fn lanczos(x: f32, t: f32) -> f32 {
     if x.abs() < t {
         if x != 0.0 {
             sinc(x) * sinc(x / t)
