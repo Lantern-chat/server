@@ -36,7 +36,7 @@ pub fn encode_avif<W: Write>(
     _heuristics: HeuristicsInfo,
     quality: u8,
 ) -> ImageResult<()> {
-    use ravif::{encode_rgb, encode_rgba, ColorSpace, Config, Img};
+    use ravif::{ColorSpace, Encoder, Img};
     use rgb::AsPixels;
 
     debug_assert!(quality <= 100);
@@ -52,27 +52,30 @@ pub fn encode_avif<W: Write>(
     };
     let quality = JPEG_TO_AVIF_QUALITY[quality as usize];
 
-    let config = Config {
-        quality: quality as f32,
-        alpha_quality: quality as f32,
-        speed,
-        premultiplied_alpha: false,
-        color_space: ColorSpace::YCbCr,
+    let encoder = Encoder::new()
+        .with_quality(quality as f32)
+        .with_alpha_quality(quality as f32)
+        .with_speed(speed)
+        .with_alpha_color_mode(ravif::AlphaColorMode::UnassociatedClean)
+        .with_internal_color_space(ColorSpace::YCbCr)
         // try to save some parallelism on small images, but larger images require extra
-        threads: Some(if small { 1 } else { 3 }),
-    };
+        .with_num_threads(Some(if small { 1 } else { 3 }));
 
     let res = match image {
-        DynamicImage::ImageRgb8(image) => encode_rgb(
-            Img::new(image.as_raw().as_pixels(), width as usize, height as usize),
-            &config,
-        )
-        .map(|r| r.0),
-        DynamicImage::ImageRgba8(image) => encode_rgba(
-            Img::new(image.as_raw().as_pixels(), width as usize, height as usize),
-            &config,
-        )
-        .map(|r| r.0),
+        DynamicImage::ImageRgb8(image) => encoder
+            .encode_rgb(Img::new(
+                image.as_raw().as_pixels(),
+                width as usize,
+                height as usize,
+            ))
+            .map(|r| r.avif_file),
+        DynamicImage::ImageRgba8(image) => encoder
+            .encode_rgba(Img::new(
+                image.as_raw().as_pixels(),
+                width as usize,
+                height as usize,
+            ))
+            .map(|r| r.avif_file),
         _ => unimplemented!(),
     };
 
