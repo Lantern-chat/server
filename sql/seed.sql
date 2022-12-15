@@ -78,6 +78,7 @@ $$
             ELSE 'english'::regconfig
         END
 $$ LANGUAGE SQL IMMUTABLE;
+COMMENT ON FUNCTION lantern.to_language IS 'Converts a language code into the equivalent regconfig language';
 
 CREATE TYPE lantern.event_code AS ENUM (
     'message_create',
@@ -153,6 +154,8 @@ CREATE TABLE lantern.event_log (
 
     code        lantern.event_code  NOT NULL
 );
+COMMENT ON COLUMN lantern.event_log.id IS 'The snowflake ID of whatever this event is pointing to';
+COMMENT ON COLUMN lantern.event_log.counter IS 'Incrementing counter for sorting';
 
 ALTER SEQUENCE lantern.event_id OWNED BY lantern.event_log.counter;
 
@@ -161,6 +164,7 @@ CREATE TABLE lantern.event_log_last_notification (
     last_notif      timestamptz NOT NULL DEFAULT now(),
     max_interval    interval    NOT NULL DEFAULT INTERVAL '100 milliseconds'
 );
+COMMENT ON TABLE lantern.event_log_last_notification IS 'Notification rate-limiting table';
 
 CREATE TABLE lantern.rate_limits (
     violations  integer     NOT NULL DEFAULT 0,
@@ -197,11 +201,21 @@ CREATE TABLE IF NOT EXISTS lantern.metrics (
 
     CONSTRAINT metrics_pk PRIMARY KEY (ts)
 );
+COMMENT ON COLUMN lantern.metrics.mem IS 'allocated memory usage, in bytes';
+COMMENT ON COLUMN lantern.metrics.upload IS 'bytes uploaded by users since last metric';
+COMMENT ON COLUMN lantern.metrics.reqs IS 'requests since last metric';
+COMMENT ON COLUMN lantern.metrics.errs IS 'errors since last metric';
+COMMENT ON COLUMN lantern.metrics.conns IS 'number of connected gateway users';
+COMMENT ON COLUMN lantern.metrics.events IS 'number of gateway events since last metric';
+COMMENT ON COLUMN lantern.metrics.p50 IS '50th latency percently';
+COMMENT ON COLUMN lantern.metrics.p95 IS '95th latency percentile';
+COMMENT ON COLUMN lantern.metrics.p99 IS '99th latency percentile';
 
 CREATE TABLE lantern.users (
     --- Snowflake id
     id              bigint              NOT NULL,
     deleted_at      timestamptz,
+    last_active     timestamptz,
     dob             date                NOT NULL,
     flags           int                 NOT NULL    DEFAULT 0,
     -- 2-byte integer that can be displayed as 4 hex digits,
@@ -220,6 +234,8 @@ CREATE TABLE lantern.users (
 
     CONSTRAINT users_pk PRIMARY KEY (id)
 );
+COMMENT ON COLUMN lantern.users.preferences IS 'this is for client-side user preferences, which can be stored as JSON easily enough';
+COMMENT ON COLUMN lantern.users.discriminator IS '2-byte integer that can be displayed as 4 hex digits, actually stored as a 4-byte signed integer because Postgres doesn''t support unsigned...';
 
 CREATE TABLE lantern.user_freelist (
     username        text            NOT NULL,
@@ -240,7 +256,6 @@ CREATE TABLE lantern.user_tokens (
 CREATE TABLE lantern.party (
     id              bigint      NOT NULL,
     owner_id        bigint      NOT NULL,
-    -- NOTE: FK is added in later migration
     default_room    bigint      NOT NULL,
     -- packed party flags
     flags           bigint      NOT NULL DEFAULT 0,
@@ -255,14 +270,20 @@ CREATE TABLE lantern.party (
 
 -- Association map between parties and users
 CREATE TABLE lantern.party_member (
-    party_id    bigint      NOT NULL,
-    user_id     bigint      NOT NULL,
+    party_id    bigint          NOT NULL,
+    user_id     bigint          NOT NULL,
+    perms       bigint          NOT NULL DEFAULT 0,
+
     invite_id   bigint,
     joined_at   timestamptz     NOT NULL    DEFAULT now(),
+    mute_until  timestamptz,
+    flags       smallint        NOT NULL    DEFAULT 0,
+    position    smallint        NOT NULL    DEFAULT 0,
 
     -- Composite primary key
     CONSTRAINT party_member_pk PRIMARY KEY (party_id, user_id)
 );
+COMMENT ON TABLE lantern.party_member IS 'Association map between parties and users';
 
 CREATE TABLE lantern.rooms (
     id              bigint      NOT NULL,
@@ -278,18 +299,32 @@ CREATE TABLE lantern.rooms (
     CONSTRAINT room_pk PRIMARY KEY (id)
 );
 
-
-CREATE TABLE lantern.subscriptions (
+-- Table for holding active per-room per-user settings
+CREATE TABLE lantern.room_members (
     user_id         bigint      NOT NULL,
     room_id         bigint      NOT NULL,
+    party_id        bigint      NOT NULL,
+
+    -- if NULL, there is no difference between these and party_member perms
+    -- full permissions can be computed from `(party_member.perms & !deny) | allow`
+    allow           bigint      DEFAULT 0, -- (user_allow | (role_allow & !user_deny))
+    deny            bigint      DEFAULT 0, -- (role_deny | user_deny)
+
+    last_read       bigint,
+
+    wallpaper_id    bigint,
 
     -- If NULL, there is no mute
     mute_expires    timestamptz,
 
-    flags           smallint    NOT NULL DEFAULT 0,
+    flags           int    NOT NULL DEFAULT 0,
 
-    CONSTRAINT subscription_pk PRIMARY KEY (room_id, user_id)
+    CONSTRAINT room_members_pk PRIMARY KEY (room_id, user_id)
 );
+COMMENT ON TABLE lantern.room_members IS 'Table for holding active per-room per-user settings.';
+COMMENT ON COLUMN lantern.room_members.allow IS '`(user_allow | (role_allow & !user_deny))`';
+COMMENT ON COLUMN lantern.room_members.deny IS '`(role_deny | user_deny)`';
+COMMENT ON COLUMN lantern.room_members.mute_expires IS 'If NULL, there is no mute';
 
 -- Backing file table for all attachments, avatars and so forth
 CREATE TABLE lantern.files (
@@ -325,6 +360,13 @@ CREATE TABLE lantern.files (
 
     CONSTRAINT file_pk PRIMARY KEY (id)
 );
+COMMENT ON TABLE lantern.files IS 'Backing file table for all attachments, avatars and so forth';
+COMMENT ON COLUMN lantern.files.nonce IS 'Encryption Nonce';
+COMMENT ON COLUMN lantern.files.size IS 'Size of file in bytes';
+COMMENT ON COLUMN lantern.files.name IS 'Filename given at upload';
+COMMENT ON COLUMN lantern.files.mime IS 'MIME type';
+COMMENT ON COLUMN lantern.files.sha1 IS 'SHA-1 hash of completed file';
+COMMENT ON COLUMN lantern.files.preview IS 'blurhash preview (first frame of video if video). this shouldn''t be too large, less than 128 bytes.';
 
 CREATE TABLE lantern.user_assets (
     id          bigint      NOT NULL,
@@ -337,6 +379,8 @@ CREATE TABLE lantern.user_assets (
 
     CONSTRAINT user_asset_pk PRIMARY KEY (id)
 );
+COMMENT ON COLUMN lantern.user_assets.file_id IS 'Original asset before processing';
+COMMENT ON COLUMN lantern.user_assets.preview IS 'One single blurhash preview for all versions of this asset';
 
 CREATE TABLE lantern.user_asset_files (
     asset_id    bigint      NOT NULL,
@@ -360,6 +404,7 @@ CREATE TABLE lantern.profiles (
     custom_status   text,
     biography       text
 );
+COMMENT ON TABLE lantern.profiles IS 'Users can have multiple profiles, with one main profile where the `party_id` is NULL';
 
 CREATE TABLE lantern.messages (
     -- Snowflake ID, contains created_at timestamp
@@ -435,6 +480,7 @@ CREATE TABLE lantern.roles (
 
     CONSTRAINT role_pk PRIMARY KEY (id)
 );
+COMMENT ON COLUMN lantern.roles.permissions IS 'Actually contains 3 16-bit fields';
 
 -- Role/User association map
 -- The party id can be found by joining with the role itself
@@ -647,13 +693,17 @@ ALTER TABLE lantern.party ADD CONSTRAINT default_room_fk FOREIGN KEY (default_ro
     ON DELETE RESTRICT ON UPDATE CASCADE -- don't allow deleting default room
     DEFERRABLE INITIALLY DEFERRED;
 
-ALTER TABLE lantern.subscriptions ADD CONSTRAINT room_fk FOREIGN KEY (room_id)
+ALTER TABLE lantern.room_members ADD CONSTRAINT room_fk FOREIGN KEY (room_id)
     REFERENCES lantern.rooms (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE lantern.subscriptions ADD CONSTRAINT user_fk FOREIGN KEY (user_id)
+ALTER TABLE lantern.room_members ADD CONSTRAINT user_fk FOREIGN KEY (user_id)
     REFERENCES lantern.users (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE lantern.room_members ADD CONSTRAINT wall_fk FOREIGN KEY (wallpaper_id)
+    REFERENCES lantern.files (id) MATCH FULL
+    ON DELETE SET NULL ON UPDATE CASCADE;
 
 ALTER TABLE lantern.files ADD CONSTRAINT user_fk FOREIGN KEY (user_id)
     REFERENCES lantern.users (id) MATCH FULL
@@ -984,7 +1034,7 @@ CREATE INDEX user_tokens_expires_idx        ON lantern.user_tokens      USING bt
 CREATE INDEX party_name_idx                 ON lantern.party            USING btree(name);
 CREATE INDEX party_member_user_idx          ON lantern.party_member     USING btree(user_id);
 CREATE INDEX room_name_idx                  ON lantern.rooms            USING btree(name);
-CREATE INDEX room_avatar_idx                ON lantern.rooms            USING btree(avatar_id);
+CREATE INDEX room_avatar_idx                ON lantern.rooms            USING btree(avatar_id) WHERE avatar_id IS NOT NULL;
 CREATE INDEX file_idx                       ON lantern.files            USING btree(user_id, id)        INCLUDE (size);
 CREATE INDEX user_asset_original_file_idx   ON lantern.user_assets      USING btree(file_id);
 
@@ -1040,6 +1090,8 @@ CREATE INDEX user_presence_idx              ON lantern.user_presence    USING bt
 
 CREATE INDEX user_block_user_idx            ON lantern.user_blocks      USING btree(user_id);
 CREATE INDEX metrics_ts_idx                 ON lantern.metrics          USING btree(ts);
+
+CREATE INDEX room_member_wallpaper_idx      ON lantern.room_members     USING btree(wallpaper_id) WHERE wallpaper_id IS NOT NULL;
 
 ----------------------------------------
 ----------- INITIAL VALUES -------------
@@ -1127,6 +1179,11 @@ BEGIN
         END
     );
 
+    -- if a new presence includes the online flag
+    IF TG_OP != 'DELETE' AND (NEW.flags & (1 << 2)) = (1 << 2) THEN
+        UPDATE lantern.users SET last_active = now() WHERE id = NEW.user_id;
+    END IF;
+
     RETURN NEW;
 END
 $$;
@@ -1142,37 +1199,63 @@ FOR EACH ROW EXECUTE FUNCTION lantern.presence_trigger();
 -- Member is no longer visible in party, cannot rejoin
 -- Member unbanned, delete member row and emit member_unban
 
-CREATE OR REPLACE FUNCTION lantern.member_trigger()
+CREATE OR REPLACE FUNCTION lantern.on_member_insert()
 RETURNS trigger
 LANGUAGE plpgsql AS
 $$
 BEGIN
-    IF TG_OP = 'UPDATE' AND OLD.position != NEW.position THEN
+    INSERT INTO lantern.event_log (code, id, party_id)
+    VALUES (
+        'member_joined'::lantern.event_code,
+        NEW.user_id,
+        NEW.party_id
+    );
+    RETURN NEW;
+END
+$$;
+
+CREATE OR REPLACE FUNCTION lantern.on_member_delete()
+RETURNS trigger
+LANGUAGE plpgsql AS
+$$
+BEGIN
+    INSERT INTO lantern.event_log (code, id, party_id)
+    SELECT
+        CASE
+            -- Deleting a member entry when unbanning signifies the ban has been lifted
+            -- but they must rejoin manually
+            WHEN ((OLD.flags & 1 = 1))
+                THEN 'member_unban'::lantern.event_code
+            ELSE 'member_left'::lantern.event_code
+        END,
+        OLD.user_id,
+        OLD.party_id;
+    RETURN NEW;
+END
+$$;
+
+CREATE OR REPLACE FUNCTION lantern.on_member_update()
+RETURNS trigger
+LANGUAGE plpgsql AS
+$$
+BEGIN
+    -- NOTE: If perms was updated via another trigger, then the condition on
+    -- member_update_event prevents this trigger from being called in the first place
+    IF OLD.perms != NEW.perms THEN
+        -- do nothing when cached permissions change
+        -- NOTE: When updating perms, make sure a `WHERE perms != new_perms` is given on the UPDATE to avoid triggering
+        RETURN NEW;
+    ELSEIF OLD.position != NEW.position THEN
         -- Force a self-update to refresh party positions
         INSERT INTO lantern.event_log(code, id, party_id)
-        VALUES('self_updated'::lantern.event_code, OLD.user_id, OLD.party_id);
-
-    ELSIF TG_OP = 'DELETE' THEN
+        VALUES('self_updated'::lantern.event_code, NEW.user_id, NEW.party_id);
+    ELSEIF (OLD.flags != NEW.flags) THEN
         INSERT INTO lantern.event_log (code, id, party_id)
         SELECT
             CASE
-                -- Deleting a member entry when unbanning signifies the ban has been lifted
-                -- but they must rejoin manually
-                WHEN ((OLD.flags & 1 = 1)) THEN 'member_unban'::lantern.event_code
-                ELSE 'member_left'::lantern.event_code
-            END,
-            OLD.user_id,
-            OLD.party_id;
-    ELSE
-        INSERT INTO lantern.event_log (code, id, party_id)
-        SELECT
-            CASE
-                WHEN TG_OP = 'INSERT'
-                    THEN 'member_joined'::lantern.event_code
                 WHEN ((OLD.flags & 1 = 0)) AND ((NEW.flags & 1 = 1))
                     THEN 'member_ban'::lantern.event_code
-                WHEN TG_OP = 'UPDATE'
-                    THEN 'member_updated'::lantern.event_code
+                ELSE 'member_updated'::lantern.event_code
             END,
             NEW.user_id,
             NEW.party_id;
@@ -1182,8 +1265,15 @@ BEGIN
 END
 $$;
 
-CREATE TRIGGER member_event AFTER UPDATE OR INSERT OR DELETE ON lantern.party_member
-FOR EACH ROW EXECUTE FUNCTION lantern.member_trigger();
+CREATE TRIGGER member_insert_event AFTER INSERT ON lantern.party_member
+FOR EACH ROW EXECUTE FUNCTION lantern.on_member_insert();
+
+CREATE TRIGGER member_update_event AFTER UPDATE ON lantern.party_member
+FOR EACH ROW WHEN (pg_trigger_depth() = 0)
+EXECUTE FUNCTION lantern.on_member_update();
+
+CREATE TRIGGER member_delete_event AFTER DELETE ON lantern.party_member
+FOR EACH ROW EXECUTE FUNCTION lantern.on_member_delete();
 
 --
 
@@ -1248,26 +1338,24 @@ LANGUAGE plpgsql AS
 $$
 BEGIN
     IF
-        OLD.mfa_secret IS DISTINCT FROM NEW.mfa_secret OR
-        OLD.mfa_backup IS DISTINCT FROM NEW.mfa_backup OR
-        OLD.passhash IS DISTINCT FROM NEW.passhash
-    THEN
-        -- don't emit events on authorization changes
-        RETURN NEW;
-    ELSIF
+        OLD.preferences IS DISTINCT FROM NEW.preferences OR
         OLD.dob != NEW.dob OR
         OLD.email != NEW.email OR
-        OLD.preferences != NEW.preferences OR
-        OLD.flags != NEW.flags -- only compare public fields?
+        OLD.flags != NEW.flags -- TODO: only compare public fields?
     THEN
         -- self event when changing private fields
         INSERT INTO lantern.event_log(code, id)
         VALUES ('self_updated'::lantern.event_code, NEW.id);
-    ELSE
+    ELSIF
+        OLD.username != NEW.username OR
+        OLD.deleted_at IS DISTINCT FROM NEW.deleted_at
+    THEN
         -- user event
         INSERT INTO lantern.event_log(code, id)
         VALUES ('user_updated'::lantern.event_code, NEW.id);
     END IF;
+
+    -- ignore any other fields
 
     RETURN NEW;
 END
@@ -1342,6 +1430,135 @@ $$;
 
 CREATE TRIGGER pin_tag_delete_event AFTER DELETE ON lantern.pin_tags
 FOR EACH ROW EXECUTE FUNCTION lantern.pin_tag_delete_trigger();
+
+----------------------------------------
+------------ PERM TRIGGERS -------------
+----------------------------------------
+
+-- When a role updates, the change should cascade down each user's
+-- base permissiona and their specific room permissions
+
+CREATE OR REPLACE FUNCTION lantern.on_role_update_trigger()
+RETURNS trigger
+LANGUAGE plpgsql AS
+$$
+BEGIN
+    IF OLD.permissions = NEW.permissions THEN
+        RETURN NEW;
+    END IF;
+
+    WITH members_to_update AS (
+        -- get a list of members relevant to this role
+        SELECT role_members.user_id FROM role_members WHERE role_members.role_id = NEW.id
+    ), perms AS (
+        -- compute base permissions for each user
+        SELECT
+            m.user_id, bit_or(roles.permissions) AS perms
+        FROM role_members
+        -- join with roles to get roles.permissions
+        INNER JOIN roles ON roles.id = role_members.role_id OR roles.id = roles.party_id
+        -- join with m to limit members updated
+        INNER JOIN members_to_update m ON role_members.user_id = m.user_id
+        GROUP BY role_members.user_id
+    )
+    -- apply updated base permissions
+    UPDATE party_member SET perms = perms.perms
+    FROM perms WHERE party_member.user_id = perms.user_id
+    -- but don't modify if unchanged, avoiding triggers
+    AND party_member.perms != perms.perms;
+
+    RETURN NEW;
+END
+$$;
+
+CREATE TRIGGER role_update AFTER UPDATE ON lantern.roles
+FOR EACH ROW EXECUTE FUNCTION lantern.on_role_update_trigger();
+
+CREATE OR REPLACE FUNCTION lantern.on_overwrite_update_trigger()
+RETURNS trigger
+LANGUAGE plpgsql AS
+$$
+BEGIN
+    -- skip unchanged/spurious
+    IF NEW.allow = OLD.allow AND NEW.deny = OLD.deny THEN
+        RETURN NEW;
+    END IF;
+
+    IF NEW.role_id IS NOT NULL THEN
+        WITH members_to_update AS (
+            SELECT role_members.user_id FROM role_members WHERE role_members.role_id = NEW.role_id
+        ), perms AS (
+            SELECT
+                m.user_id,
+                -- user_allow | (allow & !user_deny), NULL if 0
+                NULLIF(COALESCE(bit_or(o.user_allow), 0) | (COALESCE(bit_or(o.allow), 0) & ~COALESCE(bit_or(o.user_deny), 0)), 0) AS allow,
+                -- deny | user_deny, NULL if 0
+                NULLIF(COALESCE(bit_or(o.deny), 0) | COALESCE(bit_or(o.user_deny)), 0) AS deny
+            FROM lantern.agg_overwrites o
+            INNER JOIN members_to_update m ON o.user_id = m.user_id -- limit to users with this role
+            WHERE o.room_id = NEW.room_id -- limit by room, of course
+            GROUP BY m.user_id
+        )
+        UPDATE lantern.room_members
+            SET allow = perms.allow, deny = perms.deny
+            FROM perms
+            WHERE room_members.user_id = perms.user_id AND room_members.room_id = NEW.room_id
+            AND room_members.allow IS DISTINCT FROM perms.allow
+            AND room_members.deny IS DISTINCT FROM perms.deny;
+
+    ELSIF NEW.user_id IS NOT NULL THEN
+        WITH perms AS (
+            SELECT
+                -- user_allow | (allow & !user_deny), NULL if 0
+                NULLIF(COALESCE(bit_or(o.user_allow), 0) | (COALESCE(bit_or(o.allow), 0) & ~COALESCE(bit_or(o.user_deny), 0)), 0) AS allow,
+                -- deny | user_deny, NULL if 0
+                NULLIF(COALESCE(bit_or(o.deny), 0) | COALESCE(bit_or(o.user_deny)), 0) AS deny
+            FROM lantern.agg_overwrites o
+            WHERE o.user_id = NEW.user_id AND o.room_id = NEW.room_id
+        )
+        UPDATE lantern.room_members
+            SET allow = perms.allow, deny = perms.deny
+            FROM perms
+            WHERE room_members.user_id = NEW.user_id AND room_members.room_id = NEW.room_id
+            AND room_members.allow IS DISTINCT FROM perms.allow
+            AND room_members.deny IS DISTINCT FROM perms.deny;
+    END IF;
+
+    RETURN NEW;
+END
+$$;
+
+CREATE TRIGGER role_update AFTER UPDATE ON lantern.overwrites
+FOR EACH ROW EXECUTE FUNCTION lantern.on_overwrite_update_trigger();
+
+CREATE OR REPLACE FUNCTION lantern.on_party_member_exist()
+RETURNS trigger
+LANGUAGE plpgsql AS
+$$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        DELETE FROM lantern.room_members m
+        USING lantern.rooms
+        WHERE m.user_id = OLD.user_id
+        AND m.room_id = rooms.id
+        AND rooms.party_id = OLD.party_id;
+    ELSIF TG_OP = 'INSERT' THEN
+        INSERT INTO lantern.room_members (user_id, room_id, allow, deny)
+        SELECT NEW.user_id, o.room_id,
+        -- user_allow | (allow & !user_deny), NULL if 0
+        NULLIF(COALESCE(bit_or(o.user_allow), 0) | (COALESCE(bit_or(o.allow), 0) & ~COALESCE(bit_or(o.user_deny), 0)), 0) AS allow,
+        -- deny | user_deny, NULL if 0
+        NULLIF(COALESCE(bit_or(o.deny), 0) | COALESCE(bit_or(o.user_deny)), 0) AS deny
+        FROM lantern.agg_overwrites o INNER JOIN lantern.rooms ON rooms.id = o.room_id
+        WHERE rooms.party_id = NEW.party_id;
+    END IF;
+
+    RETURN NEW;
+END
+$$;
+
+CREATE TRIGGER room_member_update AFTER INSERT OR DELETE ON lantern.party_member
+FOR EACH ROW EXECUTE FUNCTION lantern.on_party_member_exist();
 
 -----------------------------------------
 ---------------- VIEWS ------------------
@@ -1495,26 +1712,6 @@ FROM
     ON agg_overwrites.room_id = rooms.id AND agg_overwrites.user_id = party_member.user_id
 GROUP BY party_member.user_id, rooms.id;
 
---
-
-CREATE OR REPLACE VIEW lantern.agg_room_perms_full(party_id, owner_id, room_id, user_id, base_perms, deny, allow, user_deny, user_allow) AS
-SELECT
-    party.id as party_id,
-    party.owner_id,
-    rooms.id AS room_id,
-    party_member.user_id,
-
-    roles.permissions AS base_perms,
-    deny AS deny,
-    allow AS allow,
-    user_deny AS user_deny,
-    user_allow AS user_allow
-
-FROM
-    lantern.party INNER JOIN lantern.party_member ON party_member.party_id = party.id
-    INNER JOIN lantern.rooms ON rooms.party_id = party.id
-    INNER JOIN lantern.roles ON roles.id = party.id
-    LEFT JOIN lantern.agg_overwrites ON agg_overwrites.room_id = rooms.id AND agg_overwrites.user_id = party_member.user_id;
 
 --
 
@@ -1563,6 +1760,7 @@ SELECT DISTINCT ON (user_id)
    FROM lantern.user_presence
   ORDER BY user_id, flags DESC, updated_at DESC
 ;
+COMMENT ON VIEW lantern.agg_presence IS 'Returns the single most recent/priority presence';
 
 --
 
@@ -1699,6 +1897,8 @@ UNION ALL
 SELECT file_id FROM lantern.user_asset_files
 UNION ALL
 SELECT file_id FROM lantern.attachments
+UNION ALL
+SELECT wallpaper_id FROM lantern.room_members WHERE wallpaper_id IS NOT NULL
 ;
 
 --
@@ -1802,10 +2002,14 @@ BEGIN
     ELSIF _party_id IS NULL THEN
         RAISE EXCEPTION 'invalid_invite';
     ELSE
+        -- new users just start out with @everyone permissions
+        WITH p AS (
+            SELECT r.permissions AS perms FROM lantern.roles r WHERE r.id = _party_id
+        )
         -- insert new one at the top
         -- NOTE: Using -1 and doing this insert first avoids extra rollback work on failure
-        INSERT INTO lantern.party_member(party_id, user_id, invite_id, joined_at, position)
-        VALUES (_party_id, _user_id, _invite_id, now(), -1);
+        INSERT INTO lantern.party_member(party_id, user_id, invite_id, joined_at, position, perms)
+        SELECT _party_id, _user_id, _invite_id, now(), -1, p.perms FROM p;
 
         -- move all parties down to normalize
         UPDATE lantern.party_member
@@ -2005,7 +2209,6 @@ BEGIN
     DELETE FROM lantern.profiles WHERE user_id = _user_id;
     DELETE FROM lantern.friends WHERE user_a_id = _user_id OR user_b_id = _user_id;
     DELETE FROM lantern.user_blocks WHERE user_id = _user_id OR block_id = _user_id;
-    DELETE FROM lantern.room_members WHERE user_id = _user_id;
     DELETE FROM lantern.party_bans WHERE user_id = _user_id;
     DELETE FROM lantern.overrides WHERE user_id = _user_id;
     DELETE FROM lantern.role_members WHERE user_id = _user_id;
