@@ -1441,10 +1441,18 @@ CREATE OR REPLACE FUNCTION lantern.on_role_update_trigger()
 RETURNS trigger
 LANGUAGE plpgsql AS
 $$
+DECLARE
+    _party_id bigint;
+    _role_id bigint;
 BEGIN
     IF OLD.permissions = NEW.permissions THEN
         RETURN NEW;
     END IF;
+
+    SELECT
+        COALESCE(NEW.party_id, OLD.party_id),
+        COALESCE(NEW.role_id, OLD.role_id)
+    INTO _party_id, _role_id;
 
     -- Handle @everyone special case
     IF NEW.id = NEW.party_id THEN
@@ -1456,12 +1464,12 @@ BEGIN
         )
         UPDATE party_member SET perms = perms.perms
         FROM perms WHERE party_member.user_id = perms.user_id
-        AND party_member.party_id = NEW.party_id
+        AND party_member.party_id = _party_id
         AND party_member.perms != perms.perms;
     ELSE
         WITH members_to_update AS (
             -- get a list of members relevant to this role
-            SELECT role_members.user_id FROM role_members WHERE role_members.role_id = NEW.id
+            SELECT role_members.user_id FROM role_members WHERE role_members.role_id = _role_id
         ), perms AS (
             -- compute base permissions for each user
             SELECT
@@ -1476,7 +1484,7 @@ BEGIN
         -- apply updated base permissions
         UPDATE lantern.party_member SET perms = perms.perms
         FROM perms WHERE party_member.user_id = perms.user_id
-        AND party_member.party_id = NEW.party_id
+        AND party_member.party_id = _party_id
         -- but don't modify if unchanged, avoiding triggers
         AND party_member.perms != perms.perms;
     END IF;
@@ -1485,28 +1493,38 @@ BEGIN
 END
 $$;
 
-CREATE TRIGGER role_update AFTER UPDATE ON lantern.roles
+CREATE TRIGGER role_update AFTER INSERT OR UPDATE OR DELETE ON lantern.roles
 FOR EACH ROW EXECUTE FUNCTION lantern.on_role_update_trigger();
 
 CREATE OR REPLACE FUNCTION lantern.on_overwrite_update_trigger()
 RETURNS trigger
 LANGUAGE plpgsql AS
 $$
+DECLARE
+    _role_id bigint;
+    _user_id bigint;
+    _room_id bigint;
 BEGIN
     -- skip unchanged/spurious
     IF NEW.allow = OLD.allow AND NEW.deny = OLD.deny THEN
         RETURN NEW;
     END IF;
 
-    IF COALESCE(OLD.role_id, NEW.role_id) IS NOT NULL THEN
+    SELECT
+        COALESCE(NEW.role_id, OLD.role_id),
+        COALESCE(NEW.user_id, OLD.user_id),
+        COALESCE(NEW.room_id, OLD.room_id)
+    INTO _role_id, _user_id, _room_id;
+
+    IF _role_id IS NOT NULL THEN
         WITH members_to_update AS (
             -- will return 0 rows on @everyone, because @everyone doesn't use role_members at all
-            SELECT role_members.user_id FROM lantern.role_members WHERE role_members.role_id = COALESCE(OLD.role_id, NEW.role_id)
+            SELECT role_members.user_id FROM lantern.role_members WHERE role_members.role_id = _role_id
             UNION ALL
             -- will only return rows when roles.id = roles.party_id, indicating @everyone
             SELECT party_member.user_id
             FROM lantern.roles INNER JOIN lantern.party_members ON party_member.party_id = roles.party_id
-            WHERE roles.id = COALESCE(OLD.role_id, NEW.role_id)
+            WHERE roles.id = _role_id
             AND   roles.id = roles.party_id
         ), perms AS (
             SELECT
@@ -1517,18 +1535,18 @@ BEGIN
                 NULLIF(COALESCE(bit_or(o.deny), 0) | COALESCE(bit_or(o.user_deny)), 0) AS deny
             FROM lantern.agg_overwrites o
             INNER JOIN members_to_update m ON o.user_id = m.user_id -- limit to users with this role
-            WHERE o.room_id = COALESCE(OLD.room_id, NEW.room_id) -- limit by room, of course
+            WHERE o.room_id = _room_id -- limit by room, of course
             GROUP BY m.user_id
         )
         UPDATE lantern.room_members
             SET allow = perms.allow, deny = perms.deny
             FROM perms
             WHERE room_members.user_id = perms.user_id
-            AND   room_members.room_id = COALESCE(OLD.room_id, NEW.room_id)
+            AND   room_members.room_id = _room_id
             AND room_members.allow IS DISTINCT FROM perms.allow
             AND room_members.deny  IS DISTINCT FROM perms.deny;
 
-    ELSIF COALESCE(OLD.user_id, NEW.user_id) IS NOT NULL THEN
+    ELSIF _user_id IS NOT NULL THEN
         WITH perms AS (
             SELECT
                 -- user_allow | (allow & !user_deny), NULL if 0
@@ -1536,14 +1554,14 @@ BEGIN
                 -- deny | user_deny, NULL if 0
                 NULLIF(COALESCE(bit_or(o.deny), 0) | COALESCE(bit_or(o.user_deny)), 0) AS deny
             FROM lantern.agg_overwrites o
-            WHERE o.user_id = COALESCE(NEW.user_id, OLD.user_id)
-              AND o.room_id = COALESCE(NEW.room_id, OLD.room_id)
+            WHERE o.user_id = _user_id
+              AND o.room_id = _room_id
         )
         UPDATE lantern.room_members
             SET allow = perms.allow, deny = perms.deny
             FROM perms
-            WHERE room_members.user_id = COALESCE(OLD.user_id, NEW.user_id)
-            AND   room_members.room_id = COALESCE(OLD.room_id, NEW.room_id)
+            WHERE room_members.user_id = _user_id
+            AND   room_members.room_id = _room_id
             AND room_members.allow IS DISTINCT FROM perms.allow
             AND room_members.deny  IS DISTINCT FROM perms.deny;
     END IF;
@@ -1606,13 +1624,21 @@ CREATE OR REPLACE FUNCTION lantern.on_role_member_modify()
 RETURNS trigger
 LANGUAGE plpgsql AS
 $$
+DECLARE
+    _user_id bigint;
+    _role_id bigint;
 BEGIN
+    SELECT
+        COALESCE(NEW.user_id, OLD.user_id),
+        COALESCE(NEW.role_id, OLD.role_id)
+    INTO _user_id, _role_id;
+
     -- update per-room cached permissions first
     WITH r AS (
         -- get all rooms in party based on the role given/removed
         SELECT rooms.id AS room_id, rooms.party_id
         FROM lantern.rooms INNER JOIN lantern.roles ON roles.party_id = rooms.party_id
-        WHERE roles.id = COALESCE(OLD.role_id, NEW.role_id)
+        WHERE roles.id = _role_id
     ), perms AS (
         -- iterate through rooms and accumulate overwrites
         SELECT
@@ -1622,13 +1648,13 @@ BEGIN
             -- deny | user_deny, NULL if 0
             NULLIF(COALESCE(bit_or(o.deny), 0) | COALESCE(bit_or(o.user_deny)), 0) AS deny
         FROM lantern.agg_overwrites o
-        INNER JOIN r ON o.room_id = r.room_id AND o.user_id = COALESCE(OLD.user_id, NEW.user_id)
+        INNER JOIN r ON o.room_id = r.room_id AND o.user_id = _user_id
         GROUP BY o.room_id
     )
     UPDATE lantern.room_members
         SET allow = perms.allow, deny = perms.deny
         FROM perms
-        WHERE room_members.user_id = COALESCE(OLD.user_id, NEW.user_id)
+        WHERE room_members.user_id = _user_id
         AND room_members.room_id = perms.room_id
         AND room_members.allow IS DISTINCT FROM perms.allow
         AND room_members.deny IS DISTINCT FROM perms.deny;
@@ -1638,7 +1664,7 @@ BEGIN
         -- get party_id of role being given/removed
         SELECT roles.party_id
         FROM lantern.roles
-        WHERE roles.id = COALESCE(OLD.role_id, NEW.role_id)
+        WHERE roles.id = _role_id
     ), perms AS (
         -- pass through p.party_id to limit party_member below
         SELECT p.party_id, bit_or(roles.permissions) AS perms
@@ -1648,7 +1674,7 @@ BEGIN
         GROUP BY p.party_id
     )
     UPDATE lantern.party_member SET perms = perms.perms
-    FROM perms WHERE party_member.user_id = COALESCE(OLD.user_id, NEW.user_id)
+    FROM perms WHERE party_member.user_id = _user_id
     AND party_member.party_id = perms.party_id
     AND party_member.perms != perms.perms;
 
