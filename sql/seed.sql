@@ -1451,11 +1451,11 @@ BEGIN
 
     SELECT
         COALESCE(NEW.party_id, OLD.party_id),
-        COALESCE(NEW.role_id, OLD.role_id)
+        COALESCE(NEW.id, OLD.id)
     INTO _party_id, _role_id;
 
     -- Handle @everyone special case
-    IF NEW.id = NEW.party_id THEN
+    IF _role_id = _party_id THEN
         WITH perms AS (
             SELECT party_member.user_id, bit_or(roles.permissions) AS perms
             FROM lantern.party_member
