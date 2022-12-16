@@ -1498,15 +1498,16 @@ BEGIN
         RETURN NEW;
     END IF;
 
-    IF NEW.role_id IS NOT NULL THEN
+    IF COALESCE(OLD.role_id, NEW.role_id) IS NOT NULL THEN
         WITH members_to_update AS (
             -- will return 0 rows on @everyone, because @everyone doesn't use role_members at all
-            SELECT role_members.user_id FROM lantern.role_members WHERE role_members.role_id = NEW.role_id
+            SELECT role_members.user_id FROM lantern.role_members WHERE role_members.role_id = COALESCE(OLD.role_id, NEW.role_id)
             UNION ALL
             -- will only return rows when roles.id = roles.party_id, indicating @everyone
             SELECT party_member.user_id
             FROM lantern.roles INNER JOIN lantern.party_members ON party_member.party_id = roles.party_id
-            WHERE roles.id = NEW.role_id AND roles.id = roles.party_id
+            WHERE roles.id = COALESCE(OLD.role_id, NEW.role_id)
+            AND   roles.id = roles.party_id
         ), perms AS (
             SELECT
                 m.user_id,
@@ -1516,17 +1517,18 @@ BEGIN
                 NULLIF(COALESCE(bit_or(o.deny), 0) | COALESCE(bit_or(o.user_deny)), 0) AS deny
             FROM lantern.agg_overwrites o
             INNER JOIN members_to_update m ON o.user_id = m.user_id -- limit to users with this role
-            WHERE o.room_id = NEW.room_id -- limit by room, of course
+            WHERE o.room_id = COALESCE(OLD.room_id, NEW.room_id) -- limit by room, of course
             GROUP BY m.user_id
         )
         UPDATE lantern.room_members
             SET allow = perms.allow, deny = perms.deny
             FROM perms
-            WHERE room_members.user_id = perms.user_id AND room_members.room_id = NEW.room_id
+            WHERE room_members.user_id = perms.user_id
+            AND   room_members.room_id = COALESCE(OLD.room_id, NEW.room_id)
             AND room_members.allow IS DISTINCT FROM perms.allow
-            AND room_members.deny IS DISTINCT FROM perms.deny;
+            AND room_members.deny  IS DISTINCT FROM perms.deny;
 
-    ELSIF NEW.user_id IS NOT NULL THEN
+    ELSIF COALESCE(OLD.user_id, NEW.user_id) IS NOT NULL THEN
         WITH perms AS (
             SELECT
                 -- user_allow | (allow & !user_deny), NULL if 0
@@ -1534,21 +1536,23 @@ BEGIN
                 -- deny | user_deny, NULL if 0
                 NULLIF(COALESCE(bit_or(o.deny), 0) | COALESCE(bit_or(o.user_deny)), 0) AS deny
             FROM lantern.agg_overwrites o
-            WHERE o.user_id = NEW.user_id AND o.room_id = NEW.room_id
+            WHERE o.user_id = COALESCE(NEW.user_id, OLD.user_id)
+              AND o.room_id = COALESCE(NEW.room_id, OLD.room_id)
         )
         UPDATE lantern.room_members
             SET allow = perms.allow, deny = perms.deny
             FROM perms
-            WHERE room_members.user_id = NEW.user_id AND room_members.room_id = NEW.room_id
+            WHERE room_members.user_id = COALESCE(OLD.user_id, NEW.user_id)
+            AND   room_members.room_id = COALESCE(OLD.room_id, NEW.room_id)
             AND room_members.allow IS DISTINCT FROM perms.allow
-            AND room_members.deny IS DISTINCT FROM perms.deny;
+            AND room_members.deny  IS DISTINCT FROM perms.deny;
     END IF;
 
     RETURN NEW;
 END
 $$;
 
-CREATE TRIGGER role_update AFTER UPDATE ON lantern.overwrites
+CREATE TRIGGER overwrite_update AFTER UPDATE OR INSERT OR DELETE ON lantern.overwrites
 FOR EACH ROW EXECUTE FUNCTION lantern.on_overwrite_update_trigger();
 
 CREATE OR REPLACE FUNCTION lantern.on_party_member_exist()
