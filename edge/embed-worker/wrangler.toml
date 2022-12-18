@@ -4,7 +4,7 @@ compatibility_date = "2022-01-20"
 send_metrics = false
 
 [vars]
-WORKERS_RS_VERSION = "0.0.11"
+WORKERS_RS_VERSION = "0.0.12"
 
 [build]
 command = "worker-build --release"
