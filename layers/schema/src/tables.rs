@@ -522,6 +522,7 @@ thorn::tables! {
         UserId: Type::INT8,
         BlockId: Type::INT8,
         BlockedAt: Type::TIMESTAMPTZ,
+        Flags: Type::INT2,
     }
 
     pub struct UserFreelist in Lantern {

@@ -105,7 +105,8 @@ CREATE TYPE lantern.event_code AS ENUM (
     'invite_create',
     'message_react',
     'message_unreact',
-    'profile_updated'
+    'profile_updated',
+    'user_blocked'
 );
 
 CREATE SEQUENCE lantern.event_id;
@@ -618,6 +619,8 @@ CREATE TABLE IF NOT EXISTS lantern.user_blocks (
     block_id    bigint      NOT NULL,
 
     blocked_at  timestamptz NOT NULL DEFAULT now(),
+
+    flags       int2        NOT NULL DEFAULT 0,
 
     CONSTRAINT user_blocks_pk PRIMARY KEY (user_id, block_id)
 );
