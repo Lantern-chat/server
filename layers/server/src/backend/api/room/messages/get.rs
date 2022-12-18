@@ -72,12 +72,12 @@ pub async fn get_many(
 
     #[rustfmt::skip]
     let query = match (had_perms, form.query) {
-        (true,  None | Some(MessageSearch::Before(_))) => db.prepare_cached_typed(p::before_no_perm).boxed(),
-        (true,         Some(MessageSearch::After(_)))  => db.prepare_cached_typed(p::after_no_perm).boxed(),
-        (true,         Some(MessageSearch::Exact(_)))  => db.prepare_cached_typed(p::exact_no_perm).boxed(),
-        (false, None | Some(MessageSearch::Before(_))) => db.prepare_cached_typed(p::before_perm).boxed(),
-        (false,        Some(MessageSearch::After(_)))  => db.prepare_cached_typed(p::after_perm).boxed(),
-        (false,        Some(MessageSearch::Exact(_)))  => db.prepare_cached_typed(p::exact_perm).boxed(),
+        (true,  None | Some(MessageSearch::Before(_))) => db.prepare_cached_typed(p::wuser_before_no_perm).boxed(),
+        (true,         Some(MessageSearch::After(_)))  => db.prepare_cached_typed(p::wuser_after_no_perm).boxed(),
+        (true,         Some(MessageSearch::Exact(_)))  => db.prepare_cached_typed(p::wuser_exact_no_perm).boxed(),
+        (false, None | Some(MessageSearch::Before(_))) => db.prepare_cached_typed(p::wuser_before_perm).boxed(),
+        (false,        Some(MessageSearch::After(_)))  => db.prepare_cached_typed(p::wuser_after_perm).boxed(),
+        (false,        Some(MessageSearch::Exact(_)))  => db.prepare_cached_typed(p::wuser_exact_perm).boxed(),
     };
 
     let query = query.await?;
@@ -153,24 +153,34 @@ mod p {
     use MessageSearch::*;
     const NULL: Snowflake = Snowflake::null();
 
-    pub fn exact_no_perm_no_room() -> impl AnyQuery { q::query(Exact(NULL), false, false) }
+    pub fn exact_no_perm_no_room() -> impl AnyQuery { q::query(Exact(NULL), false, false, false) }
+    pub fn exact_no_perm()  -> impl AnyQuery { q::query(Exact(NULL),  false, true, false) }
 
-    pub fn before_no_perm() -> impl AnyQuery { q::query(Before(NULL), false, true) }
-    pub fn after_no_perm()  -> impl AnyQuery { q::query(After(NULL),  false, true) }
-    pub fn exact_no_perm()  -> impl AnyQuery { q::query(Exact(NULL),  false, true) }
-    pub fn before_perm()    -> impl AnyQuery { q::query(Before(NULL), true, true) }
-    pub fn after_perm()     -> impl AnyQuery { q::query(After(NULL),  true, true) }
-    pub fn exact_perm()     -> impl AnyQuery { q::query(Exact(NULL),  true, true) }
+    pub fn wuser_before_no_perm() -> impl AnyQuery { q::query(Before(NULL), false, true, true) }
+    pub fn wuser_after_no_perm()  -> impl AnyQuery { q::query(After(NULL),  false, true, true) }
+    pub fn wuser_exact_no_perm()  -> impl AnyQuery { q::query(Exact(NULL),  false, true, true) }
+    pub fn wuser_before_perm()    -> impl AnyQuery { q::query(Before(NULL), true, true, true) }
+    pub fn wuser_after_perm()     -> impl AnyQuery { q::query(After(NULL),  true, true, true) }
+    pub fn wuser_exact_perm()     -> impl AnyQuery { q::query(Exact(NULL),  true, true, true) }
 }
 
 mod q {
-    use super::{MessageFlags, MessageSearch, Permission};
+    use super::{MessageFlags, MessageSearch, Permission, UserBlockFlags};
 
     use db::Row;
     pub use schema::*;
     pub use thorn::*;
 
     thorn::tables! {
+        pub struct SelectedMessages {
+            Id: Messages::Id,
+            Unavailable: Type::BOOL,
+        }
+
+        struct AggPerm {
+            Perms: AggRoomPerms::Perms,
+        }
+
         pub struct TempReactions {
             Reactions: Type::JSONB,
         }
@@ -200,7 +210,11 @@ mod q {
                 Messages::Flags,
             }
 
-            pub enum PartyColumns continue MessageColumns {
+            pub enum SelectedColumns continue MessageColumns {
+                SelectedMessages::Unavailable,
+            }
+
+            pub enum PartyColumns continue SelectedColumns {
                 TempParty::Id,
             }
 
@@ -253,32 +267,39 @@ mod q {
         }
     }
 
-    pub fn query(mode: MessageSearch, check_perms: bool, with_room: bool) -> impl thorn::AnyQuery {
-        tables! {
-            pub struct SelectedMessages {
-                Id: Messages::Id,
-            }
-
-            struct AggPerm {
-                Perms: AggRoomPerms::Perms,
-            }
-        }
-
+    pub fn query(
+        mode: MessageSearch,
+        check_perms: bool,
+        with_room: bool,
+        with_user: bool,
+    ) -> impl thorn::AnyQuery {
         let mut selected = Query::select()
             .expr(Messages::Id.alias_to(SelectedMessages::Id))
-            .from_table::<Messages>()
-            .and_where(
-                // test if message is deleted
-                Messages::Flags
-                    .bit_and(MessageFlags::DELETED.bits().lit())
-                    .equals(0i16.lit()),
-            )
+            // test if message is deleted
+            .and_where(Messages::Flags.has_no_bits(MessageFlags::DELETED.bits().lit()))
             .and_where(
                 Params::thread_id()
                     .is_null()
                     .or(Messages::ThreadId.equals(Params::thread_id())),
             )
             .limit(Params::limit());
+
+        selected = match with_user {
+            false => selected
+                .from_table::<Messages>()
+                .expr(false.lit().alias_to(SelectedMessages::Unavailable)),
+            true => selected
+                .from(
+                    Messages::left_join_table::<UserBlocks>().on(UserBlocks::UserId
+                        .equals(Messages::UserId)
+                        .and(UserBlocks::BlockId.equals(Params::user_id()))),
+                )
+                .expr(
+                    UserBlocks::Flags
+                        .has_all_bits(UserBlockFlags::HIDE_OWN_MESSAGES.bits().lit())
+                        .alias_to(SelectedMessages::Unavailable),
+                ),
+        };
 
         if with_room {
             selected = selected.and_where(Messages::RoomId.equals(Params::room_id()));
@@ -319,6 +340,7 @@ mod q {
             .with(SelectedMessages::as_query(selected.materialized()).exclude())
             .with(TempParty::as_query(party).exclude())
             .cols(MessageColumns::default())
+            .cols(SelectedColumns::default())
             .cols(PartyColumns::default())
             .cols(UserColumns::default())
             // ProfileColumns, must follow order as listed above
@@ -403,11 +425,7 @@ mod q {
                                 .or(Params::room_id().is_null()),
                         ),
                 ))
-                .and_where(
-                    AggPerm::Perms
-                        .bit_and(READ_MESSAGES.lit())
-                        .equals(READ_MESSAGES.lit()),
-                )
+                .and_where(AggPerm::Perms.has_all_bits(READ_MESSAGES.lit()))
         }
 
         query
@@ -442,10 +460,100 @@ where
         Ok(row) => {
             let party_id: Option<Snowflake> = row.try_get(PartyColumns::id())?;
             let msg_id = row.try_get(MessageColumns::id())?;
+            let unavailable = row.try_get(SelectedColumns::unavailable())?;
 
-            let mut user_mentions = Vec::new();
-            let mut role_mentions = Vec::new();
-            let mut room_mentions = Vec::new();
+            // many fields here are empty, easy to construct, and are filled in below
+            let mut msg = Message {
+                id: msg_id,
+                party_id,
+                created_at: msg_id.timestamp(),
+                room_id: row.try_get(MessageColumns::room_id())?,
+                flags: MessageFlags::empty(),
+                kind: MessageKind::Normal,
+                edited_at: None,
+                content: None,
+                author: 'user: {
+                    if unavailable {
+                        break 'user make_system_user();
+                    }
+
+                    let id = row.try_get(MessageColumns::user_id())?;
+
+                    match last_user {
+                        Some(ref last_user) if last_user.id == id => last_user.clone(),
+                        _ => {
+                            let user = User {
+                                id,
+                                username: row.try_get(UserColumns::username())?,
+                                discriminator: row.try_get(UserColumns::discriminator())?,
+                                flags: UserFlags::from_bits_truncate_public(
+                                    row.try_get(UserColumns::flags())?,
+                                ),
+                                last_active: None,
+                                email: None,
+                                preferences: None,
+                                profile: match row.try_get(ProfileColumns::bits())? {
+                                    None => Nullable::Null,
+                                    Some(bits) => Nullable::Some(UserProfile {
+                                        bits,
+                                        extra: Default::default(),
+                                        nick: row.try_get(ProfileColumns::nickname())?,
+                                        avatar: encrypt_snowflake_opt(
+                                            &state,
+                                            row.try_get(ProfileColumns::avatar_id())?,
+                                        )
+                                        .into(),
+                                        banner: Nullable::Undefined,
+                                        status: Nullable::Undefined,
+                                        bio: Nullable::Undefined,
+                                    }),
+                                },
+                            };
+
+                            last_user = Some(user.clone());
+
+                            user
+                        }
+                    }
+                },
+                member: None,
+                thread_id: row.try_get(MessageColumns::thread_id())?,
+                user_mentions: Vec::new(),
+                role_mentions: Vec::new(),
+                room_mentions: Vec::new(),
+                attachments: Vec::new(),
+                reactions: Vec::new(),
+                embeds: Vec::new(),
+                pins: Vec::new(),
+            };
+
+            // before we continue, if the message was marked unavailable, then we can skip everything else
+            if unavailable {
+                msg.kind = MessageKind::Unavailable;
+
+                return Ok(msg);
+            }
+
+            msg.flags = MessageFlags::from_bits_truncate_public(row.try_get(MessageColumns::flags())?);
+            msg.kind =
+                MessageKind::try_from(row.try_get::<_, i16>(MessageColumns::kind())?).unwrap_or_default();
+
+            msg.member = match party_id {
+                None => None,
+                Some(_) => Some(PartyMember {
+                    user: None,
+                    roles: row.try_get(RoleColumns::role_ids())?,
+                    presence: None,
+                    flags: None,
+                }),
+            };
+
+            msg.content = row.try_get(DynamicMsgColumns::content())?;
+            msg.edited_at = row.try_get(MessageColumns::edited_at())?;
+
+            let mut user_mentions = &mut msg.user_mentions;
+            let mut role_mentions = &mut msg.role_mentions;
+            let mut room_mentions = &mut msg.room_mentions;
 
             let mention_kinds: Option<Vec<i32>> = row.try_get(MentionColumns::kinds())?;
 
@@ -473,153 +581,91 @@ where
                 _ => {}
             }
 
-            let mut msg = Message {
-                id: msg_id,
-                party_id,
-                created_at: msg_id.timestamp(),
-                room_id: row.try_get(MessageColumns::room_id())?,
-                flags: MessageFlags::from_bits_truncate_public(row.try_get(MessageColumns::flags())?),
-                kind: MessageKind::try_from(row.try_get::<_, i16>(MessageColumns::kind())?)
-                    .unwrap_or_default(),
-                edited_at: row.try_get::<_, Option<_>>(MessageColumns::edited_at())?,
-                content: row.try_get(DynamicMsgColumns::content())?,
-                author: {
-                    let id = row.try_get(MessageColumns::user_id())?;
+            msg.attachments = {
+                let mut attachments = Vec::new();
 
-                    match last_user {
-                        Some(ref last_user) if last_user.id == id => last_user.clone(),
-                        _ => {
-                            let user = User {
-                                id,
-                                username: row.try_get(UserColumns::username())?,
-                                discriminator: row.try_get(UserColumns::discriminator())?,
-                                flags: UserFlags::from_bits_truncate_public(
-                                    row.try_get(UserColumns::flags())?,
-                                ),
-                                email: None,
-                                preferences: None,
-                                profile: match row.try_get(ProfileColumns::bits())? {
-                                    None => Nullable::Null,
-                                    Some(bits) => Nullable::Some(UserProfile {
-                                        bits,
-                                        extra: Default::default(),
-                                        nick: row.try_get(ProfileColumns::nickname())?,
-                                        avatar: encrypt_snowflake_opt(
-                                            &state,
-                                            row.try_get(ProfileColumns::avatar_id())?,
-                                        )
-                                        .into(),
-                                        banner: Nullable::Undefined,
-                                        status: Nullable::Undefined,
-                                        bio: Nullable::Undefined,
-                                    }),
-                                },
-                            };
+                let meta: Option<Json<Vec<schema::AggAttachmentsMeta>>> =
+                    row.try_get(AttachmentColumns::meta())?;
 
-                            last_user = Some(user.clone());
+                if let Some(Json(meta)) = meta {
+                    let previews: Vec<Option<&[u8]>> = row.try_get(AttachmentColumns::preview())?;
 
-                            user
-                        }
-                    }
-                },
-                member: match party_id {
-                    None => None,
-                    Some(_) => Some(PartyMember {
-                        user: None,
-                        roles: row.try_get(RoleColumns::role_ids())?,
-                        presence: None,
-                        flags: None,
-                    }),
-                },
-                thread_id: row.try_get(MessageColumns::thread_id())?,
-                user_mentions,
-                role_mentions,
-                room_mentions,
-                attachments: {
-                    let mut attachments = Vec::new();
-
-                    let meta: Option<Json<Vec<schema::AggAttachmentsMeta>>> =
-                        row.try_get(AttachmentColumns::meta())?;
-
-                    if let Some(Json(meta)) = meta {
-                        let previews: Vec<Option<&[u8]>> = row.try_get(AttachmentColumns::preview())?;
-
-                        if meta.len() != previews.len() {
-                            return Err(Error::InternalErrorStatic("Meta != Previews length"));
-                        }
-
-                        attachments.reserve(meta.len());
-
-                        for (meta, preview) in meta.into_iter().zip(previews) {
-                            use z85::ToZ85;
-
-                            // NOTE: This filtering is done in the application layer because it
-                            // produces sub-optimal query-plans in Postgres.
-                            //
-                            // Perhaps more intelligent indexes could solve that later.
-                            if let Some(raw_flags) = meta.flags {
-                                if AttachmentFlags::from_bits_truncate(raw_flags)
-                                    .contains(AttachmentFlags::ORPHANED)
-                                {
-                                    continue; // skip
-                                }
-                            }
-
-                            attachments.push(Attachment {
-                                file: File {
-                                    id: meta.id,
-                                    filename: meta.name,
-                                    size: meta.size as i64,
-                                    mime: meta.mime,
-                                    width: meta.width,
-                                    height: meta.height,
-                                    preview: preview.and_then(|p| p.to_z85().ok()),
-                                },
-                            })
-                        }
+                    if meta.len() != previews.len() {
+                        return Err(Error::InternalErrorStatic("Meta != Previews length"));
                     }
 
-                    attachments
-                },
-                reactions: match row.try_get(ReactionColumns::reactions())? {
-                    Some(Json::<Vec<RawReaction>>(raw)) if !raw.is_empty() => {
-                        let mut reactions = Vec::with_capacity(raw.len());
+                    attachments.reserve(meta.len());
 
-                        for r in raw {
-                            if r.count == 0 {
-                                continue;
+                    for (meta, preview) in meta.into_iter().zip(previews) {
+                        use z85::ToZ85;
+
+                        // NOTE: This filtering is done in the application layer because it
+                        // produces sub-optimal query-plans in Postgres.
+                        //
+                        // Perhaps more intelligent indexes could solve that later.
+                        if let Some(raw_flags) = meta.flags {
+                            if AttachmentFlags::from_bits_truncate(raw_flags)
+                                .contains(AttachmentFlags::ORPHANED)
+                            {
+                                continue; // skip
                             }
+                        }
 
-                            reactions.push(Reaction::Shorthand(ReactionShorthand {
-                                me: r.me,
-                                count: r.count,
-                                emote: match (r.emote_id, r.emoji_id) {
-                                    (Some(emote), None) => EmoteOrEmoji::Emote { emote },
-                                    (None, Some(id)) => match state.emoji.id_to_emoji(id) {
-                                        Some(emoji) => EmoteOrEmoji::Emoji { emoji },
-                                        None => {
-                                            log::warn!("Emoji not found for id {id} -- skipping");
+                        attachments.push(Attachment {
+                            file: File {
+                                id: meta.id,
+                                filename: meta.name,
+                                size: meta.size as i64,
+                                mime: meta.mime,
+                                width: meta.width,
+                                height: meta.height,
+                                preview: preview.and_then(|p| p.to_z85().ok()),
+                            },
+                        })
+                    }
+                }
 
-                                            continue;
-                                        }
-                                    },
-                                    _ => {
-                                        log::error!("Invalid state for reactions on message {}", msg_id);
+                attachments
+            };
 
-                                        continue; // just skip the invalid one
+            msg.pins = row
+                .try_get::<_, Option<Vec<Snowflake>>>(DynamicMsgColumns::pin_tags())?
+                .unwrap_or_default();
+
+            msg.reactions = match row.try_get(ReactionColumns::reactions())? {
+                Some(Json::<Vec<RawReaction>>(raw)) if !raw.is_empty() => {
+                    let mut reactions = Vec::with_capacity(raw.len());
+
+                    for r in raw {
+                        if r.count == 0 {
+                            continue;
+                        }
+
+                        reactions.push(Reaction::Shorthand(ReactionShorthand {
+                            me: r.me,
+                            count: r.count,
+                            emote: match (r.emote_id, r.emoji_id) {
+                                (Some(emote), None) => EmoteOrEmoji::Emote { emote },
+                                (None, Some(id)) => match state.emoji.id_to_emoji(id) {
+                                    Some(emoji) => EmoteOrEmoji::Emoji { emoji },
+                                    None => {
+                                        log::warn!("Emoji not found for id {id} -- skipping");
+
+                                        continue;
                                     }
                                 },
-                            }));
-                        }
+                                _ => {
+                                    log::error!("Invalid state for reactions on message {}", msg_id);
 
-                        reactions
+                                    continue; // just skip the invalid one
+                                }
+                            },
+                        }));
                     }
-                    _ => Vec::new(),
-                },
-                embeds: Vec::new(),
-                pins: row
-                    .try_get::<_, Option<Vec<Snowflake>>>(DynamicMsgColumns::pin_tags())?
-                    .unwrap_or_default(),
+
+                    reactions
+                }
+                _ => Vec::new(),
             };
 
             let mention_kinds: Option<Vec<i32>> = row.try_get(MentionColumns::kinds())?;
@@ -646,6 +692,19 @@ where
             Ok(msg)
         }
     })
+}
+
+pub const fn make_system_user() -> User {
+    User {
+        id: Snowflake(unsafe { std::num::NonZeroU64::new_unchecked(1) }),
+        discriminator: 0,
+        username: SmolStr::new_inline("SYSTEM"),
+        flags: UserFlags::SYSTEM_USER,
+        last_active: None,
+        profile: Nullable::Undefined,
+        email: None,
+        preferences: None,
+    }
 }
 
 #[derive(Default, Debug, Clone, Deserialize)]
