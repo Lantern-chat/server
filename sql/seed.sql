@@ -1434,6 +1434,53 @@ FOR EACH ROW EXECUTE FUNCTION lantern.pin_tag_delete_trigger();
 ------------ PERM TRIGGERS -------------
 ----------------------------------------
 
+CREATE OR REPLACE PROCEDURE lantern.refresh_all_permissions()
+LANGUAGE plpgsql AS
+$$
+BEGIN
+    -- TODO: See if this can be made more efficient for the conflcit query
+    WITH rm AS (
+        SELECT party_member.user_id, rooms.id AS room_id
+        FROM lantern.party_member LEFT JOIN lantern.rooms ON rooms.party_id = party_member.party_id
+    ), perms AS (
+        SELECT
+            rm.user_id, rm.room_id,
+            -- user_allow | (allow & !user_deny), NULL if 0
+            NULLIF(COALESCE(bit_or(o.user_allow), 0) | (COALESCE(bit_or(o.allow), 0) & ~COALESCE(bit_or(o.user_deny), 0)), 0) AS allow,
+            -- deny | user_deny, NULL if 0
+            NULLIF(COALESCE(bit_or(o.deny), 0) | COALESCE(bit_or(o.user_deny)), 0) AS deny
+        FROM rm LEFT JOIN lantern.agg_overwrites o ON o.user_id = rm.user_id AND o.room_id = rm.room_id
+        GROUP BY rm.user_id, rm.room_id
+    )
+    INSERT INTO lantern.room_members (user_id, room_id, allow, deny)
+    SELECT perms.user_id, perms.room_id, perms.allow, perms.deny FROM perms
+    ON CONFLICT (user_id, room_id) DO UPDATE SET (allow, deny) = (
+        SELECT perms.allow, perms.deny
+        FROM perms WHERE perms.user_id = room_members.user_id AND perms.room_id = room_members.room_id
+    );
+
+    WITH ur AS (
+        SELECT p.party_id, p.user_id, roles.permissions
+        FROM lantern.party_member p
+        INNER JOIN lantern.roles ON roles.party_id = p.party_id
+        INNER JOIN lantern.role_members ON role_members.role_id = roles.id AND role_members.user_id = p.user_id
+        UNION ALL
+        -- Also select @everyone
+        SELECT p.party_id, p.user_id, roles.permissions
+        FROM lantern.party_member p
+        INNER JOIN lantern.roles ON roles.party_id = p.party_id AND roles.party_id = roles.id
+    ), perms AS (
+        SELECT ur.party_id, ur.user_id, bit_or(ur.permissions) AS perms
+        FROM ur GROUP BY ur.user_id, ur.party_id
+    )
+    UPDATE lantern.party_member SET
+        perms = perms.perms
+    FROM perms
+    WHERE party_member.user_id = perms.user_id AND party_member.party_id = perms.party_id
+    AND party_member.perms != perms.perms;
+END
+$$;
+
 -- When a role updates, the change should cascade down each user's
 -- base permissiona and their specific room permissions
 
@@ -1820,23 +1867,11 @@ FROM
 
 CREATE OR REPLACE VIEW lantern.agg_room_perms(room_id, user_id, perms) AS
 SELECT
-    rooms.id AS room_id,
-    party_member.user_id,
---    roles.permissions, deny, allow, user_deny, user_allow
---    bit_or(roles.permissions), COALESCE(bit_or(deny), 0), COALESCE(bit_or(allow), 0), COALESCE(bit_or(user_deny), 0), COALESCE(bit_or(user_allow), 0)
-    (((bit_or(roles.permissions) & ~COALESCE(bit_or(deny), 0)) | COALESCE(bit_or(allow), 0)) & ~COALESCE(bit_or(user_deny), 0)) | COALESCE(bit_or(user_allow), 0) |
-       bit_or(CASE WHEN party.owner_id = party_member.user_id THEN -1 ELSE 0 END) AS perms
-
+    rooms.id, party_member.user_id, COALESCE(allow, 0) | (party_member.perms & ~COALESCE(deny, 0))
 FROM
-    lantern.agg_overwrites RIGHT JOIN
-        lantern.roles RIGHT JOIN
-            lantern.rooms INNER JOIN
-                lantern.party INNER JOIN lantern.party_member ON party_member.party_id = party.id
-            ON rooms.party_id = party.id
-        ON roles.id = party.id
-    ON agg_overwrites.room_id = rooms.id AND agg_overwrites.user_id = party_member.user_id
-GROUP BY party_member.user_id, rooms.id;
-
+    lantern.party_member INNER JOIN lantern.rooms ON rooms.party_id = party_member.party_id
+    LEFT JOIN lantern.room_members ON room_members.room_id = rooms.id AND room_members.user_id = party_member.user_id
+;
 
 --
 
