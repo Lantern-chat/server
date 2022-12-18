@@ -16,6 +16,7 @@ pub async fn get_full(state: &ServerState, user_id: Snowflake) -> Result<User, E
         discriminator: row.try_get(UserColumns::discriminator())?,
         flags: UserFlags::from_bits_truncate(row.try_get(UserColumns::flags())?),
         email: Some(row.try_get(UserColumns::email())?),
+        last_active: None,
         preferences: {
             row.try_get::<_, Option<_>>(UserColumns::preferences())?
                 .map(|v: Json<_>| v.0)

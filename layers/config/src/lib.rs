@@ -66,6 +66,7 @@ pub mod sections {
     pub mod services;
     pub mod upload;
     pub mod web;
+    pub mod user;
 }
 
 mod util;
@@ -115,6 +116,8 @@ decl_config! {
     keys: sections::keys::Keys,
     /// Web/HTTP Configuration
     web: sections::web::Web,
+    /// User-related Configuration
+    user: sections::user::User,
 }
 
 impl Config {

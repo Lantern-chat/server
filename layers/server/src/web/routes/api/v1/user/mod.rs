@@ -6,7 +6,7 @@ use crate::{web::auth::authorize, Error};
 use super::ApiResponse;
 
 //pub mod check;
-pub mod profile;
+pub mod get;
 pub mod register;
 
 pub mod me;
@@ -28,7 +28,8 @@ pub async fn user(mut route: Route<crate::ServerState>) -> ApiResponse {
             let auth = authorize(&route).await?;
 
             match route.next().method_segment() {
-                (&Method::GET, Exact("profile")) => profile::profile(route, auth, user_id).await,
+                // GET /api/v1/user/1234
+                (&Method::GET, End) => get::get(route, auth, user_id).await,
                 _ => Err(Error::Unimplemented),
             }
         }

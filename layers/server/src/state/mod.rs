@@ -42,6 +42,7 @@ pub struct InnerServerState {
     pub rate_limit: RateLimitTable,
     pub file_cache: MainFileCache,
     pub emoji: self::emoji::EmojiMap,
+    pub hasher: ahash::RandomState,
 }
 
 #[derive(Clone)]
@@ -71,6 +72,7 @@ impl ServerState {
             rate_limit: RateLimitTable::new(),
             file_cache: MainFileCache::default(),
             emoji: Default::default(),
+            hasher: ahash::RandomState::new(),
             config,
         }))
     }

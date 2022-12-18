@@ -73,6 +73,7 @@ pub async fn add_reaction(
                     username: row.try_get(Columns::username())?,
                     discriminator: row.try_get(Columns::discriminator())?,
                     flags: UserFlags::from_bits_truncate_public(row.try_get(Columns::user_flags())?),
+                    last_active: None,
                     email: None,
                     preferences: None,
                     profile: match row.try_get(Columns::profile_bits())? {

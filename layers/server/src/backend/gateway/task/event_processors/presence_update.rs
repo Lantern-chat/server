@@ -35,6 +35,7 @@ pub async fn presence_updated(
                     discriminator: row.try_get(UserColumns::discriminator())?,
                     flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
                     profile: Nullable::Undefined,
+                    last_active: None,
                     email: None,
                     preferences: None,
                 },

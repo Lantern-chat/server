@@ -33,6 +33,7 @@ pub async fn profile_updated(
                 username: row.try_get(UserColumns::username())?,
                 discriminator: row.try_get(UserColumns::discriminator())?,
                 flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
+                last_active: None,
                 email: None,
                 preferences: None,
                 profile: match row.try_get(ProfileColumns::bits())? {
