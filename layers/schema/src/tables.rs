@@ -468,7 +468,6 @@ thorn::tables! {
     pub struct RoomMembers in Lantern {
         UserId: Type::INT8,
         RoomId: Type::INT8,
-        PartyId: Type::INT8,
         /// `(user_allow | (role_allow & !user_deny))`
         Allow: Nullable(Type::INT8),
         /// `(role_deny | user_deny)`
