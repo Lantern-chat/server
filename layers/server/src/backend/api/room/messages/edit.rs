@@ -181,11 +181,7 @@ fn query_existing_message() -> impl thorn::AnyQuery {
             )))
             .on(true.lit()),
         )
-        .and_where(
-            Messages::Flags
-                .bit_and(MessageFlags::DELETED.bits().lit())
-                .equals(0i16.lit()),
-        )
+        .and_where(Messages::Flags.has_no_bits(MessageFlags::DELETED.bits().lit()))
 }
 
 // TODO: Deduplicate this with query in message_create

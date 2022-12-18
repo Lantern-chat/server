@@ -50,7 +50,7 @@ pub async fn delete_msg(
 
 use thorn::*;
 
-const DELETED_FLAG: Literal = Literal::Int2(MessageFlags::DELETED.bits());
+const DELETED_FLAG: i16 = MessageFlags::DELETED.bits();
 
 ///!!! NOTE: All parameters of these are sorted as: [msg_id, user_id, room_id]
 
@@ -59,12 +59,9 @@ fn delete_without_perms() -> impl AnyQuery {
 
     Query::update()
         .table::<Messages>()
-        .set(Messages::Flags, Messages::Flags.bit_or(DELETED_FLAG.clone()))
+        .set(Messages::Flags, Messages::Flags.bit_or(DELETED_FLAG.lit()))
         .and_where(Messages::Id.equals(Var::of(Messages::Id)))
-        .and_where(
-            // prevent double-updates
-            Messages::Flags.bit_and(DELETED_FLAG.clone()).equals(0i16.lit()),
-        )
+        .and_where(Messages::Flags.has_no_bits(DELETED_FLAG.lit())) // prevent double-updates
 }
 
 fn delete_if_own() -> impl AnyQuery {
@@ -72,13 +69,10 @@ fn delete_if_own() -> impl AnyQuery {
 
     Query::update()
         .table::<Messages>()
-        .set(Messages::Flags, Messages::Flags.bit_or(DELETED_FLAG.clone()))
+        .set(Messages::Flags, Messages::Flags.bit_or(DELETED_FLAG.lit()))
         .and_where(Messages::Id.equals(Var::of(Messages::Id)))
         .and_where(Messages::UserId.equals(Var::of(Users::Id)))
-        .and_where(
-            // prevent double-updates
-            Messages::Flags.bit_and(DELETED_FLAG.clone()).equals(0i16.lit()),
-        )
+        .and_where(Messages::Flags.has_no_bits(DELETED_FLAG.lit())) // prevent double-updates
 }
 
 fn delete_with_perms() -> impl AnyQuery {
@@ -110,14 +104,10 @@ fn delete_with_perms() -> impl AnyQuery {
         .table::<Messages>()
         .and_where(
             AggPerm::Perms
-                .bit_and(MANAGE_MESSAGE.lit())
-                .equals(MANAGE_MESSAGE.lit())
+                .has_all_bits(MANAGE_MESSAGE.lit())
                 .or(Messages::UserId.equals(user_id_var)),
         )
-        .set(Messages::Flags, Messages::Flags.bit_or(DELETED_FLAG.clone()))
+        .set(Messages::Flags, Messages::Flags.bit_or(DELETED_FLAG.lit()))
         .and_where(Messages::Id.equals(msg_id_var))
-        .and_where(
-            // prevent double-updates
-            Messages::Flags.bit_and(DELETED_FLAG.clone()).equals(0i16.lit()),
-        )
+        .and_where(Messages::Flags.has_no_bits(DELETED_FLAG.lit())) // prevent double-updates
 }
