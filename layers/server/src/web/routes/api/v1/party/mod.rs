@@ -54,9 +54,12 @@ pub async fn party(mut route: Route<crate::ServerState>) -> ApiResponse {
                         (&Method::PATCH, Exact("profile")) => members::profile::patch_profile(route, auth, party_id).await,
 
                         // GET /api/v1/party/1234/members/5678/profile
-                        (&Method::GET, Exact(segment)) => match segment.parse::<Snowflake>() {
-                            Err(_) => Err(Error::BadRequest),
-                            Ok(member_id) => match route.next().segment() {
+                        (&Method::GET, Exact(segment)) => {
+                            let Ok(member_id) = segment.parse::<Snowflake>() else {
+                                return Err(Error::BadRequest);
+                            };
+
+                            match route.next().segment() {
                                 End => Err(Error::Unimplemented),
                                 Exact("profile") => members::profile::get_profile(route, auth, member_id, party_id).await,
                                 _ => Err(Error::NotFound),

@@ -3,12 +3,12 @@ use thorn::pg::Json;
 
 use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Authorization, Error, ServerState};
 
-pub async fn get_full(state: &ServerState, user_id: Snowflake) -> Result<User, Error> {
+pub async fn get_full_self(state: &ServerState, user_id: Snowflake) -> Result<User, Error> {
     let db = state.db.read.get().await?;
 
     let row = db.query_one_cached_typed(|| q::query(), &[&user_id]).await?;
 
-    use q::{ProfileColumns, UserColumns};
+    use q::{PresenceColumns, ProfileColumns, UserColumns};
 
     Ok(User {
         id: user_id,
@@ -16,7 +16,31 @@ pub async fn get_full(state: &ServerState, user_id: Snowflake) -> Result<User, E
         discriminator: row.try_get(UserColumns::discriminator())?,
         flags: UserFlags::from_bits_truncate(row.try_get(UserColumns::flags())?),
         email: Some(row.try_get(UserColumns::email())?),
-        last_active: None,
+        presence: Some({
+            let last_active = crate::backend::util::relative::approximate_relative_time(
+                &state,
+                user_id,
+                row.try_get(UserColumns::last_active())?,
+                None,
+            );
+
+            match row.try_get(PresenceColumns::updated_at())? {
+                Some(updated_at) => UserPresence {
+                    flags: UserPresenceFlags::from_bits_truncate_public(
+                        row.try_get(PresenceColumns::flags())?,
+                    ),
+                    last_active,
+                    updated_at: Some(updated_at),
+                    activity: None,
+                },
+                None => UserPresence {
+                    flags: UserPresenceFlags::empty(),
+                    last_active,
+                    updated_at: None,
+                    activity: None,
+                },
+            }
+        }),
         preferences: {
             row.try_get::<_, Option<_>>(UserColumns::preferences())?
                 .map(|v: Json<_>| v.0)
@@ -47,9 +71,16 @@ mod q {
             Users::Flags,
             Users::Email,
             Users::Preferences,
+            Users::LastActive,
         }
 
-        pub enum ProfileColumns continue UserColumns {
+        pub enum PresenceColumns continue UserColumns {
+            AggPresence::UpdatedAt,
+            AggPresence::Flags,
+            //AggPresence::Activity,
+        }
+
+        pub enum ProfileColumns continue PresenceColumns {
             Profiles::Bits,
             Profiles::Nickname,
             Profiles::AvatarId,
@@ -62,11 +93,15 @@ mod q {
     pub fn query() -> impl AnyQuery {
         Query::select()
             .cols(UserColumns::default())
+            .cols(PresenceColumns::default())
             .cols(ProfileColumns::default())
             .from(
-                Users::left_join_table::<Profiles>().on(Profiles::UserId
-                    .equals(Users::Id)
-                    .and(Profiles::PartyId.is_null())),
+                Users::left_join_table::<Profiles>()
+                    .on(Profiles::UserId
+                        .equals(Users::Id)
+                        .and(Profiles::PartyId.is_null()))
+                    .left_join_table::<AggPresence>()
+                    .on(AggPresence::UserId.equals(Users::Id)),
             )
             .and_where(Users::Id.equals(Var::of(Users::Id)))
             .and_where(Users::DeletedAt.is_null())

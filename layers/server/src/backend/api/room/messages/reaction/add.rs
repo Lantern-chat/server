@@ -68,12 +68,12 @@ pub async fn add_reaction(
             party_id,
             user_id: auth.user_id,
             member: Some(Box::new(PartyMember {
-                user: Some(User {
+                user: User {
                     id: auth.user_id,
                     username: row.try_get(Columns::username())?,
                     discriminator: row.try_get(Columns::discriminator())?,
                     flags: UserFlags::from_bits_truncate_public(row.try_get(Columns::user_flags())?),
-                    last_active: None,
+                    presence: None,
                     email: None,
                     preferences: None,
                     profile: match row.try_get(Columns::profile_bits())? {
@@ -88,10 +88,12 @@ pub async fn add_reaction(
                             bio: Nullable::Undefined,
                         }),
                     },
-                }),
-                roles: row.try_get(Columns::role_ids())?,
-                presence: None,
-                flags: None,
+                },
+                partial: PartialPartyMember {
+                    roles: row.try_get(Columns::role_ids())?,
+                    joined_at: row.try_get(Columns::joined_at())?,
+                    flags: None,
+                },
             })),
         });
 
@@ -148,6 +150,7 @@ mod q {
             AvatarId: Profiles::AvatarId,
             ProfileBits: Profiles::Bits,
             RoleIds: AggMembers::RoleIds,
+            JoinedAt: AggMembers::JoinedAt,
         }
     }
 
@@ -174,6 +177,7 @@ mod q {
                 ReactionEvent::AvatarId,
                 ReactionEvent::ProfileBits,
                 ReactionEvent::RoleIds,
+                ReactionEvent::JoinedAt,
             }
         }
     }
@@ -259,7 +263,10 @@ mod q {
         let fetch = Query::select()
             .expr(Inserted::MsgId.alias_to(ReactionEvent::MsgId))
             .expr(Values::PartyId.alias_to(ReactionEvent::PartyId))
-            .exprs([AggMembers::RoleIds.alias_to(ReactionEvent::RoleIds)])
+            .exprs([
+                AggMembers::RoleIds.alias_to(ReactionEvent::RoleIds),
+                AggMembers::JoinedAt.alias_to(ReactionEvent::JoinedAt),
+            ])
             .exprs([
                 Users::Username.alias_to(ReactionEvent::Username),
                 Users::Discriminator.alias_to(ReactionEvent::Discriminator),

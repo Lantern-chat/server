@@ -201,7 +201,7 @@ pub fn parse_oembed_to_embed(embed: &mut Embed, o: OEmbed) -> ExtraFields {
 
         thumb.mime = None; // unknown from here
 
-        embed.thumb = Some(thumb);
+        embed.thumb = Some(Box::new(thumb));
     }
 
     if let Some(cache_age) = o.cache_age {

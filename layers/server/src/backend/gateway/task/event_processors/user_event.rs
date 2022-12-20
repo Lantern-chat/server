@@ -51,7 +51,7 @@ pub async fn user_update(
             username: row.try_get(UserColumns::username())?,
             discriminator: row.try_get(UserColumns::discriminator())?,
             flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
-            last_active: None,
+            presence: None,
             email: None,
             preferences: None,
             profile: Nullable::Undefined,
@@ -131,7 +131,7 @@ pub async fn self_update(
         return party_position_update(state, db, user_id, party_id).await;
     }
 
-    let user = crate::backend::api::user::me::get::get_full(state, user_id).await?;
+    let user = crate::backend::api::user::me::get::get_full_self(state, user_id).await?;
 
     state
         .gateway

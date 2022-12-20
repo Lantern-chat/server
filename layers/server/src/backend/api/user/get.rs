@@ -2,45 +2,72 @@ use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Authorization
 
 use sdk::models::*;
 
-pub async fn get_user_full(
+pub async fn get_full_member(
     state: ServerState,
     auth: Authorization,
     user_id: Snowflake,
-    party_id: Option<Snowflake>,
-) -> Result<User, Error> {
+    party_id: Snowflake,
+) -> Result<PartyMember, Error> {
+    unimplemented!()
+}
+
+pub async fn get_full_user(
+    state: ServerState,
+    auth: Authorization,
+    user_id: Snowflake,
+) -> Result<FullUser, Error> {
     let db = state.db.read.get().await?;
 
-    use q::{AllowLastActiveColumns, AssocColumns, Parameters, Params, ProfileColumns, UserColumns};
+    use q::{columns::*, Parameters, Params};
 
     let params = Params {
         self_id: auth.user_id,
         user_id,
-        party_id,
+        party_id: None,
     };
 
-    let Some(row) = db.query_opt_cached_typed(|| q::query(), &params.as_params()).await? else {
+    let Some(row) = db.query_opt_cached_typed(|| q::query(false), &params.as_params()).await? else {
         return Err(Error::NotFound);
     };
 
     let associated = 1 == row.try_get::<_, i32>(AssocColumns::associated())?;
 
-    Ok(User {
+    let user = User {
         id: user_id,
         username: row.try_get(UserColumns::username())?,
         discriminator: row.try_get(UserColumns::discriminator())?,
         flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
         email: None,
         preferences: None,
-        // only show last_active to associated users
-        last_active: match associated && row.try_get(AllowLastActiveColumns::allowed())? {
-            false => None,
-            true => crate::backend::util::relative::approximate_relative_time(
-                &state,
-                user_id,
-                row.try_get(UserColumns::last_active())?,
-                None,
-            ),
-        },
+        presence: Some({
+            // only show last_active to associated users
+            let last_active = match associated && row.try_get(AllowLastActiveColumns::allowed())? {
+                false => None,
+                true => crate::backend::util::relative::approximate_relative_time(
+                    &state,
+                    user_id,
+                    row.try_get(UserColumns::last_active())?,
+                    None,
+                ),
+            };
+
+            match row.try_get(PresenceColumns::updated_at())? {
+                Some(updated_at) if associated => UserPresence {
+                    flags: UserPresenceFlags::from_bits_truncate_public(
+                        row.try_get(PresenceColumns::flags())?,
+                    ),
+                    last_active,
+                    updated_at: Some(updated_at),
+                    activity: None,
+                },
+                _ => UserPresence {
+                    flags: UserPresenceFlags::empty(),
+                    last_active,
+                    updated_at: None,
+                    activity: None,
+                },
+            }
+        }),
         profile: match row.try_get(ProfileColumns::bits())? {
             None => Nullable::Null,
             Some(bits) => Nullable::Some(UserProfile {
@@ -62,7 +89,9 @@ pub async fn get_user_full(
                 },
             }),
         },
-    })
+    };
+
+    Ok(unimplemented!())
 }
 
 mod q {
@@ -94,80 +123,109 @@ mod q {
         }
     }
 
-    thorn::indexed_columns! {
-        pub enum UserColumns {
-            Users::Discriminator,
-            Users::Username,
-            Users::Flags,
-            Users::LastActive,
-        }
+    pub mod columns {
+        use super::*;
 
-        pub enum AllowLastActiveColumns continue UserColumns {
-            TempAllowLastActive::Allowed,
-        }
+        thorn::indexed_columns! {
+            pub enum UserColumns {
+                Users::Discriminator,
+                Users::Username,
+                Users::Flags,
+                Users::LastActive,
+            }
 
-        pub enum ProfileColumns continue AllowLastActiveColumns {
-            Profiles::Bits,
-            Profiles::AvatarId,
-            Profiles::BannerId,
-            Profiles::Nickname,
-            Profiles::CustomStatus,
-            Profiles::Biography,
-        }
+            pub enum PresenceColumns continue UserColumns {
+                AggPresence::UpdatedAt,
+                AggPresence::Flags,
+                //AggPresence::Activity,
+            }
 
-        pub enum AssocColumns continue ProfileColumns {
-            TempAssociated::Associated
+            pub enum AllowLastActiveColumns continue PresenceColumns {
+                TempAllowLastActive::Allowed,
+            }
+
+            pub enum ProfileColumns continue AllowLastActiveColumns {
+                Profiles::Bits,
+                Profiles::AvatarId,
+                Profiles::BannerId,
+                Profiles::Nickname,
+                Profiles::CustomStatus,
+                Profiles::Biography,
+            }
+
+            pub enum AssocColumns continue ProfileColumns {
+                TempAssociated::Associated
+            }
         }
     }
 
-    pub fn query() -> impl AnyQuery {
-        Query::select()
+    use columns::*;
+
+    pub fn query(member: bool) -> impl AnyQuery {
+        let mut q = Query::select()
             .cols(UserColumns::default())
+            .cols(PresenceColumns::default())
             // AllowLastActiveColumns
             .expr(
                 // preferences/flags can be NULL, so testing (flags & bit) != bit accounts for that
                 Users::Preferences
                     .json_extract("flags".lit())
                     .cast(Type::INT4)
-                    .bit_and(UserPrefsFlags::HIDE_LAST_ACTIVE.bits().lit())
-                    .not_equals(UserPrefsFlags::HIDE_LAST_ACTIVE.bits().lit()),
-            )
-            // ProfileColumns, must follow order as listed above
-            .expr(schema::combine_profile_bits(
-                BaseProfile::col(Profiles::Bits),
-                PartyProfile::col(Profiles::Bits),
-                PartyProfile::col(Profiles::AvatarId),
-            ))
-            .expr(Builtin::coalesce((
-                PartyProfile::col(Profiles::AvatarId),
-                BaseProfile::col(Profiles::AvatarId),
-            )))
-            .expr(Builtin::coalesce((
-                PartyProfile::col(Profiles::BannerId),
-                BaseProfile::col(Profiles::BannerId),
-            )))
-            .expr(Builtin::coalesce((
-                PartyProfile::col(Profiles::Nickname),
-                BaseProfile::col(Profiles::Nickname),
-            )))
-            .expr(Builtin::coalesce((
-                PartyProfile::col(Profiles::CustomStatus),
-                BaseProfile::col(Profiles::CustomStatus),
-            )))
-            .expr(Builtin::coalesce((
-                PartyProfile::col(Profiles::Biography),
-                BaseProfile::col(Profiles::Biography),
-            )))
+                    .has_no_bits(UserPrefsFlags::HIDE_LAST_ACTIVE.bits().lit()),
+            );
+
+        q = match member {
+            false => q.cols(ProfileColumns::default()),
+            true => q
+                .expr(schema::combine_profile_bits(
+                    BaseProfile::col(Profiles::Bits),
+                    PartyProfile::col(Profiles::Bits),
+                    PartyProfile::col(Profiles::AvatarId),
+                ))
+                .expr(Builtin::coalesce((
+                    PartyProfile::col(Profiles::AvatarId),
+                    BaseProfile::col(Profiles::AvatarId),
+                )))
+                .expr(Builtin::coalesce((
+                    PartyProfile::col(Profiles::BannerId),
+                    BaseProfile::col(Profiles::BannerId),
+                )))
+                .expr(Builtin::coalesce((
+                    PartyProfile::col(Profiles::Nickname),
+                    BaseProfile::col(Profiles::Nickname),
+                )))
+                .expr(Builtin::coalesce((
+                    PartyProfile::col(Profiles::CustomStatus),
+                    BaseProfile::col(Profiles::CustomStatus),
+                )))
+                .expr(Builtin::coalesce((
+                    PartyProfile::col(Profiles::Biography),
+                    BaseProfile::col(Profiles::Biography),
+                ))),
+        };
+
+        // ProfileColumns, must follow order as listed above
+        q =
             // AssocColumns
-            .expr(
+            q.expr(
                 Query::select()
                     .from_table::<AggUserAssociations>()
                     .expr(1.lit())
                     .and_where(AggUserAssociations::UserId.equals(Params::self_id()))
                     .and_where(AggUserAssociations::OtherId.equals(Params::user_id()))
                     .exists(),
-            )
-            .from(
+            );
+
+        q = match member {
+            false => q.from(
+                Users::left_join_table::<Profiles>()
+                    .on(Profiles::UserId
+                        .equals(Users::Id)
+                        .and(Profiles::PartyId.is_null()))
+                    .left_join_table::<AggPresence>()
+                    .on(AggPresence::UserId.equals(Users::Id)),
+            ),
+            true => q.from(
                 Users::left_join_table::<BaseProfile>()
                     .on(BaseProfile::col(Profiles::UserId)
                         .equals(Users::Id)
@@ -175,8 +233,14 @@ mod q {
                     .left_join_table::<PartyProfile>()
                     .on(PartyProfile::col(Profiles::UserId)
                         .equals(Users::Id)
-                        .and(PartyProfile::col(Profiles::PartyId).equals(Params::party_id()))),
-            )
-            .and_where(Users::Id.equals(Params::user_id()))
+                        .and(PartyProfile::col(Profiles::PartyId).equals(Params::party_id())))
+                    .left_join_table::<AggPresence>()
+                    .on(AggPresence::UserId.equals(Users::Id)),
+            ),
+        };
+
+        q = q.and_where(Users::Id.equals(Params::user_id()));
+
+        q
     }
 }

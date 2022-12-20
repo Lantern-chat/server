@@ -218,7 +218,11 @@ mod q {
                 TempParty::Id,
             }
 
-            pub enum UserColumns continue PartyColumns {
+            pub enum MemberColumns continue PartyColumns {
+                AggMembers::JoinedAt,
+            }
+
+            pub enum UserColumns continue MemberColumns {
                 Users::Username,
                 Users::Discriminator,
                 Users::Flags,
@@ -489,7 +493,7 @@ where
                                 flags: UserFlags::from_bits_truncate_public(
                                     row.try_get(UserColumns::flags())?,
                                 ),
-                                last_active: None,
+                                presence: None,
                                 email: None,
                                 preferences: None,
                                 profile: match row.try_get(ProfileColumns::bits())? {
@@ -540,10 +544,9 @@ where
 
             msg.member = match party_id {
                 None => None,
-                Some(_) => Some(PartyMember {
-                    user: None,
+                Some(_) => Some(PartialPartyMember {
                     roles: row.try_get(RoleColumns::role_ids())?,
-                    presence: None,
+                    joined_at: row.try_get(MemberColumns::joined_at())?,
                     flags: None,
                 }),
             };
@@ -700,7 +703,7 @@ pub const fn make_system_user() -> User {
         discriminator: 0,
         username: SmolStr::new_inline("SYSTEM"),
         flags: UserFlags::SYSTEM_USER,
-        last_active: None,
+        presence: None,
         profile: Nullable::Undefined,
         email: None,
         preferences: None,

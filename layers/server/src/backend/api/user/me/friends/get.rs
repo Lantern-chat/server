@@ -30,7 +30,7 @@ pub async fn friends(
                     username: row.try_get(UserColumns::username())?,
                     flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
                     discriminator: row.try_get(UserColumns::discriminator())?,
-                    last_active: None,
+                    presence: None, // TODO
                     email: None,
                     preferences: None,
                     profile: match row.try_get(ProfileColumns::bits())? {

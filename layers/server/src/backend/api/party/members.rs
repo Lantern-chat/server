@@ -50,12 +50,25 @@ pub fn parse_member(row: db::Row, state: &ServerState) -> Result<PartyMember, Er
     use query::MemberColumns;
 
     Ok(PartyMember {
-        user: Some(User {
+        user: User {
             id: row.try_get(MemberColumns::user_id())?,
             username: row.try_get(MemberColumns::username())?,
             discriminator: row.try_get(MemberColumns::discriminator())?,
             flags: UserFlags::from_bits_truncate_public(row.try_get(MemberColumns::user_flags())?),
-            last_active: None,
+            presence: match row.try_get(MemberColumns::presence_updated_at())? {
+                None => None,
+                Some(updated_at) => Some(UserPresence {
+                    last_active: None,
+                    updated_at: Some(updated_at),
+                    flags: UserPresenceFlags::from_bits_truncate_public(
+                        row.try_get(MemberColumns::presence_flags())?,
+                    ),
+                    activity: match row.try_get(MemberColumns::presence_activity())? {
+                        None => None,
+                        Some(value) => Some(AnyActivity::Any(value)),
+                    },
+                }),
+            },
             email: None,
             preferences: None,
             profile: match row.try_get(MemberColumns::profile_bits())? {
@@ -70,27 +83,17 @@ pub fn parse_member(row: db::Row, state: &ServerState) -> Result<PartyMember, Er
                     bio: Nullable::Undefined,
                 }),
             },
-        }),
-        presence: match row.try_get(MemberColumns::presence_updated_at())? {
-            None => None,
-            Some(updated_at) => Some(UserPresence {
-                updated_at: Some(updated_at),
-                flags: UserPresenceFlags::from_bits_truncate_public(
-                    row.try_get(MemberColumns::presence_flags())?,
-                ),
-                activity: match row.try_get(MemberColumns::presence_activity())? {
-                    None => None,
-                    Some(value) => Some(AnyActivity::Any(value)),
-                },
-            }),
         },
-        roles: row.try_get(MemberColumns::role_ids())?,
-        flags: None,
+        partial: PartialPartyMember {
+            joined_at: row.try_get(MemberColumns::joined_at())?,
+            roles: row.try_get(MemberColumns::role_ids())?,
+            flags: None,
+        },
     })
 }
 
 pub(crate) mod query {
-    use schema::*;
+    use schema::{flags::MemberFlags, *};
     use thorn::*;
 
     pub use super::parse_member;
@@ -120,6 +123,6 @@ pub(crate) mod query {
             .from_table::<AggMembersFull>()
             .and_where(AggMembersFull::PartyId.equals(Var::of(Party::Id)))
             // not banned
-            .and_where(AggMembersFull::MemberFlags.bit_and(1i16.lit()).equals(0i16.lit()))
+            .and_where(AggMembersFull::MemberFlags.has_no_bits(MemberFlags::BANNED.bits().lit()))
     }
 }

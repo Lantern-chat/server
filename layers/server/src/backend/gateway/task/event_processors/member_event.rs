@@ -66,12 +66,12 @@ pub async fn member_event(
             use user_query::{ProfileColumns, UserColumns};
 
             Ok::<Option<_>, Error>(Some(PartyMember {
-                user: Some(User {
+                user: User {
                     id: user_id,
                     username: row.try_get(UserColumns::username())?,
                     discriminator: row.try_get(UserColumns::discriminator())?,
                     flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
-                    last_active: None,
+                    presence: None,
                     profile: match row.try_get(ProfileColumns::bits())? {
                         None => Nullable::Null,
                         Some(bits) => Nullable::Some(UserProfile {
@@ -87,10 +87,14 @@ pub async fn member_event(
                     },
                     email: None,
                     preferences: None,
-                }),
-                roles: None,
-                presence: None,
-                flags: None,
+                },
+                partial: PartialPartyMember {
+                    roles: None,
+                    flags: None,
+                    // TODO: Code smell. Maybe use another value or Option<> here? Only place it's an invalid value.
+                    // might also be worth redesigning events
+                    joined_at: Timestamp::UNIX_EPOCH,
+                },
             }))
         }),
         EventCode::MemberJoined | EventCode::MemberUpdated => Either::Right(async {
@@ -117,13 +121,14 @@ pub async fn member_event(
     };
 
     // If a user just joined a party, they need to be given information on it
-    let party_future = match event {
-        EventCode::MemberJoined => Either::Left(async {
-            crate::backend::api::party::get::get_party_inner(state.clone(), db, user_id, party_id)
-                .await
-                .map(Some)
-        }),
-        _ => Either::Right(futures::future::ok::<Option<Party>, Error>(None)),
+    let party_future = async {
+        if EventCode::MemberJoined != event {
+            return Ok(None);
+        }
+
+        crate::backend::api::party::get::get_party_inner(state.clone(), db, user_id, party_id)
+            .await
+            .map(Some)
     };
 
     let (member, party): (Option<PartyMember>, _) = tokio::try_join!(member_future, party_future)?;

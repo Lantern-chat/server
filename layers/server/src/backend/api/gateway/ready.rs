@@ -32,7 +32,7 @@ pub async fn ready(
         super::refresh::refresh_room_perms(&state, &db, auth.user_id).await
     };
 
-    let user_future = crate::backend::api::user::me::get::get_full(&state, auth.user_id);
+    let user_future = crate::backend::api::user::me::get::get_full_self(&state, auth.user_id);
 
     let parties_future = async {
         mod party_query {

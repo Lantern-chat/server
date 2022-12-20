@@ -57,7 +57,11 @@ pub async fn trigger_typing(
                 Users::Flags,
             }
 
-            pub enum ProfileColumns continue UserColumns {
+            pub enum MemberColumns continue UserColumns {
+                PartyMember::JoinedAt,
+            }
+
+            pub enum ProfileColumns continue MemberColumns {
                 Profiles::Bits,
                 Profiles::AvatarId,
                 Profiles::Nickname,
@@ -89,6 +93,7 @@ pub async fn trigger_typing(
                     .select()
                     .cols(RoomColumns::default())
                     .cols(UserColumns::default())
+                    .cols(MemberColumns::default())
                     // ProfileColumns, must follow order as listed above
                     .expr(schema::combine_profile_bits(
                         BaseProfile::col(Profiles::Bits),
@@ -142,7 +147,7 @@ pub async fn trigger_typing(
 
     let Some(row) = row else { return Ok(()) };
 
-    use q::{ProfileColumns, RoleColumns, RoomColumns, UserColumns};
+    use q::{MemberColumns, ProfileColumns, RoleColumns, RoomColumns, UserColumns};
 
     let party_id: Option<Snowflake> = row.try_get(RoomColumns::party_id())?;
 
@@ -151,7 +156,7 @@ pub async fn trigger_typing(
         username: row.try_get(UserColumns::username())?,
         discriminator: row.try_get(UserColumns::discriminator())?,
         flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
-        last_active: None,
+        presence: None,
         email: None,
         preferences: None,
         profile: match row.try_get(ProfileColumns::bits())? {
@@ -171,10 +176,12 @@ pub async fn trigger_typing(
     match party_id {
         Some(party_id) => {
             let member = PartyMember {
-                user: Some(user),
-                roles: row.try_get(RoleColumns::role_ids())?,
-                presence: None,
-                flags: None,
+                user,
+                partial: PartialPartyMember {
+                    roles: row.try_get(RoleColumns::role_ids())?,
+                    joined_at: row.try_get(MemberColumns::joined_at())?,
+                    flags: None,
+                },
             };
 
             let event = ServerMsg::new_typing_start(events::TypingStart {

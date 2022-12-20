@@ -35,23 +35,25 @@ pub async fn presence_updated(
                     discriminator: row.try_get(UserColumns::discriminator())?,
                     flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
                     profile: Nullable::Undefined,
-                    last_active: None,
                     email: None,
                     preferences: None,
-                },
-                presence: match row.try_get(PresenceColumns::updated_at())? {
-                    Some(updated_at) => UserPresence {
-                        flags: UserPresenceFlags::from_bits_truncate_public(
-                            row.try_get(PresenceColumns::flags())?,
-                        ),
-                        updated_at: Some(updated_at),
-                        activity: None,
-                    },
-                    None => UserPresence {
-                        flags: UserPresenceFlags::empty(),
-                        updated_at: None,
-                        activity: None,
-                    },
+                    // both branches are `Some` because it must overwrite existing values on the client
+                    presence: Some(match row.try_get(PresenceColumns::updated_at())? {
+                        Some(updated_at) => UserPresence {
+                            flags: UserPresenceFlags::from_bits_truncate_public(
+                                row.try_get(PresenceColumns::flags())?,
+                            ),
+                            last_active: None, // TODO?
+                            updated_at: Some(updated_at),
+                            activity: None,
+                        },
+                        None => UserPresence {
+                            flags: UserPresenceFlags::empty(),
+                            last_active: None, // TODO?
+                            updated_at: None,
+                            activity: None,
+                        },
+                    }),
                 },
             };
 
