@@ -1,25 +1,16 @@
-use ftl::*;
-
-use schema::Snowflake;
-
-use super::ApiResponse;
-use crate::{Authorization, Error};
+use super::*;
 
 pub mod get;
 pub mod patch;
 //pub mod post;
 
-pub async fn party_rooms(
-    mut route: Route<crate::ServerState>,
-    auth: Authorization,
-    party_id: Snowflake,
-) -> ApiResponse {
+pub fn party_rooms(mut route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> RouteResult {
     match route.next().method_segment() {
         // POST /api/v1/party/1234/rooms
         //(&Method::POST, End) => post::post_room(route, auth, party_id).await,
 
         // GET /api/v1/party/1234/rooms
-        (&Method::GET, End) => get::get(route, auth, party_id).await,
+        (&Method::GET, End) => Ok(get::get(route, auth, party_id)),
 
         // ANY /api/v1/party/1234/rooms/5678
         _ => match route.param::<Snowflake>() {

@@ -1,9 +1,4 @@
-use ftl::*;
-use sdk::Snowflake;
-
-use crate::{web::auth::authorize, Error};
-
-use super::ApiResponse;
+use super::*;
 
 //pub mod check;
 pub mod get;
@@ -11,13 +6,13 @@ pub mod register;
 
 pub mod me;
 
-pub async fn user(mut route: Route<crate::ServerState>) -> ApiResponse {
+pub fn user(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
     match route.next().method_segment() {
         // POST /api/v1/user
-        (&Method::POST, End) => register::register(route).await,
+        (&Method::POST, End) => Ok(register::register(route)),
 
         // ANY /api/v1/user/@me
-        (_, Exact("@me")) => me::me(route).await,
+        (_, Exact("@me")) => me::me(route, auth),
 
         // ANY /api/v1/user/1234
         (_, Exact(segment)) => {
@@ -25,11 +20,11 @@ pub async fn user(mut route: Route<crate::ServerState>) -> ApiResponse {
                 return Err(Error::BadRequest);
             };
 
-            let auth = authorize(&route).await?;
+            let auth = auth.unwrap()?;
 
             match route.next().method_segment() {
                 // GET /api/v1/user/1234
-                (&Method::GET, End) => get::get(route, auth, user_id).await,
+                (&Method::GET, End) => Ok(get::get(route, auth, user_id)),
                 _ => Err(Error::Unimplemented),
             }
         }

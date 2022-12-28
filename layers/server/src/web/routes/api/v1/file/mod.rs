@@ -1,8 +1,5 @@
 use http::{HeaderMap, HeaderValue, Method, StatusCode};
 
-use ftl::*;
-use sdk::models::Snowflake;
-
 // https://tus.io/protocols/resumable-upload.html
 
 lazy_static::lazy_static! {
@@ -22,21 +19,21 @@ fn tus_headers() -> impl Iterator<Item = (headers::HeaderName, HeaderValue)> {
     TUS_HEADERS.iter().map(|t| t.clone_tuple())
 }
 
-use super::ApiResponse;
-use crate::{util::TupleClone, Error, ServerState};
+use super::*;
+use crate::util::TupleClone;
 
 pub mod head;
 pub mod options;
 pub mod patch;
 pub mod post;
 
-pub async fn file(mut route: Route<ServerState>) -> ApiResponse {
-    let auth = crate::web::auth::authorize(&route).await?;
+pub fn file(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
+    let auth = auth.unwrap()?;
 
     match route.next().method_segment() {
-        (&Method::OPTIONS, End) => options::options(route, auth).await,
+        (&Method::OPTIONS, End) => Ok(options::options(route, auth)),
 
-        (&Method::POST, End) => post::post(route, auth).await,
+        (&Method::POST, End) => Ok(post::post(route, auth)),
 
         (&Method::HEAD | &Method::PATCH | &Method::DELETE, Exact(_)) => {
             match route.param::<Snowflake>() {
@@ -47,8 +44,8 @@ pub async fn file(mut route: Route<ServerState>) -> ApiResponse {
                     }
 
                     match route.method() {
-                        &Method::HEAD => head::head(route, auth, file_id).await,
-                        &Method::PATCH => patch::patch(route, auth, file_id).await,
+                        &Method::HEAD => Ok(head::head(route, auth, file_id)),
+                        &Method::PATCH => Ok(patch::patch(route, auth, file_id)),
 
                         _ => Err(Error::MethodNotAllowed),
                     }

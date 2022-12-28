@@ -1,14 +1,10 @@
-use ftl::*;
-
-use super::ApiResponse;
-use crate::{Authorization, Error, ServerState};
+use super::*;
 
 #[async_recursion]
-pub async fn patch_profile(mut route: Route<ServerState>, auth: Authorization) -> ApiResponse {
+pub async fn patch_profile(mut route: Route<ServerState>, auth: Authorization) -> WebResult {
     let form = body::any(&mut route).await?;
 
-    let profile =
-        crate::backend::api::user::me::profile::patch_profile(route.state, auth, form, None).await?;
-
-    Ok(reply::json(profile).into_response())
+    Ok(WebResponse::new(
+        crate::backend::api::user::me::profile::patch_profile(route.state, auth, form, None).await?,
+    ))
 }

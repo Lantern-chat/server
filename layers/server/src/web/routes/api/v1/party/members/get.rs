@@ -1,13 +1,8 @@
-use ftl::*;
-use schema::Snowflake;
-
-use super::ApiResponse;
-use crate::{Authorization, ServerState};
+use super::*;
 
 #[async_recursion]
-pub async fn get_members(route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> ApiResponse {
-    let members =
-        crate::backend::api::party::members::get_members(route.state, party_id, auth.user_id).await?;
-
-    Ok(reply::json::array_stream(members).into_response())
+pub async fn get_members(route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> WebResult {
+    Ok(WebResponse::stream(
+        crate::backend::api::party::members::get_members(route.state, party_id, auth.user_id).await?,
+    ))
 }

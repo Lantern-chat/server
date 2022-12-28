@@ -1,16 +1,14 @@
-use ftl::*;
+use super::*;
 
-use crate::{Error, ServerState};
-
-pub async fn debug(mut route: Route<ServerState>) -> Result<Response, Error> {
+pub fn debug(mut route: Route<ServerState>) -> RouteResult {
     match route.next().segment() {
-        Exact("exception") => test_exception(route.state).await,
-        _ => Ok(().into_response()),
+        Exact("exception") => Ok(test_exception(route.state)),
+        _ => Err(Error::NotFound),
     }
 }
 
 #[async_recursion]
-async fn test_exception(state: ServerState) -> Result<Response, Error> {
+async fn test_exception(state: ServerState) -> WebResult {
     let db = state.db.read.get().await.unwrap();
 
     match db.execute("CALL lantern.do_thing()", &[]).await {
@@ -22,5 +20,5 @@ async fn test_exception(state: ServerState) -> Result<Response, Error> {
         }
     }
 
-    Ok(().into_response())
+    Ok(().into())
 }

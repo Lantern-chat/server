@@ -1,10 +1,7 @@
-use ftl::*;
 use headers::{ContentLength, HeaderValue};
-use sdk::models::Snowflake;
 
-use super::ApiResponse;
+use super::*;
 use crate::backend::api::file::patch::FilePatchParams;
-use crate::{Authorization, Error, ServerState};
 
 lazy_static::lazy_static! {
     static ref APPLICATION_OFFSET_OCTET_STREAM: headers::ContentType =
@@ -12,7 +9,7 @@ lazy_static::lazy_static! {
 }
 
 #[async_recursion]
-pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: Snowflake) -> ApiResponse {
+pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: Snowflake) -> WebResult {
     match route.header::<headers::ContentType>() {
         None => return Err(Error::MissingContentTypeHeader),
         Some(ct) if ct == *APPLICATION_OFFSET_OCTET_STREAM => {}
@@ -51,7 +48,7 @@ pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: 
 
     headers.insert("Upload-Offset", super::header_from_int(patch.upload_offset));
 
-    Ok(res)
+    Ok(res.into())
 }
 
 fn parse_checksum_header(header: &HeaderValue) -> Result<u32, Error> {

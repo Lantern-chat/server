@@ -55,7 +55,7 @@ impl EncodedEvent {
     pub fn new<S: serde::Serialize>(value: &S) -> Result<Self, EventEncodingError> {
         let as_json = serde_json::to_vec(value)?;
         let as_cbor = {
-            let mut buf = Vec::with_capacity(std::mem::size_of_val(value));
+            let mut buf = Vec::with_capacity(128);
             ciborium::ser::into_writer(value, &mut buf)?;
             buf
         };

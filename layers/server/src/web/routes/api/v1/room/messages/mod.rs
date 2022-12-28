@@ -1,9 +1,4 @@
-use ftl::*;
-
-use schema::Snowflake;
-
-use super::ApiResponse;
-use crate::{Authorization, Error};
+use super::*;
 
 pub mod delete;
 pub mod get_many;
@@ -12,31 +7,27 @@ pub mod patch;
 pub mod post;
 pub mod reactions;
 
-pub async fn messages(
-    mut route: Route<crate::ServerState>,
-    auth: Authorization,
-    room_id: Snowflake,
-) -> ApiResponse {
+pub fn messages(mut route: Route<ServerState>, auth: Authorization, room_id: Snowflake) -> RouteResult {
     match route.next().method_segment() {
         // POST /api/v1/room/1234/messages
-        (&Method::POST, End) => post::post(route, auth, room_id).await,
+        (&Method::POST, End) => Ok(post::post(route, auth, room_id)),
 
         // GET /api/v1/room/1234/messages
-        (&Method::GET, End) => get_many::get_many(route, auth, room_id).await,
+        (&Method::GET, End) => Ok(get_many::get_many(route, auth, room_id)),
 
         // ANY /api/v1/room/1234/messages/5678
         (_, Exact(_)) => match route.param::<Snowflake>() {
             Some(Ok(msg_id)) => match route.next().method_segment() {
                 // GET /api/v1/room/1234/messages/5678
-                (&Method::GET, End) => get_one::get_one(route, auth, room_id, msg_id).await,
+                (&Method::GET, End) => Ok(get_one::get_one(route, auth, room_id, msg_id)),
 
                 // PATCH /api/v1/room/1234/messages/5678
-                (&Method::PATCH, End) => patch::patch(route, auth, room_id, msg_id).await,
+                (&Method::PATCH, End) => Ok(patch::patch(route, auth, room_id, msg_id)),
 
                 // DELETE /api/v1/room/1234/messages/5678
-                (&Method::DELETE, End) => delete::delete(route, auth, room_id, msg_id).await,
+                (&Method::DELETE, End) => Ok(delete::delete(route, auth, room_id, msg_id)),
 
-                (_, Exact("reactions")) => reactions::reactions(route, auth, room_id, msg_id).await,
+                (_, Exact("reactions")) => reactions::reactions(route, auth, room_id, msg_id),
 
                 (_, End) => Err(Error::MethodNotAllowed),
                 _ => Err(Error::NotFound),

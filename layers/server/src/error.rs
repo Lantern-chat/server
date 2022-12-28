@@ -3,7 +3,7 @@ use std::{borrow::Cow, string::FromUtf8Error};
 use db::pool::Error as DbError;
 use ftl::{body::BodyDeserializeError, *};
 use http::header::InvalidHeaderValue;
-use sdk::{api::error::ApiErrorCode, models::UserPreferenceError};
+use sdk::{api::error::ApiErrorCode, driver::Encoding, models::UserPreferenceError};
 use smol_str::SmolStr;
 
 #[derive(Debug, thiserror::Error)]
@@ -349,21 +349,32 @@ impl Error {
             Error::ChecksumMismatch         => ApiErrorCode::ChecksumMismatch,
         }
     }
+}
 
-    fn into_json(self) -> reply::Json {
+#[derive(Serialize)]
+struct ApiError {
+    pub code: ApiErrorCode,
+    pub message: Cow<'static, str>,
+}
+
+impl Error {
+    fn log(&self) {
         if self.is_fatal() {
             log::error!("Fatal error: {self}");
         } else if cfg!(debug_assertions) {
             log::warn!("Non-fatal error: {self}");
         }
+    }
 
-        #[derive(Serialize)]
-        pub struct ApiError {
-            pub code: ApiErrorCode,
-            pub message: Cow<'static, str>,
-        }
-
+    fn into_json(self) -> reply::Json {
         reply::json(&ApiError {
+            code: self.to_apierror(),
+            message: self.format(),
+        })
+    }
+
+    fn into_cbor(self) -> reply::cbor::Cbor {
+        reply::cbor::cbor(&ApiError {
             code: self.to_apierror(),
             message: self.format(),
         })
@@ -399,11 +410,20 @@ impl Error {
             Conflict
         }
     }
+
+    pub(crate) fn into_encoding(self, encoding: Encoding) -> Response {
+        self.log();
+
+        match encoding {
+            Encoding::JSON => self.into_cached_json().into_response(),
+            Encoding::CBOR => self.into_cbor().into_response(),
+        }
+    }
 }
 
 impl ftl::Reply for Error {
     fn into_response(self) -> Response {
-        self.into_cached_json().into_response()
+        self.into_encoding(Encoding::JSON)
     }
 }
 

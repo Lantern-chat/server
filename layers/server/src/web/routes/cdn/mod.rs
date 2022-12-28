@@ -1,14 +1,22 @@
 use ftl::*;
 use sdk::Snowflake;
 
-use crate::{Error, ServerState};
+use crate::{web::response::WebResult, Error, ServerState};
 
 pub mod asset;
 pub mod attachments;
 
-use super::api::v1::ApiResponse;
+#[rustfmt::skip]
+pub async fn cdn(route: Route<ServerState>) -> Response {
+    let encoding = match route.query::<crate::web::encoding::EncodingQuery>() {
+        Some(Ok(q)) => q.encoding,
+        _ => sdk::driver::Encoding::JSON,
+    };
 
-pub async fn cdn(mut route: Route<ServerState>) -> ApiResponse {
+    crate::web::response::web_response(encoding, real_cdn(route).await)
+}
+
+async fn real_cdn(mut route: Route<ServerState>) -> WebResult {
     let config = &route.state.config;
     if config.web.strict_cdn {
         match route.host() {

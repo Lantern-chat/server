@@ -1,8 +1,4 @@
-use ftl::*;
-use schema::Snowflake;
-
-use super::ApiResponse;
-use crate::{Error, ServerState};
+use super::*;
 
 pub mod get;
 pub mod messages;
@@ -10,17 +6,17 @@ pub mod patch;
 pub mod threads;
 pub mod typing;
 
-pub async fn room(mut route: Route<ServerState>) -> ApiResponse {
-    let auth = crate::web::auth::authorize(&route).await?;
+pub fn room(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
+    let auth = auth.unwrap()?;
 
     // ANY /api/v1/room/1234
     match route.next().param::<Snowflake>() {
         Some(Ok(room_id)) => match route.next().method_segment() {
-            (&Method::GET, End) => get::get_room(route, auth, room_id).await,
-            (&Method::POST, Exact("typing")) => typing::trigger_typing(route, auth, room_id).await,
+            (&Method::GET, End) => Ok(get::get_room(route, auth, room_id)),
+            (&Method::POST, Exact("typing")) => Ok(typing::trigger_typing(route, auth, room_id)),
 
-            (_, Exact("messages")) => messages::messages(route, auth, room_id).await,
-            (_, Exact("threads")) => threads::threads(route, auth, room_id).await,
+            (_, Exact("messages")) => messages::messages(route, auth, room_id),
+            (_, Exact("threads")) => threads::threads(route, auth, room_id),
             _ => Err(Error::NotFound),
         },
         _ => Err(Error::BadRequest),

@@ -1,16 +1,10 @@
-use ftl::*;
-
 use smol_str::SmolStr;
 
-use sdk::{
-    api::asset::{AssetFlags, AssetQuery},
-    models::Snowflake,
-};
+use sdk::api::asset::{AssetFlags, AssetQuery};
 
 use crate::backend::{cdn::AssetKind, util::encrypted_asset::decrypt_snowflake};
 
-use super::ApiResponse;
-use crate::{Error, ServerState};
+use super::*;
 
 pub enum PlainAssetKind {
     User,
@@ -29,7 +23,7 @@ pub enum AssetSubKind {
 // cdn.lanternchat.net/user/user_id/banner/banner_id
 
 #[async_recursion]
-pub async fn asset(mut route: Route<ServerState>) -> ApiResponse {
+pub async fn asset(mut route: Route<ServerState>) -> WebResult {
     let plain_kind = match route.segment() {
         End => unreachable!(),
         Exact(segment) => match segment {
@@ -90,5 +84,7 @@ pub async fn asset(mut route: Route<ServerState>) -> ApiResponse {
 
     log::debug!("REQUESTED ASSET FLAGS: {}={:?}", flags.bits(), flags);
 
-    crate::backend::cdn::get_asset(route, kind, kind_id, asset_id, is_head, false, flags).await
+    crate::backend::cdn::get_asset(route, kind, kind_id, asset_id, is_head, false, flags)
+        .await
+        .map(From::from)
 }

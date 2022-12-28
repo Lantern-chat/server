@@ -1,9 +1,4 @@
-use ftl::*;
-
-use schema::Snowflake;
-
-use super::ApiResponse;
-use crate::{Authorization, ServerState};
+use super::*;
 
 #[async_recursion]
 pub async fn delete(
@@ -11,8 +6,8 @@ pub async fn delete(
     auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,
-) -> ApiResponse {
+) -> WebResult {
     crate::backend::api::room::messages::delete::delete_msg(route.state, auth, room_id, msg_id).await?;
 
-    Ok(StatusCode::OK.into_response())
+    Ok(StatusCode::OK.into())
 }

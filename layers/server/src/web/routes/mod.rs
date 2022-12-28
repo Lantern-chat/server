@@ -24,9 +24,12 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
 
     match route.method_segment() {
         // ANY /api
-        (_, Exact("api")) => compression::wrap_route(true, route, api::api)
+        (_, Exact("api")) => {
+            compression::wrap_route(true, route, |route| {
+                crate::web::response::wrap_response(route, api::api)
+            })
             .await
-            .into_response(),
+        }
 
         (&Method::GET, Exact("robots.txt")) => include_str!("robots.txt")
             .with_header(ContentType::text())
@@ -41,7 +44,7 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
         .await
         .into_response(),
 
-        (&Method::GET | &Method::HEAD, Exact("cdn")) => cdn::cdn(route).await.into_response(),
+        (&Method::GET | &Method::HEAD, Exact("cdn")) => cdn::cdn(route).await,
 
         _ if BAD_PATTERNS.is_match(route.path()) || route.path().ends_with(".php") => {
             StatusCode::IM_A_TEAPOT.into_response()
@@ -55,14 +58,12 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
         }
 
         (&Method::GET | &Method::HEAD, segment) => {
-            let allowed = match segment {
-                Segment::End => true,
-                Segment::Exact(part) => matches!(
-                    part,
-                    "channels" | "login" | "register" | "invite" | "verify" | "settings" | "reset"
-                ),
-            };
+            #[rustfmt::skip]
+            let allowed = matches!(segment, Segment::End | Segment::Exact(
+                "channels" | "login" | "register" | "invite" | "verify" | "settings" | "reset"
+            ));
 
+            // NOTE: Whitelisting paths deters a bunch of false requests from bots
             if !allowed {
                 return StatusCode::NOT_FOUND.into_response();
             }

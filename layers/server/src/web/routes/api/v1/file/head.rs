@@ -1,12 +1,10 @@
-use ftl::*;
 use headers::{CacheControl, HeaderMapExt, HeaderValue};
-use sdk::models::Snowflake;
 
-use super::ApiResponse;
-use crate::{backend::api::file::head::UploadHead, util::TupleClone, Authorization, ServerState};
+use super::*;
+use crate::{backend::api::file::head::UploadHead, util::TupleClone};
 
 #[async_recursion]
-pub async fn head(route: Route<ServerState>, auth: Authorization, file_id: Snowflake) -> ApiResponse {
+pub async fn head(route: Route<ServerState>, auth: Authorization, file_id: Snowflake) -> WebResult {
     let head = crate::backend::api::file::head::head(route.state, auth, file_id).await?;
 
     let mut res = Response::default();
@@ -25,7 +23,7 @@ pub async fn head(route: Route<ServerState>, auth: Authorization, file_id: Snowf
 
     headers.typed_insert(CacheControl::new().with_no_store());
 
-    Ok(res)
+    Ok(res.into())
 }
 
 fn encode_metadata(head: &UploadHead) -> HeaderValue {

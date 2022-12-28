@@ -1,21 +1,10 @@
-use ftl::*;
-
-use super::ApiResponse;
-use crate::{Authorization, ServerState};
+use super::*;
 
 #[async_recursion]
-pub async fn post(
-    mut route: Route<ServerState>,
-    auth: Authorization,
-) -> ApiResponse {
+pub async fn post(mut route: Route<ServerState>, auth: Authorization) -> WebResult {
     let form = body::any(&mut route).await?;
 
-    let party = crate::backend::api::party::create::create_party(
-        route.state,
-        auth,
-        form,
-    )
-    .await?;
-
-    Ok(reply::json(party).into_response())
+    Ok(WebResponse::new(
+        crate::backend::api::party::create::create_party(route.state, auth, form).await?,
+    ))
 }

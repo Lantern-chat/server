@@ -19,10 +19,9 @@ pub mod error;
 //pub mod net;
 pub mod metrics;
 pub mod state;
+pub mod tasks;
 pub mod util;
 pub mod web;
-
-pub mod tasks;
 
 pub(crate) use backend::Authorization;
 pub use error::Error;

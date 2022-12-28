@@ -1,10 +1,4 @@
-use ftl::*;
-use schema::Snowflake;
-
-use crate::ServerState;
-
-use super::ApiResponse;
-use crate::Authorization;
+use super::*;
 
 #[async_recursion]
 pub async fn get(
@@ -12,9 +6,8 @@ pub async fn get(
     auth: Authorization,
     room_id: Snowflake,
     thread_id: Snowflake,
-) -> ApiResponse {
-    let thread =
-        crate::backend::api::room::threads::get::get_thread(route.state, auth, room_id, thread_id).await?;
-
-    Ok(reply::json(thread).into_response())
+) -> WebResult {
+    Ok(WebResponse::new(
+        crate::backend::api::room::threads::get::get_thread(route.state, auth, room_id, thread_id).await?,
+    ))
 }

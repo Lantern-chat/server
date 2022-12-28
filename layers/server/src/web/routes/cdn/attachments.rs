@@ -1,12 +1,7 @@
-use ftl::*;
-
-use sdk::models::Snowflake;
-
-use super::ApiResponse;
-use crate::{Error, ServerState};
+use super::*;
 
 #[async_recursion]
-pub async fn attachments(mut route: Route<ServerState>) -> ApiResponse {
+pub async fn attachments(mut route: Route<ServerState>) -> WebResult {
     let Some(Ok(room_id)) = route.next().param::<Snowflake>() else { return Err(Error::BadRequest) };
     let Some(Ok(attachment_id)) = route.next().param::<Snowflake>() else { return Err(Error::BadRequest) };
 
@@ -21,4 +16,5 @@ pub async fn attachments(mut route: Route<ServerState>) -> ApiResponse {
 
     crate::backend::cdn::get_attachment(route, room_id, attachment_id, Some(&filename), is_head, download)
         .await
+        .map(From::from)
 }

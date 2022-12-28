@@ -1,9 +1,4 @@
-use ftl::*;
-
-use schema::Snowflake;
-
-use super::ApiResponse;
-use crate::Error;
+use super::*;
 
 //pub mod delete;
 pub mod get;
@@ -12,7 +7,7 @@ pub mod post;
 
 pub mod invites;
 pub mod members {
-    use super::ApiResponse;
+    use super::*;
 
     pub mod get;
     pub mod profile;
@@ -20,18 +15,18 @@ pub mod members {
 pub mod rooms;
 
 #[rustfmt::skip]
-pub async fn party(mut route: Route<crate::ServerState>) -> ApiResponse {
-    let auth = crate::web::auth::authorize(&route).await?;
+pub fn party(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
+    let auth = auth.unwrap()?;
 
     match route.next().method_segment() {
         // POST /api/v1/party
-        (&Method::POST, End) => post::post(route, auth).await,
+        (&Method::POST, End) => Ok(post::post(route, auth)),
 
         // ANY /api/v1/party/1234
         (_, Exact(_)) => match route.param::<Snowflake>() {
             Some(Ok(party_id)) => match route.next().method_segment() {
                 // GET /api/v1/party/1234
-                (&Method::GET, End) => get::get(route, auth, party_id).await,
+                (&Method::GET, End) => Ok(get::get(route, auth, party_id)),
 
                 // PATCH /api/v1/party/1234
                 //(&Method::PATCH, End) => patch::patch(route, auth, party_id).await,
@@ -42,16 +37,16 @@ pub async fn party(mut route: Route<crate::ServerState>) -> ApiResponse {
                 //}
 
                 // ANY /api/v1/party/1234/rooms
-                (_, Exact("rooms")) => rooms::party_rooms(route, auth, party_id).await,
+                (_, Exact("rooms")) => rooms::party_rooms(route, auth, party_id),
 
                 // ANY /api/v1/party/1234/members
                 (_, Exact("members")) => {
                     match route.next().method_segment() {
                         // GET /api/v1/party/1234/members
-                        (&Method::GET, End) => members::get::get_members(route, auth, party_id).await,
+                        (&Method::GET, End) => Ok(members::get::get_members(route, auth, party_id)),
 
                         // PATCH /api/v1/party/1234/members/profile
-                        (&Method::PATCH, Exact("profile")) => members::profile::patch_profile(route, auth, party_id).await,
+                        (&Method::PATCH, Exact("profile")) => Ok(members::profile::patch_profile(route, auth, party_id)),
 
                         // GET /api/v1/party/1234/members/5678/profile
                         (&Method::GET, Exact(segment)) => {
@@ -61,7 +56,7 @@ pub async fn party(mut route: Route<crate::ServerState>) -> ApiResponse {
 
                             match route.next().segment() {
                                 End => Err(Error::Unimplemented),
-                                Exact("profile") => members::profile::get_profile(route, auth, member_id, party_id).await,
+                                Exact("profile") => Ok(members::profile::get_profile(route, auth, member_id, party_id)),
                                 _ => Err(Error::NotFound),
                             }
                         }

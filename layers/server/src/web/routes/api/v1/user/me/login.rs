@@ -1,20 +1,11 @@
-use ftl::*;
-
-use super::ApiResponse;
-use crate::ServerState;
+use super::*;
 
 #[async_recursion]
-pub async fn login(mut route: Route<ServerState>) -> ApiResponse {
+pub async fn login(mut route: Route<ServerState>) -> WebResult {
     let form = body::any(&mut route).await?;
 
-    let session = crate::backend::api::user::me::login::login(
-        route.state,
-        route.real_addr,
-        form,
+    Ok(WebResponse::new(
+        crate::backend::api::user::me::login::login(route.state, route.real_addr, form).await?,
     )
-    .await?;
-
-    Ok(reply::json(session)
-        .with_status(StatusCode::CREATED)
-        .into_response())
+    .with_status(StatusCode::CREATED))
 }

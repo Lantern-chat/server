@@ -1,9 +1,4 @@
-use ftl::*;
-
-use schema::Snowflake;
-
-use super::ApiResponse;
-use crate::{Authorization, ServerState};
+use super::*;
 
 #[async_recursion]
 pub async fn patch(
@@ -11,7 +6,7 @@ pub async fn patch(
     auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,
-) -> ApiResponse {
+) -> WebResult {
     let form = body::any(&mut route).await?;
 
     let msg =
@@ -19,7 +14,7 @@ pub async fn patch(
             .await?;
 
     Ok(match msg {
-        Some(ref msg) => reply::json(msg).into_response(),
-        None => StatusCode::OK.into_response(),
+        Some(msg) => WebResponse::new(msg),
+        None => StatusCode::OK.into(),
     })
 }

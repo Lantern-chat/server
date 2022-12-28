@@ -1,19 +1,8 @@
-use ftl::*;
-
-use schema::Snowflake;
-
-use super::ApiResponse;
-use crate::Authorization;
+use super::*;
 
 #[async_recursion]
-pub async fn get_room(
-    route: Route<crate::ServerState>,
-    auth: Authorization,
-    room_id: Snowflake,
-) -> ApiResponse {
-    let room =
-        crate::backend::api::room::get::get_room(route.state, auth, room_id)
-            .await?;
-
-    Ok(reply::json(room).into_response())
+pub async fn get_room(route: Route<ServerState>, auth: Authorization, room_id: Snowflake) -> WebResult {
+    Ok(WebResponse::new(
+        crate::backend::api::room::get::get_room(route.state, auth, room_id).await?,
+    ))
 }

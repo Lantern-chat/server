@@ -1,12 +1,9 @@
-use ftl::*;
+use super::*;
 
-use crate::{
-    backend::api::oembed::get::{process_oembed, OEmbedFormat, OEmbedRequest, OEmbedResponse},
-    Error, ServerState,
-};
+use crate::backend::api::oembed::get::{process_oembed, OEmbedFormat, OEmbedRequest, OEmbedResponse};
 
 #[async_recursion]
-pub async fn oembed(route: Route<ServerState>) -> Result<Response, Error> {
+pub async fn oembed(route: Route<ServerState>) -> WebResult {
     let req = match route.query::<OEmbedRequest>() {
         Some(res) => res?,
         None => OEmbedRequest::default(),
@@ -27,5 +24,5 @@ pub async fn oembed(route: Route<ServerState>) -> Result<Response, Error> {
         }
     };
 
-    Ok(resp.into_response())
+    Ok(resp.into())
 }
