@@ -17,13 +17,13 @@ pub async fn oembed(route: Route<ServerState>) -> Result<Response, Error> {
     let resp = match req.format {
         OEmbedFormat::Json => serde_json::to_string(&resp)?,
         OEmbedFormat::XML => {
-            let mut writer = Vec::from(r#"<?xml version="1.0" encoding="utf-8" standalone="yes"?><oembed>"#);
+            let mut writer = r#"<?xml version="1.0" encoding="utf-8" standalone="yes"?><oembed>"#.to_owned();
 
             quick_xml::se::to_writer(&mut writer, &resp)?;
 
-            writer.extend_from_slice(b"</oembed>");
+            writer.push_str("</oembed>");
 
-            unsafe { String::from_utf8_unchecked(writer) }
+            writer
         }
     };
 
