@@ -29,6 +29,7 @@ pub async fn presence_updated(
             // TODO: Get other broadcast ids
 
             let inner = UserPresenceEvent {
+                party_id,
                 user: User {
                     id: user_id,
                     username: row.try_get(UserColumns::username())?,
@@ -58,7 +59,7 @@ pub async fn presence_updated(
             };
 
             if let Some(party_id) = party_id {
-                let event = Event::new(ServerMsg::new_presence_update(party_id, inner), None)?;
+                let event = Event::new(ServerMsg::new_presence_update(inner), None)?;
 
                 state.gateway.broadcast_event(event, party_id).await;
             }
