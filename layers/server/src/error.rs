@@ -24,6 +24,10 @@ pub enum Error {
     SemaphoreError(#[from] tokio::sync::AcquireError),
     #[error("Parse Error {0}")]
     JsonError(#[from] serde_json::Error),
+    #[error("Cbor Encoding Error: {0}")]
+    CborEncodingError(#[from] ciborium::ser::Error<std::io::Error>),
+    #[error("Cbor Decoding Error: {0}")]
+    CborDecodingError(#[from] ciborium::de::Error<std::io::Error>),
     #[error("Bincode Error: {0}")]
     BincodeError(#[from] bincode::Error),
     #[error("XML Serialize Error {0}")]
@@ -204,6 +208,8 @@ impl Error {
             | Error::SemaphoreError(_)
             | Error::HashError(_)
             | Error::JsonError(_)
+            | Error::CborDecodingError(_)
+            | Error::CborEncodingError(_)
             | Error::BincodeError(_)
             | Error::XMLError(_)
             | Error::EventEncodingError(_)
@@ -234,6 +240,8 @@ impl Error {
             | Error::AuthTokenError(_)
             | Error::Base64DecodeError(_)
             | Error::Base85DecodeError(_)
+            | Error::CborDecodingError(_)
+            | Error::CborEncodingError(_)
             | Error::JsonError(_) => StatusCode::UNPROCESSABLE_ENTITY,
 
             Error::ChecksumMismatch => *CHECKSUM_MISMATCH,
@@ -290,6 +298,9 @@ impl Error {
             Error::XMLError(_)              => ApiErrorCode::XMLError,
             Error::RequestError(_)          => ApiErrorCode::RequestError,
             Error::Unimplemented            => ApiErrorCode::Unimplemented,
+
+            | Error::CborDecodingError(_)
+            | Error::CborEncodingError(_)   => ApiErrorCode::CborError,
 
             Error::AlreadyExists            => ApiErrorCode::AlreadyExists,
             Error::UsernameUnavailable      => ApiErrorCode::UsernameUnavailable,
