@@ -5,7 +5,7 @@ use filesystem::store::{CipherOptions, FileExt, OpenMode};
 
 use crate::{Authorization, Error, ServerState};
 
-use futures::{Stream, StreamExt};
+use futures::{FutureExt, Stream, StreamExt};
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
 use schema::{flags::FileFlags, Snowflake, SnowflakeExt};
@@ -62,10 +62,12 @@ pub async fn patch_file(
     }
 
     // acquire these at the same time
-    let (_file_lock, _fs_permit) = tokio::try_join! {
-        async { Ok(state.id_lock.lock(file_id).await) },
-        async { state.fs_semaphore.acquire().await },
-    }?;
+    let (_file_lock, _fs_permit) = tokio::join! {
+        state.id_lock.lock(file_id),
+        state.fs_semaphore.acquire(),
+    };
+
+    let _fs_permit = _fs_permit?;
 
     let mut file = state
         .fs()
@@ -171,7 +173,7 @@ pub async fn patch_file(
     if let Some(err) = res {
         // only rewind if there was anything written
         if bytes_written > 0 {
-            file.set_len(append_pos).await?;
+            file.set_len(append_pos).boxed().await?;
         }
 
         return Err(err);
@@ -235,10 +237,7 @@ pub async fn patch_file(
 
     drop(_file_lock);
 
-    crate::metrics::API_METRICS
-        .load()
-        .upload
-        .add(params.content_length);
+    crate::metrics::API_METRICS.load().upload.add(params.content_length);
 
     Ok(file_patch)
 }
