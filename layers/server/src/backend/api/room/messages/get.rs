@@ -272,8 +272,8 @@ mod q {
     pub fn query(
         mode: MessageSearch,
         check_perms: bool,
-        with_room: bool,
-        with_user: bool,
+        with_room: bool, // messages selected from a known room
+        with_user: bool, // messages selected by a known user
     ) -> impl thorn::AnyQuery {
         let mut selected = Query::select()
             .expr(Messages::Id.alias_to(SelectedMessages::Id))
@@ -328,7 +328,7 @@ mod q {
         let party = match with_room {
             true => Query::select()
                 .expr(Rooms::PartyId.alias_to(TempParty::Id))
-                .expr(Params::room_id().alias_to(TempParty::RoomId))
+                .expr(Rooms::Id.alias_to(TempParty::RoomId))
                 .from_table::<Rooms>()
                 .and_where(Rooms::Id.equals(Params::room_id())),
 

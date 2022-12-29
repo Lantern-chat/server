@@ -53,9 +53,8 @@ pub async fn member_event(
                             .cols(UserColumns::default())
                             .cols(ProfileColumns::default())
                             .from(
-                                Users::left_join_table::<Profiles>().on(Profiles::UserId
-                                    .equals(Users::Id)
-                                    .and(Profiles::PartyId.is_null())),
+                                Users::left_join_table::<Profiles>()
+                                    .on(Profiles::UserId.equals(Users::Id).and(Profiles::PartyId.is_null())),
                             )
                             .and_where(Users::Id.equals(Var::of(Users::Id)))
                     },
@@ -78,8 +77,7 @@ pub async fn member_event(
                             bits,
                             extra: Default::default(),
                             nick: row.try_get(ProfileColumns::nickname())?,
-                            avatar: encrypt_snowflake_opt(state, row.try_get(ProfileColumns::avatar_id())?)
-                                .into(),
+                            avatar: encrypt_snowflake_opt(state, row.try_get(ProfileColumns::avatar_id())?).into(),
                             banner: Nullable::Undefined,
                             bio: Nullable::Undefined,
                             status: Nullable::Undefined,
@@ -91,9 +89,7 @@ pub async fn member_event(
                 partial: PartialPartyMember {
                     roles: None,
                     flags: None,
-                    // TODO: Code smell. Maybe use another value or Option<> here? Only place it's an invalid value.
-                    // might also be worth redesigning events
-                    joined_at: Timestamp::UNIX_EPOCH,
+                    joined_at: None,
                 },
             }))
         }),
@@ -166,10 +162,7 @@ pub async fn member_event(
             if event == EventCode::MemberBan {
                 state
                     .gateway
-                    .broadcast_event(
-                        Event::new(ServerMsg::new_member_ban(inner.clone()), None)?,
-                        party_id,
-                    )
+                    .broadcast_event(Event::new(ServerMsg::new_member_ban(inner.clone()), None)?, party_id)
                     .await;
             }
 
@@ -179,10 +172,7 @@ pub async fn member_event(
         _ => unreachable!(),
     };
 
-    state
-        .gateway
-        .broadcast_event(Event::new(msg, None)?, party_id)
-        .await;
+    state.gateway.broadcast_event(Event::new(msg, None)?, party_id).await;
 
     Ok(())
 }
