@@ -92,10 +92,7 @@ pub async fn get_many(
         thread_id: form.thread,
     };
 
-    Ok(parse_stream(
-        state,
-        db.query_stream(&query, &params.as_params()).await?,
-    ))
+    Ok(parse_stream(state, db.query_stream(&query, &params.as_params()).await?))
 }
 
 pub async fn get_one_transactional(
@@ -165,9 +162,10 @@ mod p {
 }
 
 mod q {
-    use super::{MessageFlags, MessageSearch, Permission, UserBlockFlags};
-
+    use super::{MessageFlags, MessageSearch, Permission};
     use db::Row;
+    use sdk::models::UserRelationship;
+
     pub use schema::*;
     pub use thorn::*;
 
@@ -294,13 +292,15 @@ mod q {
                 .expr(false.lit().alias_to(SelectedMessages::Unavailable)),
             true => selected
                 .from(
-                    Messages::left_join_table::<UserBlocks>().on(UserBlocks::UserId
+                    Messages::left_join_table::<AggRelationships>().on(AggRelationships::UserId
                         .equals(Messages::UserId)
-                        .and(UserBlocks::BlockId.equals(Params::user_id()))),
+                        .and(AggRelationships::FriendId.equals(Params::user_id()))),
                 )
+                // if user of message has reported reader as dangerous
                 .expr(
-                    UserBlocks::Flags
-                        .has_all_bits(UserBlockFlags::HIDE_OWN_MESSAGES.bits().lit())
+                    AggRelationships::RelA
+                        .equals((UserRelationship::BlockedDangerous as i8).lit())
+                        .is_true()
                         .alias_to(SelectedMessages::Unavailable),
                 ),
         };
@@ -346,6 +346,7 @@ mod q {
             .cols(MessageColumns::default())
             .cols(SelectedColumns::default())
             .cols(PartyColumns::default())
+            .cols(MemberColumns::default())
             .cols(UserColumns::default())
             // ProfileColumns, must follow order as listed above
             .expr(schema::combine_profile_bits(
@@ -490,9 +491,7 @@ where
                                 id,
                                 username: row.try_get(UserColumns::username())?,
                                 discriminator: row.try_get(UserColumns::discriminator())?,
-                                flags: UserFlags::from_bits_truncate_public(
-                                    row.try_get(UserColumns::flags())?,
-                                ),
+                                flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
                                 presence: None,
                                 email: None,
                                 preferences: None,
@@ -539,8 +538,7 @@ where
             }
 
             msg.flags = MessageFlags::from_bits_truncate_public(row.try_get(MessageColumns::flags())?);
-            msg.kind =
-                MessageKind::try_from(row.try_get::<_, i16>(MessageColumns::kind())?).unwrap_or_default();
+            msg.kind = MessageKind::try_from(row.try_get::<_, i16>(MessageColumns::kind())?).unwrap_or_default();
 
             msg.member = match party_id {
                 None => None,
@@ -587,8 +585,7 @@ where
             msg.attachments = {
                 let mut attachments = Vec::new();
 
-                let meta: Option<Json<Vec<schema::AggAttachmentsMeta>>> =
-                    row.try_get(AttachmentColumns::meta())?;
+                let meta: Option<Json<Vec<schema::AggAttachmentsMeta>>> = row.try_get(AttachmentColumns::meta())?;
 
                 if let Some(Json(meta)) = meta {
                     let previews: Vec<Option<&[u8]>> = row.try_get(AttachmentColumns::preview())?;
@@ -607,9 +604,7 @@ where
                         //
                         // Perhaps more intelligent indexes could solve that later.
                         if let Some(raw_flags) = meta.flags {
-                            if AttachmentFlags::from_bits_truncate(raw_flags)
-                                .contains(AttachmentFlags::ORPHANED)
-                            {
+                            if AttachmentFlags::from_bits_truncate(raw_flags).contains(AttachmentFlags::ORPHANED) {
                                 continue; // skip
                             }
                         }
