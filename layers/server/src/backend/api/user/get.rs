@@ -11,11 +11,7 @@ pub async fn get_full_member(
     unimplemented!()
 }
 
-pub async fn get_full_user(
-    state: ServerState,
-    auth: Authorization,
-    user_id: Snowflake,
-) -> Result<FullUser, Error> {
+pub async fn get_full_user(state: ServerState, auth: Authorization, user_id: Snowflake) -> Result<User, Error> {
     let db = state.db.read.get().await?;
 
     use q::{columns::*, Parameters, Params};
@@ -32,7 +28,7 @@ pub async fn get_full_user(
 
     let associated = 1 == row.try_get::<_, i32>(AssocColumns::associated())?;
 
-    let user = User {
+    Ok(User {
         id: user_id,
         username: row.try_get(UserColumns::username())?,
         discriminator: row.try_get(UserColumns::discriminator())?,
@@ -53,9 +49,7 @@ pub async fn get_full_user(
 
             match row.try_get(PresenceColumns::updated_at())? {
                 Some(updated_at) if associated => UserPresence {
-                    flags: UserPresenceFlags::from_bits_truncate_public(
-                        row.try_get(PresenceColumns::flags())?,
-                    ),
+                    flags: UserPresenceFlags::from_bits_truncate_public(row.try_get(PresenceColumns::flags())?),
                     last_active,
                     updated_at: Some(updated_at),
                     activity: None,
@@ -89,9 +83,7 @@ pub async fn get_full_user(
                 },
             }),
         },
-    };
-
-    Ok(unimplemented!())
+    })
 }
 
 mod q {
@@ -174,6 +166,7 @@ mod q {
                     .has_no_bits(UserPrefsFlags::HIDE_LAST_ACTIVE.bits().lit()),
             );
 
+        // ProfileColumns, must follow order as listed above
         q = match member {
             false => q.cols(ProfileColumns::default()),
             true => q
@@ -204,24 +197,20 @@ mod q {
                 ))),
         };
 
-        // ProfileColumns, must follow order as listed above
-        q =
-            // AssocColumns
-            q.expr(
-                Query::select()
-                    .from_table::<AggUserAssociations>()
-                    .expr(1.lit())
-                    .and_where(AggUserAssociations::UserId.equals(Params::self_id()))
-                    .and_where(AggUserAssociations::OtherId.equals(Params::user_id()))
-                    .exists(),
-            );
+        // AssocColumns
+        q = q.expr(
+            Query::select()
+                .from_table::<AggUserAssociations>()
+                .expr(1.lit())
+                .and_where(AggUserAssociations::UserId.equals(Params::self_id()))
+                .and_where(AggUserAssociations::OtherId.equals(Params::user_id()))
+                .exists(),
+        );
 
         q = match member {
             false => q.from(
                 Users::left_join_table::<Profiles>()
-                    .on(Profiles::UserId
-                        .equals(Users::Id)
-                        .and(Profiles::PartyId.is_null()))
+                    .on(Profiles::UserId.equals(Users::Id).and(Profiles::PartyId.is_null()))
                     .left_join_table::<AggPresence>()
                     .on(AggPresence::UserId.equals(Users::Id)),
             ),
