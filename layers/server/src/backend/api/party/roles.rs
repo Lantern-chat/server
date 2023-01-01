@@ -71,9 +71,7 @@ pub async fn get_roles_raw<'a, 'b>(
             party_id: row.try_get(RoleColumns::party_id())?,
             name: row.try_get(RoleColumns::name())?,
             permissions: Permission::unpack_i64(row.try_get(RoleColumns::permissions())?),
-            color: row
-                .try_get::<_, Option<i32>>(RoleColumns::color())?
-                .map(|c| c as u32),
+            color: row.try_get::<_, Option<i32>>(RoleColumns::color())?.map(|c| c as u32),
             position: row.try_get(RoleColumns::position())?,
             flags: row.try_get(RoleColumns::flags())?,
             avatar: encrypt_snowflake_opt(&state, row.try_get(RoleColumns::avatar_id())?),

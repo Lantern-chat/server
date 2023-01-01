@@ -369,20 +369,15 @@ mod q {
             // ReactionColumns
             .expr(
                 Query::select()
-                    .expr(
-                        Call::custom("jsonb_agg").arg(
-                            Call::custom("jsonb_build_object")
-                                .arg("emote_id".lit())
-                                .arg(AggReactions::EmoteId)
-                                .arg("emoji_id".lit())
-                                .arg(AggReactions::EmojiId)
-                                .arg("me".lit())
-                                .arg(Params::user_id().equals(Builtin::any(AggReactions::UserIds)))
-                                .arg("count".lit())
-                                .arg(
-                                    Builtin::coalesce((Builtin::array_length((AggReactions::UserIds, 1.lit())), 0.lit()))
-                                ),
-                        ),
+                    .expr(Call::custom("jsonb_agg").arg(
+                        Call::custom("jsonb_build_object").args((
+                            "emote_id".lit(), AggReactions::EmoteId,
+                            "emoji_id".lit(), AggReactions::EmojiId,
+                            "me".lit(), Params::user_id().equals(Builtin::any(AggReactions::UserIds)),
+                            "count".lit(), Builtin::coalesce((
+                                Builtin::array_length((AggReactions::UserIds, 1.lit())), 0.lit()
+                            ))
+                        ))),
                     )
                     .from_table::<AggReactions>()
                     .and_where(AggReactions::MsgId.equals(Messages::Id))
