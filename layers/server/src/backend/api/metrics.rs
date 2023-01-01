@@ -53,7 +53,7 @@ impl Metrics {
     }
 }
 
-use futures::{Stream, StreamExt};
+use futures::{FutureExt, Stream, StreamExt};
 use smol_str::SmolStr;
 use timestamp::{formats::ShortMilliseconds, Timestamp, TimestampStr};
 
@@ -75,11 +75,7 @@ pub async fn get_metrics(
     state: &ServerState,
     options: MetricsOptions,
 ) -> Result<impl Stream<Item = Result<(TimestampStr<ShortMilliseconds>, AggregatedMetrics), Error>>, Error> {
-    let MetricsOptions {
-        resolution,
-        start,
-        end,
-    } = options;
+    let MetricsOptions { resolution, start, end } = options;
 
     let minute_resolution = match resolution {
         Some(res) if res > 5 => res as i64,
@@ -90,25 +86,32 @@ pub async fn get_metrics(
 
     let db = state.db.read.get().await?;
 
-    //#[rustfmt::skip]
-    let stream = match (start, end) {
-        (None, None) => db
-            .query_stream_cached_typed(|| query(false, false), &[&secs])
-            .await?
-            .boxed(),
-        (Some(start), Some(end)) => db
-            .query_stream_cached_typed(|| query(true, true), &[&secs, &start, &end])
-            .await?
-            .boxed(),
-        (Some(start), None) => db
-            .query_stream_cached_typed(|| query(true, false), &[&secs, &start])
-            .await?
-            .boxed(),
-        (None, Some(end)) => db
-            .query_stream_cached_typed(|| query(false, true), &[&secs, &end])
-            .await?
-            .boxed(),
+    let mut parameters = arrayvec::ArrayVec::<&(dyn pg::ToSql + Sync), 3>::new();
+
+    parameters.push(&secs);
+
+    let statement_future = match (start.as_ref(), end.as_ref()) {
+        (None, None) => db.prepare_cached_typed(|| query(false, false)).boxed(),
+        (Some(start), Some(end)) => {
+            parameters.push(start);
+            parameters.push(end);
+
+            db.prepare_cached_typed(|| query(true, true)).boxed()
+        }
+        (Some(start), None) => {
+            parameters.push(start);
+
+            db.prepare_cached_typed(|| query(true, false)).boxed()
+        }
+        (None, Some(end)) => {
+            parameters.push(end);
+
+            db.prepare_cached_typed(|| query(false, true)).boxed()
+        }
     };
+
+    let statement = statement_future.await?;
+    let stream = db.query_stream(&statement, &parameters).await?;
 
     Ok(stream.map(|row| match row {
         Err(e) => Err(e.into()),
