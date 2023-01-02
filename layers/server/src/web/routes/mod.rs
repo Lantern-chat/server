@@ -18,6 +18,11 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
         return StatusCode::METHOD_NOT_ALLOWED.into_response();
     }
 
+    if !route.state.rate_limit.req(&route).await {
+        // TODO: Add headers
+        return StatusCode::TOO_MANY_REQUESTS.into_response();
+    }
+
     route.next();
 
     let paths = &route.state.config.paths;
@@ -68,23 +73,17 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
                 return StatusCode::NOT_FOUND.into_response();
             }
 
-            let mut resp = fs::file(
-                &route,
-                paths.web_path.join("dist/index.html"),
-                &route.state.file_cache,
-            )
-            .boxed()
-            .await
-            .into_response();
+            let mut resp = fs::file(&route, paths.web_path.join("dist/index.html"), &route.state.file_cache)
+                .boxed()
+                .await
+                .into_response();
 
             let headers = resp.headers_mut();
 
             if cfg!(debug_assertions) {
                 headers.insert(
                     "Cache-Control",
-                    HeaderValue::from_static(
-                        "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
-                    ),
+                    HeaderValue::from_static("no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"),
                 );
             }
 

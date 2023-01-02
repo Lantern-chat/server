@@ -69,7 +69,7 @@ impl ServerState {
             services: Services::start().expect("Services failed to start correctly"),
             queues: Queues::default(),
             gateway: Gateway::default(),
-            rate_limit: RateLimitTable::new(),
+            rate_limit: RateLimitTable::default(),
             file_cache: MainFileCache::default(),
             emoji: Default::default(),
             hasher: ahash::RandomState::new(),
@@ -104,9 +104,7 @@ impl ServerState {
             .query_stream_cached_typed(
                 || {
                     use q::*;
-                    Query::select()
-                        .cols(EmojisColumns::default())
-                        .from_table::<Emojis>()
+                    Query::select().cols(EmojisColumns::default()).from_table::<Emojis>()
                 },
                 &[],
             )

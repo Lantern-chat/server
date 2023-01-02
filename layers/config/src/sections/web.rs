@@ -12,6 +12,7 @@ section! {
         pub secure: bool = true                                         => "LANTERN_SECURE"         | util::parse[true],
         /// enable the use of camo proxy for third-party media content
         pub camo: bool = true                                           => "LANTERN_CAMO"           | util::parse[true],
+        pub req_per_sec: f32 = 50.0,
     }
 }
 
@@ -21,10 +22,6 @@ fn parse_address(value: &str) -> SocketAddr {
 
 impl Web {
     pub fn base_url(&self) -> String {
-        format!(
-            "http{}://{}",
-            if self.secure { "s" } else { "" },
-            self.base_domain
-        )
+        format!("http{}://{}", if self.secure { "s" } else { "" }, self.base_domain)
     }
 }
