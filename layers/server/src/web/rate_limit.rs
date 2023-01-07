@@ -30,11 +30,11 @@ impl RateLimitTable {
                 let mut hasher = route.state.hasher.build_hasher();
 
                 // split path on /, get alphabetic segments, hash those
-                route
-                    .path()
-                    .split('/')
-                    .filter(|s| s.starts_with(|c: char| c.is_alphabetic()))
-                    .for_each(|segment| segment.hash(&mut hasher));
+                route.path().split('/').for_each(|segment| {
+                    if segment.starts_with(|c: char| c.is_ascii_alphabetic()) {
+                        segment.hash(&mut hasher);
+                    }
+                });
 
                 hasher.finish()
             },
@@ -44,6 +44,7 @@ impl RateLimitTable {
             .get_mut_or_default(&key)
             .await
             .update(route, route.state.config.web.req_per_sec)
+            .is_ok()
     }
 
     pub async fn cleanup_at(&self, now: Instant) {
