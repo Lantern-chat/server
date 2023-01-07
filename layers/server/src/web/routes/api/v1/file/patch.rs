@@ -1,4 +1,5 @@
 use headers::{ContentLength, HeaderValue};
+use hyper::body::HttpBody;
 
 use super::*;
 use crate::backend::api::file::patch::FilePatchParams;
@@ -16,6 +17,13 @@ pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: 
         Some(ct) => return Err(Error::UnsupportedMediaType(ct)),
     }
 
+    // content-length may lie, or not be available at all, so reject all potential bad requests
+    if route.body().size_hint().upper().unwrap_or(u64::MAX)
+        > (route.state.config.upload.max_upload_chunk_size as u64)
+    {
+        return Err(Error::RequestEntityTooLarge);
+    }
+
     let Some(Ok(Ok(upload_offset))) = route.parse_raw_header("Upload-Offset") else { return Err(Error::BadRequest) };
     let Some(ContentLength(content_length)) = route.header::<headers::ContentLength>() else { return Err(Error::BadRequest) };
 
@@ -23,10 +31,6 @@ pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: 
         Some(checksum_header) => parse_checksum_header(checksum_header)?,
         _ => return Err(Error::BadRequest),
     };
-
-    if content_length > (route.state.config.upload.max_upload_chunk_size as u64) {
-        return Err(Error::RequestEntityTooLarge);
-    }
 
     let params = FilePatchParams {
         crc32: checksum,
@@ -36,8 +40,7 @@ pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: 
 
     let body = route.take_body().unwrap();
 
-    let patch =
-        crate::backend::api::file::patch::patch_file(route.state, auth, file_id, params, body).await?;
+    let patch = crate::backend::api::file::patch::patch_file(route.state, auth, file_id, params, body).await?;
 
     let mut res = Response::default();
     *res.status_mut() = StatusCode::NO_CONTENT;
