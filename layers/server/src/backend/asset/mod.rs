@@ -23,9 +23,10 @@ pub enum AssetMode {
 fn gen_formats(state: &ServerState, mode: AssetMode) -> Vec<(EncodingFormat, u8)> {
     let mut all_formats = Vec::new();
 
+    let config = state.config();
     let formats = match mode {
-        AssetMode::Avatar => &state.config.upload.avatar_formats,
-        AssetMode::Banner => &state.config.upload.banner_formats,
+        AssetMode::Avatar => &config.upload.avatar_formats,
+        AssetMode::Banner => &config.upload.banner_formats,
     };
 
     // NOTE: JPEG must go at bottom/last, as it will premultiply any alpha channel
@@ -49,19 +50,20 @@ pub async fn add_asset(
     let max_pixels;
     let max_size;
 
+    let config = state.config();
     match mode {
         AssetMode::Avatar => {
-            let width = state.config.upload.avatar_width;
+            let width = config.upload.avatar_width;
             max_width = width;
             max_height = width;
-            max_pixels = state.config.upload.max_avatar_pixels;
-            max_size = state.config.upload.max_avatar_size;
+            max_pixels = config.upload.max_avatar_pixels;
+            max_size = config.upload.max_avatar_size;
         }
         AssetMode::Banner => {
-            max_width = state.config.upload.banner_width;
-            max_height = state.config.upload.banner_height;
-            max_pixels = state.config.upload.max_banner_pixels;
-            max_size = state.config.upload.max_banner_size;
+            max_width = config.upload.banner_width;
+            max_height = config.upload.banner_height;
+            max_pixels = config.upload.max_banner_pixels;
+            max_size = config.upload.max_banner_size;
         }
     }
 
@@ -100,20 +102,26 @@ pub async fn add_asset(
 
     let _cpu_permit = state.cpu_semaphore.acquire().await?;
 
-    let mut child = SystemCommand::new(state.config.paths.bin_path.join("process"))
+    let mut child = SystemCommand::new(state.config().paths.bin_path.join("process"))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .kill_on_drop(true)
         .spawn()?;
 
-    let mut input = AsyncFramedWriter::new(child.stdin.take().ok_or(Error::InternalErrorStatic(
-        "Could not acquire child process stream",
-    ))?);
+    let mut input = AsyncFramedWriter::new(
+        child
+            .stdin
+            .take()
+            .ok_or(Error::InternalErrorStatic("Could not acquire child process stream"))?,
+    );
 
-    let mut output = AsyncFramedReader::new(child.stdout.take().ok_or(Error::InternalErrorStatic(
-        "Could not acquire child process stream",
-    ))?);
+    let mut output = AsyncFramedReader::new(
+        child
+            .stdout
+            .take()
+            .ok_or(Error::InternalErrorStatic("Could not acquire child process stream"))?,
+    );
 
     let mut formats = gen_formats(state, mode);
     let mut current = formats.pop();
@@ -139,7 +147,7 @@ pub async fn add_asset(
                     .open_crypt(
                         file_id,
                         OpenMode::Read,
-                        &CipherOptions::new_from_i64_nonce(state.config.keys.file_key, nonce),
+                        &CipherOptions::new_from_i64_nonce(state.config().keys.file_key, nonce),
                     )
                     .await?;
 
@@ -184,7 +192,7 @@ pub async fn add_asset(
                         .open_crypt(
                             id,
                             OpenMode::Write,
-                            &CipherOptions::new_from_i64_nonce(state.config.keys.file_key, nonce),
+                            &CipherOptions::new_from_i64_nonce(state.config().keys.file_key, nonce),
                         )
                         .await?;
 
@@ -346,11 +354,7 @@ pub async fn add_asset(
 
                 Query::insert()
                     .into::<UserAssetFiles>()
-                    .cols(&[
-                        UserAssetFiles::FileId,
-                        UserAssetFiles::AssetId,
-                        UserAssetFiles::Flags,
-                    ])
+                    .cols(&[UserAssetFiles::FileId, UserAssetFiles::AssetId, UserAssetFiles::Flags])
                     .values([
                         Var::of(UserAssetFiles::FileId),
                         Var::of(UserAssetFiles::AssetId),

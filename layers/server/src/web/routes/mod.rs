@@ -25,8 +25,6 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
 
     route.next();
 
-    let paths = &route.state.config.paths;
-
     match route.method_segment() {
         // ANY /api
         (_, Exact("api")) => {
@@ -42,7 +40,7 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
 
         (&Method::GET | &Method::HEAD, Exact("favicon.ico")) => fs::file(
             &route,
-            paths.web_path.join("assets/favicon.ico"),
+            &route.state.config().paths.web_path.join("assets/favicon.ico"),
             &route.state.file_cache,
         )
         .boxed()
@@ -55,12 +53,14 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
             StatusCode::IM_A_TEAPOT.into_response()
         }
 
-        (&Method::GET | &Method::HEAD, Exact("static")) => {
-            fs::dir(&route, paths.web_path.join("dist"), &route.state.file_cache)
-                .boxed()
-                .await
-                .into_response()
-        }
+        (&Method::GET | &Method::HEAD, Exact("static")) => fs::dir(
+            &route,
+            &route.state.config().paths.web_path.join("dist"),
+            &route.state.file_cache,
+        )
+        .boxed()
+        .await
+        .into_response(),
 
         (&Method::GET | &Method::HEAD, segment) => {
             #[rustfmt::skip]
@@ -73,10 +73,14 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
                 return StatusCode::NOT_FOUND.into_response();
             }
 
-            let mut resp = fs::file(&route, paths.web_path.join("dist/index.html"), &route.state.file_cache)
-                .boxed()
-                .await
-                .into_response();
+            let mut resp = fs::file(
+                &route,
+                &route.state.config().paths.web_path.join("dist/index.html"),
+                &route.state.file_cache,
+            )
+            .boxed()
+            .await
+            .into_response();
 
             let headers = resp.headers_mut();
 

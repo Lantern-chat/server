@@ -2,9 +2,7 @@ use sdk::models::Snowflake;
 use smol_str::SmolStr;
 
 use crate::{
-    backend::util::validation::{
-        validate_email, validate_password, validate_username, USERNAME_SANITIZE_REGEX,
-    },
+    backend::util::validation::{validate_email, validate_password, validate_username, USERNAME_SANITIZE_REGEX},
     Authorization, Error, ServerState,
 };
 
@@ -35,13 +33,15 @@ pub async fn modify_account(
 ) -> Result<(), Error> {
     let mut num_fields = 0;
 
+    let config = state.config();
+
     if let Some(ref username) = form.new_username {
-        validate_username(&state.config, username)?;
+        validate_username(&config, username)?;
         num_fields += 1;
     }
 
     if let Some(ref password) = form.new_password {
-        validate_password(&state.config, password)?;
+        validate_password(&config, password)?;
         num_fields += 1;
     }
 

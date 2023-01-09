@@ -9,8 +9,8 @@ use ftl::{
 use filesystem::store::{CipherOptions, FileExt, OpenMode};
 use futures::FutureExt;
 use headers::{
-    AcceptRanges, ContentLength, ContentRange, ContentType, HeaderMap, HeaderMapExt, HeaderValue,
-    IfModifiedSince, LastModified, Range,
+    AcceptRanges, ContentLength, ContentRange, ContentType, HeaderMap, HeaderMapExt, HeaderValue, IfModifiedSince,
+    LastModified, Range,
 };
 use hyper::Body;
 use smol_str::SmolStr;
@@ -38,7 +38,7 @@ pub async fn send_file(
         .open_crypt(
             meta.id,
             OpenMode::Read,
-            &CipherOptions::new_from_i64_nonce(state.config.keys.file_key, meta.nonce),
+            &CipherOptions::new_from_i64_nonce(state.config().keys.file_key, meta.nonce),
         )
         .await?;
 
@@ -152,10 +152,7 @@ pub async fn send_file(
 
     let headers = res.headers_mut();
 
-    headers.insert(
-        "Cache-Control",
-        HeaderValue::from_static("public, max-age=2678400"),
-    );
+    headers.insert("Cache-Control", HeaderValue::from_static("public, max-age=2678400"));
     headers.typed_insert(ContentLength(len));
     headers.typed_insert(AcceptRanges::bytes());
     headers.typed_insert(last_modified);

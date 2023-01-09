@@ -18,12 +18,8 @@ pub struct PartyCreateForm {
     security: SecurityFlags,
 }
 
-pub async fn create_party(
-    state: ServerState,
-    auth: Authorization,
-    form: PartyCreateForm,
-) -> Result<Party, Error> {
-    if !state.config.party.partyname_len.contains(&form.name.len()) {
+pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCreateForm) -> Result<Party, Error> {
+    if !state.config().party.partyname_len.contains(&form.name.len()) {
         return Err(Error::InvalidName);
     }
 
@@ -149,11 +145,7 @@ fn insert_member() -> impl AnyQuery {
     Query::insert()
         .into::<PartyMember>()
         .cols(&[PartyMember::PartyId, PartyMember::UserId, PartyMember::Position])
-        .values([
-            Var::of(Party::Id),
-            Var::of(Users::Id),
-            Var::of(PartyMember::Position),
-        ])
+        .values([Var::of(Party::Id), Var::of(Users::Id), Var::of(PartyMember::Position)])
 }
 
 // NOTE: Does not set sort order manually, defaults to 0
@@ -176,13 +168,7 @@ fn insert_room() -> impl AnyQuery {
 
     Query::insert()
         .into::<Rooms>()
-        .cols(&[
-            Rooms::Id,
-            Rooms::PartyId,
-            Rooms::Name,
-            Rooms::Position,
-            Rooms::Flags,
-        ])
+        .cols(&[Rooms::Id, Rooms::PartyId, Rooms::Name, Rooms::Position, Rooms::Flags])
         .values([
             Var::of(Rooms::Id),
             Var::of(Party::Id),

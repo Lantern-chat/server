@@ -26,13 +26,7 @@ pub async fn head(state: ServerState, auth: Authorization, file_id: Snowflake) -
 
                     Query::select()
                         .from_table::<Files>()
-                        .cols(&[
-                            Files::Size,
-                            Files::Flags,
-                            Files::Name,
-                            Files::Mime,
-                            Files::Preview,
-                        ])
+                        .cols(&[Files::Size, Files::Flags, Files::Name, Files::Mime, Files::Preview])
                         .and_where(Files::Id.equals(Var::of(Files::Id)))
                         .and_where(Files::UserId.equals(Var::of(Files::UserId)))
                         .limit_n(1)

@@ -19,7 +19,7 @@ pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: 
 
     // content-length may lie, or not be available at all, so reject all potential bad requests
     if route.body().size_hint().upper().unwrap_or(u64::MAX)
-        > (route.state.config.upload.max_upload_chunk_size as u64)
+        > (route.state.config().upload.max_upload_chunk_size as u64)
     {
         return Err(Error::RequestEntityTooLarge);
     }

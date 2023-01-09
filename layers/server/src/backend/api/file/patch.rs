@@ -74,7 +74,7 @@ pub async fn patch_file(
         .open_crypt(
             file_id,
             OpenMode::Write,
-            &CipherOptions::new_from_i64_nonce(state.config.keys.file_key, nonce),
+            &CipherOptions::new_from_i64_nonce(state.config().keys.file_key, nonce),
         )
         .await?;
 

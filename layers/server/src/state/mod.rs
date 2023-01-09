@@ -6,11 +6,12 @@ use std::{
     },
 };
 
+use arc_swap::ArcSwap;
 use config::Config;
 use filesystem::store::FileStore;
 use futures::StreamExt;
 use schema::Snowflake;
-use tokio::sync::{Mutex, OwnedMutexGuard, Semaphore};
+use tokio::sync::{watch, Mutex, OwnedMutexGuard, Semaphore};
 use util::cmap::CHashMap;
 
 use crate::{
@@ -28,7 +29,11 @@ pub mod id_lock;
 
 pub struct InnerServerState {
     pub db: db::DatabasePools,
-    pub config: Config,
+
+    pub config: ArcSwap<Config>,
+    /// Only use the watcher for triggering reloads, don't access its value directly, as it
+    /// has a RwLock internally. Use [`ServerState::config()`] instead.
+    pub config_watcher: watch::Receiver<Arc<Config>>,
     pub id_lock: id_lock::IdLockMap,
     /// Each permit represents 1 Kibibyte
     pub mem_semaphore: Semaphore,
@@ -57,7 +62,9 @@ impl Deref for ServerState {
 }
 
 impl ServerState {
-    pub fn new(config: Config, db: db::DatabasePools) -> Self {
+    pub fn new(config_recv: watch::Receiver<Arc<Config>>, db: db::DatabasePools) -> Self {
+        let config = config_recv.borrow().clone();
+
         ServerState(Arc::new(InnerServerState {
             db,
             id_lock: Default::default(),
@@ -73,13 +80,19 @@ impl ServerState {
             file_cache: MainFileCache::default(),
             emoji: Default::default(),
             hasher: ahash::RandomState::new(),
-            config,
+            config: ArcSwap::from(config),
+            config_watcher: config_recv,
         }))
+    }
+
+    #[inline]
+    pub fn config(&self) -> arc_swap::Guard<Arc<Config>, arc_swap::DefaultStrategy> {
+        self.config.load()
     }
 
     pub fn fs(&self) -> FileStore {
         FileStore {
-            root: &self.config.paths.data_path,
+            root: self.config().paths.data_path.clone(),
         }
     }
 }

@@ -16,15 +16,17 @@ pub async fn register_user(
     //    return Err(Error::TemporarilyDisabled);
     //}
 
-    validate_username(&state.config, &form.username)?;
-    validate_password(&state.config, &form.password)?;
+    let config = state.config();
+
+    validate_username(&config, &form.username)?;
+    validate_password(&config, &form.password)?;
     validate_email(&form.email)?;
 
     let dob = form.dob.try_into()?;
 
     let now = SystemTime::now();
 
-    if !util::time::is_of_age(state.config.account.min_age as i32, now, dob) {
+    if !util::time::is_of_age(config.account.min_age as i32, now, dob) {
         return Err(Error::InsufficientAge);
     }
 
@@ -32,8 +34,8 @@ pub async fn register_user(
         .services
         .hcaptcha
         .verify(HCaptchaParameters {
-            secret: &state.config.services.hcaptcha_secret,
-            sitekey: Some(&state.config.services.hcaptcha_sitekey),
+            secret: &config.services.hcaptcha_secret,
+            sitekey: Some(&config.services.hcaptcha_sitekey),
             response: &form.token,
             ..HCaptchaParameters::default()
         })

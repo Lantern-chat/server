@@ -1,6 +1,6 @@
 use std::fs::Metadata;
 use std::io;
-use std::path::Path;
+use std::path::PathBuf;
 
 use aes::cipher::{Iv, Key, KeyIvInit};
 use aes::Aes256;
@@ -71,22 +71,22 @@ impl<F: FileExt + Sync> FileExt for EncryptedFile<F> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct FileStore<'a> {
-    pub root: &'a Path,
+pub struct FileStore {
+    pub root: PathBuf,
 }
 
-impl FileStore<'_> {
-    pub async fn delete(&self, id: Snowflake) -> io::Result<()> {
-        let mut path = self.root.to_path_buf();
+impl FileStore {
+    pub async fn delete(self, id: Snowflake) -> io::Result<()> {
+        let mut path = self.root;
         id_to_path(id, &mut path);
         id_to_name(id, &mut path);
         fs::remove_file(path).await
     }
 
     pub async fn open_crypt(
-        &self,
+        self,
         id: Snowflake,
         mode: OpenMode,
         options: &CipherOptions,
@@ -97,8 +97,8 @@ impl FileStore<'_> {
         Ok(EncryptedFile::new(file, cipher))
     }
 
-    pub async fn open(&self, id: Snowflake, mode: OpenMode) -> io::Result<TkFile> {
-        let mut path = self.root.to_path_buf();
+    pub async fn open(self, id: Snowflake, mode: OpenMode) -> io::Result<TkFile> {
+        let mut path = self.root;
         id_to_path(id, &mut path);
 
         if mode == OpenMode::Write {
@@ -121,8 +121,8 @@ impl FileStore<'_> {
         options.open(path).await
     }
 
-    pub async fn metadata(&self, id: Snowflake) -> io::Result<Metadata> {
-        let mut path = self.root.to_path_buf();
+    pub async fn metadata(self, id: Snowflake) -> io::Result<Metadata> {
+        let mut path = self.root;
         id_to_path(id, &mut path);
         id_to_name(id, &mut path);
 
@@ -138,9 +138,9 @@ impl<T> ReadSeekStream for T where T: io::Read + io::Seek {}
 pub trait WriteSeekStream: io::Write + io::Seek {}
 impl<T> WriteSeekStream for T where T: io::Write + io::Seek {}
 
-impl FileStore<'_> {
+impl FileStore {
     pub fn open_crypt_write_sync(
-        &self,
+        self,
         id: Snowflake,
         options: &CipherOptions,
     ) -> io::Result<EncryptedFile<std::fs::File>> {
@@ -151,7 +151,7 @@ impl FileStore<'_> {
     }
 
     pub fn open_crypt_read_sync(
-        &self,
+        self,
         id: Snowflake,
         options: &CipherOptions,
     ) -> io::Result<EncryptedFile<std::fs::File>> {
@@ -161,8 +161,8 @@ impl FileStore<'_> {
         Ok(EncryptedFile::new(file, cipher))
     }
 
-    pub fn open_sync(&self, id: Snowflake, mode: OpenMode) -> io::Result<std::fs::File> {
-        let mut path = self.root.to_path_buf();
+    pub fn open_sync(self, id: Snowflake, mode: OpenMode) -> io::Result<std::fs::File> {
+        let mut path = self.root;
         id_to_path(id, &mut path);
 
         if mode == OpenMode::Write {

@@ -43,7 +43,7 @@ impl RateLimitTable {
         self.table
             .get_mut_or_default(&key)
             .await
-            .update(route, route.state.config.web.req_per_sec)
+            .update(route, route.state.config().web.req_per_sec)
             .is_ok()
     }
 

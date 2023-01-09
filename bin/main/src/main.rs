@@ -1,5 +1,6 @@
 extern crate tracing as log;
 use db::{pg::NoTls, DatabasePools};
+use std::sync::Arc;
 use tracing_subscriber::{
     filter::{EnvFilter, LevelFilter},
     FmtSubscriber,
@@ -75,17 +76,14 @@ async fn main() -> anyhow::Result<()> {
     log::info!("Applying environment overrides to configuration");
     config.apply_overrides();
 
-    if args.write_config {
-        // if write-config requested, do this before saving
-        config.configure();
+    config.configure();
 
+    if args.write_config {
         log::info!("Saving config to: {}", args.config_path.display());
         config.save(&args.config_path).await?;
 
         return Ok(());
     }
-
-    config.configure();
 
     let db = {
         use db::pool::{Pool, PoolConfig};
@@ -102,7 +100,9 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    let state = server::ServerState::new(config, db);
+    let (config_sender, config_recv) = tokio::sync::watch::channel(Arc::new(config));
+
+    let state = server::ServerState::new(config_recv, db);
 
     log::info!("Running startup tasks...");
     server::tasks::startup::run_startup_tasks(&state).await;

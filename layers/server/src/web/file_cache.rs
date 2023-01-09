@@ -58,11 +58,7 @@ impl EncodedFile for CachedFile {
 
 impl AsyncRead for CachedFile {
     #[inline]
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        _cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
+    fn poll_read(mut self: Pin<&mut Self>, _cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
         let pos = self.pos as usize;
         let end = (pos + buf.remaining()).min(self.buf.len());
 
@@ -177,9 +173,7 @@ impl FileCache<ServerState> for MainFileCache {
                         let preferred = encodings.next();
                         encodings.find(|e| *e == file.best).or(preferred)
                     }) {
-                        None | Some(ContentCoding::COMPRESS | ContentCoding::IDENTITY) => {
-                            ContentCoding::IDENTITY
-                        }
+                        None | Some(ContentCoding::COMPRESS | ContentCoding::IDENTITY) => ContentCoding::IDENTITY,
                         Some(encoding) => encoding,
                     };
 
@@ -385,6 +379,8 @@ impl MainFileCache {
     pub fn do_process(&self, state: &ServerState, mut file: Vec<u8>) -> Vec<u8> {
         let mut new_file = Vec::new();
 
+        let c = state.config();
+
         let mut last_index = 0;
         for m in VARIABLE_PATTERNS.find_iter(&file) {
             new_file.extend_from_slice(&file[last_index..m.start()]);
@@ -393,7 +389,6 @@ impl MainFileCache {
 
             match m.pattern() {
                 0 => {
-                    let c = &state.config;
                     serde_json::to_writer(
                         &mut new_file,
                         &sdk::models::ServerConfig {
@@ -416,8 +411,8 @@ impl MainFileCache {
                     )
                     .unwrap();
                 }
-                1 => new_file.extend_from_slice(state.config.web.base_url().as_bytes()),
-                2 => new_file.extend_from_slice(state.config.general.server_name.as_bytes()),
+                1 => new_file.extend_from_slice(c.web.base_url().as_bytes()),
+                2 => new_file.extend_from_slice(c.general.server_name.as_bytes()),
                 _ => log::error!("Unreachable replacement"),
             }
         }

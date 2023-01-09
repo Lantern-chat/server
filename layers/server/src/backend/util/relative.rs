@@ -26,7 +26,7 @@ pub fn approximate_relative_time(
     // -1..1
     let factor = hash.mul_add(2.0, -1.0);
     // scale by relative_time_random_factor
-    let random = state.config.user.relative_time_random_factor as f64 * factor;
+    let random = state.config().user.relative_time_random_factor as f64 * factor;
     // offset elapsed by a random amount proportional to elapsed itself
     let randomized_elapsed = (elapsed as f64).mul_add(random, elapsed as f64);
     // convert back to u64

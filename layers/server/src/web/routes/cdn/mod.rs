@@ -17,7 +17,7 @@ pub async fn cdn(route: Route<ServerState>) -> Response {
 }
 
 async fn real_cdn(mut route: Route<ServerState>) -> WebResult {
-    let config = &route.state.config;
+    let config = route.state.config();
     if config.web.strict_cdn {
         match route.host() {
             Some(host) if host.as_str() == config.web.cdn_domain => {}
