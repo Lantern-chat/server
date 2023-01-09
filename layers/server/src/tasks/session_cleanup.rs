@@ -6,7 +6,7 @@ pub fn add_cleanup_sessions_task(state: &ServerState, runner: &TaskRunner) {
     runner.add(RetryTask::new(IntervalFnTask::new(
         state.clone(),
         Duration::from_secs(60 * 5),
-        |state, _, _| async move {
+        |state, _| async move {
             log::trace!("Cleaning up old user sessions");
 
             let now = SystemTime::now();

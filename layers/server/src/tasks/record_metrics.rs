@@ -6,7 +6,7 @@ pub fn add_record_metrics_task(state: &ServerState, runner: &TaskRunner) {
     runner.add(RetryTask::new(IntervalFnTask::new(
         state.clone(),
         Duration::from_secs(60 * 5),
-        |state, _, _| async move {
+        |state, _| async move {
             log::trace!("Collecting metrics");
 
             let task = async {

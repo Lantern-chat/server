@@ -11,7 +11,7 @@ use std::sync::Arc;
 use tokio::task::JoinError;
 use tokio::{sync::watch, task::JoinHandle};
 
-use futures::stream::{FuturesUnordered, Stream, StreamExt, TryStreamExt};
+use futures::stream::{self, FuturesUnordered, Stream, StreamExt, TryStreamExt};
 
 pub trait Task {
     fn start(self, alive: watch::Receiver<bool>) -> JoinHandle<()>;
@@ -105,40 +105,91 @@ where
     }
 }
 
-use tokio::time::{Duration, Instant};
+use tokio::time::Duration;
+
+pub trait IntervalStream: Send + 'static {
+    type Stream: Stream<Item = Duration> + Send;
+
+    fn interval(self) -> Self::Stream;
+}
+
+// yields once and then forever pending
+impl IntervalStream for Duration {
+    type Stream = stream::Chain<stream::Once<futures::future::Ready<Duration>>, stream::Pending<Duration>>;
+
+    fn interval(self) -> Self::Stream {
+        stream::once(futures::future::ready(self)).chain(stream::pending())
+    }
+}
+
+impl<F, R> IntervalStream for F
+where
+    F: FnOnce() -> R + Send + 'static,
+    R: Stream<Item = Duration> + Send + 'static,
+{
+    type Stream = R;
+
+    fn interval(self) -> Self::Stream {
+        (self)()
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct IntervalFnTask<T, S>(pub S, pub Duration, pub T);
+pub struct IntervalFnTask<T, S, I>(pub S, pub I, pub T);
 
-impl<T, F, S> IntervalFnTask<T, S>
+impl<T, F, S, I> IntervalFnTask<T, S, I>
 where
-    T: Fn(S, Instant, &watch::Receiver<bool>) -> F + Send + Sync + 'static,
+    T: Fn(S, &watch::Receiver<bool>) -> F + Send + Sync + 'static,
     F: Future<Output = ()> + Send + 'static,
     S: Clone + Send + Sync + 'static,
+    I: IntervalStream,
 {
-    pub const fn new(state: S, interval: Duration, f: T) -> Self {
+    pub const fn new(state: S, interval: I, f: T) -> Self {
         IntervalFnTask(state, interval, f)
     }
 }
 
-impl<T, F, S> Task for IntervalFnTask<T, S>
+impl<T, F, S, I> Task for IntervalFnTask<T, S, I>
 where
-    T: Fn(S, Instant, &watch::Receiver<bool>) -> F + Send + Sync + 'static,
+    T: Fn(S, &watch::Receiver<bool>) -> F + Send + Sync + 'static,
     F: Future<Output = ()> + Send + 'static,
     S: Clone + Send + Sync + 'static,
+    I: IntervalStream,
 {
     fn start(self, alive: watch::Receiver<bool>) -> JoinHandle<()> {
         AsyncFnTask(move |mut alive: watch::Receiver<bool>| async move {
-            let IntervalFnTask(state, interval, f) = self;
+            let IntervalFnTask(state, i, f) = self;
 
-            let mut interval = tokio::time::interval(interval);
+            let interval = i.interval();
+            futures::pin_mut!(interval);
+
+            let mut current_interval = interval.next().await.unwrap_or_default();
+
+            let sleep = tokio::time::sleep(current_interval);
+            futures::pin_mut!(sleep);
+
+            let mut next_interval = interval.next();
 
             while *alive.borrow_and_update() {
+                let deadline = sleep.deadline();
+
                 tokio::select! {
                     biased;
-                    t = interval.tick() => f(state.clone(), t, &alive).await,
+                    _ = &mut sleep => f(state.clone(), &alive).await,
                     _ = alive.changed() => break,
+                    i = &mut next_interval => match i {
+                        Some(new_interval) => {
+                            // rewind, then add new duration
+                            sleep.as_mut().reset(deadline - current_interval + new_interval);
+                            current_interval = new_interval;
+                            next_interval = interval.next(); // start waiting for next value
+                            continue;
+                        }
+                        None => {}
+                    }
                 }
+
+                sleep.as_mut().reset(deadline + current_interval);
             }
         })
         .start(alive)
@@ -201,8 +252,7 @@ where
     }
 }
 
-impl<T, F, E, S, POLICY: FailurePolicy, INSTRUMENT: Instrument> Task
-    for RetryAsyncFnTask<T, S, POLICY, INSTRUMENT>
+impl<T, F, E, S, POLICY: FailurePolicy, INSTRUMENT: Instrument> Task for RetryAsyncFnTask<T, S, POLICY, INSTRUMENT>
 where
     T: Fn(watch::Receiver<bool>, S) -> F + Send + 'static,
     for<'a> &'a T: Send,

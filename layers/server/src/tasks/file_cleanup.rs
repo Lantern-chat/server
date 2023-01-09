@@ -1,27 +1,35 @@
 use std::sync::atomic::Ordering;
 
 use schema::{Snowflake, SnowflakeExt};
+use tokio_stream::StreamExt;
 
 use crate::Error;
 
 use super::*;
 
 pub fn add_orphaned_file_cleanup_task(state: &ServerState, runner: &TaskRunner) {
-    if state.config.upload.cleanup_interval.is_zero() {
-        return;
-    }
+    let config = state.config_watcher.clone();
 
     runner.add(RetryTask::new(IntervalFnTask::new(
         state.clone(),
-        state.config.upload.cleanup_interval,
-        |state, _, _| async move {
+        move || {
+            WatchStream::new(config).map(|config| {
+                let mut cleanup_interval = config.upload.cleanup_interval;
+                if cleanup_interval.is_zero() {
+                    // 100 years
+                    cleanup_interval = Duration::from_secs(60 * 60 * 24 * 365 * 100);
+                }
+                cleanup_interval
+            })
+        },
+        move |state, _| async move {
             log::trace!("Cleaning up orphaned files");
 
             let task = async {
                 // find orphaned files older than the last cleanup time
 
                 let last_run = Snowflake::now()
-                    .add(-time::Duration::try_from(state.config.upload.cleanup_interval).unwrap())
+                    .add(-time::Duration::try_from(state.config().upload.cleanup_interval).unwrap())
                     .unwrap();
 
                 let db = state.db.read.get().await?;
@@ -52,7 +60,7 @@ pub fn add_orphaned_file_cleanup_task(state: &ServerState, runner: &TaskRunner) 
                 let deleting = async {
                     for row in orphaned {
                         let id = row.try_get(0)?;
-                        match fs.delete(id).await {
+                        match fs.clone().delete(id).await {
                             Ok(_) => {}
                             Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {
                                 // allow already-deleted files to be cleaned

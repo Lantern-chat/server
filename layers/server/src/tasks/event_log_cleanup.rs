@@ -9,7 +9,7 @@ pub fn add_event_log_cleanup_task(state: &ServerState, runner: &TaskRunner) {
     runner.add(RetryTask::new(IntervalFnTask::new(
         state.clone(),
         Duration::from_secs(60),
-        |state, _, _| async move {
+        |state, _| async move {
             log::trace!("Cleaning up event_log");
 
             let task = async {

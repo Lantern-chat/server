@@ -10,7 +10,7 @@ pub fn add_file_cache_cleanup_task(state: &ServerState, runner: &TaskRunner) {
     runner.add(RetryTask::new(IntervalFnTask::new(
         state.clone(),
         CLEANUP_INTERVAL,
-        |state, _, _| async move {
+        |state, _| async move {
             log::trace!("Cleaning up file cache");
             state.file_cache.cleanup().await;
         },
