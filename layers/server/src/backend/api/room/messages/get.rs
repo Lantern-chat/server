@@ -11,7 +11,7 @@ use thorn::pg::{Json, ToSql};
 
 use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Authorization, Error, ServerState};
 
-use sdk::api::commands::room::{GetMessagesQuery, MessageSearch};
+use sdk::api::commands::room::GetMessagesQuery;
 
 pub async fn get_one(
     state: ServerState,
@@ -19,12 +19,12 @@ pub async fn get_one(
     room_id: Snowflake,
     msg_id: Snowflake,
 ) -> Result<Message, Error> {
-    let stream = super::get::get_many(
+    let stream = get_many(
         state,
         auth,
         room_id,
         GetMessagesQuery {
-            query: Some(MessageSearch::Exact(msg_id)),
+            query: Some(Cursor::Exact(msg_id)),
             limit: Some(1),
             thread: None,
         },
@@ -59,9 +59,7 @@ pub async fn get_many(
     let db = state.db.read.get().await?;
 
     let msg_id = match form.query {
-        Some(MessageSearch::After(id)) => id,
-        Some(MessageSearch::Before(id)) => id,
-        Some(MessageSearch::Exact(id)) => id,
+        Some(Cursor::After(id) | Cursor::Before(id) | Cursor::Exact(id)) => id,
         None => Snowflake::max_value(),
     };
 
@@ -72,12 +70,12 @@ pub async fn get_many(
 
     #[rustfmt::skip]
     let query = match (had_perms, form.query) {
-        (true,  None | Some(MessageSearch::Before(_))) => db.prepare_cached_typed(p::wuser_before_no_perm).boxed(),
-        (true,         Some(MessageSearch::After(_)))  => db.prepare_cached_typed(p::wuser_after_no_perm).boxed(),
-        (true,         Some(MessageSearch::Exact(_)))  => db.prepare_cached_typed(p::wuser_exact_no_perm).boxed(),
-        (false, None | Some(MessageSearch::Before(_))) => db.prepare_cached_typed(p::wuser_before_perm).boxed(),
-        (false,        Some(MessageSearch::After(_)))  => db.prepare_cached_typed(p::wuser_after_perm).boxed(),
-        (false,        Some(MessageSearch::Exact(_)))  => db.prepare_cached_typed(p::wuser_exact_perm).boxed(),
+        (true,  None | Some(Cursor::Before(_))) => db.prepare_cached_typed(p::wuser_before_no_perm).boxed(),
+        (true,         Some(Cursor::After(_)))  => db.prepare_cached_typed(p::wuser_after_no_perm).boxed(),
+        (true,         Some(Cursor::Exact(_)))  => db.prepare_cached_typed(p::wuser_exact_no_perm).boxed(),
+        (false, None | Some(Cursor::Before(_))) => db.prepare_cached_typed(p::wuser_before_perm).boxed(),
+        (false,        Some(Cursor::After(_)))  => db.prepare_cached_typed(p::wuser_after_perm).boxed(),
+        (false,        Some(Cursor::Exact(_)))  => db.prepare_cached_typed(p::wuser_exact_perm).boxed(),
     };
 
     let query = query.await?;
@@ -147,7 +145,7 @@ mod p {
     use super::*;
     use thorn::AnyQuery;
 
-    use MessageSearch::*;
+    use Cursor::*;
     const NULL: Snowflake = Snowflake::null();
 
     pub fn exact_no_perm_no_room() -> impl AnyQuery { q::query(Exact(NULL), false, false, false) }
@@ -162,7 +160,7 @@ mod p {
 }
 
 mod q {
-    use super::{MessageFlags, MessageSearch, Permission};
+    use super::{Cursor, MessageFlags, Permission};
     use db::Row;
     use sdk::models::UserRelationship;
 
@@ -270,7 +268,7 @@ mod q {
     }
 
     pub fn query(
-        mode: MessageSearch,
+        mode: Cursor,
         check_perms: bool,
         with_room: bool, // messages selected from a known room
         with_user: bool, // messages selected by a known user
@@ -310,19 +308,19 @@ mod q {
         } else {
             // if there is no room to select from, double-check that we're picking out
             // a single message
-            debug_assert!(matches!(mode, MessageSearch::Exact(_)));
+            debug_assert!(matches!(mode, Cursor::Exact(_)));
         }
 
         selected = match mode {
-            MessageSearch::After(_) => selected
+            Cursor::After(_) => selected
                 .and_where(Messages::Id.greater_than(Params::msg_id()))
                 .order_by(Messages::Id.ascending()),
 
-            MessageSearch::Before(_) => selected
+            Cursor::Before(_) => selected
                 .and_where(Messages::Id.less_than(Params::msg_id()))
                 .order_by(Messages::Id.descending()),
 
-            MessageSearch::Exact(_) => selected.and_where(Messages::Id.equals(Params::msg_id())),
+            Cursor::Exact(_) => selected.and_where(Messages::Id.equals(Params::msg_id())),
         };
 
         let party = match with_room {

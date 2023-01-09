@@ -1,15 +1,11 @@
 use std::borrow::Cow;
-use std::io;
-use std::io::SeekFrom;
+use std::io::{self, SeekFrom};
 use std::path::{Path, PathBuf};
-use std::pin::Pin;
-use std::sync::Arc;
 use std::task::{Context, Poll};
-use std::time::Duration;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
+use std::{pin::Pin, sync::Arc};
 
-use tokio::io::AsyncSeek;
-use tokio::io::{AsyncRead, ReadBuf};
+use tokio::io::{AsyncRead, AsyncSeek, ReadBuf};
 use util::cmap::CHashMap;
 
 use ftl::fs::{EncodedFile, FileCache, FileMetadata, GenericFile};
