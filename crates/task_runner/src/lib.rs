@@ -105,7 +105,7 @@ where
     }
 }
 
-use tokio::time::Duration;
+use tokio::time::{Duration, Instant};
 
 pub trait IntervalStream: Send + 'static {
     type Stream: Stream<Item = Duration> + Send;
@@ -149,6 +149,14 @@ where
     }
 }
 
+fn clean_interval(mut interval: Duration) -> Duration {
+    if interval.is_zero() {
+        // 100 years
+        interval = Duration::from_secs(60 * 60 * 24 * 365 * 100);
+    }
+    interval
+}
+
 impl<T, F, S, I> Task for IntervalFnTask<T, S, I>
 where
     T: Fn(S, &watch::Receiver<bool>) -> F + Send + Sync + 'static,
@@ -165,31 +173,53 @@ where
 
             let mut current_interval = interval.next().await.unwrap_or_default();
 
-            let sleep = tokio::time::sleep(current_interval);
+            let sleep = tokio::time::sleep(clean_interval(current_interval));
             futures::pin_mut!(sleep);
 
-            let mut next_interval = interval.next();
-
             while *alive.borrow_and_update() {
-                let deadline = sleep.deadline();
+                let mut deadline = sleep.deadline();
 
                 tokio::select! {
                     biased;
-                    _ = &mut sleep => f(state.clone(), &alive).await,
+                    _ = &mut sleep => {
+                        // never run if zero, even after 100 years
+                        if !current_interval.is_zero() {
+                            f(state.clone(), &alive).await
+                        }
+                    },
                     _ = alive.changed() => break,
-                    i = &mut next_interval => match i {
+
+                    // if the interval value changes, we are almost certainly *before* the deadline
+                    i = interval.next() => match i {
+                        // TODO: Revisit this logic to double-check
                         Some(new_interval) => {
-                            // rewind, then add new duration
-                            sleep.as_mut().reset(deadline - current_interval + new_interval);
+                            let previous_deadline = deadline - clean_interval(current_interval);
+
+                            // new_interval is explicitely not cleaned
+                            let next_deadline = previous_deadline + new_interval;
+
+                            // if the time between runs is being reduced and the task is expected
+                            // to run sooner (next_deadline < deadline), compute how much time is left
+                            // before it needs to be run (diff)
+                            deadline = match deadline.checked_duration_since(next_deadline) {
+                                None => previous_deadline,
+                                Some(diff) => {
+                                    // set the now-previous deadline to a value such that the task will run at
+                                    // most once (now) with the shorter interval, or after
+                                    // new_interval from the previous deadline
+                                    Instant::now() - diff.min(new_interval)
+                                }
+                            };
+
                             current_interval = new_interval;
-                            next_interval = interval.next(); // start waiting for next value
-                            continue;
+
                         }
                         None => {}
                     }
                 }
 
-                sleep.as_mut().reset(deadline + current_interval);
+                // reset to next deadline
+                sleep.as_mut().reset(deadline + clean_interval(current_interval));
             }
         })
         .start(alive)

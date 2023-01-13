@@ -12,16 +12,7 @@ pub fn add_orphaned_file_cleanup_task(state: &ServerState, runner: &TaskRunner) 
 
     runner.add(RetryTask::new(IntervalFnTask::new(
         state.clone(),
-        move || {
-            WatchStream::new(config).map(|config| {
-                let mut cleanup_interval = config.upload.cleanup_interval;
-                if cleanup_interval.is_zero() {
-                    // 100 years
-                    cleanup_interval = Duration::from_secs(60 * 60 * 24 * 365 * 100);
-                }
-                cleanup_interval
-            })
-        },
+        move || WatchStream::new(config).map(|config| config.upload.cleanup_interval),
         move |state, _| async move {
             log::trace!("Cleaning up orphaned files");
 
