@@ -249,10 +249,13 @@ impl Pool {
     }
 
     pub fn replace_config(&self, config: PoolConfig) {
-        // avoid creating new connections while storing new config
-        let mut queue = self.queue.lock();
-        self.config.store(Arc::new(config));
-        queue.clear();
+        if **self.config.load() != config {
+            // avoid creating new connections while storing new config
+            let mut queue = self.queue.lock();
+            self.config.store(Arc::new(config));
+            // TODO: Figure out how semaphore should be updated
+            queue.clear();
+        }
     }
 
     async fn create(&self) -> Result<Client, Error> {

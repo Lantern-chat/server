@@ -1,4 +1,5 @@
 extern crate tracing as log;
+use cli::CliOptions;
 use db::{pg::NoTls, DatabasePools};
 use std::sync::Arc;
 use tracing_subscriber::{
@@ -9,13 +10,44 @@ use tracing_subscriber::{
 pub mod allocator;
 pub mod cli;
 
+use server::config::{Config, ConfigError};
 use task_runner::TaskRunner;
+
+async fn load_config(args: &CliOptions) -> anyhow::Result<Config> {
+    log::info!("Loading config from: {}", args.config_path.display());
+    let mut config = match Config::load(&args.config_path).await {
+        Ok(config) => config,
+        Err(ConfigError::IOError(e)) if e.kind() == std::io::ErrorKind::NotFound => {
+            if args.write_config {
+                log::warn!("Config file not found, but `--write-config` given, therefore assuming defaults");
+
+                Config::default()
+            } else {
+                let err = concat!(
+                    "Config file not found, re-run with `--write-config` to generate default configuration\n\t",
+                    "Or specify a config file path with `--config ./somewhere/config.toml`"
+                );
+
+                log::error!("{}", err);
+                return Err(anyhow::format_err!("{}", err));
+            }
+        }
+        Err(e) => return Err(e.into()),
+    };
+
+    log::info!("Applying environment overrides to configuration");
+    config.apply_overrides();
+
+    config.configure();
+
+    Ok(config)
+}
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
 
-    let args = cli::CliOptions::parse()?;
+    let args = CliOptions::parse()?;
 
     let mut extreme_trace = false;
 
@@ -52,31 +84,7 @@ async fn main() -> anyhow::Result<()> {
 
     log::debug!("Arguments: {:?}", args);
 
-    use server::config::{Config, ConfigError};
-
-    log::info!("Loading config from: {}", args.config_path.display());
-    let mut config = match Config::load(&args.config_path).await {
-        Ok(config) => config,
-        Err(ConfigError::IOError(e)) if e.kind() == std::io::ErrorKind::NotFound => {
-            if args.write_config {
-                log::warn!("Config file not found, but `--write-config` given, therefore assuming defaults");
-
-                Config::default()
-            } else {
-                log::error!(concat!(
-                    "Config file not found, re-run with `--write-config` to generate default configuration\n\t",
-                    "Or specify a config file path with `--config ./somewhere/config.toml`"
-                ));
-                return Ok(());
-            }
-        }
-        Err(e) => return Err(e.into()),
-    };
-
-    log::info!("Applying environment overrides to configuration");
-    config.apply_overrides();
-
-    config.configure();
+    let config = load_config(&args).await?;
 
     if args.write_config {
         log::info!("Saving config to: {}", args.config_path.display());
@@ -92,7 +100,7 @@ async fn main() -> anyhow::Result<()> {
 
         let write_pool = Pool::new(pool_config.clone(), NoTls);
 
-        db::migrate::migrate(write_pool.clone(), &config.db.migrations).await?;
+        //db::migrate::migrate(write_pool.clone(), &config.db.migrations).await?;
 
         DatabasePools {
             write: write_pool,
@@ -100,9 +108,7 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    let (config_sender, config_recv) = tokio::sync::watch::channel(Arc::new(config));
-
-    let state = server::ServerState::new(config_recv, db);
+    let state = server::ServerState::new(config, db);
 
     log::info!("Running startup tasks...");
     server::tasks::startup::run_startup_tasks(&state).await;
@@ -117,6 +123,55 @@ async fn main() -> anyhow::Result<()> {
         let _ = tokio::signal::ctrl_c().await;
         shutdown.stop();
     });
+
+    let s1 = state.clone();
+    tokio::spawn(async move {
+        log::debug!("Waiting for config reload signal");
+
+        loop {
+            s1.config_reload.notified().await;
+
+            log::info!("Reloading config");
+
+            match load_config(&args).await {
+                Err(e) => log::error!("Error loading config: {e}"),
+                Ok(config) => {
+                    use db::pool::PoolConfig;
+
+                    let db_config = match config.db.db_str.parse::<PoolConfig>() {
+                        Ok(c) => c,
+                        Err(e) => {
+                            log::error!("Error parsing database config: {e}");
+                            continue;
+                        }
+                    };
+
+                    s1.db.write.replace_config(db_config.clone());
+                    s1.db.read.replace_config(db_config.readonly());
+
+                    s1.set_config(Arc::new(config))
+                }
+            }
+        }
+    });
+
+    #[cfg(unix)]
+    {
+        let s2 = state.clone();
+        tokio::spawn(async move {
+            loop {
+                log::debug!("Waiting for SIGUSR1 signal...");
+
+                tokio::signal::unix::signal(tokio::signal::unix::SignalKind::user_defined1())
+                    .unwrap()
+                    .recv()
+                    .await;
+
+                log::info!("SIGUSR1 received");
+                s2.trigger_config_reload();
+            }
+        });
+    }
 
     runner.wait().await?;
 

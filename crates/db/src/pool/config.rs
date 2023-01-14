@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use pg::Config as PgConfig;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Timeouts {
     /// Timeout when waiting for a slot to become available
     pub wait: Option<Duration>,
@@ -71,7 +71,7 @@ impl Default for RecyclingMethod {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PoolConfig {
     pub pg_config: PgConfig,
     pub timeouts: Timeouts,

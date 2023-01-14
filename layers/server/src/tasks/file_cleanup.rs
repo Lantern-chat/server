@@ -8,11 +8,9 @@ use crate::Error;
 use super::*;
 
 pub fn add_orphaned_file_cleanup_task(state: &ServerState, runner: &TaskRunner) {
-    let config = state.config_watcher.clone();
-
     runner.add(RetryTask::new(IntervalFnTask::new(
         state.clone(),
-        move || WatchStream::new(config).map(|config| config.upload.cleanup_interval),
+        |state: &ServerState| state.config_stream().map(|config| config.upload.cleanup_interval),
         move |state, _| async move {
             log::trace!("Cleaning up orphaned files");
 

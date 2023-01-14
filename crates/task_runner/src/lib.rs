@@ -107,30 +107,30 @@ where
 
 use tokio::time::{Duration, Instant};
 
-pub trait IntervalStream: Send + 'static {
+pub trait IntervalStream<S>: Send + 'static {
     type Stream: Stream<Item = Duration> + Send;
 
-    fn interval(self) -> Self::Stream;
+    fn interval(self, state: &S) -> Self::Stream;
 }
 
 // yields once and then forever pending
-impl IntervalStream for Duration {
+impl<S> IntervalStream<S> for Duration {
     type Stream = stream::Chain<stream::Once<futures::future::Ready<Duration>>, stream::Pending<Duration>>;
 
-    fn interval(self) -> Self::Stream {
+    fn interval(self, _: &S) -> Self::Stream {
         stream::once(futures::future::ready(self)).chain(stream::pending())
     }
 }
 
-impl<F, R> IntervalStream for F
+impl<F, S, R> IntervalStream<S> for F
 where
-    F: FnOnce() -> R + Send + 'static,
+    F: FnOnce(&S) -> R + Send + 'static,
     R: Stream<Item = Duration> + Send + 'static,
 {
     type Stream = R;
 
-    fn interval(self) -> Self::Stream {
-        (self)()
+    fn interval(self, state: &S) -> Self::Stream {
+        (self)(state)
     }
 }
 
@@ -142,7 +142,7 @@ where
     T: Fn(S, &watch::Receiver<bool>) -> F + Send + Sync + 'static,
     F: Future<Output = ()> + Send + 'static,
     S: Clone + Send + Sync + 'static,
-    I: IntervalStream,
+    I: IntervalStream<S>,
 {
     pub const fn new(state: S, interval: I, f: T) -> Self {
         IntervalFnTask(state, interval, f)
@@ -162,13 +162,13 @@ where
     T: Fn(S, &watch::Receiver<bool>) -> F + Send + Sync + 'static,
     F: Future<Output = ()> + Send + 'static,
     S: Clone + Send + Sync + 'static,
-    I: IntervalStream,
+    I: IntervalStream<S>,
 {
     fn start(self, alive: watch::Receiver<bool>) -> JoinHandle<()> {
         AsyncFnTask(move |mut alive: watch::Receiver<bool>| async move {
             let IntervalFnTask(state, i, f) = self;
 
-            let interval = i.interval();
+            let interval = i.interval(&state);
             futures::pin_mut!(interval);
 
             let mut current_interval = interval.next().await.unwrap_or_default();

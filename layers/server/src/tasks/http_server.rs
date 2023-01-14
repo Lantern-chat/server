@@ -28,19 +28,21 @@ impl task_runner::Task for HttpServer {
                 let state = state.clone();
                 let mut alive = alive.clone();
 
-                let mut config_changed = state.config_watcher.clone();
                 let (send_shutdown, shutdown) = tokio::sync::oneshot::channel::<()>();
 
                 bind_addr = state.config().web.bind;
 
+                let cstate = state.clone();
                 let controller = async move {
                     loop {
                         tokio::select! {
                             biased;
                             _ = alive.changed() => break, // send shutdown and kill controller loop
-                            value = config_changed.changed() => match value {
-                                Ok(_) if config_changed.borrow().web.bind == bind_addr => continue, // nothing changed, continue to poll
-                                _ => break, // send graceful shutdown to restart server
+                            _ = cstate.config_change.notified() => {
+                                // send graceful shutdown to restart server
+                                if cstate.config.load().web.bind != bind_addr {
+                                    break;
+                                }
                             }
                         }
                     }
@@ -65,7 +67,6 @@ impl task_runner::Task for HttpServer {
                                     Ok(resp) => resp,
                                     Err(err) => {
                                         log::error!("Internal Server Error: {err}");
-
                                         Ok(StatusCode::INTERNAL_SERVER_ERROR.into_response())
                                     }
                                 }
