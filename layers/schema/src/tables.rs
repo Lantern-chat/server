@@ -19,8 +19,6 @@ thorn::functions! {
 
     pub extern "pg" fn set_presence(_user_id: Type::INT8, _conn_id: Type::INT8, _flags: Type::INT2, _activity: Type::JSONB) in Lantern;
 
-    pub extern "pg" fn set_user_status(_user_id: Type::INT8, _active: Type::INT2) in Lantern;
-
     pub extern "pg" fn soft_delete_user(_user_id: Type::INT8, _new_username: Type::TEXT) in Lantern;
 
     /// Converts a language code into the equivalent regconfig language
@@ -59,12 +57,13 @@ thorn::enums! {
         MessageReact,
         MessageUnreact,
         ProfileUpdated,
+        RelUpdated,
     }
 }
 
 lazy_static::lazy_static! {
     /// See [EventCode] for full documentation
-    pub static ref EVENT_CODE: Type = <EventCode as EnumType>::ty(19664);
+    pub static ref EVENT_CODE: Type = <EventCode as EnumType>::ty(21303);
 }
 
 thorn::tables! {
@@ -94,14 +93,6 @@ thorn::tables! {
         UserId: Nullable(Type::INT8),
         OtherId: Nullable(Type::INT8),
         PartyId: Nullable(Type::INT8),
-    }
-
-    pub struct AggFriends in Lantern {
-        UserId: Nullable(Type::INT8),
-        FriendId: Nullable(Type::INT8),
-        UpdatedAt: Nullable(Type::TIMESTAMPTZ),
-        Flags: Nullable(Type::INT2),
-        Note: Nullable(Type::TEXT),
     }
 
     pub struct AggMemberPresence in Lantern {
@@ -134,15 +125,18 @@ thorn::tables! {
         UserId: Nullable(Type::INT8),
         Discriminator: Nullable(Type::INT4),
         UserFlags: Nullable(Type::INT4),
+        LastActive: Nullable(Type::TIMESTAMPTZ),
         Username: Nullable(Type::TEXT),
         PresenceFlags: Nullable(Type::INT2),
         PresenceUpdatedAt: Nullable(Type::TIMESTAMPTZ),
         Nickname: Nullable(Type::TEXT),
         MemberFlags: Nullable(Type::INT2),
         JoinedAt: Nullable(Type::TIMESTAMPTZ),
-        AvatarId: Nullable(Type::INT8),
         ProfileBits: Nullable(Type::INT4),
+        AvatarId: Nullable(Type::INT8),
+        BannerId: Nullable(Type::INT8),
         CustomStatus: Nullable(Type::TEXT),
+        Biography: Nullable(Type::TEXT),
         RoleIds: Nullable(Type::INT8_ARRAY),
         PresenceActivity: Nullable(Type::JSONB),
     }
@@ -187,6 +181,15 @@ thorn::tables! {
         UserIds: Nullable(Type::INT8_ARRAY),
     }
 
+    pub struct AggRelationships in Lantern {
+        UserId: Nullable(Type::INT8),
+        FriendId: Nullable(Type::INT8),
+        UpdatedAt: Nullable(Type::TIMESTAMPTZ),
+        RelA: Nullable(Type::INT4),
+        RelB: Nullable(Type::INT4),
+        Note: Nullable(Type::TEXT),
+    }
+
     pub struct AggRoomPerms in Lantern {
         RoomId: Nullable(Type::INT8),
         UserId: Nullable(Type::INT8),
@@ -208,6 +211,7 @@ thorn::tables! {
         Discriminator: Nullable(Type::INT4),
         Email: Nullable(Type::TEXT),
         Flags: Nullable(Type::INT4),
+        LastActive: Nullable(Type::TIMESTAMPTZ),
         Username: Nullable(Type::TEXT),
         Preferences: Nullable(Type::JSONB),
         PresenceFlags: Nullable(Type::INT2),
@@ -258,6 +262,7 @@ thorn::tables! {
         Id: Type::INT8,
         PartyId: Nullable(Type::INT8),
         RoomId: Nullable(Type::INT8),
+        UserId: Nullable(Type::INT8),
         Code: EVENT_CODE.clone(),
     }
 
@@ -287,15 +292,6 @@ thorn::tables! {
         /// blurhash preview (first frame of video if video). this shouldn't
         /// be too large, less than 128 bytes.
         Preview: Nullable(Type::BYTEA),
-    }
-
-    pub struct Friends in Lantern {
-        UserAId: Type::INT8,
-        UserBId: Type::INT8,
-        UpdatedAt: Type::TIMESTAMPTZ,
-        Flags: Type::INT2,
-        NoteA: Nullable(Type::TEXT),
-        NoteB: Nullable(Type::TEXT),
     }
 
     pub struct GroupMembers in Lantern {
@@ -447,6 +443,15 @@ thorn::tables! {
         UserIds: Type::INT8_ARRAY,
     }
 
+    pub struct Relationships in Lantern {
+        UserAId: Type::INT8,
+        UserBId: Type::INT8,
+        UpdatedAt: Type::TIMESTAMPTZ,
+        Relation: Type::INT2,
+        NoteA: Nullable(Type::TEXT),
+        NoteB: Nullable(Type::TEXT),
+    }
+
     pub struct RoleMembers in Lantern {
         RoleId: Type::INT8,
         UserId: Type::INT8,
@@ -518,13 +523,6 @@ thorn::tables! {
         Preview: Nullable(Type::BYTEA),
     }
 
-    pub struct UserBlocks in Lantern {
-        UserId: Type::INT8,
-        BlockId: Type::INT8,
-        BlockedAt: Type::TIMESTAMPTZ,
-        Flags: Type::INT2,
-    }
-
     pub struct UserFreelist in Lantern {
         Username: Type::TEXT,
         Discriminator: Type::INT4,
@@ -536,12 +534,6 @@ thorn::tables! {
         UpdatedAt: Type::TIMESTAMPTZ,
         Flags: Type::INT2,
         Activity: Nullable(Type::JSONB),
-    }
-
-    pub struct UserStatus in Lantern {
-        UserId: Type::INT8,
-        Updated: Type::TIMESTAMPTZ,
-        Active: Type::INT2,
     }
 
     pub struct UserTokens in Lantern {

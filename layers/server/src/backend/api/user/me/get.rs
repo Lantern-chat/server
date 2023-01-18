@@ -16,31 +16,24 @@ pub async fn get_full_self(state: &ServerState, user_id: Snowflake) -> Result<Us
         discriminator: row.try_get(UserColumns::discriminator())?,
         flags: UserFlags::from_bits_truncate(row.try_get(UserColumns::flags())?),
         email: Some(row.try_get(UserColumns::email())?),
-        presence: Some({
-            let last_active = crate::backend::util::relative::approximate_relative_time(
-                &state,
-                user_id,
-                row.try_get(UserColumns::last_active())?,
-                None,
-            );
+        presence: match row.try_get(PresenceColumns::updated_at())? {
+            Some(updated_at) => {
+                let last_active = crate::backend::util::relative::approximate_relative_time(
+                    &state,
+                    user_id,
+                    row.try_get(UserColumns::last_active())?,
+                    None,
+                );
 
-            match row.try_get(PresenceColumns::updated_at())? {
-                Some(updated_at) => UserPresence {
-                    flags: UserPresenceFlags::from_bits_truncate_public(
-                        row.try_get(PresenceColumns::flags())?,
-                    ),
+                Some(UserPresence {
+                    flags: UserPresenceFlags::from_bits_truncate_public(row.try_get(PresenceColumns::flags())?),
                     last_active,
                     updated_at: Some(updated_at),
                     activity: None,
-                },
-                None => UserPresence {
-                    flags: UserPresenceFlags::empty(),
-                    last_active,
-                    updated_at: None,
-                    activity: None,
-                },
+                })
             }
-        }),
+            None => None,
+        },
         preferences: {
             row.try_get::<_, Option<_>>(UserColumns::preferences())?
                 .map(|v: Json<_>| v.0)
@@ -97,9 +90,7 @@ mod q {
             .cols(ProfileColumns::default())
             .from(
                 Users::left_join_table::<Profiles>()
-                    .on(Profiles::UserId
-                        .equals(Users::Id)
-                        .and(Profiles::PartyId.is_null()))
+                    .on(Profiles::UserId.equals(Users::Id).and(Profiles::PartyId.is_null()))
                     .left_join_table::<AggPresence>()
                     .on(AggPresence::UserId.equals(Users::Id)),
             )

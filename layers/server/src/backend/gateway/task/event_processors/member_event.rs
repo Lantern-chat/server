@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use futures::future::Either;
+use futures::{future::Either, TryFutureExt};
 use schema::EventCode;
 
 use crate::backend::util::encrypted_asset::encrypt_snowflake_opt;
@@ -93,26 +93,10 @@ pub async fn member_event(
                 },
             }))
         }),
-        EventCode::MemberJoined | EventCode::MemberUpdated => Either::Right(async {
-            use crate::backend::api::party::members::query::{parse_member, select_members};
-
-            let row = db
-                .query_opt_cached_typed(
-                    || {
-                        use schema::*;
-                        use thorn::*;
-
-                        select_members().and_where(AggMembersFull::UserId.equals(Var::of(Users::Id)))
-                    },
-                    &[&party_id, &user_id],
-                )
-                .await?;
-
-            match row {
-                Some(row) => parse_member(row, state).map(Some),
-                None => Ok(None),
-            }
-        }),
+        EventCode::MemberJoined | EventCode::MemberUpdated => Either::Right(
+            crate::backend::api::party::members::get_one_anonymouse(state, db, party_id, user_id, false)
+                .map_ok(Some),
+        ),
         _ => unreachable!(),
     };
 

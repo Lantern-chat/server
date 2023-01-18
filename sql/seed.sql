@@ -106,42 +106,16 @@ CREATE TYPE lantern.event_code AS ENUM (
     'message_react',
     'message_unreact',
     'profile_updated',
-    'user_blocked'
+    'rel_updated'
 );
 
 CREATE SEQUENCE lantern.event_id;
-
-CREATE OR REPLACE FUNCTION lantern.combine_profile_bits(
-    base_bits int,
-    party_bits int,
-    party_avatar bigint
-) RETURNS int
-AS
-$$
-    SELECT CASE
-        WHEN party_bits IS NULL
-            THEN base_bits
-        ELSE
-        -- Select lower 7 avatar bits
-        (x'7F'::int & CASE
-            WHEN party_avatar IS NOT NULL
-                THEN party_bits
-            ELSE base_bits
-        END) |
-        -- Select higher 25 banner bits
-        (x'FFFFFF80'::int & CASE
-            -- pick out 8th bit, which signifies whether to override banner color
-            WHEN party_bits & 128 != 0
-                THEN party_bits
-            ELSE base_bits
-        END)
-    END
-$$ LANGUAGE SQL IMMUTABLE;
 
 ----------------------------------------
 -------------- TABLES ------------------
 ----------------------------------------
 
+-- NOTE: Keep this under 8 columns
 CREATE TABLE lantern.event_log (
     counter     bigint      NOT NULL DEFAULT nextval('lantern.event_id'),
 
@@ -152,6 +126,8 @@ CREATE TABLE lantern.event_log (
     party_id    bigint,
     -- May be NULL even when the event
     room_id     bigint,
+
+    user_id     bigint,
 
     code        lantern.event_code  NOT NULL
 );
@@ -212,6 +188,34 @@ COMMENT ON COLUMN lantern.metrics.p50 IS '50th latency percently';
 COMMENT ON COLUMN lantern.metrics.p95 IS '95th latency percentile';
 COMMENT ON COLUMN lantern.metrics.p99 IS '99th latency percentile';
 
+-- Reduce movement and animations in the UI
+#define USER_PREFS_REDUCE_ANIMATIONS         (1 << 0)
+-- Pause animations on window unfocus
+#define USER_PREFS_UNFOCUS_PAUSE             (1 << 1)
+#define USER_PREFS_LIGHT_MODE                (1 << 2)
+-- Allow direct messages from shared server memmbers
+#define USER_PREFS_ALLOW_DMS                 (1 << 3)
+-- Show small lines between message groups
+#define USER_PREFS_GROUP_LINES               (1 << 4)
+#define USER_PREFS_HIDE_AVATARS              (1 << 5)
+-- Display dark theme in an OLED-compatible mode
+#define USER_PREFS_OLED_MODE                 (1 << 6)
+-- Mute videos/audio by default
+#define USER_PREFS_MUTE_MEDIA                (1 << 7)
+-- Hide images/video with unknown dimensions
+#define USER_PREFS_HIDE_UNKNOWN_DIMENSIONS   (1 << 8)
+#define USER_PREFS_COMPACT_VIEW              (1 << 9)
+-- Prefer browser/platform emojis rather than twemoji
+#define USER_PREFS_USE_PLATFORM_EMOJIS       (1 << 10)
+#define USER_PREFS_ENABLE_SPELLCHECK         (1 << 11)
+#define USER_PREFS_LOW_BANDWIDTH_MODE        (1 << 12)
+#define USER_PREFS_FORCE_COLOR_CONSTRAST     (1 << 13)
+-- Displays information like mime type and file size
+#define USER_PREFS_SHOW_MEDIA_METADATA       (1 << 14)
+#define USER_PREFS_DEVELOPER_MODE            (1 << 15)
+#define USER_PREFS_SHOW_DATE_CHANGE          (1 << 16)
+#define USER_PREFS_HIDE_LAST_ACTIVE          (1 << 17)
+
 CREATE TABLE lantern.users (
     --- Snowflake id
     id              bigint              NOT NULL,
@@ -268,6 +272,8 @@ CREATE TABLE lantern.party (
 
     CONSTRAINT party_pk PRIMARY KEY (id)
 );
+
+#define MEMBER_BANNED 1
 
 -- Association map between parties and users
 CREATE TABLE lantern.party_member (
@@ -392,6 +398,11 @@ CREATE TABLE lantern.user_asset_files (
     CONSTRAINT user_asset_files_pk PRIMARY KEY (asset_id, file_id)
 );
 
+#define PROFILE_AVATAR_ROUNDNESS 127 -- x'7F'::int4
+#define PROFILE_OVERRIDE_COLOR 128 -- x'80'::int4
+#define PROFILE_PRIMARY_COLOR x'FFFFFF00'::int4
+#define PROFILE_COLOR_FIELDS x'FFFFFF80'::int4
+
 -- Users can have multiple profiles, with one main profile where the `party_id` is NULL
 CREATE TABLE lantern.profiles (
     user_id         bigint  NOT NULL,
@@ -405,6 +416,35 @@ CREATE TABLE lantern.profiles (
     biography       text
 );
 COMMENT ON TABLE lantern.profiles IS 'Users can have multiple profiles, with one main profile where the `party_id` is NULL';
+
+CREATE OR REPLACE FUNCTION lantern.combine_profile_bits(
+    base_bits int,
+    party_bits int,
+    party_avatar bigint
+) RETURNS int
+AS
+$$
+    SELECT CASE
+        WHEN party_bits IS NULL
+            THEN base_bits
+        ELSE
+        -- Select lower 7 avatar bits
+        (PROFILE_AVATAR_ROUNDNESS & CASE
+            WHEN party_avatar IS NOT NULL
+                THEN party_bits
+            ELSE base_bits
+        END) |
+        -- Select higher 25 banner bits
+        (PROFILE_COLOR_FIELDS & CASE
+            -- pick out 8th bit, which signifies whether to override banner color
+            WHEN party_bits & PROFILE_OVERRIDE_COLOR != 0
+                THEN party_bits
+            ELSE base_bits
+        END)
+    END
+$$ LANGUAGE SQL IMMUTABLE;
+
+#define MESSAGE_DELETED 1
 
 CREATE TABLE lantern.messages (
     -- Snowflake ID, contains created_at timestamp
@@ -556,14 +596,6 @@ CREATE TABLE lantern.overwrites (
     user_id         bigint
 );
 
-CREATE TABLE lantern.user_status (
-    user_id         bigint      NOT NULL,
-    updated         timestamptz NOT NULL DEFAULT now(),
-    active          smallint    NOT NULL DEFAULT 0,
-
-    CONSTRAINT user_status_pk PRIMARY KEY (user_id)
-);
-
 CREATE TABLE lantern.reactions (
     msg_id      bigint      NOT NULL,
     emote_id    bigint,
@@ -584,14 +616,25 @@ CREATE TABLE lantern.mentions (
     room_id     bigint
 );
 
-CREATE TABLE lantern.friends (
+#define RELATION_NONE 0
+#define RELATION_FRIEND 1
+#define RELATION_BLOCKED 2
+
+CREATE TABLE lantern.relationships (
     user_a_id   bigint      NOT NULL,
     user_b_id   bigint      NOT NULL,
     updated_at  timestamptz NOT NULL DEFAULT now(),
-    flags       smallint    NOT NULL DEFAULT 0,
+    relation    smallint    NOT NULL DEFAULT 0,
     note_a      text,
     note_b      text
 );
+
+#define PRESENCE_OFFLINE    0
+#define PRESENCE_AWAY      (1 << 0)
+#define PRESENCE_MOBILE    (1 << 1)
+#define PRESENCE_ONLINE    (1 << 2)
+#define PRESENCE_BUSY      (1 << 3)
+#define PRESENCE_INVISIBLE (1 << 4)
 
 CREATE TABLE lantern.user_presence (
     user_id     bigint      NOT NULL,
@@ -664,6 +707,10 @@ ALTER TABLE lantern.event_log ADD CONSTRAINT party_fk FOREIGN KEY (party_id)
 
 ALTER TABLE lantern.event_log ADD CONSTRAINT room_fk FOREIGN KEY (room_id)
     REFERENCES lantern.rooms (id) MATCH FULL
+    ON DELETE CASCADE ON UPDATE CASCADE;
+
+ALTER TABLE lantern.event_log ADD CONSTRAINT user_fk FOREIGN KEY (user_id)
+    REFERENCES lantern.users (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE lantern.user_tokens ADD CONSTRAINT user_fk FOREIGN KEY (user_id)
@@ -869,10 +916,6 @@ ALTER TABLE lantern.reactions ADD CONSTRAINT emoji_id_fk FOREIGN KEY (emoji_id)
     REFERENCES lantern.emojis (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE lantern.user_status ADD CONSTRAINT user_fk FOREIGN KEY(user_id)
-    REFERENCES lantern.users (id) MATCH FULL
-    ON DELETE CASCADE ON UPDATE CASCADE;
-
 ALTER TABLE lantern.mentions ADD CONSTRAINT msg_fk FOREIGN KEY (msg_id)
     REFERENCES lantern.messages (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
@@ -889,11 +932,11 @@ ALTER TABLE lantern.mentions ADD CONSTRAINT room_fk FOREIGN KEY (room_id)
     REFERENCES lantern.rooms (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE lantern.friends ADD CONSTRAINT user_a_fk FOREIGN KEY(user_a_id)
+ALTER TABLE lantern.relationships ADD CONSTRAINT user_a_fk FOREIGN KEY(user_a_id)
     REFERENCES lantern.users (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE lantern.friends ADD CONSTRAINT user_b_fk FOREIGN KEY(user_b_id)
+ALTER TABLE lantern.relationships ADD CONSTRAINT user_b_fk FOREIGN KEY(user_b_id)
     REFERENCES lantern.users (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -969,8 +1012,8 @@ ALTER TABLE lantern.ip_bans ADD CONSTRAINT addr_check CHECK (
 -- Messages can only be the parent of a single thread
 ALTER TABLE lantern.threads ADD CONSTRAINT parent_uq UNIQUE (parent_id);
 
--- ensure proper ordering of friend columns
-ALTER TABLE lantern.friends ADD CONSTRAINT ch_friend_order CHECK (user_a_id < user_b_id);
+-- ensure proper ordering of relationships columns
+ALTER TABLE lantern.relationships ADD CONSTRAINT ch_relationship_order CHECK (user_a_id < user_b_id);
 
 -- user cannot block themselves
 ALTER TABLE lantern.user_blocks ADD CONSTRAINT ch_user_blocks CHECK (user_id <> block_id);
@@ -1015,7 +1058,7 @@ CREATE UNIQUE INDEX reactions_emoji_idx ON lantern.reactions
 CREATE UNIQUE INDEX emoji_idx ON lantern.emojis
     USING btree(emoji);
 
-CREATE UNIQUE INDEX friend_idx ON lantern.friends
+CREATE UNIQUE INDEX relationship_idx ON lantern.relationships
     USING btree(user_a_id, user_b_id);
 
 CREATE UNIQUE INDEX user_blocks_idx ON lantern.user_blocks
@@ -1048,8 +1091,8 @@ CREATE INDEX user_asset_file_idx            ON lantern.user_asset_files USING bt
 CREATE INDEX msg_id_idx                     ON lantern.messages         USING btree(id);
 
 -- mutually exclusive indexes
-CREATE INDEX msg_dl_idx                     ON lantern.messages         USING btree(room_id, id) WHERE flags & 1 = 1;
-CREATE INDEX msg_nd_idx                     ON lantern.messages         USING btree(room_id, id) WHERE flags & 1 = 0;
+CREATE INDEX msg_dl_idx                     ON lantern.messages         USING btree(room_id, id) WHERE flags & MESSAGE_DELETED = 1;
+CREATE INDEX msg_nd_idx                     ON lantern.messages         USING btree(room_id, id) WHERE flags & MESSAGE_DELETED = 0;
 
 
 CREATE INDEX msg_ts_idx                     ON lantern.messages         USING GIN (ts);
@@ -1070,8 +1113,6 @@ CREATE INDEX group_member_id_idx            ON lantern.group_members    USING bt
 CREATE INDEX group_member_user_idx          ON lantern.group_members    USING btree(user_id);
 
 CREATE INDEX overwrites_room_idx            ON lantern.overwrites       USING btree(room_id);
-CREATE INDEX user_status_user_idx           ON lantern.user_status      USING btree(user_id);
-CREATE INDEX user_status_time_idx           ON lantern.user_status      USING btree(updated);
 
 CREATE INDEX reaction_msg_idx               ON lantern.reactions        USING btree(msg_id);
 
@@ -1085,8 +1126,8 @@ CREATE INDEX mention_role_idx               ON lantern.mentions         USING bt
 CREATE INDEX rate_limit_idx                 ON lantern.rate_limits      USING btree(addr);
 CREATE INDEX ip_bans_address_idx            ON lantern.ip_bans          USING btree(address) WHERE address IS NOT NULL;
 CREATE INDEX ip_bans_network_idx            ON lantern.ip_bans          USING GIST(network inet_ops) WHERE network IS NOT NULL;
-CREATE INDEX friend_a_idx                   ON lantern.friends          USING btree(user_a_id);
-CREATE INDEX friend_b_idx                   ON lantern.friends          USING btree(user_b_id);
+CREATE INDEX relationship_a_idx             ON lantern.relationships    USING btree(user_a_id);
+CREATE INDEX relationship_b_idx             ON lantern.relationships    USING btree(user_b_id);
 CREATE INDEX user_presence_conn_idx         ON lantern.user_presence    USING btree(conn_id);
 CREATE INDEX user_presence_idx              ON lantern.user_presence    USING btree(user_id, updated_at);
 
@@ -1148,13 +1189,13 @@ BEGIN
     INSERT INTO lantern.event_log (code, id, party_id)
     SELECT
         -- when old was not deleted, and new is deleted
-        CASE WHEN (OLD.flags & 1 = 0) AND (NEW.flags & 1 != 0)
+        CASE WHEN (OLD.flags & MESSAGE_DELETED = 0) AND (NEW.flags & MESSAGE_DELETED != 0)
                 THEN 'message_delete'::lantern.event_code
 
              WHEN TG_OP = 'INSERT'
                 THEN 'message_create'::lantern.event_code
 
-             WHEN TG_OP = 'UPDATE' AND (NEW.flags & 1 = 0)
+             WHEN TG_OP = 'UPDATE' AND (NEW.flags & MESSAGE_DELETED = 0)
                 THEN 'message_update'::lantern.event_code
         END,
         NEW.id,
@@ -1182,7 +1223,7 @@ BEGIN
     );
 
     -- if a new presence includes the online flag
-    IF TG_OP != 'DELETE' AND (NEW.flags & (1 << 2)) = (1 << 2) THEN
+    IF TG_OP != 'DELETE' AND (NEW.flags & PRESENCE_ONLINE) = PRESENCE_ONLINE THEN
         UPDATE lantern.users SET last_active = now() WHERE id = NEW.user_id;
     END IF;
 
@@ -1226,7 +1267,7 @@ BEGIN
         CASE
             -- Deleting a member entry when unbanning signifies the ban has been lifted
             -- but they must rejoin manually
-            WHEN ((OLD.flags & 1 = 1))
+            WHEN ((OLD.flags & MEMBER_BANNED = 1))
                 THEN 'member_unban'::lantern.event_code
             ELSE 'member_left'::lantern.event_code
         END,
@@ -1255,7 +1296,7 @@ BEGIN
         INSERT INTO lantern.event_log (code, id, party_id)
         SELECT
             CASE
-                WHEN ((OLD.flags & 1 = 0)) AND ((NEW.flags & 1 = 1))
+                WHEN ((OLD.flags & MEMBER_BANNED = 0)) AND ((NEW.flags & MEMBER_BANNED = 1))
                     THEN 'member_ban'::lantern.event_code
                 ELSE 'member_updated'::lantern.event_code
             END,
@@ -1809,11 +1850,10 @@ FROM lantern.mentions GROUP BY msg_id;
 
 ---
 
-CREATE OR REPLACE VIEW lantern.agg_friends(user_id, friend_id, updated_at, flags, note) AS
-SELECT user_a_id, user_b_id, updated_at, flags, note_a FROM lantern.friends
+CREATE OR REPLACE VIEW lantern.agg_relationships(user_id, friend_id, updated_at, rel_a, rel_b, note) AS
+SELECT user_a_id, user_b_id, updated_at, relation & 255, relation >> 8, note_a FROM lantern.relationships
 UNION ALL
--- xor the ADDED_BY flag if the order is reversed
-SELECT user_b_id, user_a_id, updated_at, flags # 2::int2, note_b FROM lantern.friends;
+SELECT user_b_id, user_a_id, updated_at, relation >> 8, relation & 255, note_b FROM lantern.relationships;
 
 --
 
@@ -1932,6 +1972,7 @@ CREATE OR REPLACE VIEW lantern.agg_users(
     discriminator,
     email,
     flags,
+    last_active,
     username,
     preferences,
     presence_flags,
@@ -1944,6 +1985,7 @@ SELECT
     users.discriminator,
     users.email,
     users.flags,
+    CASE WHEN (users.preferences->'flags')::int4 & USER_PREFS_HIDE_LAST_ACTIVE = 0 THEN users.last_active ELSE NULL END,
     users.username,
     users.preferences,
     agg_presence.flags,
@@ -1988,15 +2030,18 @@ CREATE OR REPLACE VIEW lantern.agg_members_full(
     user_id,
     discriminator,
     user_flags,
+    last_active,
     username,
     presence_flags,
     presence_updated_at,
-    nickname,
     member_flags,
     joined_at,
-    avatar_id,
     profile_bits,
+    avatar_id,
+    banner_id,
+    nickname,
     custom_status,
+    biography,
     role_ids,
     presence_activity
 ) AS
@@ -2005,15 +2050,18 @@ SELECT
     party_member.user_id,
     agg_users.discriminator,
     agg_users.flags,
+    agg_users.last_active,
     agg_users.username,
     agg_users.presence_flags,
     agg_users.presence_updated_at,
-    COALESCE(party_profile.nickname, base_profile.nickname),
     party_member.flags,
     party_member.joined_at,
-    COALESCE(party_profile.avatar_id, base_profile.avatar_id),
     lantern.combine_profile_bits(base_profile.bits, party_profile.bits, party_profile.avatar_id),
+    COALESCE(party_profile.avatar_id, base_profile.avatar_id),
+    COALESCE(party_profile.banner_id, base_profile.banner_id),
+    COALESCE(party_profile.nickname, base_profile.nickname),
     COALESCE(party_profile.custom_status, base_profile.custom_status),
+    COALESCE(party_profile.biography, base_profile.biography),
     agg_roles.roles,
     agg_users.presence_activity
 FROM
@@ -2035,8 +2083,10 @@ FROM
 --
 
 CREATE OR REPLACE VIEW lantern.agg_broadcast_visibility(user_id, other_id, party_id) AS
-SELECT user_id, friend_id, NULL FROM lantern.agg_friends
+-- broadcast to friends
+SELECT user_id, friend_id, NULL FROM lantern.agg_relationships WHERE rel_b = RELATION_FRIEND
 UNION ALL
+-- broadcast to shared party members
 SELECT p.user_id, NULL, p.party_id FROM lantern.party_member p
 -- UNION ALL
 -- Select users from DMs that are subscribed (open) by the other members
@@ -2045,7 +2095,7 @@ SELECT p.user_id, NULL, p.party_id FROM lantern.party_member p
 --
 
 CREATE OR REPLACE VIEW lantern.agg_user_associations(user_id, other_id, party_id) AS
-SELECT user_id, friend_id, NULL FROM lantern.agg_friends f WHERE f.flags & 1 = 1
+SELECT user_id, friend_id, NULL FROM lantern.agg_relationships WHERE rel_b = RELATION_FRIEND
 UNION ALL
 SELECT my.user_id, o.user_id, my.party_id FROM
     lantern.party_member my INNER JOIN lantern.party_member o ON (o.party_id = my.party_id)
@@ -2288,23 +2338,6 @@ $$;
 
 --
 
-CREATE OR REPLACE PROCEDURE lantern.set_user_status(
-    _user_id bigint,
-    _active smallint
-)
-LANGUAGE plpgsql AS
-$$
-DECLARE
-    _now timestamptz := now();
-BEGIN
-    INSERT INTO lantern.user_status (id, updated, active) VALUES (_user_id, _now, _active)
-    ON CONFLICT ON CONSTRAINT user_status_pk DO
-        UPDATE SET updated = _now, active = _active;
-END
-$$;
-
---
-
 CREATE OR REPLACE PROCEDURE lantern.set_presence(
     _user_id bigint,
     _conn_id bigint,
@@ -2370,8 +2403,7 @@ BEGIN
     DELETE FROM lantern.user_tokens WHERE user_id = _user_id;
     DELETE FROM lantern.user_presence WHERE user_id = _user_id;
     DELETE FROM lantern.profiles WHERE user_id = _user_id;
-    DELETE FROM lantern.friends WHERE user_a_id = _user_id OR user_b_id = _user_id;
-    DELETE FROM lantern.user_blocks WHERE user_id = _user_id OR block_id = _user_id;
+    -- DELETE FROM lantern.relationships WHERE user_a_id = _user_id OR user_b_id = _user_id;
     DELETE FROM lantern.party_bans WHERE user_id = _user_id;
     DELETE FROM lantern.overrides WHERE user_id = _user_id;
     DELETE FROM lantern.role_members WHERE user_id = _user_id;

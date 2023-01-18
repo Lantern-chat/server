@@ -16,12 +16,10 @@ pub mod gateway {
 
 pub mod user {
     pub mod get;
-    pub mod profile;
     pub mod register;
 
     pub mod me {
         pub mod account;
-        pub mod block;
         pub mod get;
         pub mod login;
         pub mod logout;
@@ -29,10 +27,9 @@ pub mod user {
         pub mod profile;
         pub mod sessions;
 
-        pub mod friends {
-            pub mod add;
+        pub mod relationships {
             pub mod get;
-            pub mod remove;
+            pub mod modify;
         }
     }
 }

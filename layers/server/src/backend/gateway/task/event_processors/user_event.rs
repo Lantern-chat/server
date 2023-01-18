@@ -60,6 +60,7 @@ pub async fn user_update(
 
     // TODO: Use a union/view for these IDs
 
+    // send events to these users because they are friend-like
     let friends_future = async {
         let row = db
             .query_one_cached_typed(
@@ -67,9 +68,10 @@ pub async fn user_update(
                     use schema::*;
 
                     Query::select()
-                        .expr(Builtin::array_agg_nonnull(AggFriends::FriendId))
-                        .from_table::<AggFriends>()
-                        .and_where(AggFriends::UserId.equals(Var::of(Users::Id)))
+                        .expr(Builtin::array_agg_nonnull(AggRelationships::FriendId))
+                        .from_table::<AggRelationships>()
+                        .and_where(AggRelationships::UserId.equals(Var::of(Users::Id)))
+                        .and_where(AggRelationships::RelA.not_equals(0.lit()))
                 },
                 &[&user_id],
             )
