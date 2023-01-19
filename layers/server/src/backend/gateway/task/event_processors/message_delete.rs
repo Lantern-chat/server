@@ -15,20 +15,24 @@ pub async fn message_delete(
                 Query::select()
                     .from_table::<Messages>()
                     .col(Messages::RoomId)
+                    .col(Messages::UserId)
                     .and_where(Messages::Id.equals(Var::of(Messages::Id)))
             },
             &[&id],
         )
         .await?;
 
-    let room_id = match row {
-        Some(row) => row.try_get(0)?,
-        None => return Ok(()),
+    let Some(row) = row else {
+        return Ok(());
     };
+
+    let room_id = row.try_get(0)?;
+    let user_id = row.try_get(1)?;
 
     let event = ServerMsg::new_message_delete(MessageDeleteEvent {
         id,
         room_id,
+        user_id,
         party_id,
     });
 

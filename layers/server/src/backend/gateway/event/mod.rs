@@ -7,25 +7,40 @@ use sdk::api::gateway::{Encoding, GatewayQueryParams};
 
 use sdk::models::gateway::message::ServerMsg;
 
+pub mod internal;
+
+/// Compressed and Uncompressed variants of a serialized event
 #[derive(Debug)]
 pub struct CompressedEvent {
     pub uncompressed: Vec<u8>,
     pub compressed: Vec<u8>,
 }
 
+/// Stores events in various formats that the gateway can send
 #[derive(Debug)]
 pub struct EncodedEvent {
     pub json: CompressedEvent,
     pub cbor: CompressedEvent,
 }
 
+pub use internal::InternalEvent;
+
+/// An event that is intended to reach the external world
 #[derive(Debug)]
-pub struct EventInner {
+pub struct ExternalEvent {
     pub msg: ServerMsg,
     pub encoded: EncodedEvent,
     pub room_id: Option<Snowflake>,
 }
 
+/// Actual event enum
+#[derive(Debug)]
+pub enum EventInner {
+    Internal(InternalEvent),
+    External(ExternalEvent),
+}
+
+/// `Arc<EventInner>` for efficient broadcasting of events
 #[derive(Debug, Clone)]
 #[repr(transparent)]
 pub struct Event(Arc<EventInner>);
@@ -43,11 +58,15 @@ impl Event {
     pub fn new(msg: ServerMsg, room_id: Option<Snowflake>) -> Result<Event, EventEncodingError> {
         let encoded = EncodedEvent::new(&msg)?;
 
-        Ok(Event(Arc::new(EventInner {
+        Ok(Event(Arc::new(EventInner::External(ExternalEvent {
             msg,
             encoded,
             room_id,
-        })))
+        }))))
+    }
+
+    pub fn internal(event: InternalEvent) -> Event {
+        Event(Arc::new(EventInner::Internal(event)))
     }
 }
 

@@ -83,6 +83,8 @@ impl PartyEmitter {
 
 use conn::GatewayConnection;
 
+use crate::backend::gateway::event::EventInner;
+
 #[derive(Default)]
 pub struct Gateway {
     /// per-party emitters that can be subscribed to
@@ -129,7 +131,13 @@ impl Gateway {
 
     pub async fn broadcast_event(&self, event: Event, party_id: Snowflake) {
         if let Some(party) = self.parties.get(&party_id).await {
-            log::debug!("Sending event {:?} to party tx: {party_id}", event.msg.opcode());
+            match *event {
+                EventInner::External(ref event) => {
+                    log::debug!("Sending event {:?} to party tx: {party_id}", event.msg.opcode());
+                }
+                EventInner::Internal(_) => log::debug!("broadcasting internal event"),
+            }
+
             if let Err(e) = party.tx.send(event) {
                 crate::metrics::API_METRICS.load().errs.add(1);
 
@@ -182,10 +190,7 @@ impl Gateway {
     }
 
     async fn activate_connection(&self, user_id: UserId, conn: GatewayConnection) {
-        self.users
-            .get_mut_or_default(&user_id)
-            .await
-            .insert(conn.id, conn);
+        self.users.get_mut_or_default(&user_id).await.insert(conn.id, conn);
     }
 
     async fn subscribe(&self, party_ids: impl IntoIterator<Item = &PartyId>) -> Vec<PartySubscription> {
@@ -194,26 +199,17 @@ impl Gateway {
         let mut cache = Vec::new();
 
         self.parties
-            .batch_read(
-                party_ids.into_iter(),
-                Some(&mut cache),
-                |key, value| match value {
-                    Some((_, p)) => subs.push(p.subscribe()),
-                    None => missing.push(key),
-                },
-            )
+            .batch_read(party_ids.into_iter(), Some(&mut cache), |key, value| match value {
+                Some((_, p)) => subs.push(p.subscribe()),
+                None => missing.push(key),
+            })
             .await;
 
         if !missing.is_empty() {
             self.parties
                 .batch_write(missing, Some(&mut cache), |key, value| {
                     log::debug!("Added gateway entry for missing party: {}", key);
-                    subs.push(
-                        value
-                            .or_insert_with(|| (*key, PartyEmitter::new(*key)))
-                            .1
-                            .subscribe(),
-                    )
+                    subs.push(value.or_insert_with(|| (*key, PartyEmitter::new(*key))).1.subscribe())
                 })
                 .await;
         }

@@ -17,7 +17,7 @@ use sdk::{api::gateway::GatewayQueryParams, driver::Encoding, models::RoomPermis
 use tokio::sync::{broadcast::error::RecvError, mpsc};
 use tokio_stream::wrappers::{errors::BroadcastStreamRecvError, BroadcastStream, ReceiverStream};
 
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 
 use ftl::ws::{Message as WsMessage, SinkError, WebSocket};
 use schema::Snowflake;
@@ -27,6 +27,7 @@ use crate::{
         api::auth::Authorization,
         api::gateway::presence::{clear_presence, set_presence},
         cache::permission_cache::PermMute,
+        gateway::event::{EventInner, InternalEvent},
     },
     ServerState,
 };
@@ -110,12 +111,18 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
         let mut ws_tx = ws_tx.with(move |event: Result<Event, MessageOutgoingError>| {
             futures::future::ok::<_, SinkError>(match event {
                 Err(_) => WsMessage::close(),
-                Ok(event) => WsMessage::binary(event.encoded.get(query).clone()),
+                Ok(event) => match *event {
+                    EventInner::External(ref event) => WsMessage::binary(event.encoded.get(query).clone()),
+                    _ => unreachable!(),
+                },
             })
         });
 
         // for each party that is being listened on, keep the associated cancel handle, to kill the stream if we unsub from them
         let mut listener_table = HashMap::new();
+
+        // Contains a list of user ids that have blocked the current user of this connection
+        let mut blocked_by: HashSet<Snowflake> = HashSet::default();
 
         // aggregates all event streams into one
         let mut events: SelectAll<BoxStream<Item>> = SelectAll::<BoxStream<Item>>::new();
@@ -135,129 +142,146 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
             let resp = match event {
                 Item::MissedHeartbeat => Err(MessageOutgoingError::SocketClosed),
 
-                Item::Event(event) => match event {
-                    Ok(event) => {
-                        use sdk::models::gateway::message::server_msg_payloads::*;
+                Item::Event(Err(e)) => {
+                    log::warn!("Event error: {e}");
+                    Err(MessageOutgoingError::SocketClosed) // kick for lag?
+                }
 
-                        // if this message corresponds to an intent, filter it
-                        if let Some(matching_intent) = event.msg.matching_intent() {
-                            if !intent.contains(matching_intent) {
-                                continue; // skip doing anything with this event
-                            }
-                        }
+                Item::Event(Ok(event)) => {
+                    use sdk::models::gateway::message::server_msg_payloads::*;
 
-                        match event.msg {
-                            ServerMsg::Hello(_) => {}
-                            ServerMsg::InvalidSession(_) => {
-                                // this will ensure the stream ends after this event
-                                events.clear();
-                            }
-                            ServerMsg::Ready(ReadyPayload { inner: ref ready }) => {
-                                user_id = Some(ready.user.id);
-
-                                register_subs(
-                                    &mut events,
-                                    &mut listener_table,
-                                    state
-                                        .gateway
-                                        .sub_and_activate_connection(
-                                            ready.user.id,
-                                            conn.clone(),
-                                            // NOTE: https://github.com/rust-lang/rust/issues/70263
-                                            ready.parties.iter().map(crate::util::passthrough(|p: &sdk::models::Party| &p.id)),
-                                        )
-                                        .await,
-                                )
-                            }
-                            // for other events, session must be authenticated and have permission to view such events
-                            _ => match user_id {
-                                None => {
-                                    log::warn!("Attempted to receive events before user_id was set");
-                                    break 'event_loop;
+                    let e = match *event {
+                        EventInner::External(ref e) => e,
+                        EventInner::Internal(ref event) => {
+                            match event {
+                                InternalEvent::BulkUserBlockedUpdate { blocked } => {
+                                    blocked_by.clear();
+                                    blocked_by.extend(blocked);
                                 }
-                                Some(user_id) => {
-                                    if let Some(room_id) = event.room_id {
-                                        match state.perm_cache.get(user_id, room_id).await {
-                                            None => {
-                                                // if no permission cache was found, refresh it.
-                                                // takes ownership of the event and will retry when done
-                                                tokio::spawn(refresh_and_retry(state.clone(), conn.clone(), event, user_id, room_id));
-                                                continue 'event_loop;
-                                            }
-                                            // skip event if user can't view room
-                                            Some(perms) if !perms.room.contains(RoomPermissions::VIEW_ROOM) => continue 'event_loop,
-                                            _ => { /* send message as normal*/ }
-                                        }
-                                    }
+                            }
 
-                                    match event.msg {
-                                        ServerMsg::PartyCreate(ref payload) => register_subs(
-                                            &mut events,
-                                            &mut listener_table,
-                                            state.gateway.sub_and_activate_connection(user_id, conn.clone(), &[payload.inner.id]).await,
-                                        ),
-                                        ServerMsg::PartyDelete(ref payload) => {
-                                            // by cancelling a stream, it will be removed from the SelectStream automatically
-                                            if let Some(event_stream) = listener_table.get(&payload.id) {
-                                                event_stream.abort();
-                                            }
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                            },
-                        }
-
-                        Ok(event) // forward event directly to tx
-                    }
-                    Err(e) => {
-                        log::warn!("Event error: {e}");
-                        Err(MessageOutgoingError::SocketClosed) // kick for lag?
-                    }
-                },
-                Item::Msg(msg) => match msg {
-                    Ok(msg) => match msg {
-                        // Respond to heartbeats immediately.
-                        ClientMsg::Heartbeat(_) => Ok(HEARTBEAT_ACK.clone()),
-                        ClientMsg::Identify(payload) => {
-                            // this will send a ready event on success
-                            tokio::spawn(identify::identify(state.clone(), conn.clone(), payload.inner.auth, payload.inner.intent));
-                            intent = payload.inner.intent;
                             continue;
                         }
-                        ClientMsg::Resume(_) => {
-                            log::error!("Attempted to resume connection");
+                    };
+
+                    // if this message corresponds to an intent, filter it
+                    if let Some(matching_intent) = e.msg.matching_intent() {
+                        if !intent.contains(matching_intent) {
+                            continue; // skip doing anything with this event
+                        }
+                    }
+
+                    if let Some(user_id) = e.msg.user_id() {
+                        if blocked_by.contains(&user_id) {
+                            // TODO: Replace message create with "message unavailable" create
+                            continue; // skip sending this to a user that's been blocked
+                        }
+                    }
+
+                    // Honestly these are just grouped together to reduce indentation
+                    match (user_id, &e.msg) {
+                        (_, ServerMsg::Hello(_)) => {}
+                        (_, ServerMsg::InvalidSession(_)) => {
+                            // this will ensure the stream ends after this event
+                            events.clear();
+                        }
+                        (_, ServerMsg::Ready(ref ready)) => {
+                            user_id = Some(ready.user.id);
+
+                            register_subs(
+                                &mut events,
+                                &mut listener_table,
+                                state
+                                    .gateway
+                                    .sub_and_activate_connection(
+                                        ready.user.id,
+                                        conn.clone(),
+                                        // NOTE: https://github.com/rust-lang/rust/issues/70263
+                                        ready.parties.iter().map(crate::util::passthrough(|p: &sdk::models::Party| &p.id)),
+                                    )
+                                    .await,
+                            )
+                        }
+                        (None, _) => {
+                            log::warn!("Attempted to receive events before user_id was set");
                             break 'event_loop;
                         }
-                        ClientMsg::SetPresence(payload) => {
-                            match user_id {
-                                None => {
-                                    log::warn!("Attempted to set presence before identification");
-                                    break 'event_loop;
-                                }
-                                Some(user_id) => {
-                                    tokio::spawn(set_presence(state.clone(), user_id, conn.id, payload.inner.presence));
+                        // for other events, session must be authenticated and have permission to view such events
+                        (Some(user_id), _) => {
+                            if let Some(room_id) = e.room_id {
+                                match state.perm_cache.get(user_id, room_id).await {
+                                    None => {
+                                        // if no permission cache was found, refresh it.
+                                        // takes ownership of the event and will retry when done
+                                        tokio::spawn(refresh_and_retry(state.clone(), conn.clone(), event, user_id, room_id));
+                                        continue 'event_loop;
+                                    }
+                                    // skip event if user can't view room
+                                    Some(perms) if !perms.room.contains(RoomPermissions::VIEW_ROOM) => continue 'event_loop,
+                                    _ => { /* send message as normal*/ }
                                 }
                             }
 
-                            continue 'event_loop; // no reply, so continue event loop
+                            match e.msg {
+                                ServerMsg::PartyCreate(ref payload) => register_subs(
+                                    &mut events,
+                                    &mut listener_table,
+                                    state.gateway.sub_and_activate_connection(user_id, conn.clone(), &[payload.id]).await,
+                                ),
+                                ServerMsg::PartyDelete(ref payload) => {
+                                    // by cancelling a stream, it will be removed from the SelectStream automatically
+                                    if let Some(event_stream) = listener_table.get(&payload.id) {
+                                        event_stream.abort();
+                                    }
+                                }
+                                _ => {}
+                            }
                         }
-                        ClientMsg::Subscribe(_) | ClientMsg::Unsubscribe(_) => {
-                            log::error!("Unimplemented sub/unsub");
-                            continue 'event_loop; // no reply
+                    }
+
+                    Ok(event) // forward event directly to tx
+                }
+                Item::Msg(Err(e)) => match e {
+                    _ if e.is_close() => {
+                        log::warn!("Connection disconnected");
+                        break;
+                    }
+                    // TODO: Send code with it
+                    _ => {
+                        log::error!("Misc err: {e}");
+                        Err(MessageOutgoingError::SocketClosed)
+                    }
+                },
+                Item::Msg(Ok(msg)) => match msg {
+                    // Respond to heartbeats immediately.
+                    ClientMsg::Heartbeat(_) => Ok(HEARTBEAT_ACK.clone()),
+                    ClientMsg::Identify(payload) => {
+                        // this will send a ready event on success
+                        tokio::spawn(identify::identify(state.clone(), conn.clone(), payload.inner.auth, payload.intent));
+                        intent = payload.intent;
+                        continue;
+                    }
+                    ClientMsg::Resume(_) => {
+                        log::error!("Attempted to resume connection");
+                        break 'event_loop;
+                    }
+                    ClientMsg::SetPresence(payload) => {
+                        match user_id {
+                            None => {
+                                log::warn!("Attempted to set presence before identification");
+                                break 'event_loop;
+                            }
+                            Some(user_id) => {
+                                tokio::spawn(set_presence(state.clone(), user_id, conn.id, payload.inner.presence));
+                            }
                         }
-                    },
-                    Err(e) => match e {
-                        _ if e.is_close() => {
-                            log::warn!("Connection disconnected");
-                            break;
-                        }
-                        // TODO: Send code with it
-                        _ => {
-                            log::error!("Misc err: {e}");
-                            Err(MessageOutgoingError::SocketClosed)
-                        }
-                    },
+
+                        continue 'event_loop; // no reply, so continue event loop
+                    }
+                    ClientMsg::Subscribe(_) | ClientMsg::Unsubscribe(_) => {
+                        log::error!("Unimplemented sub/unsub");
+                        continue 'event_loop; // no reply
+                    }
                 },
             };
 
