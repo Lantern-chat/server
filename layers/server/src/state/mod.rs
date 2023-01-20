@@ -107,12 +107,21 @@ impl ServerState {
     }
 
     /// Returns an infinite stream that yields a reference to the config only when it changes
+    ///
+    /// The first value returns immediately
     pub fn config_stream(&self) -> impl Stream<Item = arc_swap::Guard<Arc<Config>, arc_swap::DefaultStrategy>> {
-        // TODO: Figure out how to avoid cloning on every item
-        futures::stream::repeat(self.clone()).then(|state| async move {
+        use futures::stream::{iter, repeat};
+
+        // NOTE: `iter` has less overhead than `once`
+        let first = iter([self.config()]);
+
+        // TODO: Figure out how to avoid cloning on every item, maybe convert to stream::poll_fn
+        let rest = repeat(self.clone()).then(|state| async move {
             state.config_change.notified().await;
             state.config()
-        })
+        });
+
+        first.chain(rest)
     }
 
     pub fn fs(&self) -> FileStore {

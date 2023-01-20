@@ -187,7 +187,7 @@ where
                             f(state.clone(), &alive).await
                         }
                     },
-                    _ = alive.changed() => break,
+                    _ = alive.changed() => return,
 
                     // if the interval value changes, we are almost certainly *before* the deadline
                     i = interval.next() => match i {
