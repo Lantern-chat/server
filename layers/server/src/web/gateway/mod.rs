@@ -154,9 +154,15 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                         EventInner::External(ref e) => e,
                         EventInner::Internal(ref event) => {
                             match event {
-                                InternalEvent::BulkUserBlockedUpdate { blocked } => {
+                                InternalEvent::BulkUserBlockedRefresh { blocked } => {
                                     blocked_by.clear();
                                     blocked_by.extend(blocked);
+                                }
+                                InternalEvent::UserBlockedAdd { user_id } => {
+                                    blocked_by.insert(*user_id);
+                                }
+                                InternalEvent::UserBlockedRemove { user_id } => {
+                                    blocked_by.remove(user_id);
                                 }
                             }
 
