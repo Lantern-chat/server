@@ -27,6 +27,8 @@ pub async fn get_one(
             query: Some(Cursor::Exact(msg_id)),
             limit: Some(1),
             thread: None,
+            pinned: false,
+            starred: false,
         },
     )
     .await?;
@@ -88,6 +90,8 @@ pub async fn get_many(
         limit,
         user_id: Some(auth.user_id),
         thread_id: form.thread,
+        pinned: form.pinned,
+        starred: form.starred,
     };
 
     Ok(parse_stream(state, db.query_stream(&query, &params.as_params()).await?))
@@ -107,6 +111,8 @@ pub async fn get_one_transactional(
         limit: 1,
         user_id: None,
         thread_id: None,
+        pinned: false,
+        starred: false,
     };
 
     parse_first(
@@ -130,6 +136,8 @@ pub async fn get_one_from_client(
         limit: 1,
         user_id: None,
         thread_id: None,
+        pinned: false,
+        starred: false,
     };
 
     parse_first(
@@ -171,6 +179,11 @@ mod q {
         pub struct SelectedMessages {
             Id: Messages::Id,
             Unavailable: Type::BOOL,
+            Starred: Type::BOOL,
+        }
+
+        pub struct SelectStarred {
+            Starred: Type::BOOL,
         }
 
         struct AggPerm {
@@ -208,6 +221,7 @@ mod q {
 
             pub enum SelectedColumns continue MessageColumns {
                 SelectedMessages::Unavailable,
+                SelectedMessages::Starred,
             }
 
             pub enum PartyColumns continue SelectedColumns {
@@ -264,6 +278,8 @@ mod q {
             pub room_id: Option<Snowflake> = Rooms::Id,
             pub user_id: Option<Snowflake> = Users::Id,
             pub thread_id: Option<Snowflake> = Threads::Id,
+            pub pinned: bool = Type::BOOL,
+            pub starred: bool = Type::BOOL,
         }
     }
 
@@ -275,6 +291,7 @@ mod q {
     ) -> impl thorn::AnyQuery {
         let mut selected = Query::select()
             .expr(Messages::Id.alias_to(SelectedMessages::Id))
+            .expr(SelectStarred::Starred.alias_to(SelectedMessages::Starred))
             // test if message is deleted
             .and_where(Messages::Flags.has_no_bits(MessageFlags::DELETED.bits().lit()))
             .and_where(
@@ -282,6 +299,13 @@ mod q {
                     .is_null()
                     .or(Messages::ThreadId.equals(Params::thread_id())),
             )
+            .and_where(
+                // TODO: Refine by specific pin tag, rather than a boolean
+                Params::pinned()
+                    .is_false()
+                    .or(Builtin::cardinality((Messages::PinTags,)).greater_than(0.lit())), // cardinality(pin_tags) > 0
+            )
+            .and_where(Params::starred().is_false().or(SelectStarred::Starred))
             .limit(Params::limit());
 
         selected = match with_user {
@@ -302,6 +326,14 @@ mod q {
                         .alias_to(SelectedMessages::Unavailable),
                 ),
         };
+
+        // Need to shove this logic into a lateral subquery so it can be used in WHERE
+        selected = selected.from(Lateral(SelectStarred::as_query(
+            Query::select().expr(
+                Builtin::coalesce((Params::user_id().equals(Builtin::any(Messages::StarredBy)), false.lit()))
+                    .alias_to(SelectStarred::Starred),
+            ),
+        )));
 
         if with_room {
             selected = selected.and_where(Messages::RoomId.equals(Params::room_id()));
@@ -521,6 +553,7 @@ where
                 reactions: Vec::new(),
                 embeds: Vec::new(),
                 pins: Vec::new(),
+                starred: false,
             };
 
             // before we continue, if the message was marked unavailable, then we can skip everything else
@@ -622,6 +655,8 @@ where
             msg.pins = row
                 .try_get::<_, Option<Vec<Snowflake>>>(DynamicMsgColumns::pin_tags())?
                 .unwrap_or_default();
+
+            msg.starred = row.try_get(SelectedColumns::starred())?;
 
             msg.reactions = match row.try_get(ReactionColumns::reactions())? {
                 Some(Json::<Vec<RawReaction>>(raw)) if !raw.is_empty() => {
