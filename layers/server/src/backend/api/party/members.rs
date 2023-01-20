@@ -131,11 +131,11 @@ mod q {
             AggMembersFull::PresenceActivity,
         }
 
-        pub enum RelColumns {
+        pub enum RelColumns continue MemberColumns {
             AggRelationships::RelB,
         }
 
-        pub enum ExtraColumns continue MemberColumns {
+        pub enum ExtraColumns continue RelColumns {
             AggMembersFull::BannerId,
             AggMembersFull::Biography,
         }
