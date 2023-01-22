@@ -11,8 +11,14 @@ pub async fn options(route: Route<ServerState>, auth: Authorization) -> WebResul
 
     headers.extend(super::tus_headers());
 
-    headers.insert("Upload-Quota-Used", super::header_from_int(options.quota_used));
-    headers.insert("Upload-Quota-Total", super::header_from_int(options.quota_total));
+    headers.insert(
+        HeaderName::from_static("Upload-Quota-Used"),
+        super::header_from_int(options.quota_used),
+    );
+    headers.insert(
+        HeaderName::from_static("Upload-Quota-Total"),
+        super::header_from_int(options.quota_total),
+    );
 
     Ok(res.into())
 }

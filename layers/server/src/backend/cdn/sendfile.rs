@@ -9,8 +9,8 @@ use ftl::{
 use filesystem::store::{CipherOptions, FileExt, OpenMode};
 use futures::FutureExt;
 use headers::{
-    AcceptRanges, ContentLength, ContentRange, ContentType, HeaderMap, HeaderMapExt, HeaderValue, IfModifiedSince,
-    LastModified, Range,
+    AcceptRanges, ContentLength, ContentRange, ContentType, HeaderMap, HeaderMapExt, HeaderName, HeaderValue,
+    IfModifiedSince, LastModified, Range,
 };
 use hyper::Body;
 use smol_str::SmolStr;
@@ -134,7 +134,7 @@ pub async fn send_file(
 
                 let mut trailers = HeaderMap::new();
                 if let Ok(value) = HeaderValue::from_str(&format!("end;dur={:.4}", elapsed)) {
-                    trailers.insert("Server-Timing", value);
+                    trailers.insert(HeaderName::from_static("Server-Timing"), value);
 
                     if let Err(e) = sender.send_trailers(trailers).await {
                         log::trace!("Error sending trailers: {e}");
@@ -152,7 +152,10 @@ pub async fn send_file(
 
     let headers = res.headers_mut();
 
-    headers.insert("Cache-Control", HeaderValue::from_static("public, max-age=2678400"));
+    headers.insert(
+        HeaderName::from_static("Cache-Control"),
+        HeaderValue::from_static("public, max-age=2678400"),
+    );
     headers.typed_insert(ContentLength(len));
     headers.typed_insert(AcceptRanges::bytes());
     headers.typed_insert(last_modified);
@@ -165,10 +168,14 @@ pub async fn send_file(
         format!("inline; filename=\"{name}\"")
     };
 
-    headers.insert("Content-Disposition", HeaderValue::from_str(&cd)?);
+    headers.insert(
+        HeaderName::from_static("Content-Disposition"),
+        HeaderValue::from_str(&cd)?,
+    );
 
-    if let Some(mime) = meta.mime {
-        headers.insert("Content-Type", HeaderValue::from_str(mime)?);
+    // if the mime isn't valid for a header, just ignore it and send as octet, don't error
+    if let Some(mime) = meta.mime.and_then(|mime| HeaderValue::from_str(mime).ok()) {
+        headers.insert(HeaderName::from_static("Content-Type"), mime);
     } else {
         headers.typed_insert(ContentType::octet_stream());
     }

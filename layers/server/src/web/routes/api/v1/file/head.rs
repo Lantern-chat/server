@@ -1,4 +1,4 @@
-use headers::{CacheControl, HeaderMapExt, HeaderValue};
+use headers::{CacheControl, HeaderMapExt, HeaderName, HeaderValue};
 
 use super::*;
 use crate::{backend::api::file::head::UploadHead, util::TupleClone};
@@ -13,12 +13,18 @@ pub async fn head(route: Route<ServerState>, auth: Authorization, file_id: Snowf
 
     headers.extend(super::tus_headers());
 
-    headers.insert("Upload-Metadata", encode_metadata(&head));
+    headers.insert(HeaderName::from_static("Upload-Metadata"), encode_metadata(&head));
 
-    headers.insert("Upload-Length", super::header_from_int(head.size));
+    headers.insert(
+        HeaderName::from_static("Upload-Length"),
+        super::header_from_int(head.size),
+    );
 
     if head.size != head.offset {
-        headers.insert("Upload-Offset", super::header_from_int(head.offset));
+        headers.insert(
+            HeaderName::from_static("Upload-Offset"),
+            super::header_from_int(head.offset),
+        );
     }
 
     headers.typed_insert(CacheControl::new().with_no_store());

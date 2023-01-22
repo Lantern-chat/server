@@ -12,8 +12,10 @@ pub async fn post(mut route: Route<ServerState>, auth: Authorization) -> WebResu
 
     res.headers_mut().extend(super::tus_headers());
 
-    res.headers_mut()
-        .insert("Location", super::header_from_int(file_id.to_u64()));
+    res.headers_mut().insert(
+        HeaderName::from_static("Location"),
+        super::header_from_int(file_id.to_u64()),
+    );
 
     Ok(res.into())
 }

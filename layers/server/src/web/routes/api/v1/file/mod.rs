@@ -1,4 +1,4 @@
-use http::{HeaderMap, HeaderValue, Method, StatusCode};
+use http::{header::HeaderName, HeaderMap, HeaderValue, Method, StatusCode};
 
 // https://tus.io/protocols/resumable-upload.html
 
@@ -6,10 +6,22 @@ lazy_static::lazy_static! {
     pub static ref TUS_HEADERS: HeaderMap<HeaderValue> = {
         let mut headers = HeaderMap::new();
 
-        headers.insert("Tus-Resumable", HeaderValue::from_static("1.0.0"));
-        headers.insert("Tus-Version", HeaderValue::from_static("1.0.0"));
-        headers.insert("Tus-Extension", HeaderValue::from_static("creation,expiration,checksum,termination"));
-        headers.insert("Tus-Checksum-Algorithm", HeaderValue::from_static("crc32"));
+        headers.insert(
+            HeaderName::from_static("Tus-Resumable"),
+            HeaderValue::from_static("1.0.0")
+        );
+        headers.insert(
+            HeaderName::from_static("Tus-Version"),
+            HeaderValue::from_static("1.0.0")
+        );
+        headers.insert(
+            HeaderName::from_static("Tus-Extension"),
+            HeaderValue::from_static("creation,expiration,checksum,termination")
+        );
+        headers.insert(
+            HeaderName::from_static("Tus-Checksum-Algorithm"),
+            HeaderValue::from_static("crc32")
+        );
 
         headers
     };

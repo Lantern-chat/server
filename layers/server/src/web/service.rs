@@ -1,6 +1,9 @@
-use std::{convert::Infallible, net::SocketAddr};
+use std::{
+    convert::{Infallible, TryFrom},
+    net::SocketAddr,
+};
 
-use headers::HeaderValue;
+use headers::{HeaderName, HeaderValue};
 use hyper::{Body, Request, Response};
 
 use crate::{metrics::API_METRICS, web::routes, ServerState};
@@ -33,9 +36,18 @@ pub async fn service(
 
     let elapsed = start.elapsed();
     let elapsedf = elapsed.as_secs_f64() * 1_000.0;
+    let status = resp.status();
 
-    log::debug!("{info} -> {} {:.4}ms", resp.status(), elapsedf);
-    if let Ok(value) = HeaderValue::from_str({
+    let headers = resp.headers_mut();
+
+    // http://www.gnuterrypratchett.com/
+    headers.insert(
+        HeaderName::from_static("X-Clacks-Overhead"),
+        HeaderValue::from_static("GNU Terry Pratchett"),
+    );
+
+    log::debug!("{info} -> {} {:.4}ms", status, elapsedf);
+    if let Ok(value) = HeaderValue::try_from({
         use std::fmt::Write;
 
         // reuse the info string to avoid another allocation
@@ -45,9 +57,9 @@ pub async fn service(
             log::error!("Error formatting response duration: {e}");
         }
 
-        &info
+        info
     }) {
-        resp.headers_mut().insert("Server-Timing", value);
+        headers.insert(HeaderName::from_static("Server-Timing"), value);
     }
 
     API_METRICS.load().add_req(resp.status().as_u16(), elapsed);

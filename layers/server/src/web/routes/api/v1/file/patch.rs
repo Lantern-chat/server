@@ -49,7 +49,10 @@ pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: 
 
     headers.extend(super::TUS_HEADERS.iter().map(|(k, v)| (k.clone(), v.clone())));
 
-    headers.insert("Upload-Offset", super::header_from_int(patch.upload_offset));
+    headers.insert(
+        HeaderName::from_static("Upload-Offset"),
+        super::header_from_int(patch.upload_offset),
+    );
 
     Ok(res.into())
 }
