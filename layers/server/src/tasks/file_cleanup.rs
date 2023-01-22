@@ -77,7 +77,7 @@ pub fn add_orphaned_file_cleanup_task(state: &ServerState, runner: &TaskRunner) 
 
                             Query::delete().from::<Files>().and_where(
                                 Query::select()
-                                    .expr(Builtin::unnest((Var::of(SNOWFLAKE_ARRAY),)))
+                                    .expr(Builtin::unnest(Var::of(SNOWFLAKE_ARRAY)))
                                     .any()
                                     .equals(Files::Id),
                             )

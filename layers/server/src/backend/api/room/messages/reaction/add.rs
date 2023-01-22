@@ -202,8 +202,7 @@ mod q {
                 true => values
                     .expr(PartyMember::PartyId.alias_to(Values::PartyId))
                     .from(
-                        PartyMember::inner_join_table::<Emotes>()
-                            .on(Emotes::PartyId.equals(PartyMember::PartyId)),
+                        PartyMember::inner_join_table::<Emotes>().on(Emotes::PartyId.equals(PartyMember::PartyId)),
                     )
                     .and_where(PartyMember::UserId.equals(Params::user_id())),
                 false => values
@@ -246,7 +245,7 @@ mod q {
                         Reactions::Reacted,
                         Case::default()
                             .when_condition(
-                                Builtin::array_length((Reactions::UserIds, 1.lit())).is_null(),
+                                Builtin::cardinality(Reactions::UserIds).equals(0.lit()),
                                 Builtin::now(()),
                             )
                             .otherwise(Reactions::Reacted),
@@ -255,7 +254,7 @@ mod q {
                         Reactions::UserIds,
                         Builtin::array_append((Reactions::UserIds, Params::user_id())),
                     )
-                    .and_where(Params::user_id().not_equals(Builtin::all((Reactions::UserIds,)))),
+                    .and_where(Params::user_id().not_equals(Builtin::all(Reactions::UserIds))),
             )
             .returning(Reactions::MsgId.alias_to(Inserted::MsgId));
 

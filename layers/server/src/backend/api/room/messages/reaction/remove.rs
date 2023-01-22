@@ -113,7 +113,7 @@ mod q {
                 true => Params::emoji_id().is_null(),
                 false => Params::emote_id().is_null(),
             })
-            .and_where(Params::user_id().equals(Builtin::any((Reactions::UserIds,))))
+            .and_where(Params::user_id().equals(Builtin::any(Reactions::UserIds)))
             .returning(Reactions::MsgId.alias_to(Updated::MsgId));
 
         Query::select()
