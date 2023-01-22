@@ -79,6 +79,7 @@ pub async fn get_party_inner(
             banner: Nullable::Undefined,
             position: row.try_get(PartyMemberColumns::position())?,
             default_room: row.try_get(PartyColumns::default_room())?,
+            pin_folders: Vec::new(),
         },
     };
 

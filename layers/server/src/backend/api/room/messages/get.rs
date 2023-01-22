@@ -27,7 +27,7 @@ pub async fn get_one(
             query: Some(Cursor::Exact(msg_id)),
             limit: Some(1),
             thread: None,
-            pinned: false,
+            pinned: Vec::new(),
             starred: false,
         },
     )
@@ -111,7 +111,7 @@ pub async fn get_one_transactional(
         limit: 1,
         user_id: None,
         thread_id: None,
-        pinned: false,
+        pinned: Vec::new(),
         starred: false,
     };
 
@@ -136,7 +136,7 @@ pub async fn get_one_from_client(
         limit: 1,
         user_id: None,
         thread_id: None,
-        pinned: false,
+        pinned: Vec::new(),
         starred: false,
     };
 
@@ -278,7 +278,7 @@ mod q {
             pub room_id: Option<Snowflake> = Rooms::Id,
             pub user_id: Option<Snowflake> = Users::Id,
             pub thread_id: Option<Snowflake> = Threads::Id,
-            pub pinned: bool = Type::BOOL,
+            pub pinned: Vec<Snowflake> = SNOWFLAKE_ARRAY,
             pub starred: bool = Type::BOOL,
         }
     }
@@ -300,10 +300,9 @@ mod q {
                     .or(Messages::ThreadId.equals(Params::thread_id())),
             )
             .and_where(
-                // TODO: Refine by specific pin tag, rather than a boolean
-                Params::pinned()
-                    .is_false()
-                    .or(Builtin::cardinality((Messages::PinTags,)).greater_than(0.lit())), // cardinality(pin_tags) > 0
+                Builtin::cardinality(Params::pinned())
+                    .equals(0.lit())
+                    .or(Messages::PinTags.overlaps(Params::pinned())),
             )
             .and_where(Params::starred().is_false().or(SelectStarred::Starred))
             .limit(Params::limit());

@@ -53,6 +53,7 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
         banner: Nullable::Null,
         position: 0,
         default_room: room_id,
+        pin_folders: Vec::new(),
     };
 
     let mut db = state.db.write.get().await?;
