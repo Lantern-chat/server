@@ -42,7 +42,7 @@ pub async fn service(
 
     // http://www.gnuterrypratchett.com/
     headers.insert(
-        HeaderName::from_static("X-Clacks-Overhead"),
+        HeaderName::from_static("x-clacks-overhead"),
         HeaderValue::from_static("GNU Terry Pratchett"),
     );
 
@@ -59,7 +59,7 @@ pub async fn service(
 
         info
     }) {
-        headers.insert(HeaderName::from_static("Server-Timing"), value);
+        headers.insert(HeaderName::from_static("server-timing"), value);
     }
 
     API_METRICS.load().add_req(resp.status().as_u16(), elapsed);

@@ -1,4 +1,5 @@
 use futures::FutureExt;
+use headers::HeaderName;
 
 use ftl::Route;
 
@@ -9,10 +10,10 @@ pub use crate::backend::Authorization;
 
 use crate::{Error, ServerState};
 
-const AUTH_HEADER: &str = "Authorization";
+const AUTH_HEADER: &str = "authorization";
 
 pub async fn authorize(route: &Route<ServerState>) -> Result<Authorization, Error> {
-    let header = match route.raw_header(AUTH_HEADER) {
+    let header = match route.raw_header(HeaderName::from_static(AUTH_HEADER)) {
         Some(header) => header.to_str()?,
         None => return Err(Error::MissingAuthorizationHeader),
     };
@@ -36,7 +37,7 @@ impl MaybeAuth {
 }
 
 pub async fn maybe_authorize(route: &Route<ServerState>) -> Result<MaybeAuth, Error> {
-    match route.raw_header(AUTH_HEADER) {
+    match route.raw_header(HeaderName::from_static(AUTH_HEADER)) {
         None => Ok(MaybeAuth(None)),
         Some(header) => auth::do_auth(&route.state, RawAuthToken::from_header(header.to_str()?)?)
             .await

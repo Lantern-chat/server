@@ -134,7 +134,7 @@ pub async fn send_file(
 
                 let mut trailers = HeaderMap::new();
                 if let Ok(value) = HeaderValue::from_str(&format!("end;dur={:.4}", elapsed)) {
-                    trailers.insert(HeaderName::from_static("Server-Timing"), value);
+                    trailers.insert(HeaderName::from_static("server-timing"), value);
 
                     if let Err(e) = sender.send_trailers(trailers).await {
                         log::trace!("Error sending trailers: {e}");
@@ -153,7 +153,7 @@ pub async fn send_file(
     let headers = res.headers_mut();
 
     headers.insert(
-        HeaderName::from_static("Cache-Control"),
+        HeaderName::from_static("cache-control"),
         HeaderValue::from_static("public, max-age=2678400"),
     );
     headers.typed_insert(ContentLength(len));
@@ -169,13 +169,13 @@ pub async fn send_file(
     };
 
     headers.insert(
-        HeaderName::from_static("Content-Disposition"),
+        HeaderName::from_static("content-disposition"),
         HeaderValue::from_str(&cd)?,
     );
 
     // if the mime isn't valid for a header, just ignore it and send as octet, don't error
     if let Some(mime) = meta.mime.and_then(|mime| HeaderValue::from_str(mime).ok()) {
-        headers.insert(HeaderName::from_static("Content-Type"), mime);
+        headers.insert(HeaderName::from_static("content-type"), mime);
     } else {
         headers.typed_insert(ContentType::octet_stream());
     }

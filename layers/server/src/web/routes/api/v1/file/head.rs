@@ -13,16 +13,16 @@ pub async fn head(route: Route<ServerState>, auth: Authorization, file_id: Snowf
 
     headers.extend(super::tus_headers());
 
-    headers.insert(HeaderName::from_static("Upload-Metadata"), encode_metadata(&head));
+    headers.insert(HeaderName::from_static("upload-metadata"), encode_metadata(&head));
 
     headers.insert(
-        HeaderName::from_static("Upload-Length"),
+        HeaderName::from_static("upload-length"),
         super::header_from_int(head.size),
     );
 
     if head.size != head.offset {
         headers.insert(
-            HeaderName::from_static("Upload-Offset"),
+            HeaderName::from_static("upload-offset"),
             super::header_from_int(head.offset),
         );
     }

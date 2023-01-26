@@ -7,19 +7,19 @@ lazy_static::lazy_static! {
         let mut headers = HeaderMap::new();
 
         headers.insert(
-            HeaderName::from_static("Tus-Resumable"),
+            HeaderName::from_static("tus-resumable"),
             HeaderValue::from_static("1.0.0")
         );
         headers.insert(
-            HeaderName::from_static("Tus-Version"),
+            HeaderName::from_static("tus-version"),
             HeaderValue::from_static("1.0.0")
         );
         headers.insert(
-            HeaderName::from_static("Tus-Extension"),
+            HeaderName::from_static("tus-extension"),
             HeaderValue::from_static("creation,expiration,checksum,termination")
         );
         headers.insert(
-            HeaderName::from_static("Tus-Checksum-Algorithm"),
+            HeaderName::from_static("tus-checksum-algorithm"),
             HeaderValue::from_static("crc32")
         );
 

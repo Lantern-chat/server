@@ -1,4 +1,4 @@
-use headers::{ContentLength, HeaderValue};
+use headers::{ContentLength, HeaderName, HeaderValue};
 use hyper::body::HttpBody;
 
 use super::*;
@@ -24,10 +24,10 @@ pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: 
         return Err(Error::RequestEntityTooLarge);
     }
 
-    let Some(Ok(Ok(upload_offset))) = route.parse_raw_header("Upload-Offset") else { return Err(Error::BadRequest) };
+    let Some(Ok(Ok(upload_offset))) = route.parse_raw_header(HeaderName::from_static("upload-offset")) else { return Err(Error::BadRequest) };
     let Some(ContentLength(content_length)) = route.header::<headers::ContentLength>() else { return Err(Error::BadRequest) };
 
-    let checksum = match route.raw_header("Upload-Checksum") {
+    let checksum = match route.raw_header(HeaderName::from_static("upload-checksum")) {
         Some(checksum_header) => parse_checksum_header(checksum_header)?,
         _ => return Err(Error::BadRequest),
     };
@@ -50,7 +50,7 @@ pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: 
     headers.extend(super::TUS_HEADERS.iter().map(|(k, v)| (k.clone(), v.clone())));
 
     headers.insert(
-        HeaderName::from_static("Upload-Offset"),
+        HeaderName::from_static("upload-offset"),
         super::header_from_int(patch.upload_offset),
     );
 

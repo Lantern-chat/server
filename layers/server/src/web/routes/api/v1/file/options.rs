@@ -12,11 +12,11 @@ pub async fn options(route: Route<ServerState>, auth: Authorization) -> WebResul
     headers.extend(super::tus_headers());
 
     headers.insert(
-        HeaderName::from_static("Upload-Quota-Used"),
+        HeaderName::from_static("upload-quota-used"),
         super::header_from_int(options.quota_used),
     );
     headers.insert(
-        HeaderName::from_static("Upload-Quota-Total"),
+        HeaderName::from_static("upload-quota-total"),
         super::header_from_int(options.quota_total),
     );
 
