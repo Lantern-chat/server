@@ -1140,7 +1140,7 @@ BEGIN
                 THEN 'message_create'::lantern.event_code
 
              WHEN TG_OP = 'UPDATE' AND (NEW.flags & MESSAGE_DELETED = 0)
-                AND (cardinality(OLD.star_tags) = 0 OR NEW.star_tags = OLD.star_tags)
+                AND (cardinality(OLD.starred_by) = 0 OR NEW.starred_by = OLD.starred_by)
                 THEN 'message_update'::lantern.event_code
         END,
         NEW.id,
