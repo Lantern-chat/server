@@ -1041,6 +1041,7 @@ CREATE INDEX msg_nd_idx                     ON lantern.messages         USING bt
 
 CREATE INDEX msg_ts_idx                     ON lantern.messages         USING GIN (ts);
 CREATE INDEX message_pin_tag_idx            ON lantern.messages         USING GIN (pin_tags) WHERE pin_tags IS NOT NULL;
+CREATE INDEX message_starred_by_idx         ON lantern.messages         USING GIN (starred_by) WHERE starred_by IS NOT NULL;
 
 CREATE INDEX attachment_msg_idx             ON lantern.attachments      USING btree(message_id); -- INCLUDE(flags) ?
 
