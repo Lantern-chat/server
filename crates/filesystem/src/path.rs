@@ -59,11 +59,8 @@ pub fn id_to_name(id: Snowflake, buf: &mut PathBuf) {
     }
 
     let mut name_encoded = [0; 8 * 4 / 3 + 4];
-    let len = base64::encode_config_slice(
-        shuffled,
-        base64::Config::new(base64::CharacterSet::UrlSafe, false),
-        &mut name_encoded,
-    );
-
-    buf.push(unsafe { std::str::from_utf8_unchecked(&name_encoded[..len]) });
+    match URL_SAFE_NO_PAD.encode_slice(shuffled, &mut name_encoded) {
+        Ok(len) => buf.push(unsafe { std::str::from_utf8_unchecked(&name_encoded[..len]) }),
+        _ => unreachable!("Encoding file id to base64 should always succeed"),
+    }
 }

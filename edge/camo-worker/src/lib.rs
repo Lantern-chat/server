@@ -13,12 +13,7 @@ fn log_request(req: &Request) {
     );
 }
 
-// configure shared base64 engine
-static BASE64_ENGINE: base64::engine::fast_portable::FastPortable =
-    base64::engine::fast_portable::FastPortable::from(
-        &base64::alphabet::URL_SAFE,
-        base64::engine::fast_portable::NO_PAD,
-    );
+use base64::engine::{general_purpose::URL_SAFE_NO_PAD, Engine};
 
 #[event(fetch)]
 pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Response> {
@@ -41,7 +36,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
     utils::set_panic_hook();
 
     // decode url
-    let url = match base64::decode_engine(&raw_url, &BASE64_ENGINE) {
+    let url = match URL_SAFE_NO_PAD.decode(&raw_url) {
         Ok(bytes) => match String::from_utf8(bytes) {
             Ok(url) => url,
             Err(_) => return Response::error("Invalid UTF-8", 400),
@@ -55,7 +50,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
     }
 
     // decode signature
-    let Ok(sig) = base64::decode_engine(&raw_sig, &BASE64_ENGINE) else {
+    let Ok(sig) = URL_SAFE_NO_PAD.decode(&raw_sig) else {
         return Response::error("Invalid Encoding", 400);
     };
 
