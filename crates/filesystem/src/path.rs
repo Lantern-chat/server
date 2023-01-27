@@ -22,19 +22,20 @@ fn outer_perfect_shuffle(mut x: u64) -> u64 {
     x
 }
 
+const KEY: [u64; 4] = [
+    0xCE388D4A7C1DEDD9,
+    0x15709E26FCDF195D,
+    0x1EC91837365B0A8B,
+    0x29B54AF59AF086D9,
+];
+
 pub fn id_to_path(id: Snowflake, buf: &mut PathBuf) {
     let id = id.to_u64();
 
-    // OLD KEYS: 0xb83d72c7cb466675af2fc624c16ef67d, 0x1e1f65d8c3f9e3477a6c09a2d6b86b86
-    // converted to new keys via https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=25d9ef963dd82a5b0f9fdba168d7a3f3
-    let state = ahash::RandomState::with_seeds(
-        0xCE388D4A7C1DEDD9,
-        0x15709E26FCDF195D,
-        0x1EC91837365B0A8B,
-        0x29B54AF59AF086D9,
-    );
+    let state = highway::HighwayHasher::new(highway::Key(KEY));
 
-    let hash = state.hash_one(id).to_le_bytes();
+    // NOTE: Ensure little-endian byte order just in case server is transferred between endianness.
+    let hash = highway::HighwayHash::hash64(state, &id.to_le_bytes()).to_le_bytes();
 
     // take upper bits and use them for directories
     // using only 32 bits for this allows for up to 2^32 directories as 256 / 256 / 256 / 256
@@ -47,6 +48,8 @@ pub fn id_to_path(id: Snowflake, buf: &mut PathBuf) {
         buf.push(unsafe { std::str::from_utf8_unchecked(chunk) });
     }
 }
+
+use base64::engine::{general_purpose::URL_SAFE_NO_PAD, Engine};
 
 pub fn id_to_name(id: Snowflake, buf: &mut PathBuf) {
     let bytes = outer_perfect_shuffle(id.to_u64()).to_le_bytes();
