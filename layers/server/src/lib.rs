@@ -1,4 +1,5 @@
 #![allow(unused_imports)]
+#![deny(deprecated)]
 
 #[macro_use]
 extern crate serde;

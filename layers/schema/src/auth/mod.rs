@@ -57,14 +57,17 @@ impl RawAuthToken {
     }
 }
 
+use base64::engine::{general_purpose::STANDARD_NO_PAD, Engine};
+
 impl From<RawAuthToken> for AuthToken {
     fn from(token: RawAuthToken) -> AuthToken {
         // SAFETY: sizes are asserted above and in debug
         match token {
             RawAuthToken::Bearer(bytes) => unsafe {
                 let mut s = BearerToken::zeroized();
-                let n = base64::encode_config_slice(bytes, base64::STANDARD_NO_PAD, s.as_bytes_mut());
-                debug_assert!(n == BearerToken::LEN);
+                if Ok(BearerToken::LEN) != STANDARD_NO_PAD.encode_slice(bytes, s.as_bytes_mut()) {
+                    unreachable!("Could not encode auth token to base64");
+                };
                 AuthToken::Bearer(s)
             },
             RawAuthToken::Bot(token) => AuthToken::Bot(token.format()),
@@ -79,7 +82,7 @@ impl TryFrom<AuthToken> for RawAuthToken {
         Ok(match token {
             AuthToken::Bearer(token) => {
                 let mut bytes = [0; BEARER_BYTES_LEN];
-                base64::decode_config_slice(token, base64::STANDARD_NO_PAD, &mut bytes)?;
+                STANDARD_NO_PAD.decode_slice_unchecked(token, &mut bytes)?;
                 RawAuthToken::Bearer(bytes)
             }
             AuthToken::Bot(token) => RawAuthToken::Bot(token.parse()?),

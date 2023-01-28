@@ -20,7 +20,7 @@ lazy_static = "1.4.0"
 futures = "0.3.14"
 thiserror = "1.0.24"
 hex = "0.4"
-base64 = "0.13.0"
+base64 = "0.21.0"
 serde = "1"
 time = { version = "0.3", features = ["macros"] }
 # itoa = "0.4.8"

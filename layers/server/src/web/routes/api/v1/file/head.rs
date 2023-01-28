@@ -32,18 +32,20 @@ pub async fn head(route: Route<ServerState>, auth: Authorization, file_id: Snowf
     Ok(res.into())
 }
 
+use base64::engine::{general_purpose::STANDARD, Engine};
+
 fn encode_metadata(head: &UploadHead) -> HeaderValue {
     let mut value = "filename ".to_owned();
-    value += &base64::encode(head.name.as_bytes());
+    STANDARD.encode_string(head.name.as_bytes(), &mut value);
 
     if let Some(ref mime) = head.mime {
         value += ",mime ";
-        value += &base64::encode(mime.as_bytes());
+        STANDARD.encode_string(mime.as_bytes(), &mut value);
     }
 
     if let Some(ref preview) = head.preview {
         value += ",preview ";
-        value += &base64::encode(preview);
+        STANDARD.encode_string(preview, &mut value);
     }
 
     HeaderValue::from_str(&value).unwrap()

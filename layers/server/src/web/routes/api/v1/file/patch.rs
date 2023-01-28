@@ -57,6 +57,8 @@ pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: 
     Ok(res.into())
 }
 
+use base64::engine::{general_purpose::STANDARD, Engine};
+
 fn parse_checksum_header(header: &HeaderValue) -> Result<u32, Error> {
     // Upload-Checksum: crc32 sawegsdgsdgsdg=
     let mut parts = header.to_str()?.split(' ').map(str::trim);
@@ -69,9 +71,10 @@ fn parse_checksum_header(header: &HeaderValue) -> Result<u32, Error> {
     let Some(checksum_encoded) = parts.next() else { return Err(Error::ChecksumMismatch) };
 
     let mut out = [0u8; 4];
-    if 4 != base64::decode_config_slice(checksum_encoded, base64::STANDARD, &mut out)? {
+
+    if Ok(4) != STANDARD.decode_slice_unchecked(checksum_encoded, &mut out) {
         return Err(Error::ChecksumMismatch);
-    }
+    };
 
     Ok(u32::from_be_bytes(out))
 }

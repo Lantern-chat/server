@@ -7,6 +7,8 @@ use std::{
     time::SystemTime,
 };
 
+use base64::engine::{general_purpose::STANDARD_NO_PAD, Engine};
+
 use hmac::{
     digest::{FixedOutput, Key},
     Mac, SimpleHmac,
@@ -31,8 +33,7 @@ pub struct SplitBotToken {
 }
 
 impl SplitBotToken {
-    pub const SPLIT_BOT_TOKEN_SIZE: usize =
-        size_of::<Snowflake>() + size_of::<u64>() + size_of::<HmacDigest>();
+    pub const SPLIT_BOT_TOKEN_SIZE: usize = size_of::<Snowflake>() + size_of::<u64>() + size_of::<HmacDigest>();
 
     #[inline]
     pub fn to_bytes(&self) -> [u8; Self::SPLIT_BOT_TOKEN_SIZE] {
@@ -79,9 +80,9 @@ impl SplitBotToken {
         let mut token;
         unsafe {
             token = BotToken::zeroized();
-            let res =
-                base64::encode_config_slice(self.to_bytes(), base64::STANDARD_NO_PAD, token.as_bytes_mut());
-            debug_assert_eq!(res, BotToken::LEN);
+            if Ok(BotToken::LEN) != STANDARD_NO_PAD.encode_slice(self.to_bytes(), token.as_bytes_mut()) {
+                unreachable!("Could not encode bot token to base64");
+            };
         }
 
         token
@@ -125,10 +126,9 @@ impl FromStr for SplitBotToken {
         }
 
         let mut bytes = [0; Self::SPLIT_BOT_TOKEN_SIZE];
-        if base64::decode_config_slice(s, base64::STANDARD_NO_PAD, &mut bytes).is_err() {
+        if let Err(_) = STANDARD_NO_PAD.decode_slice_unchecked(s, &mut bytes) {
             return Err(InvalidAuthToken);
         }
-
         SplitBotToken::try_from(&bytes[..])
     }
 }
