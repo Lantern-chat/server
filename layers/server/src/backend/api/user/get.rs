@@ -26,7 +26,7 @@ pub async fn get_full_user(state: ServerState, auth: Authorization, user_id: Sno
         return Err(Error::NotFound);
     };
 
-    let associated = 1 == row.try_get::<_, i32>(AssocColumns::associated())?;
+    let associated = auth.user_id == user_id || row.try_get(AssocColumns::associated())?;
 
     Ok(User {
         id: user_id,
@@ -168,7 +168,9 @@ mod q {
 
         // ProfileColumns, must follow order as listed above
         q = match member {
-            false => q.cols(ProfileColumns::default()),
+            false => q
+                .cols(ProfileColumns::default())
+                .and_where(Params::party_id().is_null()),
             true => q
                 .expr(schema::combine_profile_bits(
                     BaseProfile::col(Profiles::Bits),

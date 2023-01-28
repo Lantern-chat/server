@@ -173,7 +173,7 @@ mod q {
         }
 
         q = match single {
-            true => q.and_where(PartyMember::UserId.equals(Params::member_id())),
+            true => q.and_where(AggMembersFull::UserId.equals(Params::member_id())),
             false => q.and_where(Params::member_id().is_null()),
         };
 
