@@ -217,6 +217,7 @@ mod q {
                 Messages::ThreadId,
                 Messages::EditedAt,
                 Messages::Flags,
+                Messages::Embeds,
             }
 
             pub enum SelectedColumns continue MessageColumns {
@@ -501,48 +502,7 @@ where
                 kind: MessageKind::Normal,
                 edited_at: None,
                 content: None,
-                author: 'user: {
-                    if unavailable {
-                        break 'user make_system_user();
-                    }
-
-                    let id = row.try_get(MessageColumns::user_id())?;
-
-                    match last_user {
-                        Some(ref last_user) if last_user.id == id => last_user.clone(),
-                        _ => {
-                            let user = User {
-                                id,
-                                username: row.try_get(UserColumns::username())?,
-                                discriminator: row.try_get(UserColumns::discriminator())?,
-                                flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
-                                presence: None,
-                                email: None,
-                                preferences: None,
-                                profile: match row.try_get(ProfileColumns::bits())? {
-                                    None => Nullable::Null,
-                                    Some(bits) => Nullable::Some(UserProfile {
-                                        bits,
-                                        extra: Default::default(),
-                                        nick: row.try_get(ProfileColumns::nickname())?,
-                                        avatar: encrypt_snowflake_opt(
-                                            &state,
-                                            row.try_get(ProfileColumns::avatar_id())?,
-                                        )
-                                        .into(),
-                                        banner: Nullable::Undefined,
-                                        status: Nullable::Undefined,
-                                        bio: Nullable::Undefined,
-                                    }),
-                                },
-                            };
-
-                            last_user = Some(user.clone());
-
-                            user
-                        }
-                    }
-                },
+                author: make_system_user(),
                 member: None,
                 thread_id: row.try_get(MessageColumns::thread_id())?,
                 user_mentions: Vec::new(),
@@ -561,6 +521,45 @@ where
 
                 return Ok(msg);
             }
+
+            msg.author = {
+                let id = row.try_get(MessageColumns::user_id())?;
+
+                match last_user {
+                    Some(ref last_user) if last_user.id == id => last_user.clone(),
+                    _ => {
+                        let user = User {
+                            id,
+                            username: row.try_get(UserColumns::username())?,
+                            discriminator: row.try_get(UserColumns::discriminator())?,
+                            flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
+                            presence: None,
+                            email: None,
+                            preferences: None,
+                            profile: match row.try_get(ProfileColumns::bits())? {
+                                None => Nullable::Null,
+                                Some(bits) => Nullable::Some(UserProfile {
+                                    bits,
+                                    extra: Default::default(),
+                                    nick: row.try_get(ProfileColumns::nickname())?,
+                                    avatar: encrypt_snowflake_opt(
+                                        &state,
+                                        row.try_get(ProfileColumns::avatar_id())?,
+                                    )
+                                    .into(),
+                                    banner: Nullable::Undefined,
+                                    status: Nullable::Undefined,
+                                    bio: Nullable::Undefined,
+                                }),
+                            },
+                        };
+
+                        last_user = Some(user.clone());
+
+                        user
+                    }
+                }
+            };
 
             msg.flags = MessageFlags::from_bits_truncate_public(row.try_get(MessageColumns::flags())?);
             msg.kind = MessageKind::try_from(row.try_get::<_, i16>(MessageColumns::kind())?).unwrap_or_default();
@@ -712,6 +711,10 @@ where
 
                     mentions.push(id);
                 }
+            }
+
+            if let Some(Json(embeds)) = row.try_get(MessageColumns::embeds())? {
+                msg.embeds = embeds;
             }
 
             Ok(msg)
