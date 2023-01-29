@@ -2,7 +2,7 @@ use smol_str::SmolStr;
 
 use timestamp::Timestamp;
 
-use sdk::models::{Embed, EmbedMedia, EmbedType};
+use sdk::models::{EmbedMedia, EmbedType, EmbedV1};
 
 use crate::html::{Header, LinkType};
 use crate::oembed::{OEmbed, OEmbedFormat, OEmbedLink, OEmbedType};
@@ -24,7 +24,7 @@ fn parse_color(mut color: &str) -> Option<i32> {
 /// Build an initial embed profile from HTML meta tags
 ///
 /// NOTE: HEADERS MUST BE SORTED BY PROPERTY NAME FOR OPTIMAL RESULTS
-pub fn parse_meta_to_embed<'a>(embed: &mut Embed, headers: &[Header<'a>]) -> ExtraFields<'a> {
+pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> ExtraFields<'a> {
     let mut extra = ExtraFields::default();
 
     for header in headers {
@@ -41,37 +41,37 @@ pub fn parse_meta_to_embed<'a>(embed: &mut Embed, headers: &[Header<'a>]) -> Ext
                 }
 
                 match meta.property {
-                    "description" => embed.description = content(),
-                    "theme-color" => embed.color = parse_color(meta.content),
-                    "og:site_name" => embed.provider.name = content(),
+                    "description" => embed.desc = content(),
+                    "theme-color" => embed.col = parse_color(meta.content),
+                    "og:site_name" => embed.pro.name = content(),
                     // canonical URL?
                     // "og:url" => embed.url = content(),
                     "og:title" | "twitter:title" => embed.title = content(),
                     "dc:creator" | "article:author" | "book:author" => get!(author).name = raw_content(),
 
-                    "og:image" | "og:image:url" | "og:image:secure_url" => get!(image).url = raw_content(),
+                    "og:image" | "og:image:url" | "og:image:secure_url" => get!(img).url = raw_content(),
                     // don't let the twitter image overwrite og images
-                    "twitter:image" => match embed.image {
+                    "twitter:image" => match embed.img {
                         Some(ref mut image) if image.url.is_empty() => image.url = raw_content(),
-                        None => get!(image).url = raw_content(),
+                        None => get!(img).url = raw_content(),
                         _ => {}
                     },
-                    "og:video" | "og:video:secure_url" => get!(video).url = raw_content(),
+                    "og:video" | "og:video:secure_url" => get!(vid).url = raw_content(),
                     "og:audio" | "og:audio:secure_url" => get!(audio).url = raw_content(),
 
-                    "og:image:width" => get!(image).width = content_int(),
-                    "og:video:width" => get!(video).width = content_int(),
+                    "og:image:width" => get!(img).width = content_int(),
+                    "og:video:width" => get!(vid).width = content_int(),
                     "music:duration" => get!(audio).width = content_int(),
 
-                    "og:image:height" => get!(image).height = content_int(),
-                    "og:video:height" => get!(video).height = content_int(),
+                    "og:image:height" => get!(img).height = content_int(),
+                    "og:video:height" => get!(vid).height = content_int(),
 
-                    "og:image:type" => get!(image).mime = content(),
-                    "og:video:type" => get!(video).mime = content(),
+                    "og:image:type" => get!(img).mime = content(),
+                    "og:video:type" => get!(vid).mime = content(),
                     "og:audio:type" => get!(audio).mime = content(),
 
-                    "og:image:alt" => get!(image).alt = content(),
-                    "og:video:alt" => get!(video).alt = content(),
+                    "og:image:alt" => get!(img).alt = content(),
+                    "og:video:alt" => get!(vid).alt = content(),
                     "og:audio:alt" => get!(audio).alt = content(),
 
                     //"profile:first_name" | "profile:last_name" | "profile:username" | "profile:gender" => {
@@ -109,19 +109,19 @@ pub fn parse_meta_to_embed<'a>(embed: &mut Embed, headers: &[Header<'a>]) -> Ext
         }
     }
 
-    if embed.image.is_some() {
-        embed.ty = EmbedType::Image;
+    if embed.img.is_some() {
+        embed.ty = EmbedType::Img;
     }
 
     if embed.audio.is_some() {
         embed.ty = EmbedType::Audio;
     }
 
-    if embed.video.is_some() {
-        embed.ty = EmbedType::Video;
+    if embed.vid.is_some() {
+        embed.ty = EmbedType::Vid;
     }
 
-    if embed.object.is_some() {
+    if embed.obj.is_some() {
         embed.ty = EmbedType::Html;
     }
 
@@ -129,7 +129,7 @@ pub fn parse_meta_to_embed<'a>(embed: &mut Embed, headers: &[Header<'a>]) -> Ext
 }
 
 /// Add to/overwrite embed profile with oEmbed data
-pub fn parse_oembed_to_embed(embed: &mut Embed, o: OEmbed) -> ExtraFields {
+pub fn parse_oembed_to_embed(embed: &mut EmbedV1, o: OEmbed) -> ExtraFields {
     macro_rules! get {
         ($e:ident) => {
             embed.$e.get_or_insert_with(Default::default)
@@ -139,8 +139,8 @@ pub fn parse_oembed_to_embed(embed: &mut Embed, o: OEmbed) -> ExtraFields {
     let mut extra = ExtraFields::default();
 
     embed.ty = match o.kind {
-        OEmbedType::Photo => EmbedType::Image,
-        OEmbedType::Video => EmbedType::Video,
+        OEmbedType::Photo => EmbedType::Img,
+        OEmbedType::Video => EmbedType::Vid,
         OEmbedType::Rich => EmbedType::Html,
         OEmbedType::Link => EmbedType::Link,
         OEmbedType::Unknown => embed.ty,
@@ -156,13 +156,13 @@ pub fn parse_oembed_to_embed(embed: &mut Embed, o: OEmbed) -> ExtraFields {
     }
 
     embed.title.overwrite_with(o.title);
-    embed.provider.name.overwrite_with(o.provider_name);
-    embed.provider.url.overwrite_with(o.provider_url);
+    embed.pro.name.overwrite_with(o.provider_name);
+    embed.pro.url.overwrite_with(o.provider_url);
 
     let media = match o.kind {
-        OEmbedType::Photo => get!(image),
-        OEmbedType::Video => get!(video),
-        _ => get!(object),
+        OEmbedType::Photo => get!(img),
+        OEmbedType::Video => get!(vid),
+        _ => get!(obj),
     };
 
     let mut mime = media.mime.take();
