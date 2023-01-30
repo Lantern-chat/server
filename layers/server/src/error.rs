@@ -414,22 +414,12 @@ impl Error {
     pub(crate) fn into_encoding(self, encoding: Encoding) -> Response {
         self.log();
 
+        let status = self.http_status();
+
         match encoding {
-            Encoding::JSON => self.into_cached_json().into_response(),
-            Encoding::CBOR => self.into_cbor().into_response(),
+            Encoding::JSON => self.into_cached_json().with_status(status).into_response(),
+            Encoding::CBOR => self.into_cbor().with_status(status).into_response(),
         }
-    }
-}
-
-impl ftl::Reply for Error {
-    fn into_response(self) -> Response {
-        self.into_encoding(Encoding::JSON)
-    }
-}
-
-impl ftl::ReplyError for Error {
-    fn status(&self) -> StatusCode {
-        self.http_status()
     }
 }
 
