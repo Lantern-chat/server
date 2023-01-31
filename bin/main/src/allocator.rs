@@ -1,6 +1,6 @@
-#[cfg(not(unix))]
+#[cfg(not(all(unix, any(target_arch = "x86", target_arch = "x86_64"))))]
 type Global = std::alloc::System;
-#[cfg(unix)]
+#[cfg(all(unix, any(target_arch = "x86", target_arch = "x86_64")))]
 type Global = tikv_jemallocator::Jemalloc;
 
 #[cfg(feature = "memory_metrics")]
