@@ -965,7 +965,7 @@ ALTER TABLE lantern.threads ADD CONSTRAINT parent_uq UNIQUE (parent_id);
 ALTER TABLE lantern.relationships ADD CONSTRAINT ch_relationship_order CHECK (user_a_id < user_b_id);
 
 -- user cannot form a relationship with themselves
-ALTER TABLE lantern.relationships ADD CONSTRAINT ch_user_relationships CHECK (user_id <> block_id);
+ALTER TABLE lantern.relationships ADD CONSTRAINT ch_user_relationships CHECK (user_a_id <> user_b_id);
 
 ----------------------------------------
 ------- CONSTRAINT-LIKE INDICES --------
