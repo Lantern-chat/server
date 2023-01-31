@@ -7,6 +7,7 @@ publish = false
 [features]
 # nightly = ["crc32fast/nightly", "parking_lot/nightly", "hashbrown/nightly"]
 # armv8 = ["nightly", "aes/armv8", "aes-gcm-siv/armv8"]
+brotli = ["sdk/brotli", "reqwest/brotli", "async-compression/brotli", "ftl/brotli"]
 
 [build-dependencies]
 built = { version = "0.5", features = ["chrono"] }
@@ -52,7 +53,7 @@ tokio-rustls = "0.23.0"
 # tls-listener = { version = "0.2.1", features = ["hyper-h1", "hyper-h2", "tokio-net"] }
 async-stream = "0.3"
 async-trait = "0.1.50"
-async-compression = { version = "0.3.8", features = ["brotli", "deflate", "gzip", "tokio"] }
+async-compression = { version = "0.3.8", features = ["deflate", "gzip", "tokio"] }
 async-recursion = "1"
 hashbrown = { version = "0.13", features = ["inline-more"] }
 futures = "0.3"
@@ -60,7 +61,7 @@ hyper = { version = "0.14.4", features = ["http1", "http2", "server", "stream", 
 tokio-tungstenite = { version = "0.18", default-features = false, features = ["connect"] }
 mime = "0.3.16"
 http = "0.2.3"
-reqwest = { version = "0.11", default-features = false, features = ["gzip", "deflate", "brotli", "rustls-tls"] }
+reqwest = { version = "0.11", default-features = false, features = ["gzip", "deflate", "rustls-tls"] }
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
 headers = "0.3"
 base64 = "0.21.0"

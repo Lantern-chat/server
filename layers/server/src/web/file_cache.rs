@@ -165,7 +165,12 @@ impl FileCache<ServerState> for MainFileCache {
                 Ok(_) => {
                     let encoding = match accepts.and_then(|a| {
                         // prefer best
+                        #[cfg(feature = "brotli")]
                         let mut encodings = a.sorted_encodings();
+                        // TODO: make this filtering on feature cleaner
+                        #[cfg(not(feature = "brotli"))]
+                        let mut encodings = a.sorted_encodings().filter(|c| *c != ContentCoding::BROTLI);
+
                         let preferred = encodings.next();
                         encodings.find(|e| *e == file.best).or(preferred)
                     }) {
@@ -241,73 +246,106 @@ impl FileCache<ServerState> for MainFileCache {
 
             content = self.process(state, path, content).await;
 
-            let (brotli, deflate, gzip, best) = {
+            struct CompressionResults {
+                brotli: Vec<u8>,
+                deflate: Vec<u8>,
+                gzip: Vec<u8>,
+                best: ContentCoding,
+            }
+
+            let compressed = {
                 use async_compression::{
-                    tokio::bufread::{BrotliEncoder, DeflateEncoder, GzipEncoder},
+                    tokio::bufread::{DeflateEncoder, GzipEncoder},
                     Level,
                 };
 
                 let level = if cfg!(debug_assertions) { Level::Fastest } else { Level::Best };
 
-                let mut brotli_buffer = Vec::new();
-                let mut deflate_buffer = Vec::new();
-                let mut gzip_buffer = Vec::new();
-
-                let mut brotli = BrotliEncoder::with_quality(&content[..], level);
-                let mut deflate = DeflateEncoder::with_quality(&content[..], level);
-                let mut gzip = GzipEncoder::with_quality(&content[..], level);
-
-                let brotli = brotli.read_to_end(&mut brotli_buffer);
-                let deflate = deflate.read_to_end(&mut deflate_buffer);
-                let gzip = gzip.read_to_end(&mut gzip_buffer);
-
-                let res = tokio::try_join! {
-                    async { log::trace!("Compressing with Brotli"); brotli.await },
-                    async { log::trace!("Compressing with Deflate"); deflate.await },
-                    async { log::trace!("Compressing with GZip"); gzip.await }
+                let deflate_task = async {
+                    log::trace!("Compressing with Deflate");
+                    let mut deflate_buffer: Vec<u8> = Vec::new();
+                    let mut deflate = DeflateEncoder::with_quality(&content[..], level);
+                    deflate.read_to_end(&mut deflate_buffer).await?;
+                    Ok::<_, std::io::Error>(deflate_buffer)
                 };
 
-                res?;
+                let gzip_task = async {
+                    log::trace!("Compressing with GZip");
+                    let mut gzip_buffer: Vec<u8> = Vec::new();
+                    let mut gzip = GzipEncoder::with_quality(&content[..], level);
+                    gzip.read_to_end(&mut gzip_buffer).await?;
+                    Ok::<_, std::io::Error>(gzip_buffer)
+                };
 
-                let mut best = ContentCoding::BROTLI;
-                let mut best_len = brotli_buffer.len();
+                let brotli_task = async {
+                    #[cfg(feature = "brotli")]
+                    {
+                        use async_compression::tokio::bufread::BrotliEncoder;
 
-                if deflate_buffer.len() < best_len {
-                    best = ContentCoding::DEFLATE;
-                    best_len = deflate_buffer.len();
+                        log::trace!("Compressing with Brotli");
+                        let mut brotli_buffer: Vec<u8> = Vec::new();
+                        let mut brotli = BrotliEncoder::with_quality(&content[..], level);
+                        brotli.read_to_end(&mut brotli_buffer).await?;
+                        return Ok::<_, std::io::Error>(brotli_buffer);
+                    }
+
+                    #[cfg(not(feature = "brotli"))]
+                    return Ok::<_, std::io::Error>(Vec::new());
+                };
+
+                let (brotli, deflate, gzip) = tokio::try_join!(brotli_task, deflate_task, gzip_task)?;
+
+                let mut best = ContentCoding::IDENTITY;
+                let mut best_len = content.len();
+
+                #[cfg(feature = "brotli")]
+                if brotli.len() < best_len {
+                    best = ContentCoding::BROTLI;
+                    best_len = brotli.len();
                 }
 
-                if gzip_buffer.len() < best_len {
+                if deflate.len() < best_len {
+                    best = ContentCoding::DEFLATE;
+                    best_len = deflate.len();
+                }
+
+                if gzip.len() < best_len {
                     best = ContentCoding::GZIP;
                 }
 
                 log::trace!(
                     "Brotli: {}, Deflate: {}, Gzip: {}",
-                    brotli_buffer.len(),
-                    deflate_buffer.len(),
-                    gzip_buffer.len()
+                    brotli.len(),
+                    deflate.len(),
+                    gzip.len()
                 );
 
-                (brotli_buffer, deflate_buffer, gzip_buffer, best)
+                CompressionResults {
+                    brotli,
+                    deflate,
+                    gzip,
+                    best,
+                }
             };
 
             log::trace!(
                 "Inserting {} bytes into file cache from {}",
-                (content.len() + brotli.len() + deflate.len() + gzip.len()),
+                (content.len() + compressed.brotli.len() + compressed.deflate.len() + compressed.gzip.len()),
                 path.display(),
             );
 
             entry.insert(
                 path.to_path_buf(),
                 CacheEntry {
-                    best,
                     // NOTE: Arc::from(vec) does not overallocate, so shrink_to_fit() is not needed
                     iden: Arc::from(content),
-                    brotli: Arc::from(brotli),
-                    deflate: Arc::from(deflate),
-                    gzip: Arc::from(gzip),
                     last_modified: meta.modified()?,
                     last_checked: now,
+
+                    best: compressed.best,
+                    brotli: Arc::from(compressed.brotli),
+                    deflate: Arc::from(compressed.deflate),
+                    gzip: Arc::from(compressed.gzip),
                 },
             );
         }
