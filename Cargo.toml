@@ -24,7 +24,7 @@ members = ["crates/*", "bin/*", "layers/*"]
 
 [profile.dev]
 opt-level = 1
-lto = false
+lto = 'thin'
 incremental = false
 
 [profile.release]
@@ -37,7 +37,4 @@ opt-level = 3
 
 [profile.dev.package."*"]
 codegen-units = 1
-opt-level = 3
-
-[profile.dev.package.filesystem]
 opt-level = 3

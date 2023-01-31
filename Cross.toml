@@ -1,0 +1,18 @@
+[build]
+pre-build = [
+  "apt-get update && apt-get --assume-yes install nasm"
+]
+
+# [target.x86_64-unknown-linux-gnu]
+# pre-build = [
+#   "apt-get update && apt-get --assume-yes install nasm"
+# ]
+
+# [target.x86_64-unknown-linux-musl]
+# pre-build = [
+#   "apt-get update && apt-get --assume-yes install nasm"
+# ]
+
+# [target.x86_64-unknown-linux-gnu.zig]
+# enable = true
+# version = "2.27"
