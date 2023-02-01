@@ -146,7 +146,17 @@ async fn main() -> anyhow::Result<()> {
 
     runner.wait().await?;
 
-    drop(_log_guard);
+    drop(LogDropWrapper(Some(_log_guard)));
 
     Ok(())
+}
+
+struct LogDropWrapper<T>(Option<T>);
+
+impl<T> Drop for LogDropWrapper<T> {
+    fn drop(&mut self) {
+        println!("Flushing logs to file...");
+        drop(self.0.take());
+        println!("Goodbye.");
+    }
 }
