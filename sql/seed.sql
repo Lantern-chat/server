@@ -1450,6 +1450,7 @@ BEGIN
         FROM perms WHERE perms.user_id = room_members.user_id AND perms.room_id = room_members.room_id
     );
 
+    -- user roles
     WITH ur AS (
         SELECT p.party_id, p.user_id, roles.permissions
         FROM lantern.party_member p
@@ -1611,34 +1612,57 @@ $$;
 CREATE TRIGGER overwrite_update AFTER UPDATE OR INSERT OR DELETE ON lantern.overwrites
 FOR EACH ROW EXECUTE FUNCTION lantern.on_overwrite_update_trigger();
 
-CREATE OR REPLACE FUNCTION lantern.on_party_member_exist()
+CREATE OR REPLACE FUNCTION lantern.on_party_member_delete()
 RETURNS trigger
 LANGUAGE plpgsql AS
 $$
 BEGIN
-    IF TG_OP = 'DELETE' THEN
-        DELETE FROM lantern.room_members m
-        USING lantern.rooms
-        WHERE m.user_id = OLD.user_id
+    -- TODO: Delete any active per-member information that should not be retained
+
+    DELETE FROM lantern.room_members m
+    USING lantern.rooms
+    WHERE m.user_id = OLD.user_id
         AND m.room_id = rooms.id
         AND rooms.party_id = OLD.party_id;
-    ELSIF TG_OP = 'INSERT' THEN
-        INSERT INTO lantern.room_members (user_id, room_id, allow, deny)
+
+    DELETE FROM lantern.role_members m
+    USING lantern.roles
+    WHERE m.user_id = OLD.user_id
+        AND m.role_id = roles.id
+        AND roles.party_id = OLD.party_id;
+
+    RETURN NEW;
+END
+$$;
+
+CREATE OR REPLACE FUNCTION lantern.on_party_member_insert()
+RETURNS trigger
+LANGUAGE plpgsql AS
+$$
+BEGIN
+    INSERT INTO lantern.room_members (user_id, room_id, allow, deny)
         SELECT NEW.user_id, o.room_id,
         -- user_allow | (allow & !user_deny), NULL if 0
         NULLIF(COALESCE(bit_or(o.user_allow), 0) | (COALESCE(bit_or(o.allow), 0) & ~COALESCE(bit_or(o.user_deny), 0)), 0) AS allow,
         -- deny | user_deny, NULL if 0
         NULLIF(COALESCE(bit_or(o.deny), 0) | COALESCE(bit_or(o.user_deny)), 0) AS deny
         FROM lantern.agg_overwrites o INNER JOIN lantern.rooms ON rooms.id = o.room_id
-        WHERE rooms.party_id = NEW.party_id;
-    END IF;
+        WHERE rooms.party_id = NEW.party_id
+        GROUP BY o.room_id;
+
+    -- set cached perms to default @everyone perms
+    SELECT r.permissions INTO NEW.perms
+    FROM lantern.roles r WHERE r.id = NEW.party_id;
 
     RETURN NEW;
 END
 $$;
 
-CREATE TRIGGER room_member_update AFTER INSERT OR DELETE ON lantern.party_member
-FOR EACH ROW EXECUTE FUNCTION lantern.on_party_member_exist();
+CREATE TRIGGER room_member_delete AFTER DELETE ON lantern.party_member
+FOR EACH ROW EXECUTE FUNCTION lantern.on_party_member_delete();
+
+CREATE TRIGGER room_member_insert BEFORE INSERT ON lantern.party_member
+FOR EACH ROW EXECUTE FUNCTION lantern.on_party_member_insert();
 
 -- When a new room is created, the room_members must have values inserted
 CREATE OR REPLACE FUNCTION lantern.on_room_add()
