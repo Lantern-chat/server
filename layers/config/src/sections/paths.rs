@@ -19,9 +19,12 @@ section! {
         pub key_path: PathBuf = PathBuf::default() => "KEY_PATH",
 
         /// Path to static frontend files (typically `./frontend`)
-        pub web_path: PathBuf = PathBuf::from("./frontend") => "WEB_PATH",
+        pub web_path: PathBuf = "./frontend".into() => "WEB_PATH",
 
         /// Path to compiled utility binaries (defaults to `./server/target/release`)
-        pub bin_path: PathBuf = PathBuf::from("./server/target/release") => "BIN_PATH",
+        pub bin_path: PathBuf = "./server/target/release".into() => "BIN_PATH",
+
+        /// Where to write logfiles to. Automatically rotated.
+        pub log_dir: PathBuf = "./logs".into() => "LANTERN_LOG_DIR",
     }
 }

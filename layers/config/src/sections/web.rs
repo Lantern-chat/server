@@ -13,6 +13,11 @@ section! {
         /// enable the use of camo proxy for third-party media content
         pub camo: bool = true                                           => "LANTERN_CAMO"           | util::parse[true],
         pub req_per_sec: f32 = 50.0,
+
+        /// Time between last-modified file checks in file cache (default 2 minutes)
+        pub file_cache_check_secs: u64 = 120,
+        /// Time a file can be kept in the file cache (default 24 hours)
+        pub file_cache_secs: u64 = 60 * 24 * 60,
     }
 }
 

@@ -12,7 +12,10 @@ pub fn add_file_cache_cleanup_task(state: &ServerState, runner: &TaskRunner) {
         CLEANUP_INTERVAL,
         |state, _| async move {
             log::trace!("Cleaning up file cache");
-            state.file_cache.cleanup().await;
+            state
+                .file_cache
+                .cleanup(Duration::from_secs(state.config().web.file_cache_secs))
+                .await;
         },
     )))
 }

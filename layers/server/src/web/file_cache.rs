@@ -13,6 +13,7 @@ use ftl::*;
 
 use headers::ContentCoding;
 
+#[derive(Clone, Copy, Debug)]
 pub struct Metadata {
     is_dir: bool,
     len: u64,
@@ -117,13 +118,12 @@ pub struct MainFileCache {
 }
 
 impl MainFileCache {
-    pub async fn cleanup(&self) {
+    pub async fn cleanup(&self, max_age: Duration) {
         let now = SystemTime::now();
 
         self.map
             .retain(|_, file| match now.duration_since(file.last_checked) {
-                // retain if duration since last checked is less than 10 minutes (debug) or 24 hours (release)
-                Ok(dur) => dur < Duration::from_secs(60 * if cfg!(debug_assertions) { 10 } else { 24 * 60 }),
+                Ok(dur) => dur < max_age,
                 // if checked since `now`, then don't retain (or time travel, but whatever)
                 Err(_) => false,
             })
@@ -158,8 +158,7 @@ impl FileCache<ServerState> for MainFileCache {
 
             match dur {
                 Err(_) => log::warn!("Duration calculation failed, time reversed?"),
-                // recheck every 15 seconds in debug, 2 minutes in release (TODO: Increase?)
-                Ok(dur) if dur > Duration::from_secs(if cfg!(debug_assertions) { 15 } else { 120 }) => {
+                Ok(dur) if dur > Duration::from_secs(state.config().web.file_cache_check_secs) => {
                     last_modified = Some(file.last_modified);
                 }
                 Ok(_) => {
