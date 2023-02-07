@@ -64,10 +64,7 @@ pub async fn ready(
                     Query::select()
                         .cols(PartyColumns::default())
                         .cols(MemberColumns::default())
-                        .from(
-                            Party::left_join_table::<PartyMember>()
-                                .on(PartyMember::PartyId.equals(Party::Id)),
-                        )
+                        .from(Party::inner_join_table::<PartyMember>().on(PartyMember::PartyId.equals(Party::Id)))
                         .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
                         .and_where(Party::DeletedAt.is_null())
                 },
@@ -92,16 +89,17 @@ pub async fn ready(
                         name: row.try_get(PartyColumns::name())?,
                         description: row.try_get(PartyColumns::description())?,
                     },
-                    owner: row.try_get(PartyColumns::owner_id())?,
-                    security: SecurityFlags::empty(),
-                    roles: Vec::new(),
-                    emotes: Vec::new(),
                     avatar: encrypt_snowflake_opt(&state, row.try_get(PartyColumns::avatar_id())?),
                     banner: row
                         .try_get::<_, Nullable<_>>(PartyColumns::banner_id())?
                         .map(|id| encrypt_snowflake(&state, id)),
-                    position: row.try_get(MemberColumns::position())?,
                     default_room: row.try_get(PartyColumns::default_room())?,
+                    position: row.try_get(MemberColumns::position())?,
+                    security: SecurityFlags::empty(),
+                    owner: row.try_get(PartyColumns::owner_id())?,
+                    roles: Vec::new(),
+                    emotes: Vec::new(),
+                    pin_folders: Vec::new(),
                 },
             );
         }
@@ -114,7 +112,6 @@ pub async fn ready(
                     .await
             },
             async {
-                // TODO: Remove this in Ready event?
                 crate::backend::api::party::emotes::get_custom_emotes_raw(&db, SearchMode::Many(&ids))
                     .await?
                     .try_collect::<Vec<_>>()

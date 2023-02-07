@@ -45,14 +45,14 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
             name: form.name,
             description: form.description,
         },
-        owner: auth.user_id,
-        security: form.security,
-        roles: Vec::new(),
-        emotes: Vec::new(),
         avatar: None,
         banner: Nullable::Null,
-        position: 0,
         default_room: room_id,
+        position: None,
+        security: form.security,
+        owner: auth.user_id,
+        roles: Vec::new(),
+        emotes: Vec::new(),
         pin_folders: Vec::new(),
     };
 
@@ -83,6 +83,9 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
         }
     };
 
+    party.position = Some(position);
+
+    // NOTE: This is used to avoid lifetime issues
     futures::future::try_join3(
         t.execute_cached_typed(|| insert_member(), &[&party.id, &auth.user_id, &position]),
         t.execute_cached_typed(
