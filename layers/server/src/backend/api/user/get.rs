@@ -159,11 +159,11 @@ mod q {
             .cols(PresenceColumns::default())
             // AllowLastActiveColumns
             .expr(
-                // preferences/flags can be NULL, so testing (flags & bit) != bit accounts for that
                 Users::Preferences
                     .json_extract("flags".lit())
                     .cast(Type::INT4)
-                    .has_no_bits(UserPrefsFlags::HIDE_LAST_ACTIVE.bits().lit()),
+                    .has_no_bits(UserPrefsFlags::HIDE_LAST_ACTIVE.bits().lit())
+                    .is_true(),
             );
 
         // ProfileColumns, must follow order as listed above

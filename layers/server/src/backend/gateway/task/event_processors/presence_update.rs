@@ -38,7 +38,6 @@ pub async fn presence_updated(
                     profile: Nullable::Undefined,
                     email: None,
                     preferences: None,
-                    // both branches are `Some` because it must overwrite existing values on the client
                     presence: Some(match row.try_get(PresenceColumns::updated_at())? {
                         Some(updated_at) => UserPresence {
                             flags: UserPresenceFlags::from_bits_truncate_public(
@@ -68,10 +67,7 @@ pub async fn presence_updated(
         Ok(())
     };
 
-    tokio::try_join!(
-        super::user_event::self_update(state, db, user_id, None),
-        do_update
-    )?;
+    tokio::try_join!(super::user_event::self_update(state, db, user_id, None), do_update)?;
 
     Ok(())
 }

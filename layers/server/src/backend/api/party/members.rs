@@ -210,9 +210,14 @@ fn parse_member(row: db::Row, state: &ServerState, full: bool) -> Result<PartyMe
                         ),
                     };
 
-                    match row.try_get(MemberColumns::presence_updated_at())? {
-                        None => None,
-                        Some(updated_at) => Some(UserPresence {
+                    Some(match row.try_get(MemberColumns::presence_updated_at())? {
+                        None => UserPresence {
+                            flags: UserPresenceFlags::empty(),
+                            last_active,
+                            updated_at: None,
+                            activity: None,
+                        },
+                        Some(updated_at) => UserPresence {
                             last_active,
                             updated_at: Some(updated_at),
                             flags: UserPresenceFlags::from_bits_truncate_public(
@@ -222,8 +227,8 @@ fn parse_member(row: db::Row, state: &ServerState, full: bool) -> Result<PartyMe
                                 None => None,
                                 Some(value) => Some(AnyActivity::Any(value)),
                             },
-                        }),
-                    }
+                        },
+                    })
                 }
             },
             email: None,
