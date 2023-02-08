@@ -1169,9 +1169,9 @@ BEGIN
         END
     );
 
-    -- if a new presence includes the online flag
-    IF TG_OP != 'DELETE' AND (NEW.flags & PRESENCE_ONLINE) = PRESENCE_ONLINE THEN
-        UPDATE lantern.users SET last_active = now() WHERE id = NEW.user_id;
+    -- if a last presence includes the online flag
+    IF TG_OP = 'DELETE' AND (OLD.flags & PRESENCE_ONLINE) = PRESENCE_ONLINE THEN
+        UPDATE lantern.users SET last_active = now() WHERE id = OLD.user_id;
     END IF;
 
     RETURN NEW;
