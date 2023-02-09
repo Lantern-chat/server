@@ -84,12 +84,11 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
 
             let headers = resp.headers_mut();
 
-            if cfg!(debug_assertions) {
-                headers.insert(
-                    HeaderName::from_static("cache-control"),
-                    HeaderValue::from_static("no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"),
-                );
-            }
+            // index.html is small, always fetch latest version
+            headers.insert(
+                HeaderName::from_static("cache-control"),
+                HeaderValue::from_static("no-cache, no-store, must-revalidate, proxy-revalidate, max-age=0"),
+            );
 
             if let Some(hvalue) = gen_oembed_header_value(&route) {
                 headers.insert(HeaderName::from_static("link"), hvalue);

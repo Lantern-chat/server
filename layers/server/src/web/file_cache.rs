@@ -92,7 +92,7 @@ impl AsyncSeek for CachedFile {
 #[derive(Clone)]
 pub struct CacheEntry {
     best: ContentCoding,
-    iden: Arc<[u8]>,
+    identity: Arc<[u8]>,
     brotli: Arc<[u8]>,
     gzip: Arc<[u8]>,
     deflate: Arc<[u8]>,
@@ -177,7 +177,7 @@ impl FileCache<ServerState> for MainFileCache {
                         Some(encoding) => encoding,
                     };
 
-                    let file = CachedFile {
+                    let f = CachedFile {
                         pos: 0,
                         last_modified: file.last_modified,
                         encoding,
@@ -185,18 +185,19 @@ impl FileCache<ServerState> for MainFileCache {
                             ContentCoding::BROTLI => file.brotli,
                             ContentCoding::DEFLATE => file.deflate,
                             ContentCoding::GZIP => file.gzip,
-                            ContentCoding::IDENTITY => file.iden,
+                            ContentCoding::IDENTITY => file.identity,
                             ContentCoding::COMPRESS => unreachable!(),
                         },
                     };
 
                     log::trace!(
-                        "Serving cached {encoding:?} ({}) encoded file: {}",
-                        file.buf.len(),
+                        "Serving cached {encoding:?} ({}) (best {:?}) encoded file: {}",
+                        f.buf.len(),
+                        file.best,
                         path.display()
                     );
 
-                    return Ok(file);
+                    return Ok(f);
                 }
             }
         }
@@ -262,7 +263,7 @@ impl FileCache<ServerState> for MainFileCache {
 
                 let deflate_task = async {
                     log::trace!("Compressing with Deflate");
-                    let mut deflate_buffer: Vec<u8> = Vec::new();
+                    let mut deflate_buffer: Vec<u8> = Vec::with_capacity(128);
                     let mut deflate = DeflateEncoder::with_quality(&content[..], level);
                     deflate.read_to_end(&mut deflate_buffer).await?;
                     Ok::<_, std::io::Error>(deflate_buffer)
@@ -270,7 +271,7 @@ impl FileCache<ServerState> for MainFileCache {
 
                 let gzip_task = async {
                     log::trace!("Compressing with GZip");
-                    let mut gzip_buffer: Vec<u8> = Vec::new();
+                    let mut gzip_buffer: Vec<u8> = Vec::with_capacity(128);
                     let mut gzip = GzipEncoder::with_quality(&content[..], level);
                     gzip.read_to_end(&mut gzip_buffer).await?;
                     Ok::<_, std::io::Error>(gzip_buffer)
@@ -282,7 +283,7 @@ impl FileCache<ServerState> for MainFileCache {
                         use async_compression::tokio::bufread::BrotliEncoder;
 
                         log::trace!("Compressing with Brotli");
-                        let mut brotli_buffer: Vec<u8> = Vec::new();
+                        let mut brotli_buffer: Vec<u8> = Vec::with_capacity(128);
                         let mut brotli = BrotliEncoder::with_quality(&content[..], level);
                         brotli.read_to_end(&mut brotli_buffer).await?;
                         return Ok::<_, std::io::Error>(brotli_buffer);
@@ -336,15 +337,15 @@ impl FileCache<ServerState> for MainFileCache {
             entry.insert(
                 path.to_path_buf(),
                 CacheEntry {
-                    // NOTE: Arc::from(vec) does not overallocate, so shrink_to_fit() is not needed
-                    iden: Arc::from(content),
                     last_modified: meta.modified()?,
                     last_checked: now,
 
-                    best: compressed.best,
+                    // NOTE: Arc::from(vec) does not overallocate, so shrink_to_fit() is not needed
+                    identity: Arc::from(content),
                     brotli: Arc::from(compressed.brotli),
                     deflate: Arc::from(compressed.deflate),
                     gzip: Arc::from(compressed.gzip),
+                    best: compressed.best,
                 },
             );
         }
@@ -358,7 +359,7 @@ impl FileCache<ServerState> for MainFileCache {
     async fn metadata(&self, path: &Path, _state: &ServerState) -> io::Result<Self::Meta> {
         match self.map.get(path).await {
             Some(file) => Ok(Metadata {
-                len: file.iden.len() as u64,
+                len: file.identity.len() as u64,
                 last_modified: file.last_modified,
                 is_dir: false,
             }),
