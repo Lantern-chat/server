@@ -21,6 +21,7 @@ client-sdk = { path = "../client-sdk-rs" }
 
 [workspace]
 members = ["crates/*", "bin/*", "layers/*"]
+exclude = ["edge/embed-worker", "edge/camo"]
 
 [profile.dev]
 opt-level = 1

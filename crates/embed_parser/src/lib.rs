@@ -4,9 +4,11 @@ extern crate serde;
 pub mod embed;
 pub mod html;
 //pub mod iter;
-pub mod msg;
 pub mod oembed;
 //pub mod req;
+
+#[cfg(feature = "msg")]
+pub mod msg;
 
 #[inline]
 fn trim_quotes(s: &str) -> &str {
