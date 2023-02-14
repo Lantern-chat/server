@@ -19,6 +19,7 @@ iso8601-timestamp = { git = "https://github.com/Lantern-chat/iso8601-timestamp" 
 embed_parser = { path = "../../crates/embed_parser", default_features = false }
 client-sdk = { path = "../../../client-sdk-rs", default_features = false }
 iso8601-timestamp = { version = "0.2", default_features = false, features = ["worker"] }
+imagesize = "0.11.0"
 
 # keep in sync with WORKERS_RS_VERSION in wrangler.toml
 worker = "0.0.12"

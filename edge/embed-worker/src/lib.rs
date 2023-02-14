@@ -5,6 +5,7 @@ use embed_parser::{
     html::Header,
     oembed::{OEmbed, OEmbedFormat, OEmbedLink},
 };
+use sdk::models::*;
 use worker::*;
 
 mod utils;
@@ -74,6 +75,8 @@ async fn fetch_source(url: String) -> Result<Response> {
             return Response::error("Invalid MIME Type", 400);
         };
 
+        console_log!("MIME Type: {}", mime);
+
         if mime == "text/html" {
             let mut html = Vec::with_capacity(512);
             if let Some(mut headers) = read_head(&mut resp, &mut html).await? {
@@ -97,7 +100,45 @@ async fn fetch_source(url: String) -> Result<Response> {
             }
 
             drop(html); // ensure it lives long enough
-        } else if matches!(mime.get(0..6), Some("image" | "video" | "audio")) {
+        } else {
+            match mime.get(0..5) {
+                Some("image") => {
+                    let mut bytes = Vec::with_capacity(512);
+
+                    let mut img = Box::new(EmbedMedia {
+                        url: url.as_str().into(),
+                        mime: Some(mime.into()),
+                        ..EmbedMedia::default()
+                    });
+
+                    if let Ok(_) = read_bytes(&mut resp, &mut bytes, 1024 * 1024).await {
+                        if let Ok(image_size) = imagesize::blob_size(&bytes) {
+                            img.w = Some(image_size.width as _);
+                            img.h = Some(image_size.height as _);
+                        }
+                    }
+
+                    embed.ty = EmbedType::Img;
+                    embed.img = Some(img);
+                }
+                Some("video") => {
+                    embed.ty = EmbedType::Vid;
+                    embed.vid = Some(Box::new(EmbedMedia {
+                        url: url.as_str().into(),
+                        mime: Some(mime.into()),
+                        ..EmbedMedia::default()
+                    }));
+                }
+                Some("audio") => {
+                    embed.ty = EmbedType::Audio;
+                    embed.audio = Some(Box::new(EmbedMedia {
+                        url: url.as_str().into(),
+                        mime: Some(mime.into()),
+                        ..EmbedMedia::default()
+                    }));
+                }
+                _ => {}
+            }
         }
     }
 
@@ -143,16 +184,23 @@ async fn fetch_source(url: String) -> Result<Response> {
         });
     }
 
+    // after relative paths are resolved, try to find image dimensions
+    resolve_images(&mut embed).await?;
+
+    // compute expirey
     let expires = {
-        use iso8601_timestamp::{Timestamp, Duration};
+        use iso8601_timestamp::Duration;
 
         embed.ts = Timestamp::now_utc();
 
-        // limit max_age to 1 month
-        embed.ts.checked_add(Duration::seconds(max_age.min(60 * 60 * 24 * 30) as i64))
+        // limit max_age to 1 month, minimum 15 minutes
+        embed
+            .ts
+            .checked_add(Duration::seconds(max_age.min(60 * 60 * 24 * 30).max(60 * 15) as i64))
+            .unwrap()
     };
 
-    Response::from_json(&(expires, embed))
+    Response::from_json(&(expires, sdk::models::Embed::V1(embed)))
 }
 
 async fn fetch_oembed<'a>(link: &OEmbedLink<'a>) -> Result<OEmbed> {
@@ -204,4 +252,82 @@ async fn read_head<'a>(
         Ok(html) => embed_parser::html::parse_meta(html),
         Err(_) => None,
     })
+}
+
+async fn read_bytes<'a>(resp: &'a mut Response, bytes: &'a mut Vec<u8>, max: usize) -> Result<()> {
+    use futures_util::StreamExt;
+
+    let mut stream = resp.stream()?;
+
+    while let Some(chunk) = stream.next().await {
+        bytes.extend(chunk?);
+
+        if bytes.len() > max {
+            break;
+        }
+    }
+
+    Ok(())
+}
+
+// TODO: Fetch these in parallel?
+async fn resolve_images(embed: &mut EmbedV1) -> Result<()> {
+    if let Some(ref mut media) = embed.img {
+        let _ = resolve_media(&mut *media).await;
+    }
+
+    if let Some(ref mut media) = embed.thumb {
+        let _ = resolve_media(&mut *media).await;
+    }
+
+    if let Some(ref mut footer) = embed.footer {
+        if let Some(ref mut media) = footer.icon {
+            let _ = resolve_media(&mut *media).await;
+        }
+    }
+
+    if let Some(ref mut author) = embed.author {
+        if let Some(ref mut media) = author.icon {
+            let _ = resolve_media(&mut *media).await;
+        }
+    }
+
+    Ok(())
+}
+
+async fn resolve_media(media: &mut EmbedMedia) -> Result<()> {
+    // already has dimensions
+    if matches!((media.w, media.h), (Some(_), Some(_))) {
+        return Ok(());
+    }
+
+    // TODO: Remove when relative paths are handled
+    if media.url.starts_with(".") {
+        return Ok(());
+    }
+
+    let mut resp = Fetch::Request(Request::new_with_init(&media.url, &req_init(Method::Get)?)?)
+        .send()
+        .await?;
+
+    if let Some(mime) = resp.headers().get("content-type")? {
+        let Some(mime) = mime.split(';').next() else {
+            return Ok(()); // invalid mime
+        };
+
+        media.mime = Some(mime.into());
+
+        if mime.starts_with("image") {
+            let mut bytes = Vec::with_capacity(512);
+
+            if let Ok(_) = read_bytes(&mut resp, &mut bytes, 1024 * 512).await {
+                if let Ok(image_size) = imagesize::blob_size(&bytes) {
+                    media.w = Some(image_size.width as _);
+                    media.h = Some(image_size.height as _);
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
