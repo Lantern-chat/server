@@ -33,7 +33,11 @@ pub async fn main(mut req: Request, env: Env, _ctx: worker::Context) -> Result<R
 
     let url = req.text().await?;
 
-    fetch_source(url).await
+    if url.starts_with("https://") || url.starts_with("http://") {
+        fetch_source(url).await
+    } else {
+        Response::error("Invalid URL", 400)
+    }
 }
 
 async fn fetch_source(url: String) -> Result<Response> {
@@ -97,11 +101,35 @@ async fn fetch_source(url: String) -> Result<Response> {
     }
 
     if let Some(oembed) = oembed {
-        console_log!("OEmbed: {:?}", oembed);
-
         let extra = embed::parse_oembed_to_embed(&mut embed, oembed);
 
         max_age = extra.max_age;
+    }
+
+    // naively resolve relative paths
+    {
+        // https: / / whatever.com /
+        let root_idx = url.split('/').map(|s| s.len()).take(3).sum::<usize>();
+        let root = {
+            let mut root = url[..(root_idx + 2)].to_owned();
+            root += "/";
+            root
+        };
+        embed.visit_media_mut(|media| {
+            if media.url.starts_with("https://") || media.url.starts_with("http://") {
+                return;
+            }
+
+            if media.url.starts_with(".") {
+                // TODO
+            }
+
+            media.url = {
+                let mut url = root.clone();
+                url += &media.url;
+                url.into()
+            };
+        });
     }
 
     Response::from_json(&(max_age, embed))
