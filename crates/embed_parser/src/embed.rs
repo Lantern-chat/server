@@ -1,24 +1,29 @@
 use smol_str::SmolStr;
 
-use timestamp::Timestamp;
-
 use sdk::models::{EmbedMedia, EmbedType, EmbedV1};
 
 use crate::html::{Header, LinkType};
 use crate::oembed::{OEmbed, OEmbedFormat, OEmbedLink, OEmbedType};
 
-#[derive(Default)]
 pub struct ExtraFields<'a> {
-    pub expires: Option<Timestamp>,
+    pub max_age: u64,
     pub link: Option<OEmbedLink<'a>>,
 }
 
-fn parse_color(mut color: &str) -> Option<i32> {
-    color = color.trim();
+impl Default for ExtraFields<'_> {
+    fn default() -> Self {
+        ExtraFields {
+            max_age: 60 * 15, // 15 minutes
+            link: None,
+        }
+    }
+}
 
-    if color.starts_with('#') {}
-
-    None
+fn parse_color(color: &str) -> Option<u32> {
+    match csscolorparser::parse(color) {
+        Err(_) => None,
+        Ok(color) => Some(u32::from_le_bytes(color.to_rgba8())),
+    }
 }
 
 /// Build an initial embed profile from HTML meta tags
@@ -42,11 +47,16 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
 
                 match meta.property {
                     "description" => embed.desc = content(),
+                    "html_title" => {
+                        if embed.title.is_none() {
+                            embed.title = content();
+                        }
+                    }
                     "theme-color" => embed.col = parse_color(meta.content),
                     "og:site_name" => embed.pro.name = content(),
                     // canonical URL?
                     // "og:url" => embed.url = content(),
-                    "og:title" | "twitter:title" => embed.title = content(),
+                    "title" | "og:title" | "twitter:title" => embed.title = content(),
                     "dc:creator" | "article:author" | "book:author" => get!(author).name = raw_content(),
 
                     "og:image" | "og:image:url" | "og:image:secure_url" => get!(img).url = raw_content(),
@@ -59,12 +69,12 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                     "og:video" | "og:video:secure_url" => get!(vid).url = raw_content(),
                     "og:audio" | "og:audio:secure_url" => get!(audio).url = raw_content(),
 
-                    "og:image:width" => get!(img).width = content_int(),
-                    "og:video:width" => get!(vid).width = content_int(),
-                    "music:duration" => get!(audio).width = content_int(),
+                    "og:image:width" => get!(img).w = content_int(),
+                    "og:video:width" => get!(vid).w = content_int(),
+                    "music:duration" => get!(audio).w = content_int(),
 
-                    "og:image:height" => get!(img).height = content_int(),
-                    "og:video:height" => get!(vid).height = content_int(),
+                    "og:image:height" => get!(img).h = content_int(),
+                    "og:video:height" => get!(vid).h = content_int(),
 
                     "og:image:type" => get!(img).mime = content(),
                     "og:video:type" => get!(vid).mime = content(),
@@ -73,6 +83,11 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                     "og:image:alt" => get!(img).alt = content(),
                     "og:video:alt" => get!(vid).alt = content(),
                     "og:audio:alt" => get!(audio).alt = content(),
+
+                    "og:ttl" => match content_int() {
+                        None => {}
+                        Some(ttl) => extra.max_age = ttl as u64,
+                    },
 
                     //"profile:first_name" | "profile:last_name" | "profile:username" | "profile:gender" => {
                     //    embed.fields.push(EmbedField {
@@ -188,24 +203,24 @@ pub fn parse_oembed_to_embed(embed: &mut EmbedV1, o: OEmbed) -> ExtraFields {
     media.mime = mime;
 
     if overwrite {
-        media.width.overwrite_with(o.width);
-        media.height.overwrite_with(o.height);
+        media.w = o.width;
+        media.h = o.height;
     }
 
     if let Some(thumbnail_url) = o.thumbnail_url {
-        let mut thumb = EmbedMedia::default();
+        let mut thumb = Box::new(EmbedMedia::default());
 
         thumb.url = thumbnail_url;
-        thumb.width = o.thumbnail_width;
-        thumb.height = o.thumbnail_height;
+        thumb.w = o.thumbnail_width;
+        thumb.h = o.thumbnail_height;
 
         thumb.mime = None; // unknown from here
 
-        embed.thumb = Some(Box::new(thumb));
+        embed.thumb = Some(thumb);
     }
 
     if let Some(cache_age) = o.cache_age {
-        extra.expires = Some(Timestamp::now_utc() + std::time::Duration::from_secs(cache_age as u64));
+        extra.max_age = cache_age as u64;
     }
 
     extra

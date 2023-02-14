@@ -96,6 +96,24 @@ pub fn parse_meta<'a>(mut input: &'a str) -> Option<HeaderList<'a>> {
                 pty: MetaProperty::Property,
                 property: "",
             }),
+            // special behavior, parse `<title>Title</title>`
+            Some("<title") => {
+                let title_start = tag_end + 1;
+
+                if input.get(tag_end..title_start) != Some(">") {
+                    continue;
+                }
+
+                if let Some(title_end) = memchr::memmem::find(&bytes[title_start..], b"</title>") {
+                    res.push(Header::Meta(Meta {
+                        content: &input[title_start..(title_start + title_end)],
+                        pty: MetaProperty::Property,
+                        property: "html_title",
+                    }));
+                }
+
+                continue;
+            }
             Some("<link ") => Header::Link(Link {
                 href: "",
                 rel: LinkType::None,

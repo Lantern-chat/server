@@ -75,9 +75,10 @@ use smol_str::SmolStr;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OEmbed {
+    pub version: monostate::MustBe!("1.0"),
+
     #[serde(rename = "type")]
     pub kind: OEmbedType,
-    pub version: SmolStr,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<SmolStr>,
