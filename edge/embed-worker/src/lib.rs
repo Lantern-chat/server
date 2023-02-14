@@ -1,4 +1,10 @@
-use embed_parser::{embed::parse_meta_to_embed, html::Header};
+extern crate client_sdk as sdk;
+
+use embed_parser::{
+    embed,
+    html::Header,
+    oembed::{OEmbed, OEmbedFormat, OEmbedLink},
+};
 use worker::*;
 
 mod utils;
@@ -14,46 +20,115 @@ fn log_request(req: &Request) {
 }
 
 #[event(fetch)]
-pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Response> {
+pub async fn main(mut req: Request, env: Env, _ctx: worker::Context) -> Result<Response> {
+    if req.method() != Method::Post {
+        return Response::error("Method Not Allowed", 405);
+    }
+
     log_request(&req);
 
     // Optionally, get more helpful error messages written to the console in the case of a panic.
+    #[cfg(debug_assertions)]
     utils::set_panic_hook();
 
-    if let Ok(Some(url)) = req.headers().get("") {
-        let mut resp = Fetch::Request(Request::new(&url, Method::Get)?).send().await?;
+    let url = req.text().await?;
 
-        if resp.status_code() != 200 {
-            return Response::error("", resp.status_code());
-        }
+    fetch_source(url).await
+}
 
-        let link_header = resp.headers().get("link")?;
+async fn fetch_source(url: String) -> Result<Response> {
+    let mut resp = Fetch::Request(Request::new_with_init(&url, &req_init(Method::Get)?)?)
+        .send()
+        .await?;
 
-        let link = link_header
-            .as_ref()
-            .map(|h| embed_parser::oembed::parse_link_header(&h));
+    if resp.status_code() != 200 {
+        return Response::error(resp.text().await?, resp.status_code());
+    }
 
-        if let Some(mime) = resp.headers().get("content-type")? {
-            if mime == "text/html" {
-                let mut html = Vec::with_capacity(512);
-                if let Some(mut metas) = read_head(&mut resp, &mut html).await? {
-                    metas.sort_by_key(|meta| match meta {
-                        Header::Meta(meta) => meta.property,
-                        Header::Link(link) => link.href,
-                    });
+    let link_header = resp.headers().get("link")?;
 
-                    //let mut embed = sdk::models::Embed::default();
-                    //parse_meta_to_embed(&mut embed, &metas);
-                    // do stuff
-                }
+    let link = link_header
+        .as_ref()
+        .map(|h| embed_parser::oembed::parse_link_header(&h));
 
-                drop(html); // ensure it lives long enough
-            } else if matches!(mime.get(0..6), Some("image" | "video" | "audio")) {
-            }
+    let mut embed = sdk::models::EmbedV1::default();
+    let mut oembed = None;
+    let mut max_age = 0;
+
+    if let Some(json_link) = link
+        .as_ref()
+        .and_then(|l| l.iter().find(|o| o.format == OEmbedFormat::JSON))
+    {
+        if let Ok(o) = fetch_oembed(json_link).await {
+            oembed = Some(o);
         }
     }
 
-    Response::error("", 404)
+    if let Some(mime) = resp.headers().get("content-type")? {
+        let Some(mime) = mime.split(';').next() else {
+            return Response::error("Invalid MIME Type", 400);
+        };
+
+        if mime == "text/html" {
+            let mut html = Vec::with_capacity(512);
+            if let Some(mut headers) = read_head(&mut resp, &mut html).await? {
+                headers.sort_by_key(|meta| match meta {
+                    Header::Meta(meta) => meta.property,
+                    Header::Link(link) => link.href,
+                });
+
+                let extra = embed::parse_meta_to_embed(&mut embed, &headers);
+
+                match extra.link {
+                    Some(link) if oembed.is_none() && link.format == OEmbedFormat::JSON => {
+                        if let Ok(o) = fetch_oembed(&link).await {
+                            oembed = Some(o);
+                        }
+                    }
+                    _ => {}
+                }
+
+                max_age = extra.max_age;
+            }
+
+            drop(html); // ensure it lives long enough
+        } else if matches!(mime.get(0..6), Some("image" | "video" | "audio")) {
+        }
+    }
+
+    if let Some(oembed) = oembed {
+        console_log!("OEmbed: {:?}", oembed);
+
+        let extra = embed::parse_oembed_to_embed(&mut embed, oembed);
+
+        max_age = extra.max_age;
+    }
+
+    Response::from_json(&(max_age, embed))
+}
+
+async fn fetch_oembed<'a>(link: &OEmbedLink<'a>) -> Result<OEmbed> {
+    Fetch::Request(Request::new_with_init(&link.url, &req_init(Method::Get)?)?)
+        .send()
+        .await?
+        .json::<OEmbed>()
+        .await
+}
+
+fn req_init(method: Method) -> Result<RequestInit> {
+    Ok(RequestInit {
+        body: None,
+        method,
+        headers: {
+            let mut headers = Headers::new();
+            headers.append(
+                "user-agent",
+                "Mozilla/5.0 (compatible; Lantern Embed; +https://lantern.chat)",
+            )?;
+            headers
+        },
+        ..RequestInit::default()
+    })
 }
 
 async fn read_head<'a>(

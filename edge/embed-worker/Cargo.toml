@@ -14,6 +14,7 @@ client-sdk = { path = "../../../client-sdk-rs" }
 
 [dependencies]
 embed_parser = { path = "../../crates/embed_parser", default_features = false }
+client-sdk = { path = "../../../client-sdk-rs", default_features = false }
 
 # keep in sync with WORKERS_RS_VERSION in wrangler.toml
 worker = "0.0.12"
