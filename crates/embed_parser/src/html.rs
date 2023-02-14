@@ -66,29 +66,25 @@ impl Header<'_> {
 
 pub type HeaderList<'a> = smallvec::SmallVec<[Header<'a>; 32]>;
 
-use memchr::memmem::{find, rfind};
-
-pub use crate::regexes::ATTRIBUTE_RE;
+pub use crate::regexes::{ATTRIBUTE_RE, META_TAGS};
 
 /// Returns `None` on invalid HTML
-pub fn parse_meta<'a>(mut input: &'a str) -> Option<HeaderList<'a>> {
+pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
     let mut res = HeaderList::default();
 
+    // NOTE: Too many sites completely ignore the spec, so we cannot constrain to <head>, sadly.
+    // in fact, <head> may not even exist, yet <meta> tags are still somewhere.
+
     // constrain search region to <head></head> delimiters
-    let head_start = find(input.as_bytes(), b"<head")? + "<head".len();
-    input = &input[head_start..];
-    let head_end = rfind(input.as_bytes(), b"</head>")?;
-    input = &input[..head_end];
+    //let head_start = find(input.as_bytes(), b"<head")? + "<head".len();
+    //input = &input[head_start..];
+    //if let Some(head_end) = memchr::memmem::rfind(input.as_bytes(), b"</body>") {
+    //    input = &input[..head_end];
+    //}
 
     let bytes = input.as_bytes();
 
-    let tag_start_iter = memchr::memchr_iter(b'<', bytes);
-
-    const TAG_LEN: usize = "<meta ".len();
-
-    for mut start in tag_start_iter {
-        let tag_end = start + TAG_LEN;
-
+    for (mut start, tag_end) in META_TAGS.find_iter(bytes) {
         // detect tag type and initialize header value
         let mut header = match input.get(start..tag_end) {
             Some("<meta ") => Header::Meta(Meta {
@@ -96,13 +92,9 @@ pub fn parse_meta<'a>(mut input: &'a str) -> Option<HeaderList<'a>> {
                 pty: MetaProperty::Property,
                 property: "",
             }),
-            // special behavior, parse `<title>Title</title>`
-            Some("<title") => {
-                let title_start = tag_end + 1;
-
-                if input.get(tag_end..title_start) != Some(">") {
-                    continue;
-                }
+            // special case, parse `<title>Title</title>`
+            Some("<title>") => {
+                let title_start = tag_end;
 
                 if let Some(title_end) = memchr::memmem::find(&bytes[title_start..], b"</title>") {
                     res.push(Header::Meta(Meta {
@@ -120,14 +112,18 @@ pub fn parse_meta<'a>(mut input: &'a str) -> Option<HeaderList<'a>> {
                 ty: None,
                 title: None,
             }),
-            Some(_) => continue,
-            None => return None,
+            // hit actual HTML, bail
+            Some("<div") => break,
+            _ => continue,
         };
 
         start = tag_end; // skip to end of opening tag
 
         // find end of tag, like <meta whatever="" >
-        let end = memchr::memchr(b'>', &bytes[start..])? + start;
+        let end = match memchr::memchr(b'>', &bytes[start..]) {
+            Some(end) => end + start,
+            None => continue,
+        };
         let meta_inner = &input[start..end];
 
         // name="" content=""

@@ -8,14 +8,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut file = BufWriter::new(File::create(&path)?);
 
     regex_util::write_regex(
-        "ATTRIBUTE_RE",
+        "ATTRIBUTE_RE", // helps with splitting name="value"
         r#"[a-zA-Z_][0-9a-zA-Z\\-_]+\s*=\s*"(?:\\"|[^"])*[^\\]""#,
         &mut file,
     )?;
     writeln!(file, "#[cfg(feature = \"msg\")]")?;
     regex_util::write_regex(
-        "URL", //
+        "URL", // helps URL parsing in messages
         r#"[^\s<]+[^<.,:;"')\]\s]"#,
+        &mut file,
+    )?;
+    regex_util::write_regex(
+        "META_TAGS", // identifies HTML tags valid for metadata
+        r#"<(meta\x20|title>|link\x20|div)"#,
         &mut file,
     )?;
 
