@@ -66,7 +66,7 @@ impl Header<'_> {
 
 pub type HeaderList<'a> = smallvec::SmallVec<[Header<'a>; 32]>;
 
-use memchr::memmem::find;
+use memchr::memmem::{find, rfind};
 
 pub use crate::regexes::ATTRIBUTE_RE;
 
@@ -75,9 +75,9 @@ pub fn parse_meta<'a>(mut input: &'a str) -> Option<HeaderList<'a>> {
     let mut res = HeaderList::default();
 
     // constrain search region to <head></head> delimiters
-    let head_start = find(input.as_bytes(), b"<head>")? + "<head>".len();
+    let head_start = find(input.as_bytes(), b"<head")? + "<head".len();
     input = &input[head_start..];
-    let head_end = find(input.as_bytes(), b"</head>")?;
+    let head_end = rfind(input.as_bytes(), b"</head>")?;
     input = &input[..head_end];
 
     let bytes = input.as_bytes();
