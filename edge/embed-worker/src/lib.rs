@@ -297,7 +297,7 @@ async fn resolve_images(embed: &mut EmbedV1) -> Result<()> {
 
 async fn resolve_media(media: &mut EmbedMedia) -> Result<()> {
     // already has dimensions
-    if matches!((media.w, media.h), (Some(_), Some(_))) {
+    if !matches!((media.w, media.h), (None, None)) {
         return Ok(());
     }
 
