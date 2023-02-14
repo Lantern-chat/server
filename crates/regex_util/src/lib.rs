@@ -1,6 +1,16 @@
-use std::io::Write;
+pub mod rt {
+    #[repr(align(1))]
+    pub struct DenseDFABytes8<const N: usize>(pub [u8; N]);
 
-pub fn write_regex<W: Write>(name: &str, re: &str, mut out: W) -> Result<(), Box<dyn std::error::Error>> {
+    #[repr(align(2))]
+    pub struct DenseDFABytes16<const N: usize>(pub [u8; N]);
+
+    #[repr(align(4))]
+    pub struct DenseDFABytes32<const N: usize>(pub [u8; N]);
+}
+
+#[cfg(feature = "build")]
+pub fn write_regex<W: std::io::Write>(name: &str, re: &str, mut out: W) -> Result<(), Box<dyn std::error::Error>> {
     use regex_automata::RegexBuilder;
 
     let re = RegexBuilder::new()
@@ -21,7 +31,14 @@ pub fn write_regex<W: Write>(name: &str, re: &str, mut out: W) -> Result<(), Box
     }
 
     write!(
-        out, "pub static {1}: once_cell::sync::Lazy<Regex<DenseDFA<&'static [u{0}], u{0}>>> = once_cell::sync::Lazy::new(|| unsafe {{ Regex::from_dfas(DenseDFA::from_bytes(&{2:?}), DenseDFA::from_bytes(&{3:?})) }});",
+        out,
+        r#"
+        pub static {1}: once_cell::sync::Lazy<Regex<DenseDFA<&'static [u{0}], u{0}>>> = once_cell::sync::Lazy::new(|| unsafe {{
+            Regex::from_dfas(
+                DenseDFA::from_bytes(&regex_util::rt::DenseDFABytes{0}({2:?}).0),
+                DenseDFA::from_bytes(&regex_util::rt::DenseDFABytes{0}({3:?}).0)
+            )
+        }});"#,
         size, name, forward, reverse,
     )?;
 
