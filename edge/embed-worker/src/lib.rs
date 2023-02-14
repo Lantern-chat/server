@@ -110,10 +110,10 @@ async fn fetch_source(url: String) -> Result<Response> {
     {
         // https: / / whatever.com /
         let root_idx = url.split('/').map(|s| s.len()).take(3).sum::<usize>();
-        let root = {
+        let (https, root) = {
             let mut root = url[..(root_idx + 2)].to_owned();
             root += "/";
-            root
+            (root.starts_with("https://"), root)
         };
         embed.visit_media_mut(|media| {
             if media.url.starts_with("https://") || media.url.starts_with("http://") {
@@ -124,9 +124,19 @@ async fn fetch_source(url: String) -> Result<Response> {
                 // TODO
             }
 
-            media.url = {
+            let old = media.url.as_str();
+
+            media.url = 'media_url: {
                 let mut url = root.clone();
-                url += &media.url;
+
+                // I've seen this before, where "https://" is replaced with "undefined//"
+                if old.starts_with("undefined//") {
+                    url = if https { "https://" } else { "http://" }.to_owned();
+                    url += &old["undefined//".len()..];
+                    break 'media_url url.into();
+                }
+
+                url += &old;
                 url.into()
             };
         });
