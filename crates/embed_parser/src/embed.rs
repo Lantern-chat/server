@@ -55,7 +55,12 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                     "theme-color" => embed.col = parse_color(meta.content),
                     "og:site_name" => embed.pro.name = content(),
                     // canonical URL?
-                    // "og:url" => embed.url = content(),
+                    "og:url" => match embed.url {
+                        Some(ref mut url) if url.starts_with(meta.content) => {
+                            *url = meta.content.into();
+                        }
+                        _ => {}
+                    },
                     "title" | "og:title" | "twitter:title" => embed.title = content(),
                     "dc:creator" | "article:author" | "book:author" => get!(author).name = raw_content(),
 

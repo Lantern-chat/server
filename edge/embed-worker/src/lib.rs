@@ -59,6 +59,8 @@ async fn fetch_source(url: String) -> Result<Response> {
     let mut oembed = None;
     let mut max_age = 0;
 
+    embed.url = Some(url.as_str().into());
+
     if let Some(json_link) = link
         .as_ref()
         .and_then(|l| l.iter().find(|o| o.format == OEmbedFormat::JSON))
