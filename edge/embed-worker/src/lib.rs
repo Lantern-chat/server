@@ -20,14 +20,13 @@ fn log_request(req: &Request) {
 }
 
 #[event(fetch)]
-pub async fn main(mut req: Request, env: Env, _ctx: worker::Context) -> Result<Response> {
+pub async fn main(mut req: Request, _env: Env, _ctx: worker::Context) -> Result<Response> {
     if req.method() != Method::Post {
         return Response::error("Method Not Allowed", 405);
     }
 
     log_request(&req);
 
-    // Optionally, get more helpful error messages written to the console in the case of a panic.
     #[cfg(debug_assertions)]
     utils::set_panic_hook();
 
@@ -144,7 +143,16 @@ async fn fetch_source(url: String) -> Result<Response> {
         });
     }
 
-    Response::from_json(&(max_age, embed))
+    let expires = {
+        use iso8601_timestamp::{Timestamp, Duration};
+
+        embed.ts = Timestamp::now_utc();
+
+        // limit max_age to 1 month
+        embed.ts.checked_add(Duration::seconds(max_age.min(60 * 60 * 24 * 30) as i64))
+    };
+
+    Response::from_json(&(expires, embed))
 }
 
 async fn fetch_oembed<'a>(link: &OEmbedLink<'a>) -> Result<OEmbed> {
