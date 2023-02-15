@@ -40,6 +40,7 @@ pub struct Context {
     out: String,
     stack: Vec<Item>,
     pub max_substitution_depth: usize,
+    single_line_comment: &'static str,
 }
 
 impl Context {
@@ -50,7 +51,13 @@ impl Context {
             out: String::new(),
             stack: Vec::new(),
             max_substitution_depth: 32,
+            single_line_comment: "//",
         }
+    }
+
+    pub fn single_line_comment(&mut self, s: &'static str) -> &mut Self {
+        self.single_line_comment = s;
+        self
     }
 
     pub fn define(&mut self, key: String, value: String) -> &mut Self {
@@ -82,8 +89,8 @@ impl Context {
         for line in src.lines() {
             ln += 1;
 
-            let Some(mut t) = line.trim_start().split("//").next() else {
-                continue; // split("//") will always succeed once
+            let Some(mut t) = line.trim_start().split(self.single_line_comment).next() else {
+                continue; // split() will always succeed once
             };
 
             if !t.starts_with('#') {
@@ -177,7 +184,7 @@ impl Context {
     fn process_define(&mut self, define: &str) {
         let (name, value) = match define.split_once(char::is_whitespace) {
             None => (define, String::new()),
-            Some((name, value)) => (name, value.to_owned()),
+            Some((name, value)) => (name, value.trim_start().to_owned()),
         };
 
         self.defines.insert(name.to_owned(), value);
