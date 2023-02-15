@@ -33,14 +33,10 @@ pub async fn main(mut req: Request, _env: Env, _ctx: worker::Context) -> Result<
 
     let url = req.text().await?;
 
-    if url.starts_with("https://") || url.starts_with("http://") {
-        fetch_source(url).await
-    } else {
-        Response::error("Invalid URL", 400)
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Response::error("Invalid URL", 400);
     }
-}
 
-async fn fetch_source(url: String) -> Result<Response> {
     let mut resp = Fetch::Request(Request::new_with_init(&url, &req_init(Method::Get)?)?)
         .send()
         .await?;
@@ -74,8 +70,6 @@ async fn fetch_source(url: String) -> Result<Response> {
         let Some(mime) = mime.split(';').next() else {
             return Response::error("Invalid MIME Type", 400);
         };
-
-        console_log!("MIME Type: {}", mime);
 
         if mime == "text/html" {
             let mut html = Vec::with_capacity(512);
