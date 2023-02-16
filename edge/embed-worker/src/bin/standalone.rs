@@ -9,10 +9,12 @@ use reqwest::Client;
 use sdk::models::*;
 
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
 #[tokio::main]
 async fn main() {
+    dotenv::dotenv().expect("Unable to use .env");
+
     let state = Arc::new(
         reqwest::ClientBuilder::new()
             .user_agent("Mozilla/5.0 (compatible; Lantern Embed Worker; +https://lantern.chat)")
@@ -27,10 +29,11 @@ async fn main() {
             .expect("Unable to build primary client"),
     );
 
-    let app = Router::new().fallback(post(root)).with_state(state);
-    let addr = SocketAddr::from(([127, 0, 0, 1], 8787));
+    let addr = std::env::var("EMBEDW_BIND_ADDRESS").expect("EMBEDW_BIND_ADDRESS not found");
+    let addr = SocketAddr::from_str(&addr).expect("Unable to parse bind address");
+
     axum::Server::bind(&addr)
-        .serve(app.into_make_service())
+        .serve(Router::new().fallback(post(root)).with_state(state).into_make_service())
         .await
         .expect("Unable to run embed-worker");
 }
