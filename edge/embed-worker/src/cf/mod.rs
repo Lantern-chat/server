@@ -234,7 +234,7 @@ fn req_init(method: Method) -> Result<RequestInit> {
             let mut headers = Headers::new();
             headers.append(
                 "user-agent",
-                "Mozilla/5.0 (compatible; Lantern Embed Worker; +https://lantern.chat)",
+                "Lantern Embed Worker (bot; +https://github.com/Lantern-chat)",
             )?;
             headers
         },
