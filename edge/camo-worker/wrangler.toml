@@ -9,7 +9,7 @@ route = { pattern = "cdn.lanternchat.net/camo/*", zone_name = "lanternchat.net" 
 WORKERS_RS_VERSION = "0.0.12"
 
 [build]
-command = "worker-build --release -- --config profile.release.opt-level='s'"
+command = "worker-build --release -- --no-default-features --features cf --config profile.release.opt-level='s'"
 
 [env]
 CAMO_SIGNING_KEY = "your_hexadecimal_signing_key"
