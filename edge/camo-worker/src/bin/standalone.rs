@@ -1,3 +1,4 @@
+use futures_util::FutureExt;
 use reqwest::{header::HeaderName, Client};
 
 use axum::{
@@ -50,6 +51,7 @@ async fn main() {
 
     axum::Server::bind(&addr)
         .serve(Router::new().fallback(get(root)).with_state(state).into_make_service())
+        .with_graceful_shutdown(tokio::signal::ctrl_c().map(|_| ()))
         .await
         .expect("Unable to run camo-worker");
 }

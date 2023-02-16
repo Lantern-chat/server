@@ -5,6 +5,7 @@ use embed_parser::{
     html::Header,
     oembed::{OEmbed, OEmbedFormat, OEmbedLink},
 };
+use futures_util::FutureExt;
 use reqwest::Client;
 use sdk::models::*;
 
@@ -34,6 +35,7 @@ async fn main() {
 
     axum::Server::bind(&addr)
         .serve(Router::new().fallback(post(root)).with_state(state).into_make_service())
+        .with_graceful_shutdown(tokio::signal::ctrl_c().map(|_| ()))
         .await
         .expect("Unable to run embed-worker");
 }
