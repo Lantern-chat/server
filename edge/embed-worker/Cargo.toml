@@ -2,18 +2,15 @@
 name = "embed-worker"
 version = "0.1.0"
 edition = "2021"
+publish = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["console_error_panic_hook"]
-
-[patch.'https://github.com/Lantern-chat/client-sdk-rs']
-client-sdk = { path = "../../../client-sdk-rs" }
-
-[patch.crates-io]
-iso8601-timestamp = { git = "https://github.com/Lantern-chat/iso8601-timestamp" }
+default = ["standalone"]
+cf = ["dep:worker", "console_error_panic_hook"]
+standalone = ["reqwest", "tokio", "axum", "thiserror"]
 
 [dependencies]
 embed_parser = { path = "../../crates/embed_parser", default_features = false }
@@ -22,20 +19,26 @@ iso8601-timestamp = { version = "0.2", default_features = false, features = ["wo
 imagesize = "0.11.0"
 
 # keep in sync with WORKERS_RS_VERSION in wrangler.toml
-worker = "0.0.12"
+worker = { version = "0.0.12", optional = true }
+console_error_panic_hook = { version = "0.1.1", optional = true }
+
+reqwest = { version = "0.11", optional = true, features = ["json", "gzip", "brotli", "deflate"] }
+tokio = { version = "1", optional = true, features = ["full"] }
+axum = { version = "0.6", optional = true, features = ["http2"] }
+thiserror = { version = "1", optional = true }
 
 cfg-if = "1"
 serde_json = "1.0.67"
 
-# The `console_error_panic_hook` crate provides better debugging of panics by
-# logging them with `console.error`. This is great for development, but requires
-# all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
-# code size when deploying.
-console_error_panic_hook = { version = "0.1.1", optional = true }
 futures-util = "0.3.25"
 memchr = "2.5.0"
 
 [profile.release]
-opt-level = "s"
+opt-level = 3
 lto = 'fat'
 codegen-units = 1
+
+[[bin]]
+name = "embed-worker"
+path = "src/bin/standalone.rs"
+required-features = ["standalone"]

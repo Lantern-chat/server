@@ -20,8 +20,8 @@ failsafe = { git = "https://github.com/Lantern-chat/failsafe-rs" }
 client-sdk = { path = "../client-sdk-rs" }
 
 [workspace]
-members = ["crates/*", "bin/*", "layers/*"]
-exclude = ["edge/embed-worker", "edge/camo"]
+members = ["crates/*", "bin/*", "layers/*", "edge/*"]
+# exclude = ["edge/embed-worker", "edge/camo"]
 
 [profile.dev]
 opt-level = 1
