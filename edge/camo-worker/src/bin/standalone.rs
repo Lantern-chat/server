@@ -92,8 +92,8 @@ async fn root(State(state): State<Arc<CamoState>>, req: Request<Body>) -> impl I
     Ok(proxy(&state.client, &url, req).await)
 }
 
-async fn proxy(client: &Client, url: &str, req: Request<Body>) -> impl IntoResponse {
-    let mut headers = req.headers().clone();
+async fn proxy(client: &Client, url: &str, mut req: Request<Body>) -> impl IntoResponse {
+    let mut headers = std::mem::take(req.headers_mut());
     headers.remove(HeaderName::from_static("host"));
 
     match client.get(url).headers(headers).send().await {
