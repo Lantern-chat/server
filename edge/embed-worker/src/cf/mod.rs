@@ -18,8 +18,13 @@ fn log_request(req: &Request) {
     );
 }
 
+use hmac::{digest::Key, Mac};
+type Hmac = hmac::SimpleHmac<sha1::Sha1>;
+
+use base64::engine::{general_purpose::URL_SAFE_NO_PAD, Engine};
+
 #[event(fetch)]
-pub async fn main(mut req: Request, _env: Env, _ctx: worker::Context) -> Result<Response> {
+pub async fn main(mut req: Request, env: Env, _ctx: worker::Context) -> Result<Response> {
     if req.method() != Method::Post {
         return Response::error("Method Not Allowed", 405);
     }
@@ -34,6 +39,18 @@ pub async fn main(mut req: Request, _env: Env, _ctx: worker::Context) -> Result<
     if !url.starts_with("https://") && !url.starts_with("http://") {
         return Response::error("Invalid URL", 400);
     }
+
+    let signing_key = {
+        let hex_key = env.secret("CAMO_SIGNING_KEY")?.to_string();
+        let mut raw_key = Key::<Hmac>::default();
+
+        // keys are allowed to be shorter than the entire raw key. Will be padded internally.
+        if let Err(_) = hex::decode_to_slice(&hex_key, &mut raw_key[..hex_key.len() / 2]) {
+            return Response::error("", 500);
+        }
+
+        raw_key
+    };
 
     let mut resp = Fetch::Request(Request::new_with_init(&url, &req_init(Method::Get)?)?)
         .send()
@@ -171,6 +188,20 @@ pub async fn main(mut req: Request, _env: Env, _ctx: worker::Context) -> Result<
     // after relative paths are resolved, try to find image dimensions
     resolve_images(&mut embed).await?;
 
+    embed.visit_media_mut(|media| {
+        let sig = Hmac::new(&signing_key)
+            .chain_update(&*media.url)
+            .finalize()
+            .into_bytes();
+
+        let mut buf = [0; 27];
+        if let Ok(27) = URL_SAFE_NO_PAD.encode_slice(sig, &mut buf) {
+            use sdk::util::fixed::FixedStr;
+
+            media.sig = Some(FixedStr::new(unsafe { std::str::from_utf8_unchecked(&buf) }));
+        }
+    });
+
     // compute expirey
     let expires = {
         use iso8601_timestamp::Duration;
@@ -295,7 +326,7 @@ async fn resolve_media(media: &mut EmbedMedia) -> Result<()> {
         .await?;
 
     if let Some(mime) = resp.headers().get("content-type")? {
-        media.mime = Some(mime.into());
+        media.mime = Some(mime.as_str().into());
 
         if mime.starts_with("image") {
             let mut bytes = Vec::with_capacity(512);

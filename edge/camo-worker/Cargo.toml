@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["standalone"]
+default = ["cf", "standalone"]
 cf = ["dep:worker", "console_error_panic_hook"]
 standalone = ["reqwest", "tokio", "axum", "dotenv"]
 

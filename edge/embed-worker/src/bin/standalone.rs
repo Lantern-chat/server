@@ -6,18 +6,36 @@ use embed_parser::{
     oembed::{OEmbed, OEmbedFormat, OEmbedLink},
 };
 use futures_util::FutureExt;
-use reqwest::Client;
 use sdk::models::*;
 
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
+use hmac::{digest::Key, Mac};
+type Hmac = hmac::SimpleHmac<sha1::Sha1>;
+
+struct WorkerState {
+    signing_key: Key<Hmac>,
+    client: reqwest::Client,
+}
+
+use base64::engine::{general_purpose::URL_SAFE_NO_PAD, Engine};
+
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().expect("Unable to use .env");
 
-    let state = Arc::new(
-        reqwest::ClientBuilder::new()
+    let state = Arc::new(WorkerState {
+        signing_key: {
+            let hex_key = std::env::var("CAMO_SIGNING_KEY").expect("CAMO_SIGNING_KEY not found");
+            let mut raw_key = Key::<Hmac>::default();
+            // keys are allowed to be shorter than the entire raw key. Will be padded internally.
+            hex::decode_to_slice(&hex_key, &mut raw_key[..hex_key.len() / 2])
+                .expect("Could not parse signing key!");
+
+            raw_key
+        },
+        client: reqwest::ClientBuilder::new()
             .user_agent("Mozilla/5.0 (compatible; Lantern Embed Worker; +https://lantern.chat)")
             .gzip(true)
             .deflate(true)
@@ -28,7 +46,7 @@ async fn main() {
             .http2_adaptive_window(true)
             .build()
             .expect("Unable to build primary client"),
-    );
+    });
 
     let addr = std::env::var("EMBEDW_BIND_ADDRESS").expect("EMBEDW_BIND_ADDRESS not found");
     let addr = SocketAddr::from_str(&addr).expect("Unable to parse bind address");
@@ -41,12 +59,12 @@ async fn main() {
 }
 
 async fn root(
-    State(client): State<Arc<Client>>,
+    State(state): State<Arc<WorkerState>>,
     body: String,
 ) -> Result<Json<(Timestamp, Embed)>, (StatusCode, String)> {
     let url = body; // to avoid confusion
 
-    match inner(client, url).await {
+    match inner(state, url).await {
         Ok(value) => Ok(Json(value)),
         Err(e) => Err({
             let code = match e {
@@ -78,12 +96,12 @@ enum Error {
     ReqwestError(#[from] reqwest::Error),
 }
 
-async fn inner(client: Arc<Client>, url: String) -> Result<(Timestamp, Embed), Error> {
+async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed), Error> {
     if !url.starts_with("https://") && !url.starts_with("http://") {
         return Err(Error::InvalidUrl);
     }
 
-    let mut resp = client.get(url.as_str()).send().await?;
+    let mut resp = state.client.get(url.as_str()).send().await?;
 
     if !resp.status().is_success() {
         return Err(Error::Failure(resp.status()));
@@ -105,7 +123,7 @@ async fn inner(client: Arc<Client>, url: String) -> Result<(Timestamp, Embed), E
         .as_ref()
         .and_then(|l| l.iter().find(|o| o.format == OEmbedFormat::JSON))
     {
-        if let Ok(o) = fetch_oembed(&client, json_link).await {
+        if let Ok(o) = fetch_oembed(&state.client, json_link).await {
             oembed = Some(o);
         }
     }
@@ -129,7 +147,7 @@ async fn inner(client: Arc<Client>, url: String) -> Result<(Timestamp, Embed), E
 
                 match extra.link {
                     Some(link) if oembed.is_none() && link.format == OEmbedFormat::JSON => {
-                        if let Ok(o) = fetch_oembed(&client, &link).await {
+                        if let Ok(o) = fetch_oembed(&state.client, &link).await {
                             oembed = Some(o);
                         }
                     }
@@ -217,7 +235,21 @@ async fn inner(client: Arc<Client>, url: String) -> Result<(Timestamp, Embed), E
     }
 
     // after relative paths are resolved, try to find image dimensions
-    resolve_images(&client, &mut embed).await?;
+    resolve_images(&state.client, &mut embed).await?;
+
+    embed.visit_media_mut(|media| {
+        let sig = Hmac::new(&state.signing_key)
+            .chain_update(&*media.url)
+            .finalize()
+            .into_bytes();
+
+        let mut buf = [0; 27];
+        if let Ok(27) = URL_SAFE_NO_PAD.encode_slice(sig, &mut buf) {
+            use sdk::util::fixed::FixedStr;
+
+            media.sig = Some(FixedStr::new(unsafe { std::str::from_utf8_unchecked(&buf) }));
+        }
+    });
 
     // compute expirey
     let expires = {

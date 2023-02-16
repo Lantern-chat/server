@@ -8,7 +8,7 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [features]
-default = ["standalone"]
+default = ["cf", "standalone"]
 cf = ["dep:worker", "console_error_panic_hook"]
 standalone = ["reqwest", "tokio", "axum", "thiserror", "dotenv"]
 
@@ -17,6 +17,10 @@ embed_parser = { path = "../../crates/embed_parser", default_features = false }
 client-sdk = { path = "../../../client-sdk-rs", default_features = false }
 iso8601-timestamp = { version = "0.2", default_features = false, features = ["worker"] }
 imagesize = "0.11.0"
+base64 = "0.21"
+hmac = "0.12.1"
+sha1 = "0.10.5"
+hex = "0.4.3"
 
 # keep in sync with WORKERS_RS_VERSION in wrangler.toml
 worker = { version = "0.0.12", optional = true }
