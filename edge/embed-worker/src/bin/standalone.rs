@@ -37,7 +37,7 @@ async fn main() {
             raw_key
         },
         client: reqwest::ClientBuilder::new()
-            .user_agent("Lantern Embed Worker (bot; +https://github.com/Lantern-chat)")
+            .user_agent(embed_worker::USER_AGENT)
             .gzip(true)
             .deflate(true)
             .brotli(true)

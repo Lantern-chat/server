@@ -208,7 +208,7 @@ fn req_init(method: Method, domain: Option<&str>) -> Result<RequestInit> {
                 "user-agent",
                 match domain.and_then(|d| crate::USER_AGENTS.get(d)) {
                     Some(&user_agent) => user_agent,
-                    None => "Lantern Embed Worker (bot; +https://github.com/Lantern-chat)",
+                    None => crate::USER_AGENT,
                 },
             )?;
             headers

@@ -3,6 +3,8 @@ extern crate client_sdk as sdk;
 #[cfg(feature = "cf")]
 pub mod cf;
 
+pub const USER_AGENT: &'static str = "Lantern/1.0 (bot; +https://github.com/Lantern-chat)";
+
 pub static AVOID_OEMBED: phf::Set<&'static str> = phf::phf_set! {
     // gives more generic information than the meta tags, so should be avoided
     "fxtwitter.com"
