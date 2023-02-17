@@ -144,7 +144,7 @@ pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
                             "name" => MetaProperty::Name,
                             "property" => MetaProperty::Property,
                             "description" => MetaProperty::Description,
-                            "itemprop" => MetaProperty::ItemProp,
+                            "itemprop" | "ItemProp" => MetaProperty::ItemProp,
                             _ => continue,
                         };
 

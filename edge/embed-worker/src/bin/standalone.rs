@@ -40,7 +40,7 @@ async fn main() {
             .gzip(true)
             .deflate(true)
             .brotli(true)
-            .redirect(reqwest::redirect::Policy::limited(1))
+            .redirect(reqwest::redirect::Policy::limited(2))
             .connect_timeout(std::time::Duration::from_secs(10))
             .danger_accept_invalid_certs(false)
             .http2_adaptive_window(true)

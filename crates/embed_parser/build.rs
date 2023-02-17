@@ -9,7 +9,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     regex_util::write_regex(
         "ATTRIBUTE_RE", // helps with splitting name="value"
-        r#"[a-zA-Z_][0-9a-zA-Z\\-_]+\s*=\s*"(?:\\"|[^"])*[^\\]""#,
+        r#"[a-zA-Z_][0-9a-zA-Z\-_]+\s*=\s*"(?:\\"|[^"])*[^\\]""#,
         &mut file,
     )?;
     writeln!(file, "#[cfg(feature = \"msg\")]")?;
