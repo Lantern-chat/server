@@ -46,7 +46,7 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                 }
 
                 match meta.property {
-                    "description" | "og:description" => embed.desc = content(),
+                    "description" | "og:description" | "twitter:description" => embed.desc = content(),
                     "html_title" => {
                         if embed.title.is_none() {
                             embed.title = content();
