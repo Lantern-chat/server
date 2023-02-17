@@ -54,13 +54,8 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                     }
                     "theme-color" => embed.col = parse_color(meta.content),
                     "og:site_name" => embed.pro.name = content(),
-                    // canonical URL?
-                    "og:url" => match embed.url {
-                        Some(ref mut url) if url.starts_with(meta.content) => {
-                            *url = meta.content.into();
-                        }
-                        _ => {}
-                    },
+                    // TODO: This isn't quite correct, but good enough most of the time
+                    "og:url" => embed.can = content(),
                     "title" | "og:title" | "twitter:title" => embed.title = content(),
                     "dc:creator" | "article:author" | "book:author" => get!(author).name = raw_content(),
 
@@ -101,6 +96,9 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                     //}
                     _ => {}
                 }
+            }
+            Header::Link(link) if link.rel == LinkType::Canonical => {
+                embed.can = Some(link.href.into());
             }
             Header::Link(link) if link.rel == LinkType::Alternate => {
                 let ty = match link.ty {
