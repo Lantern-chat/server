@@ -52,11 +52,13 @@ pub async fn main(mut req: Request, env: Env, _ctx: worker::Context) -> Result<R
         raw_key
     };
 
-    let mut resp = Fetch::Request(Request::new_with_init(&url, &req_init(Method::Get)?)?)
+    let (https, root, domain) = embed_parser::utils::url_root(&url);
+
+    let mut resp = Fetch::Request(Request::new_with_init(&url, &req_init(Method::Get, Some(domain))?)?)
         .send()
         .await?;
 
-    if resp.status_code() != 200 {
+    if !(200..=299).contains(&resp.status_code()) {
         return Response::error("Failure", resp.status_code());
     }
 
@@ -71,8 +73,6 @@ pub async fn main(mut req: Request, env: Env, _ctx: worker::Context) -> Result<R
     let mut max_age = 0;
 
     embed.url = Some(url.as_str().into());
-
-    let (https, root, domain) = embed_parser::utils::url_root(&url);
 
     if let Some(json_link) = link
         .as_ref()
@@ -190,7 +190,7 @@ async fn fetch_oembed<'a>(link: &OEmbedLink<'a>, domain: &str) -> Result<Option<
         return Ok(None);
     }
 
-    Fetch::Request(Request::new_with_init(&link.url, &req_init(Method::Get)?)?)
+    Fetch::Request(Request::new_with_init(&link.url, &req_init(Method::Get, None)?)?)
         .send()
         .await?
         .json::<OEmbed>()
@@ -198,7 +198,7 @@ async fn fetch_oembed<'a>(link: &OEmbedLink<'a>, domain: &str) -> Result<Option<
         .map(Some)
 }
 
-fn req_init(method: Method) -> Result<RequestInit> {
+fn req_init(method: Method, domain: Option<&str>) -> Result<RequestInit> {
     Ok(RequestInit {
         body: None,
         method,
@@ -206,7 +206,10 @@ fn req_init(method: Method) -> Result<RequestInit> {
             let mut headers = Headers::new();
             headers.append(
                 "user-agent",
-                "Lantern Embed Worker (bot; +https://github.com/Lantern-chat)",
+                match domain.and_then(|d| embed_parser::quirks::USER_AGENTS.get(d)) {
+                    Some(&user_agent) => user_agent,
+                    None => "Lantern Embed Worker (bot; +https://github.com/Lantern-chat)",
+                },
             )?;
             headers
         },
@@ -293,7 +296,7 @@ async fn resolve_media(media: &mut EmbedMedia) -> Result<()> {
         return Ok(());
     }
 
-    let mut resp = Fetch::Request(Request::new_with_init(&media.url, &req_init(Method::Get)?)?)
+    let mut resp = Fetch::Request(Request::new_with_init(&media.url, &req_init(Method::Get, None)?)?)
         .send()
         .await?;
 

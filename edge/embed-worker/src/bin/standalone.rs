@@ -6,6 +6,7 @@ use embed_parser::{
     oembed::{OEmbed, OEmbedFormat, OEmbedLink},
 };
 use futures_util::FutureExt;
+use reqwest::header::HeaderName;
 use sdk::models::*;
 
 use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
@@ -101,7 +102,17 @@ async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed
         return Err(Error::InvalidUrl);
     }
 
-    let mut resp = state.client.get(url.as_str()).send().await?;
+    let (https, root, domain) = embed_parser::utils::url_root(&url);
+
+    let mut resp = {
+        let mut req = state.client.get(url.as_str());
+
+        if let Some(&user_agent) = embed_parser::quirks::USER_AGENTS.get(domain) {
+            req = req.header(HeaderName::from_static("user-agent"), user_agent);
+        }
+
+        req.send().await?
+    };
 
     if !resp.status().is_success() {
         return Err(Error::Failure(resp.status()));
@@ -118,8 +129,6 @@ async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed
     let mut max_age = 0;
 
     embed.url = Some(url.as_str().into());
-
-    let (https, root, domain) = embed_parser::utils::url_root(&url);
 
     if let Some(json_link) = link
         .as_ref()
