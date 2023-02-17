@@ -8,8 +8,9 @@ pub static AVOID_OEMBED: phf::Set<&'static str> = phf::phf_set! {
     "fxtwitter.com"
 };
 
-// TODO: Add Lantern's user-agent to vxtwitter main
 pub static USER_AGENTS: phf::Map<&'static str, &'static str> = phf::phf_map! {
+    // TODO: Add Lantern's user-agent to vxtwitter main
     // https://github.com/dylanpdx/BetterTwitFix/blob/7a1c00ebdb6479afbfcca6d84450039d29029a75/twitfix.py#L35
     "vxtwitter.com" => "test",
+    "d.vx" => "test",
 };

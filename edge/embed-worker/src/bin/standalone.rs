@@ -72,7 +72,11 @@ async fn root(
                 Error::InvalidUrl => StatusCode::BAD_REQUEST,
                 Error::InvalidMimeType => StatusCode::UNSUPPORTED_MEDIA_TYPE,
                 Error::Failure(code) => code,
-                _ => StatusCode::INTERNAL_SERVER_ERROR,
+                Error::ReqwestError(ref e) => match e.status() {
+                    Some(status) => status,
+                    None if e.is_connect() => StatusCode::REQUEST_TIMEOUT,
+                    None => StatusCode::INTERNAL_SERVER_ERROR,
+                },
             };
 
             let msg = if code.is_server_error() { "Internal Server Error".to_owned() } else { e.to_string() };
