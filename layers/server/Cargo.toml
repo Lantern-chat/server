@@ -6,11 +6,10 @@ publish = false
 
 [features]
 # nightly = ["crc32fast/nightly", "parking_lot/nightly", "hashbrown/nightly"]
-# armv8 = ["nightly", "aes/armv8", "aes-gcm-siv/armv8"]
 brotli = ["sdk/brotli", "reqwest/brotli", "async-compression/brotli", "ftl/brotli"]
 
 [build-dependencies]
-built = { version = "0.5", features = ["chrono"] }
+built = { version = "0.6", features = ["chrono"] }
 
 [dependencies]
 process = { path = "../../bin/process" }
@@ -69,7 +68,7 @@ hex = "0.4.2"
 bytes = "1.0.1"
 lazy_static = "1.4.0"
 # sha3 = "0.9.1"
-miniz_oxide = "0.6"
+miniz_oxide = "0.7"
 thiserror = "1.0.24"
 serde_repr = "0.1.6"
 paste = "1.0.5"
