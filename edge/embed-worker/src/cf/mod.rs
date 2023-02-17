@@ -186,7 +186,7 @@ pub async fn main(mut req: Request, env: Env, _ctx: worker::Context) -> Result<R
 }
 
 async fn fetch_oembed<'a>(link: &OEmbedLink<'a>, domain: &str) -> Result<Option<OEmbed>> {
-    if embed_parser::quirks::AVOID_OEMBED.contains(domain) {
+    if crate::AVOID_OEMBED.contains(domain) {
         return Ok(None);
     }
 
@@ -206,7 +206,7 @@ fn req_init(method: Method, domain: Option<&str>) -> Result<RequestInit> {
             let mut headers = Headers::new();
             headers.append(
                 "user-agent",
-                match domain.and_then(|d| embed_parser::quirks::USER_AGENTS.get(d)) {
+                match domain.and_then(|d| crate::USER_AGENTS.get(d)) {
                     Some(&user_agent) => user_agent,
                     None => "Lantern Embed Worker (bot; +https://github.com/Lantern-chat)",
                 },

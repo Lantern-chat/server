@@ -107,7 +107,7 @@ async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed
     let mut resp = {
         let mut req = state.client.get(url.as_str());
 
-        if let Some(&user_agent) = embed_parser::quirks::USER_AGENTS.get(domain) {
+        if let Some(&user_agent) = embed_worker::USER_AGENTS.get(domain) {
             req = req.header(HeaderName::from_static("user-agent"), user_agent);
         }
 
@@ -248,7 +248,7 @@ async fn fetch_oembed<'a>(
     link: &OEmbedLink<'a>,
     domain: &str,
 ) -> Result<Option<OEmbed>, Error> {
-    if embed_parser::quirks::AVOID_OEMBED.contains(domain) {
+    if embed_worker::AVOID_OEMBED.contains(domain) {
         return Ok(None);
     }
 
