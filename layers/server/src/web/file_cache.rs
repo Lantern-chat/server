@@ -392,6 +392,7 @@ lazy_static::lazy_static! {
         /*0*/ "__CONFIG__",
         /*1*/ "__BASE_URL__",
         /*2*/ "__SERVER_NAME__",
+        /*3*/ "__CDN_DOMAIN__",
     ]);
 }
 
@@ -447,6 +448,7 @@ impl MainFileCache {
                 }
                 1 => new_file.extend_from_slice(c.web.base_url().as_bytes()),
                 2 => new_file.extend_from_slice(c.general.server_name.as_bytes()),
+                3 => new_file.extend_from_slice(c.web.cdn_domain.as_bytes()),
                 _ => log::error!("Unreachable replacement"),
             }
         }
