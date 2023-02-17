@@ -5,6 +5,8 @@ pub mod embed;
 pub mod html;
 //pub mod iter;
 pub mod oembed;
+pub mod quirks;
+pub mod utils;
 //pub mod req;
 
 #[cfg(feature = "msg")]

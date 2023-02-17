@@ -129,6 +129,12 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
         }
     }
 
+    determine_embed_type(embed);
+
+    extra
+}
+
+fn determine_embed_type(embed: &mut EmbedV1) {
     if embed.img.is_some() {
         embed.ty = EmbedType::Img;
     }
@@ -144,8 +150,6 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
     if embed.obj.is_some() {
         embed.ty = EmbedType::Html;
     }
-
-    extra
 }
 
 /// Add to/overwrite embed profile with oEmbed data
@@ -175,9 +179,21 @@ pub fn parse_oembed_to_embed(embed: &mut EmbedV1, o: OEmbed) -> ExtraFields {
         }
     }
 
-    embed.title.overwrite_with(o.title);
+    // QUIRK: Sometimes oEmebed returns a bad title
+    // that's just a prefix of the meta tags title
+    if let Some(title) = o.title {
+        match embed.title {
+            Some(ref t) if t.starts_with(title.as_str()) => {}
+            _ => embed.title = Some(title),
+        }
+    }
+
     embed.pro.name.overwrite_with(o.provider_name);
     embed.pro.url.overwrite_with(o.provider_url);
+
+    if embed.ty == EmbedType::Link {
+        determine_embed_type(embed);
+    }
 
     let media = match o.kind {
         OEmbedType::Photo => get!(img),

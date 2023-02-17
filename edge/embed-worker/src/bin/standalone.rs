@@ -119,12 +119,14 @@ async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed
 
     embed.url = Some(url.as_str().into());
 
+    let (https, root, domain) = embed_parser::utils::url_root(&url);
+
     if let Some(json_link) = link
         .as_ref()
         .and_then(|l| l.iter().find(|o| o.format == OEmbedFormat::JSON))
     {
-        if let Ok(o) = fetch_oembed(&state.client, json_link).await {
-            oembed = Some(o);
+        if let Ok(o) = fetch_oembed(&state.client, json_link, domain).await {
+            oembed = o;
         }
     }
 
@@ -147,8 +149,8 @@ async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed
 
                 match extra.link {
                     Some(link) if oembed.is_none() && link.format == OEmbedFormat::JSON => {
-                        if let Ok(o) = fetch_oembed(&state.client, &link).await {
-                            oembed = Some(o);
+                        if let Ok(o) = fetch_oembed(&state.client, &link, domain).await {
+                            oembed = o;
                         }
                     }
                     _ => {}
@@ -198,44 +200,9 @@ async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed
         max_age = extra.max_age;
     }
 
-    // naively resolve relative paths
-    {
-        // https: / / whatever.com /
-        let root_idx = url.split('/').map(|s| s.len()).take(3).sum::<usize>();
-        let (https, root) = {
-            let mut root = url[..(root_idx + 2)].to_owned();
-            root += "/";
-            (root.starts_with("https://"), root)
-        };
-        embed.visit_media_mut(|media| {
-            if media.url.starts_with("https://") || media.url.starts_with("http://") {
-                return;
-            }
-
-            if media.url.starts_with(".") {
-                // TODO
-            }
-
-            let old = media.url.as_str();
-
-            media.url = 'media_url: {
-                let mut url = root.clone();
-
-                // I've seen this before, where "https://" is replaced with "undefined//"
-                if old.starts_with("undefined//") {
-                    url = if https { "https://" } else { "http://" }.to_owned();
-                    url += &old["undefined//".len()..];
-                    break 'media_url url.into();
-                }
-
-                url += &old;
-                url.into()
-            };
-        });
-    }
-
-    // after relative paths are resolved, try to find image dimensions
+    embed_parser::quirks::resolve_relative(root, https, &mut embed);
     resolve_images(&state.client, &mut embed).await?;
+    embed_parser::quirks::fix_embed(&mut embed);
 
     embed.visit_media_mut(|media| {
         let sig = Hmac::new(&state.signing_key)
@@ -267,14 +234,21 @@ async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed
     Ok((expires, sdk::models::Embed::V1(embed)))
 }
 
-async fn fetch_oembed<'a>(client: &reqwest::Client, link: &OEmbedLink<'a>) -> Result<OEmbed, Error> {
-    client
-        .get(link.url)
-        .send()
-        .await?
-        .json::<OEmbed>()
-        .await
-        .map_err(Error::from)
+async fn fetch_oembed<'a>(
+    client: &reqwest::Client,
+    link: &OEmbedLink<'a>,
+    domain: &str,
+) -> Result<Option<OEmbed>, Error> {
+    if embed_parser::quirks::AVOID_OEMBED.contains(domain) {
+        return Ok(None);
+    }
+
+    let res = client.get(link.url).send().await?.json::<OEmbed>().await;
+
+    match res {
+        Ok(o) => Ok(Some(o)),
+        Err(e) => Err(e.into()),
+    }
 }
 
 async fn read_head<'a>(
