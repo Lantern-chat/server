@@ -303,14 +303,18 @@ async fn read_head<'a>(
 
         // 1MB of HTML downloaded, assume it's a broken page or DoS attack and don't bother with more
         if html.len() > (1024 * 1024) {
-            return Ok(None);
+            break;
         }
     }
 
-    Ok(match std::str::from_utf8(html) {
-        Ok(html) => embed_parser::html::parse_meta(html),
-        Err(_) => None,
-    })
+    if let std::borrow::Cow::Owned(new_html) = String::from_utf8_lossy(&html) {
+        *html = new_html.into();
+    }
+
+    // SAFETY: Just converted it to lossy utf8, it's fine
+    Ok(embed_parser::html::parse_meta(unsafe {
+        std::str::from_utf8_unchecked(html)
+    }))
 }
 
 async fn read_bytes<'a>(resp: &'a mut reqwest::Response, bytes: &'a mut Vec<u8>, max: usize) -> Result<(), Error> {
