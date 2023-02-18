@@ -15,8 +15,6 @@ use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
 use sdk::models::*;
 
-pub const USER_AGENT: &'static str = "Lantern/1.0 (bot; +https://github.com/Lantern-chat)";
-
 pub static AVOID_OEMBED: phf::Set<&'static str> = phf::phf_set! {
     // gives more generic information than the meta tags, so should be avoided
     "fxtwitter.com"
@@ -64,10 +62,13 @@ async fn main() {
                         "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
                     ),
                 );
+                headers.insert(
+                    HeaderName::from_static("user-agent"),
+                    HeaderValue::from_static("Lantern/1.0 (bot; +https://github.com/Lantern-chat)"),
+                );
 
                 headers
             })
-            .user_agent(USER_AGENT)
             .gzip(true)
             .deflate(true)
             .brotli(true)
