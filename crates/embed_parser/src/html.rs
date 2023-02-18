@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MetaProperty {
     Name,
@@ -23,9 +25,9 @@ pub enum LinkType {
     //Stylesheet,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Meta<'a> {
-    pub content: &'a str,
+    pub content: Cow<'a, str>,
     pub pty: MetaProperty,
     pub property: &'a str,
 }
@@ -39,25 +41,25 @@ pub struct Link<'a> {
 }
 
 impl Meta<'_> {
-    pub const fn is_valid(&self) -> bool {
+    pub fn is_valid(&self) -> bool {
         !self.content.is_empty() && !self.property.is_empty()
     }
 }
 
 impl Link<'_> {
-    pub const fn is_valid(&self) -> bool {
+    pub fn is_valid(&self) -> bool {
         !self.href.is_empty()
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Header<'a> {
     Meta(Meta<'a>),
     Link(Link<'a>),
 }
 
 impl Header<'_> {
-    pub const fn is_valid(&self) -> bool {
+    pub fn is_valid(&self) -> bool {
         match self {
             Header::Meta(meta) => meta.is_valid(),
             Header::Link(link) => link.is_valid(),
@@ -79,7 +81,7 @@ pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
         // detect tag type and initialize header value
         let mut header = match input.get(start..tag_end) {
             Some("<meta ") => Header::Meta(Meta {
-                content: "",
+                content: "".into(), // deferred
                 pty: MetaProperty::Property,
                 property: "",
             }),
@@ -89,7 +91,7 @@ pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
 
                 if let Some(title_end) = memchr::memmem::find(&bytes[title_start..], b"</title>") {
                     res.push(Header::Meta(Meta {
-                        content: &input[title_start..(title_start + title_end)],
+                        content: html_escape::decode_html_entities(&input[title_start..(title_start + title_end)]),
                         pty: MetaProperty::Title,
                         property: "",
                     }));
@@ -127,7 +129,7 @@ pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
                     Header::Meta(ref mut meta) => {
                         meta.pty = match left {
                             "content" => {
-                                meta.content = value;
+                                meta.content = html_escape::decode_html_entities(value);
                                 continue;
                             }
                             "name" => MetaProperty::Name,

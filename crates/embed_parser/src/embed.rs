@@ -38,13 +38,13 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
         data: Option<&'a str>,
     }
 
-    let mut misc: [Misc<'a>; 4] = [Misc::default(); 4];
+    let mut misc: [Misc; 4] = [Misc::default(); 4];
 
     for header in headers {
         match header {
             Header::Meta(meta) => {
-                let raw_content = || SmolStr::from(meta.content);
-                let content = || Some(SmolStr::from(meta.content));
+                let raw_content = || SmolStr::from(&meta.content);
+                let content = || Some(SmolStr::from(&meta.content));
                 let content_int = || meta.content.parse().ok();
 
                 macro_rules! get {
@@ -62,7 +62,7 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                     }
 
                     "description" | "og:description" | "twitter:description" => embed.desc = content(),
-                    "theme-color" | "msapplication-TileColor" => embed.col = parse_color(meta.content),
+                    "theme-color" | "msapplication-TileColor" => embed.col = parse_color(&meta.content),
                     "og:site_name" => embed.pro.name = content(),
                     // TODO: This isn't quite correct, but good enough most of the time
                     "og:url" => embed.can = content(),

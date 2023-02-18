@@ -69,13 +69,5 @@ pub fn fix_embed(embed: &mut EmbedV1) {
         _ => {}
     }
 
-    embed.visit_text_mut(|text| {
-        use std::borrow::Cow;
-
-        if let Cow::Owned(new_text) = html_escape::decode_html_entities(text.as_str()) {
-            *text = new_text.into();
-        }
-    });
-
     embed.fields.retain(|f| !EmbedField::is_empty(f));
 }
