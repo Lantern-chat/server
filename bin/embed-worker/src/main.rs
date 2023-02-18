@@ -6,7 +6,7 @@ use embed_parser::{
     oembed::{OEmbed, OEmbedFormat, OEmbedLink},
 };
 use futures_util::FutureExt;
-use reqwest::header::HeaderName;
+use reqwest::{header::HeaderName, Method};
 use sdk::models::*;
 
 use axum::{extract::State, http::StatusCode, routing::post, Json};
@@ -323,28 +323,28 @@ async fn resolve_images(client: &reqwest::Client, embed: &mut EmbedV1) -> Result
     let f = FuturesUnordered::new();
 
     if let Some(ref mut media) = embed.img {
-        f.push(resolve_media(client, &mut *media));
+        f.push(resolve_media(client, &mut *media, false));
     }
 
     if let Some(ref mut media) = embed.thumb {
-        f.push(resolve_media(client, &mut *media));
+        f.push(resolve_media(client, &mut *media, false));
     }
 
     if let Some(ref mut footer) = embed.footer {
         if let Some(ref mut media) = footer.icon {
-            f.push(resolve_media(client, &mut *media));
+            f.push(resolve_media(client, &mut *media, false));
         }
     }
 
     if let Some(ref mut author) = embed.author {
         if let Some(ref mut media) = author.icon {
-            f.push(resolve_media(client, &mut *media));
+            f.push(resolve_media(client, &mut *media, false));
         }
     }
 
     for field in &mut embed.fields {
         if let Some(ref mut media) = field.img {
-            f.push(resolve_media(client, &mut *media));
+            f.push(resolve_media(client, &mut *media, true));
         }
     }
 
@@ -353,7 +353,7 @@ async fn resolve_images(client: &reqwest::Client, embed: &mut EmbedV1) -> Result
     Ok(())
 }
 
-async fn resolve_media(client: &reqwest::Client, media: &mut EmbedMedia) -> Result<(), Error> {
+async fn resolve_media(client: &reqwest::Client, media: &mut EmbedMedia, head: bool) -> Result<(), Error> {
     // already has dimensions
     if !matches!((media.w, media.h), (None, None)) {
         return Ok(());
@@ -364,12 +364,15 @@ async fn resolve_media(client: &reqwest::Client, media: &mut EmbedMedia) -> Resu
         return Ok(());
     }
 
-    let mut resp = client.get(&*media.url).send().await?;
+    let mut resp = client
+        .request(if head { Method::HEAD } else { Method::GET }, &*media.url)
+        .send()
+        .await?;
 
     if let Some(mime) = resp.headers().get("content-type").and_then(|h| h.to_str().ok()) {
         media.mime = Some(mime.into());
 
-        if mime.starts_with("image") {
+        if !head && mime.starts_with("image") {
             let mut bytes = Vec::with_capacity(512);
 
             if let Ok(_) = read_bytes(&mut resp, &mut bytes, 1024 * 512).await {
