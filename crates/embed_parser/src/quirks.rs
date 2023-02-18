@@ -24,7 +24,10 @@ pub fn resolve_relative(root: &str, https: bool, embed: &mut EmbedV1) {
                 }
             }
 
-            url += "/";
+            if !old.starts_with('/') {
+                url += "/";
+            }
+
             url += &old;
             url.into()
         };
