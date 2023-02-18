@@ -95,6 +95,7 @@ async fn root(
                     None if e.is_connect() => StatusCode::REQUEST_TIMEOUT,
                     None => StatusCode::INTERNAL_SERVER_ERROR,
                 },
+                Error::JsonError(_) | Error::XMLError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             };
 
             let msg = if code.is_server_error() { "Internal Server Error".to_owned() } else { e.to_string() };
@@ -114,6 +115,12 @@ enum Error {
 
     #[error("Invalid MIME Type")]
     InvalidMimeType,
+
+    #[error("JSON Error: {0}")]
+    JsonError(#[from] serde_json::Error),
+
+    #[error("XML Error: {0}")]
+    XMLError(#[from] quick_xml::de::DeError),
 
     #[error(transparent)]
     ReqwestError(#[from] reqwest::Error),
@@ -140,12 +147,6 @@ async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed
         return Err(Error::Failure(resp.status()));
     }
 
-    let link = resp
-        .headers()
-        .get("link")
-        .and_then(|h| h.to_str().ok())
-        .map(|h| embed_parser::oembed::parse_link_header(h));
-
     let mut embed = sdk::models::EmbedV1::default();
     let mut oembed: Option<OEmbed> = None;
     let mut max_age = 0;
@@ -154,18 +155,21 @@ async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed
         embed.a = embed_parser::regexes::ADULT_RATING.is_match(rating.as_bytes());
     }
 
+    let links = resp
+        .headers()
+        .get("link")
+        .and_then(|h| h.to_str().ok())
+        .map(|h| embed_parser::oembed::parse_link_header(h));
+
     embed.url = Some(url.as_str().into());
 
-    if let Some(json_link) = link
-        .as_ref()
-        .and_then(|l| l.iter().find(|o| o.format == OEmbedFormat::JSON))
-    {
-        if let Ok(o) = fetch_oembed(&state.client, json_link, domain).await {
+    if let Some(link) = links.as_ref().and_then(|l| l.first()) {
+        if let Ok(o) = fetch_oembed(&state.client, link, domain).await {
             oembed = o;
         }
     }
 
-    drop(link);
+    drop(links);
 
     if let Some(mime) = resp.headers().get("content-type").and_then(|h| h.to_str().ok()) {
         let Some(mime) = mime.split(';').next() else {
@@ -183,7 +187,7 @@ async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed
                 let extra = embed::parse_meta_to_embed(&mut embed, &headers);
 
                 match extra.link {
-                    Some(link) if oembed.is_none() && link.format == OEmbedFormat::JSON => {
+                    Some(link) if oembed.is_none() => {
                         if let Ok(o) = fetch_oembed(&state.client, &link, domain).await {
                             oembed = o;
                         }
@@ -278,12 +282,12 @@ async fn fetch_oembed<'a>(
         return Ok(None);
     }
 
-    let res = client.get(link.url).send().await?.json::<OEmbed>().await;
+    let body = client.get(link.url).send().await?.bytes().await?;
 
-    match res {
-        Ok(o) => Ok(Some(o)),
-        Err(e) => Err(e.into()),
-    }
+    Ok(Some(match link.format {
+        OEmbedFormat::JSON => serde_json::de::from_slice(&*body)?,
+        OEmbedFormat::XML => quick_xml::de::from_reader(&*body)?,
+    }))
 }
 
 async fn read_head<'a>(
