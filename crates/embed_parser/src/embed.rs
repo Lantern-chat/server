@@ -113,22 +113,22 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
 
                     // Twitter uses these for multi-image posts
                     // FIXME: Can also include images from replies!
-                    _ if meta.pty == MetaProperty::ItemProp
-                        && meta.property.eq_ignore_ascii_case("contenturl") =>
-                    {
-                        // reasonable limit for embedding
-                        if embed.fields.len() < 4 {
-                            embed.fields.push(EmbedField {
-                                name: "".into(),
-                                value: "".into(),
-                                b: false,
-                                img: Some(Box::new(EmbedMedia {
-                                    url: raw_content(),
-                                    ..EmbedMedia::default()
-                                })),
-                            });
-                        }
-                    }
+                    // _ if meta.pty == MetaProperty::ItemProp
+                    //     && meta.property.eq_ignore_ascii_case("contenturl") =>
+                    // {
+                    //     // reasonable limit for embedding
+                    //     if embed.fields.len() < 4 {
+                    //         embed.fields.push(EmbedField {
+                    //             name: "".into(),
+                    //             value: "".into(),
+                    //             b: false,
+                    //             img: Some(Box::new(EmbedMedia {
+                    //                 url: raw_content(),
+                    //                 ..EmbedMedia::default()
+                    //             })),
+                    //         });
+                    //     }
+                    // }
 
                     //"profile:first_name" | "profile:last_name" | "profile:username" | "profile:gender" => {
                     //    embed.fields.push(EmbedField {
