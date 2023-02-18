@@ -150,6 +150,10 @@ async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed
     let mut oembed: Option<OEmbed> = None;
     let mut max_age = 0;
 
+    if let Some(rating) = resp.headers().get(HeaderName::from_static("rating")) {
+        embed.a = embed_parser::regexes::ADULT_RATING.is_match(rating.as_bytes());
+    }
+
     embed.url = Some(url.as_str().into());
 
     if let Some(json_link) = link

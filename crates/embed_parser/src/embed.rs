@@ -32,6 +32,14 @@ fn parse_color(color: &str) -> Option<u32> {
 pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> ExtraFields<'a> {
     let mut extra = ExtraFields::default();
 
+    #[derive(Default, Clone, Copy)]
+    struct Misc<'a> {
+        label: Option<&'a str>,
+        data: Option<&'a str>,
+    }
+
+    let mut misc: [Misc<'a>; 4] = [Misc::default(); 4];
+
     for header in headers {
         match header {
             Header::Meta(meta) => {
@@ -46,13 +54,15 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                 }
 
                 match meta.property {
-                    "description" | "og:description" | "twitter:description" => embed.desc = content(),
-                    "html_title" => {
+                    // special property for <title></title> values
+                    "" if meta.pty == MetaProperty::Title => {
                         if embed.title.is_none() {
                             embed.title = content();
                         }
                     }
-                    "theme-color" => embed.col = parse_color(meta.content),
+
+                    "description" | "og:description" | "twitter:description" => embed.desc = content(),
+                    "theme-color" | "msapplication-TileColor" => embed.col = parse_color(meta.content),
                     "og:site_name" => embed.pro.name = content(),
                     // TODO: This isn't quite correct, but good enough most of the time
                     "og:url" => embed.can = content(),
@@ -89,8 +99,23 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                         Some(ttl) => extra.max_age = ttl as u64,
                     },
 
+                    "twitter:label1" | "twitter:label2" | "twitter:label3" | "twitter:label4" => {
+                        let idx = meta.property.as_bytes()[meta.property.len() - 1] - b'0';
+                        misc[idx as usize - 1].label = Some(&meta.content);
+                    }
+
+                    "twitter:data1" | "twitter:data2" | "twitter:data3" | "twitter:data4" => {
+                        let idx = meta.property.as_bytes()[meta.property.len() - 1] - b'0';
+                        misc[idx as usize - 1].data = Some(&meta.content);
+                    }
+
+                    _ if meta.property.eq_ignore_ascii_case("rating") => parse_rating(embed, &meta.content),
+
                     // Twitter uses these for multi-image posts
-                    "contentUrl" if meta.pty == MetaProperty::ItemProp => {
+                    // FIXME: Can also include images from replies!
+                    _ if meta.pty == MetaProperty::ItemProp
+                        && meta.property.eq_ignore_ascii_case("contenturl") =>
+                    {
                         // reasonable limit for embedding
                         if embed.fields.len() < 4 {
                             embed.fields.push(EmbedField {
@@ -143,6 +168,16 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
         }
     }
 
+    for m in misc {
+        if let (Some(label), Some(data)) = (m.label, m.data) {
+            if label.eq_ignore_ascii_case("rating") {
+                parse_rating(embed, data)
+            }
+
+            // TODO: Maybe recurse to handle more arbitrary properties?
+        }
+    }
+
     determine_embed_type(embed);
 
     extra
@@ -164,6 +199,11 @@ fn determine_embed_type(embed: &mut EmbedV1) {
     if embed.obj.is_some() {
         embed.ty = EmbedType::Html;
     }
+}
+
+pub fn parse_rating(embed: &mut EmbedV1, rating: &str) {
+    // NOTE: In case of multiple tags, this is additive
+    embed.a |= crate::regexes::ADULT_RATING.is_match(rating.as_bytes());
 }
 
 /// Add to/overwrite embed profile with oEmbed data

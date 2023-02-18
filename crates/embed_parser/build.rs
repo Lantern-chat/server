@@ -23,6 +23,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         r#"<(meta\x20|title>|link\x20)"#,
         &mut file,
     )?;
+    regex_util::write_regex(
+        "ADULT_RATING", // case-insensitive rating
+        r#"(?i)adult|mature|RTA\-5042\-1996\-1400\-1577\-RTA"#,
+        &mut file,
+    )?;
 
     Ok(())
 }
