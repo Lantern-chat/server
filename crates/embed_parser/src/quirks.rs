@@ -61,6 +61,14 @@ pub fn fix_embed(embed: &mut EmbedV1) {
         _ => {}
     }
 
+    // redundant thumbnail
+    match (&embed.img, &embed.thumb) {
+        (Some(img), Some(thumb)) if thumb.url == img.url => {
+            embed.thumb = None;
+        }
+        _ => {}
+    }
+
     embed.visit_text_mut(|text| {
         use std::borrow::Cow;
 
