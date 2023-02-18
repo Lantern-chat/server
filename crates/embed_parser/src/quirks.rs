@@ -61,6 +61,14 @@ pub fn fix_embed(embed: &mut EmbedV1) {
         _ => {}
     }
 
+    // redundant description
+    match (&embed.title, &embed.desc) {
+        (Some(title), Some(desc)) if title == desc => {
+            embed.desc = None;
+        }
+        _ => {}
+    }
+
     // redundant thumbnail
     match (&embed.img, &embed.thumb) {
         (Some(img), Some(thumb)) if thumb.url == img.url => {
