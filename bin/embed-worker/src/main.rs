@@ -190,8 +190,6 @@ async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed
                 max_age = extra.max_age;
             }
 
-            std::fs::write("./test.html", &html).unwrap();
-
             drop(html); // ensure it lives long enough
         } else {
             let mut media = Box::new(EmbedMedia {
