@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     regex_util::write_regex(
         "META_TAGS", // identifies HTML tags valid for metadata
-        r#"<(meta\x20|title>|link\x20|div)"#,
+        r#"<(meta\x20|title>|link\x20)"#,
         &mut file,
     )?;
 

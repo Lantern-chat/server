@@ -344,6 +344,12 @@ async fn resolve_images(client: &reqwest::Client, embed: &mut EmbedV1) -> Result
         }
     }
 
+    for field in &mut embed.fields {
+        if let Some(ref mut media) = field.img {
+            f.push(resolve_media(client, &mut *media));
+        }
+    }
+
     let _ = f.count().await;
 
     Ok(())

@@ -1,8 +1,8 @@
 use smol_str::SmolStr;
 
-use sdk::models::{EmbedMedia, EmbedType, EmbedV1};
+use sdk::models::{EmbedField, EmbedMedia, EmbedType, EmbedV1};
 
-use crate::html::{Header, LinkType};
+use crate::html::{Header, LinkType, MetaProperty};
 use crate::oembed::{OEmbed, OEmbedFormat, OEmbedLink, OEmbedType};
 
 pub struct ExtraFields<'a> {
@@ -88,6 +88,22 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                         None => {}
                         Some(ttl) => extra.max_age = ttl as u64,
                     },
+
+                    // Twitter uses these for multi-image posts
+                    "contentUrl" if meta.pty == MetaProperty::ItemProp => {
+                        // reasonable limit for embedding
+                        if embed.fields.len() < 4 {
+                            embed.fields.push(EmbedField {
+                                name: "".into(),
+                                value: "".into(),
+                                b: false,
+                                img: Some(Box::new(EmbedMedia {
+                                    url: raw_content(),
+                                    ..EmbedMedia::default()
+                                })),
+                            });
+                        }
+                    }
 
                     //"profile:first_name" | "profile:last_name" | "profile:username" | "profile:gender" => {
                     //    embed.fields.push(EmbedField {

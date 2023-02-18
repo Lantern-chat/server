@@ -56,4 +56,6 @@ pub fn fix_embed(embed: &mut EmbedV1) {
             *text = new_text.into();
         }
     });
+
+    embed.fields.retain(|f| !EmbedField::is_empty(f));
 }

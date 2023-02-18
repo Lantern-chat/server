@@ -70,19 +70,9 @@ pub use crate::regexes::{ATTRIBUTE_RE, META_TAGS};
 
 /// Returns `None` on invalid HTML
 pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
-    let mut res = HeaderList::default();
-
-    // NOTE: Too many sites completely ignore the spec, so we cannot constrain to <head>, sadly.
-    // in fact, <head> may not even exist, yet <meta> tags are still somewhere.
-
-    // constrain search region to <head></head> delimiters
-    //let head_start = find(input.as_bytes(), b"<head")? + "<head".len();
-    //input = &input[head_start..];
-    //if let Some(head_end) = memchr::memmem::rfind(input.as_bytes(), b"</body>") {
-    //    input = &input[..head_end];
-    //}
-
     let bytes = input.as_bytes();
+
+    let mut res = HeaderList::default();
 
     for (mut start, tag_end) in META_TAGS.find_iter(bytes) {
         // detect tag type and initialize header value
@@ -112,8 +102,6 @@ pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
                 ty: None,
                 title: None,
             }),
-            // hit actual HTML, bail
-            Some("<div") => break,
             _ => continue,
         };
 
@@ -144,7 +132,10 @@ pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
                             "name" => MetaProperty::Name,
                             "property" => MetaProperty::Property,
                             "description" => MetaProperty::Description,
-                            "itemprop" | "ItemProp" => MetaProperty::ItemProp,
+
+                            // I've seen multiple cases of this around...
+                            _ if "itemprop".eq_ignore_ascii_case(left) => MetaProperty::ItemProp,
+
                             _ => continue,
                         };
 
@@ -183,43 +174,6 @@ pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
     });
 
     Some(res)
-}
-
-// NOT NEEDED, XML/HTML specification requires there be no whitespace between opening/closing symbols and tag name
-
-pub struct HeadEndFinder {
-    pos: usize,
-    needle: usize,
-}
-
-const NEEDLE: [u8; 6] = *b"</head";
-
-impl HeadEndFinder {
-    pub const fn new() -> Self {
-        HeadEndFinder { pos: 0, needle: 0 }
-    }
-
-    pub fn found(&self) -> Option<usize> {
-        (self.needle == NEEDLE.len()).then_some(self.pos)
-    }
-
-    pub fn increment(&mut self, input: &[u8]) {
-        while self.pos < input.len() && self.needle != NEEDLE.len() {
-            let c = input[self.pos];
-
-            // skip whitespace
-            if !c.is_ascii_whitespace() {
-                if c == NEEDLE[self.needle] {
-                    self.needle += 1;
-                } else {
-                    // set back to 0 or 1 if matched first byte
-                    self.needle = (c == NEEDLE[0]) as usize;
-                }
-            }
-
-            self.pos += 1;
-        }
-    }
 }
 
 #[cfg(test)]
