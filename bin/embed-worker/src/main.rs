@@ -1,16 +1,19 @@
 extern crate client_sdk as sdk;
 
+use axum::{extract::State, http::StatusCode, routing::post, Json};
 use embed_parser::{
     embed,
     html::Header,
     oembed::{OEmbed, OEmbedFormat, OEmbedLink},
 };
 use futures_util::FutureExt;
-use reqwest::{header::HeaderName, Method};
-use sdk::models::*;
-
-use axum::{extract::State, http::StatusCode, routing::post, Json};
+use reqwest::{
+    header::{HeaderMap, HeaderName, HeaderValue},
+    Method,
+};
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
+
+use sdk::models::*;
 
 pub const USER_AGENT: &'static str = "Lantern/1.0 (bot; +https://github.com/Lantern-chat)";
 
@@ -51,6 +54,19 @@ async fn main() {
             raw_key
         },
         client: reqwest::ClientBuilder::new()
+            .default_headers({
+                let mut headers = HeaderMap::new();
+
+                headers.insert(HeaderName::from_static("dnt"), HeaderValue::from_static("1"));
+                headers.insert(
+                    HeaderName::from_static("accept"),
+                    HeaderValue::from_static(
+                        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                    ),
+                );
+
+                headers
+            })
             .user_agent(USER_AGENT)
             .gzip(true)
             .deflate(true)
