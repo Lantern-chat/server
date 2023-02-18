@@ -1,6 +1,6 @@
 use smol_str::SmolStr;
 
-use sdk::models::{EmbedField, EmbedMedia, EmbedType, EmbedV1};
+use sdk::models::{EmbedField, EmbedFlags, EmbedMedia, EmbedType, EmbedV1};
 
 use crate::html::{Header, LinkType, MetaProperty};
 use crate::oembed::{OEmbed, OEmbedFormat, OEmbedLink, OEmbedType};
@@ -203,7 +203,9 @@ fn determine_embed_type(embed: &mut EmbedV1) {
 
 pub fn parse_rating(embed: &mut EmbedV1, rating: &str) {
     // NOTE: In case of multiple tags, this is additive
-    embed.a |= crate::regexes::ADULT_RATING.is_match(rating.as_bytes());
+    if crate::regexes::ADULT_RATING.is_match(rating.as_bytes()) {
+        embed.f |= EmbedFlags::ADULT;
+    }
 }
 
 /// Add to/overwrite embed profile with oEmbed data
