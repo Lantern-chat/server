@@ -33,10 +33,22 @@ pub fn resolve_relative(root: &str, https: bool, embed: &mut EmbedV1) {
 
 pub fn fix_embed(embed: &mut EmbedV1) {
     // get rid of invalid images introduced through bad embeds
-    if let Some(ref img) = embed.img {
-        if let Some(ref mime) = img.mime {
-            if !mime.starts_with("image") {
-                embed.img = None;
+    {
+        if let Some(ref img) = embed.img {
+            if let Some(ref mime) = img.mime {
+                if !mime.starts_with("image") {
+                    embed.img = None;
+                }
+            }
+        }
+
+        for field in &mut embed.fields {
+            if let Some(ref img) = field.img {
+                if let Some(ref mime) = img.mime {
+                    if !mime.starts_with("image") {
+                        field.img = None;
+                    }
+                }
             }
         }
     }

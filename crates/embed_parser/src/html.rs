@@ -4,6 +4,7 @@ pub enum MetaProperty {
     Property,
     Description,
     ItemProp,
+    Title,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -89,8 +90,8 @@ pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
                 if let Some(title_end) = memchr::memmem::find(&bytes[title_start..], b"</title>") {
                     res.push(Header::Meta(Meta {
                         content: &input[title_start..(title_start + title_end)],
-                        pty: MetaProperty::Property,
-                        property: "html_title",
+                        pty: MetaProperty::Title,
+                        property: "",
                     }));
                 }
 
