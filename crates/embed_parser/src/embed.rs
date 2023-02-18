@@ -1,6 +1,6 @@
 use smol_str::SmolStr;
 
-use sdk::models::{EmbedField, EmbedFlags, EmbedMedia, EmbedType, EmbedV1};
+use sdk::models::*;
 
 use crate::html::{Header, LinkType, MetaProperty};
 use crate::oembed::{OEmbed, OEmbedFormat, OEmbedLink, OEmbedType};
@@ -22,7 +22,11 @@ impl Default for ExtraFields<'_> {
 fn parse_color(color: &str) -> Option<u32> {
     match csscolorparser::parse(color) {
         Err(_) => None,
-        Ok(color) => Some(u32::from_le_bytes(color.to_rgba8())),
+        Ok(color) => Some(u32::from_le_bytes({
+            let mut bytes = color.to_rgba8();
+            bytes[3] = 0; // don't include alpha channel
+            bytes
+        })),
     }
 }
 
@@ -39,6 +43,13 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
     }
 
     let mut misc: [Misc; 4] = [Misc::default(); 4];
+    let mut max_dim = 0;
+
+    macro_rules! get {
+        ($e:ident $(. $rest:ident)*) => {
+            embed.$e $(.$rest)*.get_or_insert_with(Default::default)
+        };
+    }
 
     for header in headers {
         match header {
@@ -46,12 +57,6 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                 let raw_content = || SmolStr::from(&meta.content);
                 let content = || Some(SmolStr::from(&meta.content));
                 let content_int = || meta.content.parse().ok();
-
-                macro_rules! get {
-                    ($e:ident) => {
-                        embed.$e.get_or_insert_with(Default::default)
-                    };
-                }
 
                 match meta.property {
                     // special property for <title></title> values
@@ -137,6 +142,34 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                     //}
                     _ => {}
                 }
+            }
+            Header::Link(link) if link.rel == LinkType::Icon => {
+                if let Some([w, h]) = link.sizes {
+                    let m = w.max(h);
+
+                    if max_dim >= m {
+                        // prefer larger icons
+                        continue;
+                    } else if max_dim != 0 && m > 256 {
+                        // try not to use too large icons, though
+                        continue;
+                    } else {
+                        max_dim = m;
+
+                        let media = get!(pro.icon);
+
+                        media.w = (w > 0).then_some(w as i32);
+                        media.h = (h > 0).then_some(h as i32);
+                    }
+                } else if max_dim > 0 {
+                    // if we've already found an icon with a definite size, prefer that, skip this
+                    continue;
+                }
+
+                let media = get!(pro.icon);
+
+                media.url = link.href.into();
+                media.mime = link.mime.map(From::from);
             }
             Header::Link(link) if link.rel == LinkType::Canonical => {
                 embed.can = Some(link.href.into());

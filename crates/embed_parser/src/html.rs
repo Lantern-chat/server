@@ -38,6 +38,8 @@ pub struct Link<'a> {
     pub rel: LinkType,
     pub ty: Option<&'a str>,
     pub title: Option<&'a str>,
+    pub mime: Option<&'a str>,
+    pub sizes: Option<[u32; 2]>,
 }
 
 impl Meta<'_> {
@@ -104,6 +106,8 @@ pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
                 rel: LinkType::None,
                 ty: None,
                 title: None,
+                mime: None,
+                sizes: None,
             }),
             _ => continue,
         };
@@ -153,12 +157,29 @@ pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
                                 "alternate" => LinkType::Alternate,
                                 "canonical" => LinkType::Canonical,
                                 "external" => LinkType::External,
-                                "icon" => LinkType::Icon,
                                 "license" => LinkType::License,
                                 "shortlink" => LinkType::Shortlink,
+                                "icon" | "shortcut icon" | "apple-touch-icon" => LinkType::Icon,
                                 _ => continue,
                             };
                         }
+                        _ if link.rel == LinkType::Icon => match left {
+                            "sizes" => {
+                                link.sizes = Some({
+                                    let mut sizes = [0; 2];
+
+                                    for dim in value.split('x').take(2).map(|d| d.parse()).enumerate() {
+                                        if let (idx, Ok(value)) = dim {
+                                            sizes[idx] = value;
+                                        }
+                                    }
+
+                                    sizes
+                                });
+                            }
+                            "type" => link.mime = Some(value),
+                            _ => continue,
+                        },
                         _ => continue,
                     },
                 }
