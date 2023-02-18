@@ -9,8 +9,22 @@ use futures_util::FutureExt;
 use reqwest::header::HeaderName;
 use sdk::models::*;
 
-use axum::{extract::State, http::StatusCode, routing::post, Json, Router};
+use axum::{extract::State, http::StatusCode, routing::post, Json};
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
+
+pub const USER_AGENT: &'static str = "Lantern/1.0 (bot; +https://github.com/Lantern-chat)";
+
+pub static AVOID_OEMBED: phf::Set<&'static str> = phf::phf_set! {
+    // gives more generic information than the meta tags, so should be avoided
+    "fxtwitter.com"
+};
+
+pub static USER_AGENTS: phf::Map<&'static str, &'static str> = phf::phf_map! {
+    // TODO: Add Lantern's user-agent to vxtwitter main
+    // https://github.com/dylanpdx/BetterTwitFix/blob/7a1c00ebdb6479afbfcca6d84450039d29029a75/twitfix.py#L35
+    "vxtwitter.com" => "test",
+    "d.vx" => "test",
+};
 
 use hmac::{digest::Key, Mac};
 type Hmac = hmac::SimpleHmac<sha1::Sha1>;
@@ -37,7 +51,7 @@ async fn main() {
             raw_key
         },
         client: reqwest::ClientBuilder::new()
-            .user_agent(embed_worker::USER_AGENT)
+            .user_agent(USER_AGENT)
             .gzip(true)
             .deflate(true)
             .brotli(true)
@@ -52,11 +66,15 @@ async fn main() {
     let addr = std::env::var("EMBEDW_BIND_ADDRESS").expect("EMBEDW_BIND_ADDRESS not found");
     let addr = SocketAddr::from_str(&addr).expect("Unable to parse bind address");
 
+    println!("Starting...");
+
     axum::Server::bind(&addr)
-        .serve(Router::new().fallback(post(root)).with_state(state).into_make_service())
+        .serve(post(root).with_state(state).into_make_service())
         .with_graceful_shutdown(tokio::signal::ctrl_c().map(|_| ()))
         .await
         .expect("Unable to run embed-worker");
+
+    println!("Goodbye.");
 }
 
 async fn root(
@@ -111,7 +129,7 @@ async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed
     let mut resp = {
         let mut req = state.client.get(url.as_str());
 
-        if let Some(&user_agent) = embed_worker::USER_AGENTS.get(domain) {
+        if let Some(&user_agent) = USER_AGENTS.get(domain) {
             req = req.header(HeaderName::from_static("user-agent"), user_agent);
         }
 
@@ -171,6 +189,8 @@ async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed
 
                 max_age = extra.max_age;
             }
+
+            std::fs::write("./test.html", &html).unwrap();
 
             drop(html); // ensure it lives long enough
         } else {
@@ -252,7 +272,7 @@ async fn fetch_oembed<'a>(
     link: &OEmbedLink<'a>,
     domain: &str,
 ) -> Result<Option<OEmbed>, Error> {
-    if embed_worker::AVOID_OEMBED.contains(domain) {
+    if AVOID_OEMBED.contains(domain) {
         return Ok(None);
     }
 
@@ -299,27 +319,32 @@ async fn read_bytes<'a>(resp: &'a mut reqwest::Response, bytes: &'a mut Vec<u8>,
     Ok(())
 }
 
-// TODO: Fetch these in parallel?
 async fn resolve_images(client: &reqwest::Client, embed: &mut EmbedV1) -> Result<(), Error> {
+    use futures_util::stream::{FuturesUnordered, StreamExt};
+
+    let f = FuturesUnordered::new();
+
     if let Some(ref mut media) = embed.img {
-        let _ = resolve_media(client, &mut *media).await;
+        f.push(resolve_media(client, &mut *media));
     }
 
     if let Some(ref mut media) = embed.thumb {
-        let _ = resolve_media(client, &mut *media).await;
+        f.push(resolve_media(client, &mut *media));
     }
 
     if let Some(ref mut footer) = embed.footer {
         if let Some(ref mut media) = footer.icon {
-            let _ = resolve_media(client, &mut *media).await;
+            f.push(resolve_media(client, &mut *media));
         }
     }
 
     if let Some(ref mut author) = embed.author {
         if let Some(ref mut media) = author.icon {
-            let _ = resolve_media(client, &mut *media).await;
+            f.push(resolve_media(client, &mut *media));
         }
     }
+
+    let _ = f.count().await;
 
     Ok(())
 }
