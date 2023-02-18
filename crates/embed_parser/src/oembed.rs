@@ -1,9 +1,9 @@
 //use std::collections::HashMap;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum OEmbedFormat {
-    XML,
-    JSON,
+    JSON = 1,
+    XML = 2,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -55,6 +55,8 @@ pub fn parse_link_header<'a>(header: &'a str) -> LinkList<'a> {
 
         res.push(link);
     }
+
+    res.sort_by_key(|r| r.format);
 
     res
 }
