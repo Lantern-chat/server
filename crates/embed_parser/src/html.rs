@@ -93,7 +93,9 @@ pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
 
                 if let Some(title_end) = memchr::memmem::find(&bytes[title_start..], b"</title>") {
                     res.push(Header::Meta(Meta {
-                        content: html_escape::decode_html_entities(&input[title_start..(title_start + title_end)]),
+                        content: html_escape::decode_html_entities(
+                            input[title_start..(title_start + title_end)].trim(),
+                        ),
                         pty: MetaProperty::Title,
                         property: "",
                     }));
