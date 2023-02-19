@@ -217,22 +217,20 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
     extra
 }
 
-fn determine_embed_type(embed: &mut EmbedV1) {
-    if embed.img.is_some() {
-        embed.ty = EmbedType::Img;
-    }
+pub(crate) fn determine_embed_type(embed: &mut EmbedV1) {
+    let mut check_type = |media: &MaybeEmbedMedia, ty: EmbedType| {
+        if !EmbedMedia::is_empty(media) {
+            embed.ty = ty;
+        } else if embed.ty == ty {
+            // we thought it was this ty, it was not, so revert back to link
+            embed.ty = EmbedType::Link;
+        }
+    };
 
-    if embed.audio.is_some() {
-        embed.ty = EmbedType::Audio;
-    }
-
-    if embed.video.is_some() {
-        embed.ty = EmbedType::Vid;
-    }
-
-    if embed.obj.is_some() {
-        embed.ty = EmbedType::Html;
-    }
+    check_type(&embed.img, EmbedType::Img);
+    check_type(&embed.audio, EmbedType::Audio);
+    check_type(&embed.video, EmbedType::Vid);
+    check_type(&embed.obj, EmbedType::Html);
 }
 
 pub fn parse_rating(embed: &mut EmbedV1, rating: &str) {

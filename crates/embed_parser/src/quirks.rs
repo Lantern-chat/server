@@ -108,4 +108,6 @@ pub fn fix_embed(embed: &mut EmbedV1) {
             }
         });
     }
+
+    super::embed::determine_embed_type(embed);
 }
