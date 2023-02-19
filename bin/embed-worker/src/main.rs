@@ -170,7 +170,7 @@ async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed
 
     if let Some(rating) = resp.headers().get(HeaderName::from_static("rating")) {
         if embed_parser::regexes::ADULT_RATING.is_match(rating.as_bytes()) {
-            embed.f |= EmbedFlags::ADULT;
+            embed.flags |= EmbedFlags::ADULT;
         }
     }
 
@@ -231,8 +231,8 @@ async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed
 
                     if let Ok(_) = read_bytes(&mut resp, &mut bytes, 1024 * 1024).await {
                         if let Ok(image_size) = imagesize::blob_size(&bytes) {
-                            media.w = Some(image_size.width as _);
-                            media.h = Some(image_size.height as _);
+                            media.width = Some(image_size.width as _);
+                            media.height = Some(image_size.height as _);
                         }
                     }
 
@@ -241,7 +241,7 @@ async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed
                 }
                 Some("video") => {
                     embed.ty = EmbedType::Vid;
-                    embed.vid = Some(media);
+                    embed.video = Some(media);
                 }
                 Some("audio") => {
                     embed.ty = EmbedType::Audio;
@@ -272,7 +272,7 @@ async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed
         if let Ok(27) = URL_SAFE_NO_PAD.encode_slice(sig, &mut buf) {
             use sdk::util::fixed::FixedStr;
 
-            media.sig = Some(FixedStr::new(unsafe { std::str::from_utf8_unchecked(&buf) }));
+            media.signature = Some(FixedStr::new(unsafe { std::str::from_utf8_unchecked(&buf) }));
         }
     });
 
@@ -386,7 +386,7 @@ async fn resolve_images(client: &reqwest::Client, embed: &mut EmbedV1) -> Result
 
 async fn resolve_media(client: &reqwest::Client, media: &mut EmbedMedia, head: bool) -> Result<(), Error> {
     // already has dimensions
-    if !matches!((media.w, media.h), (None, None)) {
+    if !matches!((media.width, media.height), (None, None)) {
         return Ok(());
     }
 
@@ -408,8 +408,8 @@ async fn resolve_media(client: &reqwest::Client, media: &mut EmbedMedia, head: b
 
             if let Ok(_) = read_bytes(&mut resp, &mut bytes, 1024 * 512).await {
                 if let Ok(image_size) = imagesize::blob_size(&bytes) {
-                    media.w = Some(image_size.width as _);
-                    media.h = Some(image_size.height as _);
+                    media.width = Some(image_size.width as _);
+                    media.height = Some(image_size.height as _);
                 }
             }
         }

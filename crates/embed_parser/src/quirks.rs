@@ -57,17 +57,17 @@ pub fn fix_embed(embed: &mut EmbedV1) {
     }
 
     // redundant canonical
-    match (&embed.can, &embed.url) {
-        (Some(can), Some(url)) if can == url => {
-            embed.can = None;
+    match (&embed.canonical, &embed.url) {
+        (Some(canonical), Some(url)) if canonical == url => {
+            embed.canonical = None;
         }
         _ => {}
     }
 
     // redundant description
-    match (&embed.title, &embed.desc) {
-        (Some(title), Some(desc)) if title == desc => {
-            embed.desc = None;
+    match (&embed.title, &embed.description) {
+        (Some(title), Some(description)) if title == description => {
+            embed.description = None;
         }
         _ => {}
     }

@@ -66,37 +66,38 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                         }
                     }
 
-                    "description" | "og:description" | "twitter:description" => embed.desc = content(),
-                    "theme-color" | "msapplication-TileColor" => embed.col = parse_color(&meta.content),
-                    "og:site_name" => embed.pro.name = content(),
+                    "description" | "og:description" | "twitter:description" => embed.description = content(),
+                    "theme-color" | "msapplication-TileColor" => embed.color = parse_color(&meta.content),
+                    "og:site_name" => embed.provider.name = content(),
                     // TODO: This isn't quite correct, but good enough most of the time
-                    "og:url" => embed.can = content(),
+                    "og:url" => embed.canonical = content(),
                     "title" | "og:title" | "twitter:title" => embed.title = content(),
                     "dc:creator" | "article:author" | "book:author" => get!(author).name = raw_content(),
 
-                    "og:image" | "og:image:url" | "og:image:secure_url" => get!(img).url = raw_content(),
                     // don't let the twitter image overwrite og images
                     "twitter:image" => match embed.img {
                         Some(ref mut image) if image.url.is_empty() => image.url = raw_content(),
                         None => get!(img).url = raw_content(),
                         _ => {}
                     },
-                    "og:video" | "og:video:secure_url" => get!(vid).url = raw_content(),
-                    "og:audio" | "og:audio:secure_url" => get!(audio).url = raw_content(),
 
-                    "og:image:width" => get!(img).w = content_int(),
-                    "og:video:width" => get!(vid).w = content_int(),
-                    "music:duration" => get!(audio).w = content_int(),
+                    "og:image" | "og:image:url" | "og:image:secure_url" => get!(img).url = raw_content(),
+                    "og:video" | "og:video:url" | "og:video:secure_url" => get!(video).url = raw_content(),
+                    "og:audio" | "og:audio:url" | "og:audio:secure_url" => get!(audio).url = raw_content(),
 
-                    "og:image:height" => get!(img).h = content_int(),
-                    "og:video:height" => get!(vid).h = content_int(),
+                    "og:image:width" => get!(img).width = content_int(),
+                    "og:video:width" => get!(video).width = content_int(),
+                    "music:duration" => get!(audio).width = content_int(),
+
+                    "og:image:height" => get!(img).height = content_int(),
+                    "og:video:height" => get!(video).height = content_int(),
 
                     "og:image:type" => get!(img).mime = content(),
-                    "og:video:type" => get!(vid).mime = content(),
+                    "og:video:type" => get!(video).mime = content(),
                     "og:audio:type" => get!(audio).mime = content(),
 
                     "og:image:alt" => get!(img).alt = content(),
-                    "og:video:alt" => get!(vid).alt = content(),
+                    "og:video:alt" => get!(video).alt = content(),
                     "og:audio:alt" => get!(audio).alt = content(),
 
                     "og:ttl" => match content_int() {
@@ -156,23 +157,23 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                     } else {
                         max_dim = m;
 
-                        let media = get!(pro.icon);
+                        let media = get!(provider.icon);
 
-                        media.w = (w > 0).then_some(w as i32);
-                        media.h = (h > 0).then_some(h as i32);
+                        media.width = (w > 0).then_some(w as i32);
+                        media.height = (h > 0).then_some(h as i32);
                     }
                 } else if max_dim > 0 {
                     // if we've already found an icon with a definite size, prefer that, skip this
                     continue;
                 }
 
-                let media = get!(pro.icon);
+                let media = get!(provider.icon);
 
                 media.url = link.href.into();
                 media.mime = link.mime.map(From::from);
             }
             Header::Link(link) if link.rel == LinkType::Canonical => {
-                embed.can = Some(link.href.into());
+                embed.canonical = Some(link.href.into());
             }
             Header::Link(link) if link.rel == LinkType::Alternate => {
                 let ty = match link.ty {
@@ -225,7 +226,7 @@ fn determine_embed_type(embed: &mut EmbedV1) {
         embed.ty = EmbedType::Audio;
     }
 
-    if embed.vid.is_some() {
+    if embed.video.is_some() {
         embed.ty = EmbedType::Vid;
     }
 
@@ -237,7 +238,7 @@ fn determine_embed_type(embed: &mut EmbedV1) {
 pub fn parse_rating(embed: &mut EmbedV1, rating: &str) {
     // NOTE: In case of multiple tags, this is additive
     if crate::regexes::ADULT_RATING.is_match(rating.as_bytes()) {
-        embed.f |= EmbedFlags::ADULT;
+        embed.flags |= EmbedFlags::ADULT;
     }
 }
 
@@ -277,8 +278,8 @@ pub fn parse_oembed_to_embed(embed: &mut EmbedV1, o: OEmbed) -> ExtraFields {
         }
     }
 
-    embed.pro.name.overwrite_with(o.provider_name);
-    embed.pro.url.overwrite_with(o.provider_url);
+    embed.provider.name.overwrite_with(o.provider_name);
+    embed.provider.url.overwrite_with(o.provider_url);
 
     if embed.ty == EmbedType::Link {
         determine_embed_type(embed);
@@ -286,7 +287,7 @@ pub fn parse_oembed_to_embed(embed: &mut EmbedV1, o: OEmbed) -> ExtraFields {
 
     let media = match o.kind {
         OEmbedType::Photo => get!(img),
-        OEmbedType::Video => get!(vid),
+        OEmbedType::Video => get!(video),
         _ => get!(obj),
     };
 
@@ -313,16 +314,16 @@ pub fn parse_oembed_to_embed(embed: &mut EmbedV1, o: OEmbed) -> ExtraFields {
     media.mime = mime;
 
     if overwrite {
-        media.w = o.width;
-        media.h = o.height;
+        media.width = o.width;
+        media.height = o.height;
     }
 
     if let Some(thumbnail_url) = o.thumbnail_url {
         let mut thumb = Box::new(EmbedMedia::default());
 
         thumb.url = thumbnail_url;
-        thumb.w = o.thumbnail_width;
-        thumb.h = o.thumbnail_height;
+        thumb.width = o.thumbnail_width;
+        thumb.height = o.thumbnail_height;
 
         thumb.mime = None; // unknown from here
 
