@@ -1,6 +1,11 @@
 extern crate client_sdk as sdk;
 
-use axum::{extract::State, http::StatusCode, routing::post, Json};
+use axum::{
+    extract::{Query, State},
+    http::StatusCode,
+    routing::post,
+    Json,
+};
 use embed_parser::{
     embed,
     html::Header,
@@ -94,13 +99,20 @@ async fn main() {
     println!("Goodbye.");
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct Params {
+    #[serde(rename = "l")]
+    pub lang: Option<String>,
+}
+
 async fn root(
     State(state): State<Arc<WorkerState>>,
+    Query(params): Query<Params>,
     body: String,
 ) -> Result<Json<(Timestamp, Embed)>, (StatusCode, String)> {
     let url = body; // to avoid confusion
 
-    match inner(state, url).await {
+    match inner(state, url, params).await {
         Ok(value) => Ok(Json(value)),
         Err(e) => Err({
             let code = match e {
@@ -143,7 +155,7 @@ enum Error {
     ReqwestError(#[from] reqwest::Error),
 }
 
-async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed), Error> {
+async fn inner(state: Arc<WorkerState>, url: String, params: Params) -> Result<(Timestamp, Embed), Error> {
     if !url.starts_with("https://") && !url.starts_with("http://") {
         return Err(Error::InvalidUrl);
     }
@@ -155,6 +167,10 @@ async fn inner(state: Arc<WorkerState>, url: String) -> Result<(Timestamp, Embed
 
         if let Some(&user_agent) = USER_AGENTS.get(domain) {
             req = req.header(HeaderName::from_static("user-agent"), user_agent);
+        }
+
+        if let Some(lang) = params.lang {
+            req = req.header(HeaderName::from_static("accept-language"), format!("{lang};q=0.5"));
         }
 
         req.send().await?
