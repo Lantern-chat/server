@@ -80,6 +80,7 @@ pub fn fix_embed(embed: &mut EmbedV1) {
         _ => {}
     }
 
+    // remove empty fields
     embed.fields.retain(|f| !EmbedField::is_empty(f));
 
     if let Some(ref img) = embed.img {
@@ -94,5 +95,17 @@ pub fn fix_embed(embed: &mut EmbedV1) {
             }
             _ => {}
         }
+    }
+
+    // Avoid alt-text that's the same as the description
+    if embed.description.is_some() {
+        // NOTE: SmolStr uses an Arc internally, so cloning is cheap
+        let desc = embed.description.clone();
+
+        embed.visit_media_mut(|media| {
+            if media.alt == desc {
+                media.alt = None;
+            }
+        });
     }
 }
