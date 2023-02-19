@@ -85,7 +85,7 @@ pub fn fix_embed(embed: &mut EmbedV1) {
     if let Some(ref img) = embed.img {
         match (img.width, img.height) {
             // if there is a tiny main image, relegate it down to a thumbnail
-            (Some(w), Some(h)) if w <= 224 && h <= 224 => {
+            (Some(w), Some(h)) if w <= 320 && h <= 320 => {
                 embed.thumb = std::mem::take(&mut embed.img);
 
                 if embed.ty == EmbedType::Img {
