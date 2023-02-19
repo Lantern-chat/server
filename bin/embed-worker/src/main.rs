@@ -78,7 +78,7 @@ async fn main() {
             .deflate(true)
             .brotli(true)
             .redirect(reqwest::redirect::Policy::limited(2))
-            .connect_timeout(std::time::Duration::from_secs(10))
+            .connect_timeout(std::time::Duration::from_secs(4))
             .danger_accept_invalid_certs(false)
             .http2_adaptive_window(true)
             .build()
@@ -162,19 +162,20 @@ async fn inner(state: Arc<WorkerState>, url: String, params: Params) -> Result<(
 
     let (https, root, domain) = embed_parser::utils::url_root(&url);
 
-    let mut resp = {
+    let mut resp = retry_request(2, || {
         let mut req = state.client.get(url.as_str());
 
         if let Some(&user_agent) = USER_AGENTS.get(domain) {
             req = req.header(HeaderName::from_static("user-agent"), user_agent);
         }
 
-        if let Some(lang) = params.lang {
+        if let Some(ref lang) = params.lang {
             req = req.header(HeaderName::from_static("accept-language"), format!("{lang};q=0.5"));
         }
 
-        req.send().await?
-    };
+        req
+    })
+    .await?;
 
     if !resp.status().is_success() {
         return Err(Error::Failure(resp.status()));
@@ -400,6 +401,25 @@ async fn resolve_images(client: &reqwest::Client, embed: &mut EmbedV1) -> Result
     Ok(())
 }
 
+async fn retry_request<F>(max_attempts: u8, mut make_request: F) -> Result<reqwest::Response, Error>
+where
+    F: FnMut() -> reqwest::RequestBuilder,
+{
+    let mut req = make_request().send().boxed();
+    let mut attempts = 1;
+
+    loop {
+        match req.await {
+            Ok(resp) => break Ok(resp),
+            Err(e) if e.is_timeout() && attempts < max_attempts => {
+                attempts += 1;
+                req = make_request().send().boxed();
+            }
+            Err(e) => return Err(e.into()),
+        }
+    }
+}
+
 async fn resolve_media(client: &reqwest::Client, media: &mut EmbedMedia, head: bool) -> Result<(), Error> {
     // already has dimensions
     if !matches!((media.width, media.height), (None, None)) {
@@ -411,10 +431,10 @@ async fn resolve_media(client: &reqwest::Client, media: &mut EmbedMedia, head: b
         return Ok(());
     }
 
-    let mut resp = client
-        .request(if head { Method::HEAD } else { Method::GET }, &*media.url)
-        .send()
-        .await?;
+    let mut resp = retry_request(2, || {
+        client.request(if head { Method::HEAD } else { Method::GET }, &*media.url)
+    })
+    .await?;
 
     if let Some(mime) = resp.headers().get("content-type").and_then(|h| h.to_str().ok()) {
         media.mime = Some(mime.into());
