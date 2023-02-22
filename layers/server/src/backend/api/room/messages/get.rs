@@ -198,6 +198,14 @@ mod q {
             Id: Party::Id,
             RoomId: Rooms::Id,
         }
+
+        pub struct SortedEmbeds {
+            EmbedId: MessageEmbeds::EmbedId,
+        }
+
+        pub struct TempEmbeds {
+            Embeds: Type::JSONB_ARRAY,
+        }
     }
 
     thorn::decl_alias! {
@@ -217,7 +225,6 @@ mod q {
                 Messages::ThreadId,
                 Messages::EditedAt,
                 Messages::Flags,
-                Messages::Embeds,
             }
 
             pub enum SelectedColumns continue MessageColumns {
@@ -264,7 +271,11 @@ mod q {
                 AggAttachments::Preview,
             }
 
-            pub enum ReactionColumns continue AttachmentColumns {
+            pub enum EmbedColumns continue AttachmentColumns {
+                TempEmbeds::Embeds,
+            }
+
+            pub enum ReactionColumns continue EmbedColumns {
                 TempReactions::Reactions,
             }
         }
@@ -396,23 +407,39 @@ mod q {
             .cols(DynamicMsgColumns::default())
             .cols(RoleColumns::default())
             .cols(AttachmentColumns::default())
-            // ReactionColumns
-            .expr(
-                Query::select()
-                    .expr(Call::custom("jsonb_agg").arg(
-                        Call::custom("jsonb_build_object").args((
-                            "emote_id".lit(), AggReactions::EmoteId,
-                            "emoji_id".lit(), AggReactions::EmojiId,
-                            "me".lit(), Params::user_id().equals(Builtin::any(AggReactions::UserIds)),
-                            "count".lit(), Builtin::coalesce((
-                                Builtin::array_length((AggReactions::UserIds, 1.lit())), 0.lit()
-                            ))
-                        ))),
+            // EmbedColumns
+            .expr({
+                let sorted = SortedEmbeds::as_query(
+                    Query::select()
+                        .expr(MessageEmbeds::EmbedId.alias_to(SortedEmbeds::EmbedId))
+                        .from_table::<MessageEmbeds>()
+                        .order_by(MessageEmbeds::Position.ascending())
+                        .and_where(MessageEmbeds::MsgId.equals(Messages::Id))
+                );
+
+                Query::select().with(sorted.exclude()).expr(
+                    Call::custom("jsonb_agg").arg(Embeds::Embed))
+                    .from(
+                        SortedEmbeds::inner_join_table::<Embeds>()
+                        .on(Embeds::Id.equals(SortedEmbeds::EmbedId))
                     )
-                    .from_table::<AggReactions>()
-                    .and_where(AggReactions::MsgId.equals(Messages::Id))
-                    .as_value(),
-            )
+                    .as_value()
+            })
+            // ReactionColumns
+            .expr(Query::select()
+                .expr(Call::custom("jsonb_agg").arg(
+                    Call::custom("jsonb_build_object").args((
+                        "emote_id".lit(), AggReactions::EmoteId,
+                        "emoji_id".lit(), AggReactions::EmojiId,
+                        "me".lit(), Params::user_id().equals(Builtin::any(AggReactions::UserIds)),
+                        "count".lit(), Builtin::coalesce((
+                            Builtin::array_length((AggReactions::UserIds, 1.lit())), 0.lit()
+                        ))
+                    ))),
+                )
+                .from_table::<AggReactions>()
+                .and_where(AggReactions::MsgId.equals(Messages::Id))
+                .as_value())
             .from(
                 Messages::inner_join_table::<SelectedMessages>()
                     .on(Messages::Id.equals(SelectedMessages::Id))
@@ -713,7 +740,7 @@ where
                 }
             }
 
-            if let Some(Json(embeds)) = row.try_get(MessageColumns::embeds())? {
+            if let Some(Json(embeds)) = row.try_get(EmbedColumns::embeds())? {
                 msg.embeds = embeds;
             }
 
