@@ -67,7 +67,7 @@ fn valid_url(c: &char) -> bool {
 mod url_test {
     use super::*;
 
-    const VALID_URL: &'static [u8] =
+    const VALID_URL: &[u8] =
         b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-%._~:/?#[]@!$&'()*+,;=";
 
     #[test]
@@ -75,12 +75,7 @@ mod url_test {
         for c in 0..256 {
             let c = char::from_u32(c).unwrap();
 
-            assert_eq!(
-                VALID_URL.contains(&(c as u8)),
-                valid_url(&c),
-                "Invalid? {}",
-                c as u8
-            );
+            assert_eq!(VALID_URL.contains(&(c as u8)), valid_url(&c), "Invalid? {}", c as u8);
         }
     }
 }
@@ -283,9 +278,7 @@ fn scan_substr_inner(
     let bytes = input.as_bytes();
     let mut escaped = false;
 
-    let mut chars = input.char_indices();
-
-    while let Some((i, c)) = chars.next() {
+    for (i, c) in input.char_indices() {
         if escaped || c == '\\' {
             escaped ^= true;
             continue;

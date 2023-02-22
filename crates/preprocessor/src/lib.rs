@@ -76,7 +76,7 @@ impl Context {
             return Err(Error::UnexpectedEof);
         }
 
-        Ok(std::mem::replace(&mut self.out, String::new()))
+        Ok(std::mem::take(&mut self.out))
     }
 
     fn active(&self) -> bool {
@@ -95,13 +95,7 @@ impl Context {
 
             if !t.starts_with('#') {
                 if self.active() {
-                    Self::substitute_append(
-                        0,
-                        self.max_substitution_depth,
-                        &self.defines,
-                        &mut self.out,
-                        line,
-                    )?;
+                    Self::substitute_append(0, self.max_substitution_depth, &self.defines, &mut self.out, line)?;
                     self.out.push_str("\n");
                 }
 
@@ -121,11 +115,10 @@ impl Context {
                 (which @ ("ifndef" | "ifdef"), define) => {
                     if self.active() {
                         let flip = which == "ifndef";
-                        self.stack
-                            .push(match flip ^ self.defines.contains_key(define.trim()) {
-                                true => Item::Active,
-                                false => Item::Inactive,
-                            });
+                        self.stack.push(match flip ^ self.defines.contains_key(define.trim()) {
+                            true => Item::Active,
+                            false => Item::Inactive,
+                        });
                     } else {
                         self.stack.push(Item::Inactive);
                     }
@@ -160,11 +153,7 @@ impl Context {
     fn process_include(&mut self, cwd: &Path, path: &str) -> Result<(), Error> {
         let path = path.trim_matches(|c: char| c.is_whitespace() || matches!(c, '<' | '"'));
 
-        let include_paths = self
-            .include
-            .iter()
-            .map(|p| p.as_path())
-            .chain(std::iter::once(cwd));
+        let include_paths = self.include.iter().map(|p| p.as_path()).chain(std::iter::once(cwd));
 
         for base in include_paths {
             let full_path = base.join(path);
@@ -221,13 +210,7 @@ impl Context {
     fn eval_if(&mut self, cond: &str) -> Result<bool, Error> {
         let mut resolved_cond = String::with_capacity(cond.len());
 
-        Self::substitute_append(
-            0,
-            self.max_substitution_depth,
-            &self.defines,
-            &mut resolved_cond,
-            cond,
-        )?;
+        Self::substitute_append(0, self.max_substitution_depth, &self.defines, &mut resolved_cond, cond)?;
 
         use unicode_segmentation::UnicodeSegmentation;
 

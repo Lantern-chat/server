@@ -15,7 +15,7 @@ pub struct OEmbedLink<'a> {
 
 pub type LinkList<'a> = smallvec::SmallVec<[OEmbedLink<'a>; 1]>;
 
-pub fn parse_link_header<'a>(header: &'a str) -> LinkList<'a> {
+pub fn parse_link_header(header: &str) -> LinkList {
     let mut res = LinkList::default();
 
     // multiple links can be comma-separated

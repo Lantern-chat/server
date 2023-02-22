@@ -23,10 +23,10 @@ fn map_jpeg_to_avif_quality(q: u8) -> u8 {
 
 /// `map_jpeg_to_avif_quality` made into a lookup table
 static JPEG_TO_AVIF_QUALITY: [u8; 101] = [
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 13, 14, 15, 16, 17, 17, 18, 19, 20, 21, 21, 22, 23, 24, 24,
-    25, 26, 27, 27, 28, 29, 30, 30, 31, 32, 32, 33, 34, 35, 35, 36, 37, 37, 38, 39, 40, 40, 41, 42, 43, 43,
-    44, 45, 46, 46, 47, 48, 49, 50, 51, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 66, 67, 68,
-    69, 71, 72, 73, 75, 76, 77, 79, 81, 82, 84, 85, 87, 89, 91, 93, 94, 96, 98, 100,
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 13, 14, 15, 16, 17, 17, 18, 19, 20, 21, 21, 22, 23, 24, 24, 25,
+    26, 27, 27, 28, 29, 30, 30, 31, 32, 32, 33, 34, 35, 35, 36, 37, 37, 38, 39, 40, 40, 41, 42, 43, 43, 44, 45,
+    46, 46, 47, 48, 49, 50, 51, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 66, 67, 68, 69, 71, 72,
+    73, 75, 76, 77, 79, 81, 82, 84, 85, 87, 89, 91, 93, 94, 96, 98, 100,
 ];
 
 pub fn encode_avif<W: Write>(
@@ -63,18 +63,10 @@ pub fn encode_avif<W: Write>(
 
     let res = match image {
         DynamicImage::ImageRgb8(image) => encoder
-            .encode_rgb(Img::new(
-                image.as_raw().as_pixels(),
-                width as usize,
-                height as usize,
-            ))
+            .encode_rgb(Img::new(image.as_raw().as_pixels(), width as usize, height as usize))
             .map(|r| r.avif_file),
         DynamicImage::ImageRgba8(image) => encoder
-            .encode_rgba(Img::new(
-                image.as_raw().as_pixels(),
-                width as usize,
-                height as usize,
-            ))
+            .encode_rgba(Img::new(image.as_raw().as_pixels(), width as usize, height as usize))
             .map(|r| r.avif_file),
         _ => unimplemented!(),
     };
@@ -84,9 +76,7 @@ pub fn encode_avif<W: Write>(
     // but ravif chooses to put it all in a Vec
 
     match res {
-        Ok(buffer) => Ok({
-            w.write_all(&buffer)?;
-        }),
+        Ok(buffer) => Ok(w.write_all(&buffer)?),
         Err(err) => Err(image::ImageError::Encoding(image::error::EncodingError::new(
             ImageFormat::Avif.into(),
             err,

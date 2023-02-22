@@ -19,8 +19,7 @@ thread_local!(
     // We require Rc<..> to avoid premature freeing when thread_rng is used
     // within thread-local destructors. See #968.
     static CRYPTO_THREAD_RNG_KEY: Rc<UnsafeCell<ReseedingRng<ChaCha20Core, OsRng>>> = {
-        let r = ChaCha20Core::from_rng(OsRng).unwrap_or_else(|err|
-                panic!("could not initialize thread_rng: {}", err));
+        let r = ChaCha20Core::from_rng(OsRng).unwrap_or_else(|err| panic!("could not initialize thread_rng: {err}"));
         let rng = ReseedingRng::new(r, THREAD_RNG_RESEED_THRESHOLD, OsRng);
         Rc::new(UnsafeCell::new(rng))
     }

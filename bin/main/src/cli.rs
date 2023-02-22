@@ -12,7 +12,7 @@ impl CliOptions {
         let mut pargs = pico_args::Arguments::from_env();
 
         if pargs.contains(["-h", "--help"]) {
-            print!("{}", HELP);
+            print!("{HELP}");
             std::process::exit(0);
         }
 
@@ -42,7 +42,7 @@ impl CliOptions {
     }
 }
 
-static HELP: &'static str = "\
+static HELP: &str = "\
 Lantern
 
 USAGE:

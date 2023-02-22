@@ -22,9 +22,7 @@ pub mod imageops;
 
 pub fn compute_crop((width, height): (u32, u32), config: ProcessConfig) -> (Rect, Rect) {
     let ProcessConfig {
-        max_width,
-        max_height,
-        ..
+        max_width, max_height, ..
     } = config;
 
     let uncropped = Rect {
@@ -96,9 +94,7 @@ pub fn process_image(
     config: ProcessConfig,
 ) -> Result<ProcessedImage, ProcessingError> {
     let ProcessConfig {
-        max_width,
-        max_height,
-        ..
+        max_width, max_height, ..
     } = config;
 
     let (width, height) = image.dimensions();
@@ -116,7 +112,7 @@ pub fn process_image(
     *image = match (needs_crop, needs_resize, needs_reduce) {
         (true, false, true) => imageops::crop_and_reduce(image, crop),
         (_, true, true) => imageops::crop_and_reduce_and_resize(image, crop, new_width, new_height),
-        (false, false, _) => match crate::util::actually_has_alpha(&image) {
+        (false, false, _) => match crate::util::actually_has_alpha(image) {
             true => DynamicImage::ImageRgba8(image.to_rgba8()),
             false => DynamicImage::ImageRgb8(image.to_rgb8()),
         },
@@ -125,16 +121,17 @@ pub fn process_image(
                 DynamicImage::ImageLumaA8(image) => DynamicImage::ImageRgba8(imageops::reduce_to_u8(
                     &*image.view(crop.x, crop.y, crop.width, crop.height),
                 )),
-                DynamicImage::ImageLuma8(image) => DynamicImage::ImageRgb8(imageops::reduce_to_u8(
-                    &*image.view(crop.x, crop.y, crop.width, crop.height),
-                )),
+                DynamicImage::ImageLuma8(image) => DynamicImage::ImageRgb8(imageops::reduce_to_u8(&*image.view(
+                    crop.x,
+                    crop.y,
+                    crop.width,
+                    crop.height,
+                ))),
                 DynamicImage::ImageRgb8(_) | DynamicImage::ImageRgba8(_) => {
                     image.crop_imm(crop.x, crop.y, crop.width, crop.height)
                 }
                 // sane non-exhaustive fallback
-                _ => DynamicImage::ImageRgba8(
-                    image.crop_imm(crop.x, crop.y, crop.width, crop.height).to_rgba8(),
-                ),
+                _ => DynamicImage::ImageRgba8(image.crop_imm(crop.x, crop.y, crop.width, crop.height).to_rgba8()),
             }
         }
         (false, true, false) => match image {
@@ -178,7 +175,7 @@ pub fn process_image(
     };
 
     if needs_crop || needs_resize {
-        *image = match crate::util::actually_has_alpha(&image) {
+        *image = match crate::util::actually_has_alpha(image) {
             true => DynamicImage::ImageRgba8(image.to_rgba8()),
             false => DynamicImage::ImageRgb8(image.to_rgb8()),
         };

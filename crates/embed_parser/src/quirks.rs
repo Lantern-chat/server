@@ -6,7 +6,7 @@ pub fn resolve_relative(root: &str, https: bool, embed: &mut EmbedV1) {
             return;
         }
 
-        if media.url.starts_with(".") {
+        if media.url.starts_with('.') {
             // TODO
         }
 
@@ -28,7 +28,7 @@ pub fn resolve_relative(root: &str, https: bool, embed: &mut EmbedV1) {
                 url += "/";
             }
 
-            url += &old;
+            url += old;
             url.into()
         };
     });

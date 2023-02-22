@@ -74,7 +74,7 @@ pub type HeaderList<'a> = smallvec::SmallVec<[Header<'a>; 32]>;
 pub use crate::regexes::{ATTRIBUTE_RE, META_TAGS};
 
 /// Returns `None` on invalid HTML
-pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
+pub fn parse_meta(input: &str) -> Option<HeaderList> {
     let bytes = input.as_bytes();
 
     let mut res = HeaderList::default();

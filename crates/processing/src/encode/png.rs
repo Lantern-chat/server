@@ -82,12 +82,7 @@ pub fn encode_png<W: Write>(mut w: W, image: &DynamicImage, info: &ImageInfo, qu
         }
     };
 
-    log::trace!(
-        "PNG Encoder expected {expected_bytes} bytes, got {} bytes",
-        out.len()
-    );
+    log::trace!("PNG Encoder expected {expected_bytes} bytes, got {} bytes", out.len());
 
-    Ok({
-        w.write_all(&out)?;
-    })
+    w.write_all(&out)
 }

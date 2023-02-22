@@ -432,9 +432,7 @@ where
             while cache[i].2 == current_shard {
                 f(
                     cache[i].0,
-                    shard
-                        .raw_entry_mut()
-                        .from_key_hashed_nocheck(cache[i].1, cache[i].0),
+                    shard.raw_entry_mut().from_key_hashed_nocheck(cache[i].1, cache[i].0),
                 );
                 i += 1;
 

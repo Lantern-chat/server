@@ -72,7 +72,7 @@ async fn root(State(state): State<Arc<CamoState>>, req: Request<Body>) -> impl I
     };
 
     // decode url
-    let url = match URL_SAFE_NO_PAD.decode(&raw_url) {
+    let url = match URL_SAFE_NO_PAD.decode(raw_url) {
         Ok(bytes) => match String::from_utf8(bytes) {
             Ok(url) => url,
             Err(_) => return Err((StatusCode::BAD_REQUEST, "Invalid UTF-8")),

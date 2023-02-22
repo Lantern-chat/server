@@ -33,13 +33,12 @@ pub fn write_regex<W: std::io::Write>(name: &str, re: &str, mut out: W) -> Resul
     write!(
         out,
         r#"
-        pub static {1}: once_cell::sync::Lazy<Regex<DenseDFA<&'static [u{0}], u{0}>>> = once_cell::sync::Lazy::new(|| unsafe {{
+        pub static {name}: once_cell::sync::Lazy<Regex<DenseDFA<&'static [u{size}], u{size}>>> = once_cell::sync::Lazy::new(|| unsafe {{
             Regex::from_dfas(
-                DenseDFA::from_bytes(&regex_util::rt::DenseDFABytes{0}({2:?}).0),
-                DenseDFA::from_bytes(&regex_util::rt::DenseDFABytes{0}({3:?}).0)
+                DenseDFA::from_bytes(&regex_util::rt::DenseDFABytes{size}({forward:?}).0),
+                DenseDFA::from_bytes(&regex_util::rt::DenseDFABytes{size}({reverse:?}).0)
             )
-        }});"#,
-        size, name, forward, reverse,
+        }});"#
     )?;
 
     Ok(())

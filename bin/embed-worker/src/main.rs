@@ -195,7 +195,7 @@ async fn inner(state: Arc<WorkerState>, url: String, params: Params) -> Result<(
         .headers()
         .get("link")
         .and_then(|h| h.to_str().ok())
-        .map(|h| embed_parser::oembed::parse_link_header(h));
+        .map(embed_parser::oembed::parse_link_header);
 
     embed.url = Some(url.as_str().into());
 
@@ -321,7 +321,7 @@ async fn fetch_oembed<'a>(
     let body = client.get(link.url).send().await?.bytes().await?;
 
     Ok(Some(match link.format {
-        OEmbedFormat::JSON => serde_json::de::from_slice(&*body)?,
+        OEmbedFormat::JSON => serde_json::de::from_slice(&body)?,
         OEmbedFormat::XML => quick_xml::de::from_reader(&*body)?,
     }))
 }
@@ -333,7 +333,7 @@ async fn read_head<'a>(
     while let Some(chunk) = resp.chunk().await? {
         html.extend(&chunk);
 
-        if memchr::memmem::rfind(&html, b"</body").is_some() {
+        if memchr::memmem::rfind(html, b"</body").is_some() {
             break;
         }
 
@@ -343,7 +343,7 @@ async fn read_head<'a>(
         }
     }
 
-    if let std::borrow::Cow::Owned(new_html) = String::from_utf8_lossy(&html) {
+    if let std::borrow::Cow::Owned(new_html) = String::from_utf8_lossy(html) {
         *html = new_html.into();
     }
 
@@ -427,7 +427,7 @@ async fn resolve_media(client: &reqwest::Client, media: &mut EmbedMedia, head: b
     }
 
     // TODO: Remove when relative paths are handled
-    if media.url.starts_with(".") {
+    if media.url.starts_with('.') {
         return Ok(());
     }
 

@@ -78,9 +78,7 @@ fn is_of_age_inner(min_age: i32, ts: PrimitiveDateTime, dob: Date) -> bool {
 
     let mut years = today.year() - dob.year() - 1;
 
-    if (today.month() as u8) > (dob.month() as u8)
-        || (today.month() == dob.month() && today.day() >= dob.day())
-    {
+    if (today.month() as u8) > (dob.month() as u8) || (today.month() == dob.month() && today.day() >= dob.day()) {
         years += 1;
     }
 
@@ -101,13 +99,7 @@ mod tests {
     #[test]
     fn test_birthday() {
         fn tb(dob: Date, expected: Date) {
-            assert_eq!(
-                birthday(expected.year(), dob),
-                expected,
-                "{} -> {}",
-                dob,
-                expected
-            );
+            assert_eq!(birthday(expected.year(), dob), expected, "{dob} -> {expected}");
         }
 
         // birthdays are leap years

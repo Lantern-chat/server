@@ -48,7 +48,7 @@ pub async fn migrate<P: AsRef<Path>>(pool: Pool, path: P) -> Result<(), Migratio
 
     let mut available_migrations = std::fs::read_dir(path)?
         .map(|res| {
-            res.map_err(MigrationError::from).and_then(|e| {
+            res.map_err(MigrationError::from).map(|e| {
                 let path = e.path();
                 let s = path.file_stem().unwrap().to_string_lossy();
 
@@ -56,7 +56,7 @@ pub async fn migrate<P: AsRef<Path>>(pool: Pool, path: P) -> Result<(), Migratio
 
                 let migration_number = i32::from_str(&s[..idx]).unwrap();
 
-                Ok((migration_number, path))
+                (migration_number, path)
             })
         })
         .collect::<Result<Vec<_>, MigrationError>>()?;

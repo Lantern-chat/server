@@ -545,7 +545,7 @@ impl Client {
         self.rx.recv().await
     }
 
-    pub async fn transaction<'a>(&'a mut self) -> Result<Transaction<'a>, Error> {
+    pub async fn transaction(&mut self) -> Result<Transaction, Error> {
         Ok(Transaction {
             readonly: self.readonly,
             id: self.conn.id,

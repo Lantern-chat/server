@@ -148,11 +148,8 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                 if let Some([w, h]) = link.sizes {
                     let m = w.max(h);
 
-                    if max_dim >= m {
-                        // prefer larger icons
-                        continue;
-                    } else if max_dim != 0 && m > 256 {
-                        // try not to use too large icons, though
+                    if max_dim >= m || (max_dim != 0 && m > 256) {
+                        // prefer larger icons, but try not to use too large icons, though
                         continue;
                     } else {
                         max_dim = m;
@@ -317,7 +314,7 @@ pub fn parse_oembed_to_embed(embed: &mut EmbedV1, o: OEmbed) -> ExtraFields {
     }
 
     if let Some(thumbnail_url) = o.thumbnail_url {
-        let mut thumb = Box::new(EmbedMedia::default());
+        let mut thumb = Box::<EmbedMedia>::default();
 
         thumb.url = thumbnail_url;
         thumb.width = o.thumbnail_width;
@@ -358,9 +355,7 @@ fn parse_embed_html_src(html: &str) -> Option<SmolStr> {
 
     let src = &html[start..end];
 
-    if memchr::memmem::find(src.as_bytes(), b"://").is_none() {
-        return None;
-    }
+    memchr::memmem::find(src.as_bytes(), b"://")?;
 
     Some(SmolStr::from(src))
 }
@@ -375,9 +370,7 @@ fn parse_embed_html_type(html: &str) -> Option<SmolStr> {
     let ty = &html[start..end];
 
     // mime type e.g.: image/png
-    if memchr::memchr(b'/', ty.as_bytes()).is_none() {
-        return None;
-    }
+    memchr::memchr(b'/', ty.as_bytes())?;
 
     Some(SmolStr::from(ty))
 }
@@ -401,13 +394,10 @@ mod tests {
         let ty = parse_embed_html_type(fixture);
 
         assert_eq!(
-            src.as_ref().map::<&str, _>(|s| &s),
+            src.as_ref().map::<&str, _>(|s| s),
             Some("https://www.youtube.com/v/M3r2XDceM6A&fs=1")
         );
 
-        assert_eq!(
-            ty.as_ref().map::<&str, _>(|s| &s),
-            Some("application/x-shockwave-flash")
-        );
+        assert_eq!(ty.as_ref().map::<&str, _>(|s| s), Some("application/x-shockwave-flash"));
     }
 }

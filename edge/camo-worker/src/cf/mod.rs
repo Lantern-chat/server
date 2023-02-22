@@ -36,7 +36,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
     utils::set_panic_hook();
 
     // decode url
-    let url = match URL_SAFE_NO_PAD.decode(&raw_url) {
+    let url = match URL_SAFE_NO_PAD.decode(raw_url) {
         Ok(bytes) => match String::from_utf8(bytes) {
             Ok(url) => url,
             Err(_) => return Response::error("Invalid UTF-8", 400),
