@@ -26,11 +26,7 @@ pub struct FilePostBody {
     preview: Option<String>,
 }
 
-pub async fn post_file(
-    state: &ServerState,
-    user_id: Snowflake,
-    body: FilePostBody,
-) -> Result<Snowflake, Error> {
+pub async fn post_file(state: &ServerState, user_id: Snowflake, body: FilePostBody) -> Result<Snowflake, Error> {
     let mime = match body.mime {
         None => None,
         Some(mime) => {
@@ -74,6 +70,7 @@ pub async fn post_file(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn do_post_file(
     state: &ServerState,
     user_id: Snowflake,

@@ -79,10 +79,10 @@ pub async fn verify<'a>(
         // linear search is pretty fast for N<100
         match usable_emotes.iter().find(|e| e.1 == old_id) {
             Some(&(name, id)) => {
-                write!(new_content, "<:{}:{}>", name, id).expect("write to string");
+                write!(new_content, "<:{name}:{id}>").expect("write to string");
             }
             None => {
-                write!(new_content, ":{}:", old_name).expect("write to string");
+                write!(new_content, ":{old_name}:").expect("write to string");
             }
         }
 

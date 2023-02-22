@@ -53,7 +53,7 @@ pub async fn service(
         // reuse the info string to avoid another allocation
         info.clear();
 
-        if let Err(e) = write!(info, "resp;dur={:.4}", elapsedf) {
+        if let Err(e) = write!(info, "resp;dur={elapsedf:.4}") {
             log::error!("Error formatting response duration: {e}");
         }
 

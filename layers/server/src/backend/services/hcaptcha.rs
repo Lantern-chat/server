@@ -45,17 +45,6 @@ pub struct HCaptchaParameters<'a> {
     pub sitekey: Option<&'a str>,
 }
 
-impl Default for HCaptchaParameters<'_> {
-    fn default() -> Self {
-        HCaptchaParameters {
-            secret: "",
-            response: "",
-            remoteip: None,
-            sitekey: None,
-        }
-    }
-}
-
 use timestamp::Timestamp;
 
 #[derive(Debug, Deserialize)]

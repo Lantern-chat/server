@@ -37,7 +37,7 @@ pub async fn register_user(
             secret: &config.services.hcaptcha_secret,
             sitekey: Some(&config.services.hcaptcha_sitekey),
             response: &form.token,
-            ..HCaptchaParameters::default()
+            remoteip: None, // TODO
         })
         .await?;
 

@@ -41,7 +41,7 @@ pub async fn get_relationships(
                         // such is the case where you are sending a friend request to a non-associated user
                         // still can't view their presence until it's accepted or a party is shared
                         false => None,
-                        true => {
+                        true => Some({
                             let last_active = crate::backend::util::relative::approximate_relative_time(
                                 &state,
                                 user_id,
@@ -50,22 +50,22 @@ pub async fn get_relationships(
                             );
 
                             match row.try_get(UserColumns::presence_updated_at())? {
-                                Some(updated_at) => Some(UserPresence {
+                                Some(updated_at) => UserPresence {
                                     flags: UserPresenceFlags::from_bits_truncate_public(
                                         row.try_get(UserColumns::presence_flags())?,
                                     ),
                                     last_active,
                                     updated_at: Some(updated_at),
                                     activity: None,
-                                }),
-                                None => Some(UserPresence {
+                                },
+                                None => UserPresence {
                                     flags: UserPresenceFlags::empty(),
                                     last_active,
                                     updated_at: None,
                                     activity: None,
-                                }),
+                                },
                             }
-                        }
+                        }),
                     },
                     email: None,
                     preferences: None,

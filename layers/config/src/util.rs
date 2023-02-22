@@ -173,12 +173,7 @@ pub mod duration {
                     None => return Err(de::Error::custom("Missing seconds value")),
                 };
 
-                let nanoseconds = match value.next_element::<u32>()? {
-                    Some(ns) => ns,
-                    None => 0,
-                };
-
-                Ok(Duration::new(seconds, nanoseconds))
+                Ok(Duration::new(seconds, value.next_element::<u32>()?.unwrap_or(0)))
             }
         }
 

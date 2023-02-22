@@ -12,7 +12,7 @@ pub fn approximate_relative_time(
 ) -> Option<u64> {
     let ts = ts?;
 
-    let elapsed = now.unwrap_or_else(|| Timestamp::now_utc()).duration_since(ts);
+    let elapsed = now.unwrap_or_else(Timestamp::now_utc).duration_since(ts);
 
     // convert to decaseconds
     let elapsed = elapsed.whole_seconds() / 10;

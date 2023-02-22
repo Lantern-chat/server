@@ -95,7 +95,7 @@ fn delete_with_perms() -> impl AnyQuery {
             .expr(AggRoomPerms::Perms.alias_to(AggPerm::Perms))
             .from_table::<AggRoomPerms>()
             .and_where(AggRoomPerms::UserId.equals(user_id_var.clone()))
-            .and_where(AggRoomPerms::RoomId.equals(room_id_var.clone())),
+            .and_where(AggRoomPerms::RoomId.equals(room_id_var)),
     );
 
     Query::with()

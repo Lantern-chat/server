@@ -429,10 +429,10 @@ impl From<DbError> for Error {
             use db::pg::error::SqlState;
 
             // TODO: Improve this with names of specific constraints
-            match e.code() {
-                &SqlState::FOREIGN_KEY_VIOLATION => return Error::NotFound,
-                &SqlState::CHECK_VIOLATION => return Error::BadRequest,
-                &SqlState::UNIQUE_VIOLATION => return Error::BadRequest,
+            match *e.code() {
+                SqlState::FOREIGN_KEY_VIOLATION => return Error::NotFound,
+                SqlState::CHECK_VIOLATION => return Error::BadRequest,
+                SqlState::UNIQUE_VIOLATION => return Error::BadRequest,
                 _ => {}
             }
         }

@@ -94,7 +94,7 @@ pub async fn edit_message(
     let mut update_message = Either::Left(ok::<(), Error>(()));
 
     // if there are old or new attachments
-    if !prev_files.is_none() || !body.attachments.is_empty() {
+    if prev_files.is_some() || !body.attachments.is_empty() {
         // attachments may be unordered, so a Set is required
         let pre_set: HashSet<Snowflake> = HashSet::from_iter(prev_files.unwrap_or_default());
         let new_set: HashSet<Snowflake> = HashSet::from_iter(body.attachments);
@@ -200,8 +200,7 @@ fn add_attachments_query() -> impl thorn::AnyQuery {
 
     Query::with()
         .with(
-            AggIds::as_query(Query::select().expr(Builtin::unnest((att_id_var,)).alias_to(AggIds::Id)))
-                .exclude(),
+            AggIds::as_query(Query::select().expr(Builtin::unnest((att_id_var,)).alias_to(AggIds::Id))).exclude(),
         )
         .insert()
         .into::<Attachments>()

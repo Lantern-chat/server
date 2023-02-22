@@ -286,11 +286,11 @@ impl FileCache<ServerState> for MainFileCache {
                         let mut brotli_buffer: Vec<u8> = Vec::with_capacity(128);
                         let mut brotli = BrotliEncoder::with_quality(&content[..], level);
                         brotli.read_to_end(&mut brotli_buffer).await?;
-                        return Ok::<_, std::io::Error>(brotli_buffer);
+                        Ok::<_, std::io::Error>(brotli_buffer)
                     }
 
                     #[cfg(not(feature = "brotli"))]
-                    return Ok::<_, std::io::Error>(Vec::new());
+                    Ok::<_, std::io::Error>(Vec::new())
                 };
 
                 let (brotli, deflate, gzip) = tokio::try_join!(brotli_task, deflate_task, gzip_task)?;

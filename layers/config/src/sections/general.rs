@@ -30,7 +30,7 @@ section! {
         /// defaults to the number of system threads.
         ///
         /// Setting this to 0 will use the default value.
-        pub cpu_limit: u64 = 0u64 as u64 => "LANTERN_CPU_LIMIT" | util::parse[0u64],
+        pub cpu_limit: u64 = 0u64 => "LANTERN_CPU_LIMIT" | util::parse[0u64],
     }
 }
 
