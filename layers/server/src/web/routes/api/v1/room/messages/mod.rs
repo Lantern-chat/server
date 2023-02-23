@@ -33,9 +33,9 @@ pub fn messages(mut route: Route<ServerState>, auth: Authorization, room_id: Sno
 
                 // PUT | DELETE /api/v1/room/1234/messages/5678/star/9012
                 (&Method::PUT | &Method::DELETE, Exact("pin")) => match route.next().param::<Snowflake>() {
-                    Some(Ok(pin_id)) => match route.method() {
-                        &Method::PUT => Ok(pin::pin_message(route, auth, msg_id, pin_id)),
-                        &Method::DELETE => Ok(pin::unpin_message(route, auth, msg_id, pin_id)),
+                    Some(Ok(pin_id)) => match *route.method() {
+                        Method::PUT => Ok(pin::pin_message(route, auth, msg_id, pin_id)),
+                        Method::DELETE => Ok(pin::unpin_message(route, auth, msg_id, pin_id)),
                         _ => unreachable!(),
                     },
                     _ => Err(Error::BadRequest),

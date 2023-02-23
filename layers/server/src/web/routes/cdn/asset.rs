@@ -75,7 +75,7 @@ pub async fn asset(mut route: Route<ServerState>) -> WebResult {
 
     let is_head = route.method() == Method::HEAD;
 
-    let flags = match route.raw_query().map(|query| schema::asset::parse(query)) {
+    let flags = match route.raw_query().map(schema::asset::parse) {
         Some(Ok(q)) => q.into(),
         _ => AssetFlags::all()
             .difference(AssetFlags::MAYBE_UNSUPPORTED_FORMATS)

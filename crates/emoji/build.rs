@@ -34,7 +34,7 @@ pub struct ParsedEmoji<'a> {
 }
 
 /// Removes any `\u{FE0F}` variation selectors for a more compact representation
-pub fn minimize<'a>(s: &'a str) -> Cow<'a, str> {
+pub fn minimize(s: &str) -> Cow<str> {
     if !s.contains('\u{200D}') {
         s.replace('\u{FE0F}', "").into()
     } else {
@@ -71,8 +71,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         // trim off any whitespace and # before the emoji itself
-        let line =
-            line[status.as_str().len()..].trim_start_matches(|c: char| c.is_ascii_whitespace() || c == '#');
+        let line = line[status.as_str().len()..].trim_start_matches(|c: char| c.is_ascii_whitespace() || c == '#');
 
         // find the end of the emoji
         let emoji_end_idx = line.find(" E").expect("End of emoji");
@@ -171,7 +170,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-static EXTRA: &'static str = "
+static EXTRA: &str = "
 1F1E6 ; fully-qualified # \u{1F1E6} E6.0 Regional Indicator Symbol Letter A
 1F1E7 ; fully-qualified # \u{1F1E7} E6.0 Regional Indicator Symbol Letter B
 1F1E8 ; fully-qualified # \u{1F1E8} E6.0 Regional Indicator Symbol Letter C

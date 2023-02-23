@@ -18,7 +18,7 @@ pub async fn api_v1(mut route: Route<ServerState>) -> WebResult {
     route.next();
 
     // only `PATCH api/v1/file` is allowed to exceed this value
-    if !(route.method() == &Method::PATCH && route.segment() == Exact("file")) {
+    if !(*route.method() == Method::PATCH && route.segment() == Exact("file")) {
         use hyper::body::HttpBody;
 
         // API Requests are limited to a body size of 1MiB

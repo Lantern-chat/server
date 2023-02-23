@@ -48,7 +48,9 @@ impl RateLimitTable {
     }
 
     pub async fn cleanup_at(&self, now: Instant) {
-        let one_second_ago = now - Duration::from_secs(1);
+        let one_second_ago = now
+            .checked_sub(Duration::from_secs(1))
+            .expect("Failed to subtract one second");
         self.table.retain(|_, value| value.last < one_second_ago).await;
     }
 }

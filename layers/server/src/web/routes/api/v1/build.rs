@@ -26,7 +26,7 @@ use super::*;
 
 pub fn build(route: Route<ServerState>) -> WebResult {
     // TODO: Come up with a way to cache serde stuff
-    Ok(WebResponse::new(&BUILD_INFO))
+    Ok(WebResponse::new(BUILD_INFO))
 
     // lazy_static::lazy_static! {
     //     static ref JSON_BUILD_INFO: String = serde_json::to_string(&BUILD_INFO).unwrap();

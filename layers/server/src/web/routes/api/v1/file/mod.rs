@@ -55,9 +55,9 @@ pub fn file(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
                         return Err(Error::NotFound);
                     }
 
-                    match route.method() {
-                        &Method::HEAD => Ok(head::head(route, auth, file_id)),
-                        &Method::PATCH => Ok(patch::patch(route, auth, file_id)),
+                    match *route.method() {
+                        Method::HEAD => Ok(head::head(route, auth, file_id)),
+                        Method::PATCH => Ok(patch::patch(route, auth, file_id)),
 
                         _ => Err(Error::MethodNotAllowed),
                     }

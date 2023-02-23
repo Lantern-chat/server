@@ -24,14 +24,14 @@ pub fn reactions(
                     (&Method::DELETE, Exact("@me")) => Ok(delete_reaction(route, auth, room_id, msg_id, emote)),
                     (&Method::DELETE, Exact(_)) => match route.param::<Snowflake>() {
                         Some(Ok(user_id)) => todo!("Delete user reaction"),
-                        _ => return Err(Error::BadRequest),
+                        _ => Err(Error::BadRequest),
                     },
-                    _ => return Err(Error::NotFound),
+                    _ => Err(Error::NotFound),
                 }
             }
-            _ => return Err(Error::BadRequest),
+            _ => Err(Error::BadRequest),
         },
-        (_, End) => return Err(Error::MethodNotAllowed),
+        (_, End) => Err(Error::MethodNotAllowed),
     }
 }
 
