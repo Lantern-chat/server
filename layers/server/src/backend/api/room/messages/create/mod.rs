@@ -81,11 +81,6 @@ pub async fn create_message(
 
     let msg_id = Snowflake::now();
 
-    // message is good to go, so fire off the embed processing
-    if !modified_content.is_empty() && perm.contains(RoomPermissions::EMBED_LINKS) {
-        embed::process_embeds(state.clone(), msg_id, &spans);
-    }
-
     // if we avoided getting a database connection until now, do it now
     let mut db = match maybe_db {
         Some(db) => db,
@@ -99,11 +94,16 @@ pub async fn create_message(
     // spans are valid after this call
     let modified_content = verify::verify(&t, &state, auth, room_id, perm, modified_content, &spans).await?;
 
-    let res = insert_message(t, state, auth, room_id, msg_id, &body, &modified_content)
+    let msg = insert_message(t, state.clone(), auth, room_id, msg_id, &body, &modified_content)
         .boxed()
-        .await;
+        .await?;
 
-    res.map(Option::Some)
+    // message has been inserted, so fire off the embed processing
+    if !spans.is_empty() && perm.contains(RoomPermissions::EMBED_LINKS) {
+        embed::process_embeds(state, msg_id, &modified_content, &spans);
+    }
+
+    Ok(Some(msg))
 }
 
 pub(crate) async fn insert_message(
@@ -192,12 +192,7 @@ pub(crate) async fn insert_message(
             || {
                 Query::insert()
                     .into::<Messages>()
-                    .cols(&[
-                        Messages::Id,
-                        Messages::UserId,
-                        Messages::RoomId,
-                        Messages::Content,
-                    ])
+                    .cols(&[Messages::Id, Messages::UserId, Messages::RoomId, Messages::Content])
                     .values([
                         Params::msg_id(),
                         Params::user_id(),
@@ -238,8 +233,7 @@ pub(crate) async fn insert_message(
                 Query::with()
                     .with(
                         AggIds::as_query(
-                            Query::select()
-                                .expr(Builtin::unnest((Params::attachments(),)).alias_to(AggIds::Id)),
+                            Query::select().expr(Builtin::unnest((Params::attachments(),)).alias_to(AggIds::Id)),
                         )
                         .exclude(),
                     )

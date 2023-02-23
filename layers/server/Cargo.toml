@@ -23,7 +23,6 @@ totp = { path = "../../crates/totp" }
 framed = { path = "../../crates/framed" }
 # processing = { path = "../../crates/processing" }
 iplist = { path = "../../crates/iplist" }
-embed_parser = { path = "../../crates/embed_parser" }
 blurhash = { path = "../../crates/blurhash" }
 task_runner = { path = "../../crates/task_runner" }
 filesystem = { path = "../../crates/filesystem" }
@@ -60,7 +59,7 @@ hyper = { version = "0.14.4", features = ["http1", "http2", "server", "stream", 
 tokio-tungstenite = { version = "0.18", default-features = false, features = ["connect"] }
 mime = "0.3.16"
 http = "0.2.3"
-reqwest = { version = "0.11", default-features = false, features = ["gzip", "deflate", "rustls-tls"] }
+reqwest = { version = "0.11", default-features = false, features = ["gzip", "deflate", "rustls-tls", "json"] }
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
 headers = "0.3"
 base64 = "0.21.0"

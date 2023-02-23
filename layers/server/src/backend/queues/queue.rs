@@ -1,14 +1,25 @@
-use futures::Future;
+use futures::{future::BoxFuture, Future, TryFutureExt};
 use std::sync::Arc;
 use tokio::{
     sync::{AcquireError, OwnedSemaphorePermit, Semaphore, SemaphorePermit},
     task::JoinHandle,
 };
 
-pub trait WorkItem: Send + 'static {
-    fn run(self) -> JoinHandle<()>;
+use crate::Error;
+
+pub trait WorkItem: Future<Output = Self::Res> + Send + 'static {
+    type Res: Send + 'static;
 }
 
+impl<F, R> WorkItem for F
+where
+    F: Future<Output = R> + Send + 'static,
+    R: Send + 'static,
+{
+    type Res = R;
+}
+
+#[derive(Debug, Clone)]
 pub struct Queue {
     pub limit: Arc<Semaphore>,
 }
@@ -18,40 +29,35 @@ impl Queue {
         self.limit.close();
     }
 
-    pub fn start(per_thread_buffer: usize) -> Self {
+    pub fn start(max_concurrent: usize) -> Self {
         Queue {
-            limit: Arc::new(Semaphore::new(per_thread_buffer * num_cpus::get())),
+            limit: Arc::new(Semaphore::new(max_concurrent)),
         }
     }
 
-    pub fn try_push<W: WorkItem>(&self, work: W) -> Result<JoinHandle<()>, W> {
-        let Ok(permit) = self.limit.clone().try_acquire_owned() else { return Err(work) };
+    pub fn try_push<W: WorkItem>(&self, work: W) -> Result<JoinHandle<W::Res>, W> {
+        let Ok(permit) = self.limit.clone().try_acquire_owned() else {
+            return Err(work);
+        };
 
         Ok(tokio::spawn(async move {
-            if let Err(e) = work.run().await {
-                log::error!("Error running queue work item: {e}");
-            }
-
+            let res = work.await;
             drop(permit);
+            res
         }))
     }
 
-    pub fn push<W: WorkItem>(&self, work: W) -> JoinHandle<Result<(), W>> {
+    pub fn push<W: WorkItem>(&self, work: W) -> JoinHandle<Result<W::Res, W>> {
         let limit = self.limit.clone();
 
         tokio::spawn(async move {
-            match limit.clone().acquire_owned().await {
-                Ok(permit) => {
-                    if let Err(e) = work.run().await {
-                        log::error!("Error running queue work item: {e}");
-                    }
+            let Ok(permit) = limit.acquire().await else {
+                return Err(work);
+            };
 
-                    drop(permit);
-
-                    Ok(())
-                }
-                Err(_) => Err(work),
-            }
+            let res = work.await;
+            drop(permit);
+            Ok(res)
         })
     }
 
@@ -61,23 +67,7 @@ impl Queue {
 
     pub async fn shrink(&self, by: u32) -> Result<(), AcquireError> {
         let permits = self.limit.acquire_many(by).await?;
-
         permits.forget();
-
         Ok(())
-    }
-}
-
-#[repr(transparent)]
-pub struct WorkFunction<F>(pub F);
-
-impl<F, R> WorkItem for WorkFunction<F>
-where
-    F: Send + FnOnce() -> R + 'static,
-    R: Send + Future<Output = ()> + 'static,
-{
-    #[inline]
-    fn run(self) -> JoinHandle<()> {
-        tokio::spawn(self.0())
     }
 }

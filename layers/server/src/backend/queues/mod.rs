@@ -1,8 +1,8 @@
-pub mod embed;
 pub mod queue;
+pub mod queue2;
 pub mod strip;
 
-pub use queue::{Queue, WorkFunction, WorkItem};
+pub use queue::{Queue, WorkItem};
 
 pub struct Queues {
     pub embed_processing: Queue,
@@ -11,13 +11,7 @@ pub struct Queues {
 impl Default for Queues {
     fn default() -> Self {
         Queues {
-            embed_processing: Queue::start(16),
+            embed_processing: Queue::start(64),
         }
-    }
-}
-
-impl Queues {
-    pub fn stop(&self) {
-        self.embed_processing.stop();
     }
 }
