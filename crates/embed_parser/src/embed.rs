@@ -24,7 +24,11 @@ fn parse_color(color: &str) -> Option<u32> {
         Err(_) => None,
         Ok(color) => Some(u32::from_le_bytes({
             let mut bytes = color.to_rgba8();
-            bytes[3] = 0; // don't include alpha channel
+            // rgba -> bgr0
+            bytes[3] = bytes[0]; // r -> a
+            bytes[0] = bytes[2]; // b -> r
+            bytes[2] = bytes[3]; // a -> b
+            bytes[3] = 0; // 0 -> a
             bytes
         })),
     }
