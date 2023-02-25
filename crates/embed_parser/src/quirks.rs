@@ -1,7 +1,10 @@
 use sdk::models::*;
 
+use url::Url;
+
 pub fn resolve_relative(root: &str, https: bool, embed: &mut EmbedV1) {
     embed.visit_media_mut(|media| {
+        // assume these are well-formed
         if media.url.starts_with("https://") || media.url.starts_with("http://") {
             return;
         }
@@ -12,15 +15,15 @@ pub fn resolve_relative(root: &str, https: bool, embed: &mut EmbedV1) {
 
         let old = media.url.as_str();
 
-        media.url = 'media_url: {
+        let new_url = Url::parse(&'media_url: {
             let mut url = root.to_owned();
 
             // I've seen this before, where "https://" is replaced with "undefined//"
             for prefix in ["undefined//", "//"] {
-                if old.starts_with(prefix) {
+                if let Some(old) = old.strip_prefix(prefix) {
                     url = if https { "https://" } else { "http://" }.to_owned();
-                    url += &old[prefix.len()..];
-                    break 'media_url url.into();
+                    url += old;
+                    break 'media_url url;
                 }
             }
 
@@ -29,7 +32,12 @@ pub fn resolve_relative(root: &str, https: bool, embed: &mut EmbedV1) {
             }
 
             url += old;
-            url.into()
+            url
+        });
+
+        media.url = match new_url {
+            Ok(url) => url.as_str().into(),
+            Err(_) => SmolStr::default(),
         };
     });
 }

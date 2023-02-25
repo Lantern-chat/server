@@ -2,7 +2,7 @@ use smol_str::SmolStr;
 
 use sdk::models::*;
 
-use crate::html::{Header, LinkType, MetaProperty};
+use crate::html::{Header, LinkType, MetaProperty, Scope};
 use crate::oembed::{OEmbed, OEmbedFormat, OEmbedLink, OEmbedType};
 
 pub struct ExtraFields<'a> {
@@ -32,6 +32,45 @@ fn parse_color(color: &str) -> Option<u32> {
             bytes
         })),
     }
+}
+
+#[allow(dead_code)] // until we add anything with VideoObject
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PossibleScopes {
+    Author,
+    Video,
+}
+
+impl PossibleScopes {
+    pub fn id(self) -> &'static str {
+        match self {
+            PossibleScopes::Author => "author",
+            PossibleScopes::Video => "video",
+        }
+    }
+
+    pub fn ty(self) -> &'static str {
+        match self {
+            PossibleScopes::Author => "Person",
+            PossibleScopes::Video => "VideoObject",
+        }
+    }
+}
+
+fn is_scope(scope: &Option<Scope>, p: PossibleScopes) -> bool {
+    if let Some(scope) = scope {
+        if scope.id == Some(p.id()) || scope.prop == Some(p.id()) {
+            return true;
+        }
+
+        if let Some(ty) = scope.ty {
+            if ty.contains(p.ty()) {
+                return true;
+            }
+        }
+    }
+
+    false
 }
 
 /// Build an initial embed profile from HTML meta tags
@@ -76,6 +115,18 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                     // TODO: This isn't quite correct, but good enough most of the time
                     "og:url" => embed.canonical = content(),
                     "title" | "og:title" | "twitter:title" => embed.title = content(),
+
+                    // YouTube uses this schema at least
+                    "name"
+                        if meta.pty == MetaProperty::ItemProp && is_scope(&meta.scope, PossibleScopes::Author) =>
+                    {
+                        get!(author).name = raw_content();
+                    }
+                    "url"
+                        if meta.pty == MetaProperty::ItemProp && is_scope(&meta.scope, PossibleScopes::Author) =>
+                    {
+                        get!(author).url = content();
+                    }
                     "dc:creator" | "article:author" | "book:author" => get!(author).name = raw_content(),
 
                     // don't let the twitter image overwrite og images
@@ -120,6 +171,12 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                     }
 
                     _ if meta.property.eq_ignore_ascii_case("rating") => parse_rating(embed, &meta.content),
+
+                    "isFamilyFriendly" => {
+                        if meta.content != "true" {
+                            embed.flags |= EmbedFlags::ADULT;
+                        }
+                    }
 
                     // Twitter uses these for multi-image posts
                     // FIXME: Can also include images from replies!

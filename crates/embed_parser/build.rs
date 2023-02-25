@@ -5,7 +5,7 @@ use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = Path::new(&env::var("OUT_DIR")?).join("codegen.rs");
-    let mut file = BufWriter::new(File::create(&path)?);
+    let mut file = BufWriter::new(File::create(path)?);
 
     regex_util::write_regex(
         "ATTRIBUTE_RE", // helps with splitting name="value"
@@ -24,7 +24,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     regex_util::write_regex(
         "META_TAGS", // identifies HTML tags valid for metadata
-        r#"<(meta\x20|title>|link\x20)"#,
+        r#"<(
+            meta\x20|                   # Regular meta tags
+            title>|                     # <title> element
+            link\x20|                   # link elements
+            ((div|span)[^>]+itemscope)  # itemscopes
+        )"#,
         &mut file,
     )?;
     regex_util::write_regex(

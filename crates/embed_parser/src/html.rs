@@ -30,6 +30,7 @@ pub struct Meta<'a> {
     pub content: Cow<'a, str>,
     pub pty: MetaProperty,
     pub property: &'a str,
+    pub scope: Option<Scope<'a>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,6 +41,13 @@ pub struct Link<'a> {
     pub title: Option<&'a str>,
     pub mime: Option<&'a str>,
     pub sizes: Option<[u32; 2]>,
+}
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Scope<'a> {
+    pub id: Option<&'a str>,
+    pub ty: Option<&'a str>,
+    pub prop: Option<&'a str>,
 }
 
 impl Meta<'_> {
@@ -58,6 +66,7 @@ impl Link<'_> {
 pub enum Header<'a> {
     Meta(Meta<'a>),
     Link(Link<'a>),
+    Scope(Scope<'a>),
 }
 
 impl Header<'_> {
@@ -65,6 +74,7 @@ impl Header<'_> {
         match self {
             Header::Meta(meta) => meta.is_valid(),
             Header::Link(link) => link.is_valid(),
+            Header::Scope(_) => false,
         }
     }
 }
@@ -78,14 +88,16 @@ pub fn parse_meta(input: &str) -> Option<HeaderList> {
     let bytes = input.as_bytes();
 
     let mut res = HeaderList::default();
+    let mut scope = None;
 
-    for (mut start, tag_end) in META_TAGS.find_iter(bytes) {
+    for (mut start, mut tag_end) in META_TAGS.find_iter(bytes) {
         // detect tag type and initialize header value
         let mut header = match input.get(start..tag_end) {
             Some("<meta ") => Header::Meta(Meta {
                 content: "".into(), // deferred
                 pty: MetaProperty::Property,
                 property: "",
+                scope,
             }),
             // special case, parse `<title>Title</title>`
             Some("<title>") => {
@@ -93,11 +105,10 @@ pub fn parse_meta(input: &str) -> Option<HeaderList> {
 
                 if let Some(title_end) = memchr::memmem::find(&bytes[title_start..], b"</title>") {
                     res.push(Header::Meta(Meta {
-                        content: html_escape::decode_html_entities(
-                            input[title_start..(title_start + title_end)].trim(),
-                        ),
+                        content: input[title_start..(title_start + title_end)].trim().into(),
                         pty: MetaProperty::Title,
                         property: "",
+                        scope,
                     }));
                 }
 
@@ -111,6 +122,17 @@ pub fn parse_meta(input: &str) -> Option<HeaderList> {
                 mime: None,
                 sizes: None,
             }),
+            Some(etc) => {
+                if etc.starts_with("<div ") {
+                    tag_end = start + 4;
+                } else if etc.starts_with("<span ") {
+                    tag_end = start + 5;
+                } else {
+                    continue;
+                }
+
+                Header::Scope(Scope::default())
+            }
             _ => continue,
         };
 
@@ -134,8 +156,8 @@ pub fn parse_meta(input: &str) -> Option<HeaderList> {
                 match header {
                     Header::Meta(ref mut meta) => {
                         meta.pty = match left {
-                            "content" => {
-                                meta.content = html_escape::decode_html_entities(value);
+                            "content" | "href" => {
+                                meta.content = value.into();
                                 continue;
                             }
                             "name" => MetaProperty::Name,
@@ -150,6 +172,12 @@ pub fn parse_meta(input: &str) -> Option<HeaderList> {
 
                         meta.property = value;
                     }
+                    Header::Scope(ref mut scope) => match left {
+                        _ if "itemid".eq_ignore_ascii_case(left) => scope.id = Some(value),
+                        _ if "itemtype".eq_ignore_ascii_case(left) => scope.ty = Some(value),
+                        _ if "itemprop".eq_ignore_ascii_case(left) => scope.prop = Some(value),
+                        _ => continue,
+                    },
                     Header::Link(ref mut link) => match left {
                         "href" => link.href = value,
                         "type" => link.ty = Some(value),
@@ -164,6 +192,24 @@ pub fn parse_meta(input: &str) -> Option<HeaderList> {
                                 "icon" | "shortcut icon" | "apple-touch-icon" => LinkType::Icon,
                                 _ => continue,
                             };
+                        }
+                        // weird, convert to meta
+                        _ if "itemprop".eq_ignore_ascii_case(left) => {
+                            header = Header::Meta(Meta {
+                                content: link.href.into(),
+                                pty: MetaProperty::ItemProp,
+                                property: value,
+                                scope,
+                            });
+                        }
+                        // weird, convert to meta
+                        "content" => {
+                            header = Header::Meta(Meta {
+                                content: value.into(),
+                                pty: MetaProperty::Property,
+                                property: "",
+                                scope,
+                            });
                         }
                         _ if link.rel == LinkType::Icon => match left {
                             "sizes" => {
@@ -188,6 +234,19 @@ pub fn parse_meta(input: &str) -> Option<HeaderList> {
             }
         }
 
+        match header {
+            Header::Scope(new_scope) => {
+                scope = Some(new_scope);
+                continue;
+            }
+            Header::Meta(ref mut meta) => {
+                if let Cow::Borrowed(content) = meta.content {
+                    meta.content = html_escape::decode_html_entities(content);
+                }
+            }
+            Header::Link(_) => {}
+        }
+
         if header.is_valid() {
             res.push(header);
         }
@@ -197,6 +256,7 @@ pub fn parse_meta(input: &str) -> Option<HeaderList> {
     res.sort_by_key(|h| match h {
         Header::Meta(meta) => meta.property,
         Header::Link(link) => link.href,
+        Header::Scope(_) => unreachable!(),
     });
 
     Some(res)
