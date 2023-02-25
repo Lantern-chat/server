@@ -74,13 +74,22 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
     };
 
     log_request(&req);
-    Fetch::Request(Request::new_with_init(
+    let mut resp = Fetch::Request(Request::new_with_init(
         &url,
         &RequestInit {
-            headers: req.headers().clone(),
+            headers: {
+                let mut headers = req.headers().clone();
+                let _ = headers.delete("host");
+                let _ = headers.delete("cookie");
+                headers
+            },
             ..Default::default()
         },
     )?)
     .send()
-    .await
+    .await?;
+
+    let _ = resp.headers_mut().delete("set-cookie");
+
+    Ok(resp)
 }

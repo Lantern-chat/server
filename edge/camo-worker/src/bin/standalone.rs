@@ -7,7 +7,6 @@ use axum::{
     http::{HeaderMap, Request, StatusCode},
     response::IntoResponse,
     routing::get,
-    Router,
 };
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
@@ -50,7 +49,7 @@ async fn main() {
     let addr = SocketAddr::from_str(&addr).expect("Unable to parse bind address");
 
     axum::Server::bind(&addr)
-        .serve(Router::new().fallback(get(root)).with_state(state).into_make_service())
+        .serve(get(root).with_state(state).into_make_service())
         .with_graceful_shutdown(tokio::signal::ctrl_c().map(|_| ()))
         .await
         .expect("Unable to run camo-worker");
@@ -81,7 +80,7 @@ async fn root(State(state): State<Arc<CamoState>>, req: Request<Body>) -> impl I
     };
 
     // decode signature
-    let Ok(sig) = URL_SAFE_NO_PAD.decode(&raw_sig) else {
+    let Ok(sig) = URL_SAFE_NO_PAD.decode(raw_sig) else {
         return Err((StatusCode::BAD_REQUEST, "Invalid Encoding"));
     };
 
@@ -95,6 +94,7 @@ async fn root(State(state): State<Arc<CamoState>>, req: Request<Body>) -> impl I
 async fn proxy(client: &Client, url: &str, mut req: Request<Body>) -> impl IntoResponse {
     let mut headers = std::mem::take(req.headers_mut());
     headers.remove(HeaderName::from_static("host"));
+    headers.remove(HeaderName::from_static("cookie"));
 
     match client.get(url).headers(headers).send().await {
         Err(e) => {
@@ -108,8 +108,10 @@ async fn proxy(client: &Client, url: &str, mut req: Request<Body>) -> impl IntoR
         }
         Ok(mut resp) => {
             let status = resp.status();
-            let headers = std::mem::take(resp.headers_mut());
+            let mut headers = std::mem::take(resp.headers_mut());
             let body = StreamBody::new(resp.bytes_stream());
+
+            headers.remove(HeaderName::from_static("set-cookie"));
 
             (status, headers, Ok(body))
         }

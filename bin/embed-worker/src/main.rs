@@ -8,7 +8,6 @@ use axum::{
 };
 use embed_parser::{
     embed,
-    html::Header,
     oembed::{OEmbed, OEmbedFormat, OEmbedLink},
 };
 use futures_util::FutureExt;
@@ -214,12 +213,7 @@ async fn inner(state: Arc<WorkerState>, url: String, params: Params) -> Result<(
 
         if mime == "text/html" {
             let mut html = Vec::with_capacity(512);
-            if let Some(mut headers) = read_head(&mut resp, &mut html).await? {
-                headers.sort_by_key(|meta| match meta {
-                    Header::Meta(meta) => meta.property,
-                    Header::Link(link) => link.href,
-                });
-
+            if let Some(headers) = read_head(&mut resp, &mut html).await? {
                 let extra = embed::parse_meta_to_embed(&mut embed, &headers);
 
                 match extra.link {

@@ -13,10 +13,10 @@ standalone = ["reqwest", "tokio", "axum", "dotenv"]
 
 [dependencies]
 # keep in sync with WORKERS_RS_VERSION in wrangler.toml
-worker = { version = "0.0.12", optional = true }
+worker = { version = "0.0.13", optional = true }
 console_error_panic_hook = { version = "0.1.1", optional = true }
 
-reqwest = { version = "0.11", optional = true, features = ["json", "stream"] }
+reqwest = { version = "0.11", optional = true, default_features = false, features = ["rustls-tls", "stream", "json"] }
 tokio = { version = "1", optional = true, features = ["full"] }
 axum = { version = "0.6", optional = true, features = ["http2"] }
 dotenv = { version = "0.15", optional = true }
@@ -31,6 +31,6 @@ sha1 = "0.10.5"
 hex = "0.4.3"
 
 [[bin]]
-name = "camoworker"
+name = "camo2"
 path = "src/bin/standalone.rs"
 required-features = ["standalone"]
