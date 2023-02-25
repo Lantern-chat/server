@@ -1,5 +1,7 @@
 extern crate client_sdk as sdk;
 
+pub mod brands;
+
 use axum::{
     extract::{Query, State},
     http::StatusCode,
@@ -286,6 +288,10 @@ async fn inner(state: Arc<WorkerState>, url: String, params: Params) -> Result<(
             media.signature = Some(FixedStr::new(unsafe { std::str::from_utf8_unchecked(&buf) }));
         }
     });
+
+    if let Some(brand_color) = brands::get_brand_color(domain) {
+        embed.color = Some(brand_color);
+    }
 
     // compute expirey
     let expires = {
