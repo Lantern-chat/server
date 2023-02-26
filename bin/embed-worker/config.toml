@@ -1,0 +1,121 @@
+# prefixes to strip from domains before testing
+prefixes = ["www.", "www2."]
+
+# patterns starting with % should match the `sites` table
+# otherwise this will be a list of regexes for domain names
+allow_html = [
+    "%youtube",
+    # "%twitter", # unknown if twitter embeds anything meaningful
+    "%reddit",
+    '''lantern\.chat$''',
+    '''twitch\.tv$''',
+    '''vimeo\.com$''',
+    '''soundcloud\.com$''',
+    '''rdio\.com$''',
+    '''slideshare\.net$''',
+    '''dailymotion\.com$''',
+    '''(play|open)\.spotify\.com$''',
+]
+
+skip_oembed = [
+    '''fxtwitter\.com$''', # gives more generic information than the meta tags, so should be avoided
+]
+
+[user_agents]
+# TODO: Add Lantern's user-agent to vxtwitter main
+# https://github.com/dylanpdx/BetterTwitFix/blob/7a1c00ebdb6479afbfcca6d84450039d29029a75/twitfix.py#L35
+"(?:vxtwitter\\.com|d\\.vx)$" = "test"
+
+# https://www.netify.ai/resources/applications/youtube
+[sites.youtube]
+color = 0xFF0000
+# https://www.javainuse.com/rexgenerator + manual tweaking
+pattern = '''^youtube(?:\.com?)?(?:\.(?:c(?:at|[hlorz])|s(?:oy|[aegiknv])|ca|a[elmrtuz]|b[adeghory]|d[eko]|e[cegs]|f[ir]|g[ehrt]|h[knru]|i[delnqst]|j[mop]|k[erwz]|l[abkt-vy]|m[adekntxy]|n[giloz]|om|p[aehklrty]|qa|r[osu]|t[hnrvwz]|u[agky]|v[en]|z[aw]))?$'''
+# Domains are ADDITIVE to the pattern, checked before regex evaluation
+domains = [
+    "googlevideo.com",
+    "gvt1.com",
+    "video.google.com",
+    "video.l.google.com",
+    "youtu.be",
+    "youtube.com",
+    "youtube-nocookie.com",
+    "youtube-ui.l.google.com",
+    "youtube.googleapis.com",
+    "youtubeeducation.com",
+    "youtubeembeddedplayer.googleapis.com",
+    "youtubei.googleapis.com",
+    "youtubekids.com",
+    "yt-video-upload.l.google.com",
+    "yt.be",
+    "yt3.ggpht.com",
+    "ytimg.com",
+    "ytimg.l.google.com",
+    "ytkids.app.goo.gl",
+]
+
+# https://www.netify.ai/resources/applications/twitter
+[sites.twitter]
+color = 0x1DA1F2
+pattern = '''\.twitter\.com$'''
+domains = [
+    "t.co",
+    "tweetdeck.com",
+    "twimg.com",
+    "twitpic.com",
+    "twitter.co",
+    "twitter.com",
+    "twitterinc.com",
+    "twitteroauth.com",
+    "twitterstat.us",
+    "twttr.com",
+]
+
+# https://www.netify.ai/resources/applications/reddit
+# https://securitytrails.com/list/apex_domain/www.reddit.com
+[sites.reddit]
+color = 0xFF4500
+domains = [
+    "redd.it",
+    "reddit.com",
+    "redditblog.com",
+    "redditinc.com",
+    "redditmail.com",
+    "redditmedia.com",
+    "redditstatic.com",
+    "redditstatus.com",
+    "uninews.www.reddit.com",
+    "uninews.reddit.com",
+    "mobile.www.reddit.com",
+    "mobile.reddit.com",
+    "jie.www.reddit.com",
+    "jie.reddit.com",
+    "old.www.reddit.com",
+    "old.reddit.com",
+    "np.www.reddit.com",
+    "np.reddit.com",
+    "node.www.reddit.com",
+    "node.reddit.com",
+]
+
+# https://www.netify.ai/resources/applications/discord
+# https://subdomainfinder.c99.nl/scans/2020-05-03/discord.com
+[sites.discord]
+color = 0x5865F2
+domains = [
+    "discord.com",
+    "discord.gg",
+    "discord.media",
+    "discordapp.com",
+    "discordapp.net",
+    "cdn.discordapp.com",
+    "cdn.discordapp.net",
+    "discordstatus.com",
+    "canary.discord.com",
+    "ptb.discord.com",
+    "blog.discord.com",
+    "www.discord.com",
+    "printer.discord.com",
+    "safety.discord.com",
+    "status.discord.com",
+]

@@ -1,6 +1,6 @@
 extern crate client_sdk as sdk;
 
-pub mod brands;
+pub mod config;
 
 use axum::{
     extract::{Query, State},
@@ -8,6 +8,7 @@ use axum::{
     routing::post,
     Json,
 };
+use config::Config;
 use embed_parser::{
     embed,
     oembed::{OEmbed, OEmbedFormat, OEmbedLink},
@@ -21,22 +22,11 @@ use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
 use sdk::models::*;
 
-pub static AVOID_OEMBED: phf::Set<&'static str> = phf::phf_set! {
-    // gives more generic information than the meta tags, so should be avoided
-    "fxtwitter.com"
-};
-
-pub static USER_AGENTS: phf::Map<&'static str, &'static str> = phf::phf_map! {
-    // TODO: Add Lantern's user-agent to vxtwitter main
-    // https://github.com/dylanpdx/BetterTwitFix/blob/7a1c00ebdb6479afbfcca6d84450039d29029a75/twitfix.py#L35
-    "vxtwitter.com" => "test",
-    "d.vx" => "test",
-};
-
 use hmac::{digest::Key, Mac};
 type Hmac = hmac::SimpleHmac<sha1::Sha1>;
 
 struct WorkerState {
+    config: Config,
     signing_key: Key<Hmac>,
     client: reqwest::Client,
 }
@@ -48,6 +38,16 @@ async fn main() {
     dotenv::dotenv().expect("Unable to use .env");
 
     let state = Arc::new(WorkerState {
+        config: {
+            let config_path = std::env::var("EMBEDW_CONFIG_PATH").unwrap_or_else(|_| "./config.toml".to_owned());
+
+            let config_file = std::fs::read_to_string(config_path).expect("Unable to read config file");
+
+            let parsed: config::ParsedConfig =
+                toml::de::from_str(&config_file).expect("Unable to parse config file");
+
+            parsed.build().expect("Unable to build config")
+        },
         signing_key: {
             let hex_key = std::env::var("CAMO_SIGNING_KEY").expect("CAMO_SIGNING_KEY not found");
             let mut raw_key = Key::<Hmac>::default();
@@ -166,7 +166,7 @@ async fn inner(state: Arc<WorkerState>, url: String, params: Params) -> Result<(
     let mut resp = retry_request(2, || {
         let mut req = state.client.get(url.as_str());
 
-        if let Some(&user_agent) = USER_AGENTS.get(domain) {
+        if let Some(user_agent) = state.config.user_agent(domain) {
             req = req.header(HeaderName::from_static("user-agent"), user_agent);
         }
 
@@ -201,7 +201,7 @@ async fn inner(state: Arc<WorkerState>, url: String, params: Params) -> Result<(
     embed.url = Some(url.as_str().into());
 
     if let Some(link) = links.as_ref().and_then(|l| l.first()) {
-        if let Ok(o) = fetch_oembed(&state.client, link, domain).await {
+        if let Ok(o) = fetch_oembed(&state, link, domain).await {
             oembed = o;
         }
     }
@@ -220,7 +220,7 @@ async fn inner(state: Arc<WorkerState>, url: String, params: Params) -> Result<(
 
                 match extra.link {
                     Some(link) if oembed.is_none() => {
-                        if let Ok(o) = fetch_oembed(&state.client, &link, domain).await {
+                        if let Ok(o) = fetch_oembed(&state, &link, domain).await {
                             oembed = o;
                         }
                     }
@@ -273,6 +273,19 @@ async fn inner(state: Arc<WorkerState>, url: String, params: Params) -> Result<(
 
     embed_parser::quirks::resolve_relative(root, https, &mut embed);
     resolve_images(&state.client, &mut embed).await?;
+
+    if !state.config.allow_html(domain).is_match() {
+        embed.obj = None;
+
+        if let Some(ref vid) = embed.video {
+            if let Some(ref mime) = vid.mime {
+                if mime.starts_with("text/html") {
+                    embed.video = None;
+                }
+            }
+        }
+    }
+
     embed_parser::quirks::fix_embed(&mut embed);
 
     embed.visit_media_mut(|media| {
@@ -289,8 +302,8 @@ async fn inner(state: Arc<WorkerState>, url: String, params: Params) -> Result<(
         }
     });
 
-    if let Some(brand_color) = brands::get_brand_color(domain) {
-        embed.color = Some(brand_color);
+    if let Some(site) = state.config.find_site(domain) {
+        embed.color = site.color.or(embed.color);
     }
 
     // compute expirey
@@ -310,15 +323,15 @@ async fn inner(state: Arc<WorkerState>, url: String, params: Params) -> Result<(
 }
 
 async fn fetch_oembed<'a>(
-    client: &reqwest::Client,
+    state: &WorkerState,
     link: &OEmbedLink<'a>,
     domain: &str,
 ) -> Result<Option<OEmbed>, Error> {
-    if AVOID_OEMBED.contains(domain) {
+    if state.config.skip_oembed(domain).is_match() {
         return Ok(None);
     }
 
-    let body = client.get(link.url).send().await?.bytes().await?;
+    let body = state.client.get(&*link.url).send().await?.bytes().await?;
 
     Ok(Some(match link.format {
         OEmbedFormat::JSON => serde_json::de::from_slice(&body)?,
