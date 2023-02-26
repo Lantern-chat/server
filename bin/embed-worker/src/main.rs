@@ -378,6 +378,11 @@ async fn resolve_images(client: &reqwest::Client, embed: &mut EmbedV1) -> Result
         f.push(resolve_media(client, &mut *media, false));
     }
 
+    // assert this is html
+    if let Some(ref mut media) = embed.obj {
+        f.push(resolve_media(client, &mut *media, true));
+    }
+
     if let Some(ref mut footer) = embed.footer {
         if let Some(ref mut media) = footer.icon {
             f.push(resolve_media(client, &mut *media, false));
@@ -422,7 +427,7 @@ where
 
 async fn resolve_media(client: &reqwest::Client, media: &mut EmbedMedia, head: bool) -> Result<(), Error> {
     // already has dimensions
-    if !matches!((media.width, media.height), (None, None)) {
+    if !head && !matches!((media.width, media.height), (None, None)) {
         return Ok(());
     }
 

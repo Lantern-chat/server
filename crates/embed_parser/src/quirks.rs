@@ -53,6 +53,14 @@ pub fn fix_embed(embed: &mut EmbedV1) {
             }
         }
 
+        if let Some(ref obj) = embed.obj {
+            if let Some(ref mime) = obj.mime {
+                if !mime.starts_with("text/html") {
+                    embed.obj = None;
+                }
+            }
+        }
+
         for field in &mut embed.fields {
             if let Some(ref img) = field.img {
                 if let Some(ref mime) = img.mime {
