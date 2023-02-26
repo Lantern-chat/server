@@ -59,11 +59,13 @@ impl PossibleScopes {
 
 fn is_scope(scope: &Option<Scope>, p: PossibleScopes) -> bool {
     if let Some(scope) = scope {
-        if scope.id == Some(p.id()) || scope.prop == Some(p.id()) {
+        if matches!(scope.id, Some(ref id) if id == p.id())
+            || matches!(scope.prop, Some(ref prop) if prop == p.id())
+        {
             return true;
         }
 
-        if let Some(ty) = scope.ty {
+        if let Some(ref ty) = scope.ty {
             if ty.contains(p.ty()) {
                 return true;
             }
@@ -101,7 +103,7 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                 let content = || Some(SmolStr::from(&meta.content));
                 let content_int = || meta.content.parse().ok();
 
-                match meta.property {
+                match &*meta.property {
                     // special property for <title></title> values
                     "" if meta.pty == MetaProperty::Title => {
                         if embed.title.is_none() {
@@ -227,30 +229,30 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
 
                 let media = get!(provider.icon);
 
-                media.url = link.href.into();
-                media.mime = link.mime.map(From::from);
+                media.url = link.href.as_ref().into();
+                media.mime = link.mime.as_ref().map(From::from);
             }
             Header::Link(link) if link.rel == LinkType::Canonical => {
-                embed.canonical = Some(link.href.into());
+                embed.canonical = Some(link.href.as_ref().into());
             }
             Header::Link(link) if link.rel == LinkType::Alternate => {
                 let ty = match link.ty {
-                    Some(ty) if ty.contains("oembed") => ty,
+                    Some(ref ty) if ty.contains("oembed") => ty,
                     _ => continue,
                 };
 
                 match extra.link {
                     Some(ref mut existing) => {
                         if ty.contains("json") {
-                            existing.url = link.href;
-                            existing.title = link.title;
+                            existing.url = link.href.clone();
+                            existing.title = link.title.clone();
                             existing.format = OEmbedFormat::JSON;
                         }
                     }
                     None => {
                         extra.link = Some(OEmbedLink {
-                            url: link.href,
-                            title: link.title,
+                            url: link.href.clone(),
+                            title: link.title.clone(),
                             format: if ty.contains("xml") { OEmbedFormat::XML } else { OEmbedFormat::JSON },
                         });
                     }

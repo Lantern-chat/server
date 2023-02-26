@@ -9,9 +9,6 @@ pub mod quirks;
 pub mod utils;
 //pub mod req;
 
-#[cfg(feature = "msg")]
-pub mod msg;
-
 #[inline]
 fn trim_quotes(s: &str) -> &str {
     s.trim_matches(|c: char| ['"', '\'', '“', '”'].contains(&c) || c.is_whitespace())

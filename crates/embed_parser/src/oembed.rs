@@ -6,10 +6,10 @@ pub enum OEmbedFormat {
     XML = 2,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct OEmbedLink<'a> {
-    pub url: &'a str,
-    pub title: Option<&'a str>,
+    pub url: Cow<'a, str>,
+    pub title: Option<Cow<'a, str>>,
     pub format: OEmbedFormat,
 }
 
@@ -28,7 +28,7 @@ pub fn parse_link_header(header: &str) -> LinkList {
         };
 
         let mut link = OEmbedLink {
-            url,
+            url: url.into(),
             title: None,
             format: OEmbedFormat::JSON,
         };
@@ -47,7 +47,7 @@ pub fn parse_link_header(header: &str) -> LinkList {
             let right = crate::trim_quotes(right);
 
             match left {
-                "title" => link.title = Some(right),
+                "title" => link.title = Some(right.into()),
                 "rel" if right != "alternate" => continue 'links,
                 _ => continue,
             }
@@ -72,6 +72,8 @@ pub enum OEmbedType {
     #[serde(other)]
     Unknown,
 }
+
+use std::borrow::Cow;
 
 use smol_str::SmolStr;
 

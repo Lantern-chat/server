@@ -29,25 +29,25 @@ pub enum LinkType {
 pub struct Meta<'a> {
     pub content: Cow<'a, str>,
     pub pty: MetaProperty,
-    pub property: &'a str,
+    pub property: Cow<'a, str>,
     pub scope: Option<Scope<'a>>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Link<'a> {
-    pub href: &'a str,
+    pub href: Cow<'a, str>,
     pub rel: LinkType,
-    pub ty: Option<&'a str>,
-    pub title: Option<&'a str>,
-    pub mime: Option<&'a str>,
+    pub ty: Option<Cow<'a, str>>,
+    pub title: Option<Cow<'a, str>>,
+    pub mime: Option<Cow<'a, str>>,
     pub sizes: Option<[u32; 2]>,
 }
 
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct Scope<'a> {
-    pub id: Option<&'a str>,
-    pub ty: Option<&'a str>,
-    pub prop: Option<&'a str>,
+    pub id: Option<Cow<'a, str>>,
+    pub ty: Option<Cow<'a, str>>,
+    pub prop: Option<Cow<'a, str>>,
 }
 
 impl Meta<'_> {
@@ -79,15 +79,41 @@ impl Header<'_> {
     }
 }
 
+use std::cmp::Ordering;
+
+impl PartialOrd for Header<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Header<'_> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let key_a = match self {
+            Header::Meta(meta) => &meta.property,
+            Header::Link(link) => &link.href,
+            Header::Scope(_) => &Cow::Borrowed(""),
+        };
+
+        let key_b = match other {
+            Header::Meta(meta) => &meta.property,
+            Header::Link(link) => &link.href,
+            Header::Scope(_) => &Cow::Borrowed(""),
+        };
+
+        key_a.cmp(key_b)
+    }
+}
+
 pub type HeaderList<'a> = smallvec::SmallVec<[Header<'a>; 32]>;
 
 pub use crate::regexes::{ATTRIBUTE_RE, META_TAGS};
 
 /// Returns `None` on invalid HTML
-pub fn parse_meta(input: &str) -> Option<HeaderList> {
+pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
     let bytes = input.as_bytes();
 
-    let mut res = HeaderList::default();
+    let mut res = HeaderList::<'a>::default();
     let mut scope = None;
 
     for (mut start, mut tag_end) in META_TAGS.find_iter(bytes) {
@@ -96,8 +122,8 @@ pub fn parse_meta(input: &str) -> Option<HeaderList> {
             Some("<meta ") => Header::Meta(Meta {
                 content: "".into(), // deferred
                 pty: MetaProperty::Property,
-                property: "",
-                scope,
+                property: "".into(),
+                scope: scope.clone(),
             }),
             // special case, parse `<title>Title</title>`
             Some("<title>") => {
@@ -107,15 +133,15 @@ pub fn parse_meta(input: &str) -> Option<HeaderList> {
                     res.push(Header::Meta(Meta {
                         content: input[title_start..(title_start + title_end)].trim().into(),
                         pty: MetaProperty::Title,
-                        property: "",
-                        scope,
+                        property: "".into(),
+                        scope: scope.clone(),
                     }));
                 }
 
                 continue;
             }
             Some("<link ") => Header::Link(Link {
-                href: "",
+                href: "".into(),
                 rel: LinkType::None,
                 ty: None,
                 title: None,
@@ -151,13 +177,13 @@ pub fn parse_meta(input: &str) -> Option<HeaderList> {
 
             // name=""
             if let Some((left, right)) = part.split_once('=') {
-                let value = crate::trim_quotes(right);
+                let value = html_escape::decode_html_entities(crate::trim_quotes(right));
 
                 match header {
                     Header::Meta(ref mut meta) => {
                         meta.pty = match left {
                             "content" | "href" => {
-                                meta.content = value.into();
+                                meta.content = value;
                                 continue;
                             }
                             "name" => MetaProperty::Name,
@@ -183,7 +209,7 @@ pub fn parse_meta(input: &str) -> Option<HeaderList> {
                         "type" => link.ty = Some(value),
                         "title" => link.title = Some(value),
                         "rel" => {
-                            link.rel = match value {
+                            link.rel = match &*value {
                                 "alternate" => LinkType::Alternate,
                                 "canonical" => LinkType::Canonical,
                                 "external" => LinkType::External,
@@ -196,19 +222,19 @@ pub fn parse_meta(input: &str) -> Option<HeaderList> {
                         // weird, convert to meta
                         _ if "itemprop".eq_ignore_ascii_case(left) => {
                             header = Header::Meta(Meta {
-                                content: link.href.into(),
+                                content: link.href.clone(),
                                 pty: MetaProperty::ItemProp,
                                 property: value,
-                                scope,
+                                scope: scope.clone(),
                             });
                         }
                         // weird, convert to meta
                         "content" => {
                             header = Header::Meta(Meta {
-                                content: value.into(),
+                                content: value,
                                 pty: MetaProperty::Property,
-                                property: "",
-                                scope,
+                                property: "".into(),
+                                scope: scope.clone(),
                             });
                         }
                         _ if link.rel == LinkType::Icon => match left {
@@ -234,17 +260,9 @@ pub fn parse_meta(input: &str) -> Option<HeaderList> {
             }
         }
 
-        match header {
-            Header::Scope(new_scope) => {
-                scope = Some(new_scope);
-                continue;
-            }
-            Header::Meta(ref mut meta) => {
-                if let Cow::Borrowed(content) = meta.content {
-                    meta.content = html_escape::decode_html_entities(content);
-                }
-            }
-            Header::Link(_) => {}
+        if let Header::Scope(new_scope) = header {
+            scope = Some(new_scope);
+            continue;
         }
 
         if header.is_valid() {
@@ -252,12 +270,7 @@ pub fn parse_meta(input: &str) -> Option<HeaderList> {
         }
     }
 
-    // ensure properties are sorted lexicongraphically (href doesn't matter but needs a value anyway)
-    res.sort_by_key(|h| match h {
-        Header::Meta(meta) => meta.property,
-        Header::Link(link) => link.href,
-        Header::Scope(_) => unreachable!(),
-    });
+    res.sort();
 
     Some(res)
 }

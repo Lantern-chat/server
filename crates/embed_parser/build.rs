@@ -1,6 +1,6 @@
 use std::env;
 use std::fs::File;
-use std::io::{BufWriter, Write};
+use std::io::BufWriter;
 use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -14,12 +14,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ('(?:\\'|[^'])*[^\\]')| # name='value'
             ([^'"](?:\\\s|[^\s>]*)) # name=value or name=value>
         )"#,
-        &mut file,
-    )?;
-    writeln!(file, "#[cfg(feature = \"msg\")]")?;
-    regex_util::write_regex(
-        "URL", // helps URL parsing in messages
-        r#"[^\s<]+[^<.,:;"')\]\s]"#,
         &mut file,
     )?;
     regex_util::write_regex(

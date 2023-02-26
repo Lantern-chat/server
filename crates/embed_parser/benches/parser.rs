@@ -25,11 +25,11 @@ http://last.net/test.php?query=true#hash
 
 static LINK_HEADER: &str = r#"<https://lantern.chat/api/v1/oembed?format=xml&url=https%3A%2F%2Flantern.chat>; rel="alternate"; title="Testing"; type="text/xml+oembed""#;
 
-use embed_parser::{html, msg, oembed};
+use embed_parser::{html, oembed};
 
 fn criterion_benchmark(c: &mut Criterion) {
     let mut g = c.benchmark_group("find_urls");
-    g.bench_with_input("newest", INPUT, |b, x| b.iter(|| msg::find_urls(x)));
+    //g.bench_with_input("newest", INPUT, |b, x| b.iter(|| msg::find_urls(x)));
 
     // g.bench_with_input("aho_corasick", INPUT, |b, x| {
     //     b.iter(|| msg::find_urls_aho_corasick(x))
