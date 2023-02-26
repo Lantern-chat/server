@@ -77,7 +77,7 @@ use smol_str::SmolStr;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OEmbed {
-    pub version: monostate::MustBe!("1.0"),
+    pub version: OEmbedVersion1,
 
     #[serde(rename = "type")]
     pub kind: OEmbedType,
@@ -122,3 +122,84 @@ impl OEmbed {
         }
     }
 }
+
+/// Value that can only serialize and deserialize to `"1.0"`, `1`, or `1.0` (float)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct OEmbedVersion1;
+
+const _: () = {
+    use serde::de::{self, Deserialize, Deserializer};
+    use serde::ser::{Serialize, Serializer};
+
+    impl Serialize for OEmbedVersion1 {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            serializer.serialize_str("1.0")
+        }
+    }
+
+    impl<'de> Deserialize<'de> for OEmbedVersion1 {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            return deserializer.deserialize_any(Visitor);
+
+            struct Visitor;
+
+            impl<'de> de::Visitor<'de> for Visitor {
+                type Value = OEmbedVersion1;
+
+                fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    formatter.write_str("Literal string \"1.0\" or integer 1")
+                }
+
+                fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+                where
+                    E: de::Error,
+                {
+                    if v == 1 {
+                        return Ok(OEmbedVersion1);
+                    }
+
+                    Err(E::custom(format!("Invalid OEmbed Version: {v}")))
+                }
+
+                fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+                where
+                    E: de::Error,
+                {
+                    if v == 1 {
+                        return Ok(OEmbedVersion1);
+                    }
+
+                    Err(E::custom(format!("Invalid OEmbed Version: {v}")))
+                }
+
+                fn visit_f64<E>(self, v: f64) -> Result<Self::Value, E>
+                where
+                    E: de::Error,
+                {
+                    if v == 1.0 {
+                        return Ok(OEmbedVersion1);
+                    }
+
+                    Err(E::custom(format!("Invalid OEmbed Version: {v}")))
+                }
+
+                fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                where
+                    E: de::Error,
+                {
+                    if v == "1.0" {
+                        return Ok(OEmbedVersion1);
+                    }
+
+                    Err(E::custom(format!("Invalid OEmbed Version: \"{v}\"")))
+                }
+            }
+        }
+    }
+};
