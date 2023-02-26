@@ -97,7 +97,7 @@ pub fn get_brand_color(mut domain: &str) -> Option<u32> {
     }
 
     // twitter has over 1000 subdomains
-    if domain.ends_with("twitter.com") {
+    if domain.ends_with(".twitter.com") {
         return Some(TWITTER);
     }
 
