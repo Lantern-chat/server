@@ -14,7 +14,7 @@ pub mod msg;
 
 #[inline]
 fn trim_quotes(s: &str) -> &str {
-    s.trim_matches(|c: char| c == '"' || c == '\'' || c.is_whitespace())
+    s.trim_matches(|c: char| ['"', '\'', '“', '”'].contains(&c) || c.is_whitespace())
 }
 
 pub mod regexes {
