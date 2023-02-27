@@ -3,6 +3,8 @@ prefixes = ["www.", "www2."]
 
 # patterns starting with % should match the `sites` table
 # otherwise this will be a list of regexes for domain names
+#
+# It's good practice to terminate patterns with $ to avoid fake subdomains like "youtube.com.myscamwebsite.net"
 allow_html = [
     "%youtube",
     # "%twitter", # unknown if twitter embeds anything meaningful
@@ -15,6 +17,9 @@ allow_html = [
     '''slideshare\.net$''',
     '''dailymotion\.com$''',
     '''(play|open)\.spotify\.com$''',
+    '''yewtu\.be$''',
+    '''bandcamp\.com$''',
+    '''lightspeed\.tv$''',
 ]
 
 skip_oembed = [
@@ -26,11 +31,17 @@ skip_oembed = [
 # https://github.com/dylanpdx/BetterTwitFix/blob/7a1c00ebdb6479afbfcca6d84450039d29029a75/twitfix.py#L35
 "(?:vxtwitter\\.com|d\\.vx)$" = "test"
 
+[sites.wikipedia]
+color = 0xFFFFFF
+pattern = '''wik(?:tionary|i[mp]edia)\.org$'''
+
 # https://www.netify.ai/resources/applications/youtube
 [sites.youtube]
 color = 0xFF0000
+
 # https://www.javainuse.com/rexgenerator + manual tweaking
 pattern = '''^youtube(?:\.com?)?(?:\.(?:c(?:at|[hlorz])|s(?:oy|[aegiknv])|ca|a[elmrtuz]|b[adeghory]|d[eko]|e[cegs]|f[ir]|g[ehrt]|h[knru]|i[delnqst]|j[mop]|k[erwz]|l[abkt-vy]|m[adekntxy]|n[giloz]|om|p[aehklrty]|qa|r[osu]|t[hnrvwz]|u[agky]|v[en]|z[aw]))?$'''
+
 # Domains are ADDITIVE to the pattern, checked before regex evaluation
 domains = [
     "googlevideo.com",
@@ -39,6 +50,7 @@ domains = [
     "video.l.google.com",
     "youtu.be",
     "youtube.com",
+    "music.youtube.com",
     "youtube-nocookie.com",
     "youtube-ui.l.google.com",
     "youtube.googleapis.com",
