@@ -41,6 +41,7 @@ pub fn process_embeds(state: ServerState, msg_id: Snowflake, msg: &str, spans: &
                 msg_id,
                 url.to_owned(),
                 position,
+                md_utils::is_spoilered(spans, span.start()),
             )));
 
             position += 1;
@@ -52,58 +53,60 @@ pub fn process_embeds(state: ServerState, msg_id: Snowflake, msg: &str, spans: &
         }
     }
 
-    tokio::spawn(after_embed(state, msg_id, embed_tasks));
-}
+    tokio::spawn(async move {
+        let mut num_successful = 0;
 
-pub async fn after_embed<R>(
-    state: ServerState,
-    msg_id: Snowflake,
-    mut embed_tasks: FuturesUnordered<JoinHandle<Result<Result<(), Error>, R>>>,
-) {
-    let mut num_successful = 0;
+        let mut embed_tasks = embed_tasks;
 
-    while let Some(res) = embed_tasks.next().await {
-        let res = match res {
-            Ok(inner) => inner,
-            Err(e) => {
-                log::error!("Error executing embed task: {e}");
-                continue;
+        while let Some(res) = embed_tasks.next().await {
+            let res = match res {
+                Ok(inner) => inner,
+                Err(e) => {
+                    log::error!("Error executing embed task: {e}");
+                    continue;
+                }
+            };
+
+            let res = match res {
+                Ok(inner) => inner,
+                Err(_) => {
+                    log::error!("Error queuing embed task");
+                    continue;
+                }
+            };
+
+            if let Err(e) = res {
+                log::warn!("Error fetching embed: {e}");
+            } else {
+                num_successful += 1;
             }
-        };
-
-        let res = match res {
-            Ok(inner) => inner,
-            Err(_) => {
-                log::error!("Error queuing embed task");
-                continue;
-            }
-        };
-
-        if let Err(e) = res {
-            log::warn!("Error fetching embed: {e}");
-        } else {
-            num_successful += 1;
         }
-    }
 
-    if num_successful == 0 {
-        return;
-    }
-
-    let db = match state.db.write.get().await {
-        Ok(db) => db,
-        Err(e) => {
-            log::error!("Cannot get database connection to finalize embed update: {e}");
+        if num_successful == 0 {
             return;
         }
-    };
 
-    if let Err(e) = db.execute_cached_typed(|| query::update_message(), &[&msg_id]).await {
-        log::error!("Could not update message {msg_id} after embed processing: {e}");
-    }
+        let db = match state.db.write.get().await {
+            Ok(db) => db,
+            Err(e) => {
+                log::error!("Cannot get database connection to finalize embed update: {e}");
+                return;
+            }
+        };
+
+        if let Err(e) = db.execute_cached_typed(|| query::update_message(), &[&msg_id]).await {
+            log::error!("Could not update message {msg_id} after embed processing: {e}");
+        }
+    });
 }
 
-pub async fn run_embed(state: ServerState, msg_id: Snowflake, url: String, position: i16) -> Result<(), Error> {
+pub async fn run_embed(
+    state: ServerState,
+    msg_id: Snowflake,
+    url: String,
+    position: i16,
+    spoilered: bool,
+) -> Result<(), Error> {
     let db = state.db.read.get().await?;
 
     let mut embed_id = None;
@@ -120,7 +123,9 @@ pub async fn run_embed(state: ServerState, msg_id: Snowflake, url: String, posit
     drop(db); // free connection early. Need to reacquire a write connection anyway after fetching.
 
     let embed_id = embed_id.unwrap_or_else(Snowflake::now);
+    let flags = spoilered.then_some(EmbedFlags::SPOILER);
 
+    // if we happen to get a db object after fetching, keep it around to reuse it
     let mut maybe_db = None;
 
     if fetch {
@@ -146,8 +151,11 @@ pub async fn run_embed(state: ServerState, msg_id: Snowflake, url: String, posit
         Some(db) => db,
     };
 
-    db.execute_cached_typed(|| query::insert_message_embed(), &[&embed_id, &msg_id, &position])
-        .await?;
+    db.execute_cached_typed(
+        || query::insert_message_embed(),
+        &[&embed_id, &msg_id, &position, &flags],
+    )
+    .await?;
 
     Ok(())
 }
@@ -218,11 +226,17 @@ mod query {
     pub fn insert_message_embed() -> impl AnyQuery {
         Query::insert()
             .into::<MessageEmbeds>()
-            .cols(&[MessageEmbeds::EmbedId, MessageEmbeds::MsgId, MessageEmbeds::Position])
+            .cols(&[
+                MessageEmbeds::EmbedId,
+                MessageEmbeds::MsgId,
+                MessageEmbeds::Position,
+                MessageEmbeds::Flags,
+            ])
             .values([
                 Var::at(MessageEmbeds::EmbedId, 1),
                 Var::at(MessageEmbeds::MsgId, 2),
                 Var::at(MessageEmbeds::Position, 3),
+                Var::at(MessageEmbeds::Flags, 4),
             ])
     }
 

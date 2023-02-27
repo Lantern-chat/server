@@ -451,9 +451,11 @@ CREATE TABLE lantern.message_embeds (
     msg_id      bigint          NOT NULL,
     embed_id    bigint          NOT NULL,
     position    smallint        NOT NULL,
+    flags       smallint,
 
     CONSTRAINT message_embeds_pk PRIMARY KEY (msg_id, embed_id)
 );
+COMMENT ON COLUMN lantern.message_embeds.flags IS 'Additional flags for embeds that are specific to the message';
 
 -- Message attachments association map
 CREATE TABLE lantern.attachments (

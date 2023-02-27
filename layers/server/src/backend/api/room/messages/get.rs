@@ -201,6 +201,7 @@ mod q {
 
         pub struct SortedEmbeds {
             EmbedId: MessageEmbeds::EmbedId,
+            Flags: MessageEmbeds::Flags,
         }
 
         pub struct TempEmbeds {
@@ -412,13 +413,19 @@ mod q {
                 let sorted = SortedEmbeds::as_query(
                     Query::select()
                         .expr(MessageEmbeds::EmbedId.alias_to(SortedEmbeds::EmbedId))
+                        .expr(MessageEmbeds::Flags.alias_to(SortedEmbeds::Flags))
                         .from_table::<MessageEmbeds>()
                         .order_by(MessageEmbeds::Position.ascending())
                         .and_where(MessageEmbeds::MsgId.equals(Messages::Id))
                 );
 
                 Query::select().with(sorted.exclude()).expr(
-                    Call::custom("jsonb_agg").arg(Embeds::Embed))
+                    Call::custom("jsonb_agg").arg(
+                        Call::custom("jsonb_build_object").args((
+                            "f".lit(), SortedEmbeds::Flags,
+                            "e".lit(), Embeds::Embed,
+                        ))
+                    ))
                     .from(
                         SortedEmbeds::inner_join_table::<Embeds>()
                         .on(Embeds::Id.equals(SortedEmbeds::EmbedId))
@@ -429,10 +436,10 @@ mod q {
             .expr(Query::select()
                 .expr(Call::custom("jsonb_agg").arg(
                     Call::custom("jsonb_build_object").args((
-                        "emote_id".lit(), AggReactions::EmoteId,
-                        "emoji_id".lit(), AggReactions::EmojiId,
-                        "me".lit(), Params::user_id().equals(Builtin::any(AggReactions::UserIds)),
-                        "count".lit(), Builtin::coalesce((
+                        "e".lit(), AggReactions::EmoteId,
+                        "j".lit(), AggReactions::EmojiId,
+                        "m".lit(), Params::user_id().equals(Builtin::any(AggReactions::UserIds)),
+                        "c".lit(), Builtin::coalesce((
                             Builtin::array_length((AggReactions::UserIds, 1.lit())), 0.lit()
                         ))
                     ))),
@@ -688,14 +695,14 @@ where
                     let mut reactions = Vec::with_capacity(raw.len());
 
                     for r in raw {
-                        if r.count == 0 {
+                        if r.c == 0 {
                             continue;
                         }
 
                         reactions.push(Reaction::Shorthand(ReactionShorthand {
-                            me: r.me,
-                            count: r.count,
-                            emote: match (r.emote_id, r.emoji_id) {
+                            me: r.m,
+                            count: r.c,
+                            emote: match (r.e, r.j) {
                                 (Some(emote), None) => EmoteOrEmoji::Emote { emote },
                                 (None, Some(id)) => match state.emoji.id_to_emoji(id) {
                                     Some(emoji) => EmoteOrEmoji::Emoji { emoji },
@@ -740,8 +747,17 @@ where
                 }
             }
 
-            if let Some(Json(embeds)) = row.try_get(EmbedColumns::embeds())? {
-                msg.embeds = embeds;
+            if let Some(Json::<Vec<RawEmbed>>(embeds)) = row.try_get(EmbedColumns::embeds())? {
+                msg.embeds = embeds
+                    .into_iter()
+                    .map(|RawEmbed { mut e, f }| {
+                        if let (Embed::V1(ref mut v1), Some(f)) = (&mut e, f) {
+                            v1.flags |= f;
+                        }
+
+                        e
+                    })
+                    .collect();
             }
 
             Ok(msg)
@@ -765,8 +781,22 @@ pub const fn make_system_user() -> User {
 #[derive(Default, Debug, Clone, Deserialize)]
 #[serde(default)]
 struct RawReaction {
-    pub emote_id: Option<Snowflake>,
-    pub emoji_id: Option<i32>,
-    pub me: bool,
-    pub count: i64,
+    /// emote_id
+    pub e: Option<Snowflake>,
+    /// emoji_id
+    pub j: Option<i32>,
+    /// me (own reaction)
+    pub m: bool,
+    /// count
+    pub c: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct RawEmbed {
+    /// flags
+    #[serde(default)]
+    pub f: Option<EmbedFlags>,
+
+    /// embed
+    pub e: Embed,
 }
