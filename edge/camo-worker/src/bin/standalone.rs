@@ -70,6 +70,11 @@ async fn root(State(state): State<Arc<CamoState>>, req: Request<Body>) -> impl I
         return Err((StatusCode::BAD_REQUEST, "Missing signature"));
     };
 
+    // strip any kind of file extension
+    let Some(raw_sig) = raw_sig.split('.').next() else {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, "This shouldn't happen"));
+    };
+
     // decode url
     let url = match URL_SAFE_NO_PAD.decode(raw_url) {
         Ok(bytes) => match String::from_utf8(bytes) {
@@ -91,10 +96,20 @@ async fn root(State(state): State<Arc<CamoState>>, req: Request<Body>) -> impl I
     Ok(proxy(&state.client, &url, req).await)
 }
 
+const BAD_REQUEST_HEADERS: [HeaderName; 3] = [
+    HeaderName::from_static("host"),
+    HeaderName::from_static("cookie"),
+    HeaderName::from_static("referer"),
+];
+
+const BAD_RESPONSE_HEADERS: [HeaderName; 1] = [HeaderName::from_static("set-cookie")];
+
 async fn proxy(client: &Client, url: &str, mut req: Request<Body>) -> impl IntoResponse {
     let mut headers = std::mem::take(req.headers_mut());
-    headers.remove(HeaderName::from_static("host"));
-    headers.remove(HeaderName::from_static("cookie"));
+
+    for name in &BAD_REQUEST_HEADERS {
+        headers.remove(name);
+    }
 
     match client.get(url).headers(headers).send().await {
         Err(e) => {
@@ -111,7 +126,9 @@ async fn proxy(client: &Client, url: &str, mut req: Request<Body>) -> impl IntoR
             let mut headers = std::mem::take(resp.headers_mut());
             let body = StreamBody::new(resp.bytes_stream());
 
-            headers.remove(HeaderName::from_static("set-cookie"));
+            for name in &BAD_RESPONSE_HEADERS {
+                headers.remove(name);
+            }
 
             (status, headers, Ok(body))
         }

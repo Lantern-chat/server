@@ -33,6 +33,11 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
         return Response::error("Missing signature", 400);
     };
 
+    // strip any kind of file extension
+    let Some(raw_sig) = raw_sig.split('.').next() else {
+        return Response::error("This shouldn't happen", 500);
+    };
+
     utils::set_panic_hook();
 
     // decode url
@@ -79,8 +84,9 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
         &RequestInit {
             headers: {
                 let mut headers = req.headers().clone();
-                let _ = headers.delete("host");
-                let _ = headers.delete("cookie");
+                for name in BAD_REQUEST_HEADERS {
+                    let _ = headers.delete(name);
+                }
                 headers
             },
             ..Default::default()
@@ -89,7 +95,13 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
     .send()
     .await?;
 
-    let _ = resp.headers_mut().delete("set-cookie");
+    for name in BAD_RESPONSE_HEADERS {
+        let _ = resp.headers_mut().delete(name);
+    }
 
     Ok(resp)
 }
+
+const BAD_REQUEST_HEADERS: &[&str] = &["host", "cookie", "referer"];
+
+const BAD_RESPONSE_HEADERS: &[&str] = &["set-cookie"];
