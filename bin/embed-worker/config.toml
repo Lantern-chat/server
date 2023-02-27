@@ -126,7 +126,6 @@ domains = [
     "canary.discord.com",
     "ptb.discord.com",
     "blog.discord.com",
-    "www.discord.com",
     "printer.discord.com",
     "safety.discord.com",
     "status.discord.com",
