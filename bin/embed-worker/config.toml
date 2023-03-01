@@ -1,3 +1,7 @@
+max_redirects = 2
+timeout = 4000       # milliseconds
+resolve_media = true
+
 # prefixes to strip from domains before testing
 prefixes = ["www.", "www2."]
 
@@ -6,17 +10,18 @@ prefixes = ["www.", "www2."]
 #
 # It's good practice to terminate patterns with $ to avoid fake subdomains like "youtube.com.myscamwebsite.net"
 allow_html = [
+    '''lantern\.chat$''', # We don't actually have any HTML embeds, and may never, but still a good default.
     "%youtube",
     # "%twitter", # unknown if twitter embeds anything meaningful
     "%reddit",
-    '''lantern\.chat$''',
-    '''twitch\.tv$''',
+    "%spotify",
+    "%twitch",
+    "%soundcloud",
+    "%pornhub",
+    "%dailymotion",
     '''vimeo\.com$''',
-    '''soundcloud\.com$''',
     '''rdio\.com$''',
     '''slideshare\.net$''',
-    '''dailymotion\.com$''',
-    '''(play|open)\.spotify\.com$''',
     '''yewtu\.be$''',
     '''bandcamp\.com$''',
     '''lightspeed\.tv$''',
@@ -27,21 +32,20 @@ skip_oembed = [
 ]
 
 [user_agents]
-# TODO: Add Lantern's user-agent to vxtwitter main
+"%browser" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/111.0"
+"%discord" = "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)"
+
 # https://github.com/dylanpdx/BetterTwitFix/blob/7a1c00ebdb6479afbfcca6d84450039d29029a75/twitfix.py#L35
 "(?:vxtwitter\\.com|d\\.vx)$" = "test"
-
-[sites.wikipedia]
-color = 0xFFFFFF
-pattern = '''wik(?:tionary|i[mp]edia)\.org$'''
+"fxfuraffinity\\.net$" = "%discord"
+"linkedin\\.com$" = "%browser"
 
 # https://www.netify.ai/resources/applications/youtube
 [sites.youtube]
 color = 0xFF0000
 
 # https://www.javainuse.com/rexgenerator + manual tweaking
-pattern = '''^youtube(?:\.com?)?(?:\.(?:c(?:at|[hlorz])|s(?:oy|[aegiknv])|ca|a[elmrtuz]|b[adeghory]|d[eko]|e[cegs]|f[ir]|g[ehrt]|h[knru]|i[delnqst]|j[mop]|k[erwz]|l[abkt-vy]|m[adekntxy]|n[giloz]|om|p[aehklrty]|qa|r[osu]|t[hnrvwz]|u[agky]|v[en]|z[aw]))?$'''
-
+pattern = '''youtube(?:\.com?)?(?:\.(?:c(?:at|[hlorz])|s(?:oy|[aegiknv])|ca|a[elmrtuz]|b[adeghory]|d[eko]|e[cegs]|f[ir]|g[ehrt]|h[knru]|i[delnqst]|j[mop]|k[erwz]|l[abkt-vy]|m[adekntxy]|n[giloz]|om|p[aehklrty]|qa|r[osu]|t[hnrvwz]|u[agky]|v[en]|z[aw]))?$'''
 # Domains are ADDITIVE to the pattern, checked before regex evaluation
 domains = [
     "googlevideo.com",
@@ -87,6 +91,7 @@ domains = [
 # https://securitytrails.com/list/apex_domain/www.reddit.com
 [sites.reddit]
 color = 0xFF4500
+pattern = '''reddit\.com$'''
 domains = [
     "redd.it",
     "reddit.com",
@@ -96,18 +101,6 @@ domains = [
     "redditmedia.com",
     "redditstatic.com",
     "redditstatus.com",
-    "uninews.www.reddit.com",
-    "uninews.reddit.com",
-    "mobile.www.reddit.com",
-    "mobile.reddit.com",
-    "jie.www.reddit.com",
-    "jie.reddit.com",
-    "old.www.reddit.com",
-    "old.reddit.com",
-    "np.www.reddit.com",
-    "np.reddit.com",
-    "node.www.reddit.com",
-    "node.reddit.com",
 ]
 
 # https://www.netify.ai/resources/applications/discord
@@ -130,3 +123,114 @@ domains = [
     "safety.discord.com",
     "status.discord.com",
 ]
+
+[sites.giphy]
+color = 0x9933FF
+pattern = '''giphy\.com$'''
+
+[sites.spotify]
+color = 0x1DB954
+pattern = '''(?:play|open)\.spotify\.com$'''
+
+[sites.twitch]
+color = 0x9146FF
+pattern = '''twitch\.tv$'''
+
+[sites.dailymotion]
+color = 0x00AAFF
+pattern = '''dailymotion\.com$'''
+
+[sites.slashdot]
+color = 0x006666
+pattern = '''slashdot\.org$'''
+
+[sites.soundcloud]
+color = 0xF26F23
+pattern = '''soundcloud\.com$'''
+
+[sites.pornhub]
+color = 0xFFA31A
+pattern = '''pornhub\.com$'''
+
+[sites.wikipedia]
+color = 0xFFFFFF
+pattern = '''(?:wik(?:i(?:versity|(?:(?:sourc|quot)e|voyage|(?:book|new)s|[mp]edia))|tionary)|mediawiki)\.org$'''
+
+[sites.google]
+color = 0x4285f4
+pattern = '''google\.com$'''
+
+[sites.hackernews]
+color = 0xff4000
+domains = ["news.ycombinator.com"]
+
+[sites.linkedin]
+color = 0x0077b5
+pattern = '''linkedin\.com$'''
+
+# https://pages.ebay.com/securitycenter/security_researchers_eligible_domains.html
+[sites.ebay]
+color = 0xe53238
+domains = [
+    "ebay.com",
+    "ebay.co.uk",
+    "ebay.de",
+    "ebay.com.au",
+    "ebay.ca",
+    "ebay.fr",
+    "ebay.it",
+    "ebay.es",
+    "ebay.at",
+    "ebay.ch",
+    "ebay.com.hk",
+    "ebay.com.sg",
+    "ebay.com.my",
+    "ebay.in",
+    "ebay.ph",
+    "ebay.ie",
+    "ebay.pl",
+    "ebay.be",
+    "ebay.nl",
+    "ebay.cn",
+    "sea.ebay.com",
+    "ebay.co.jp",
+    "export.ebay.co.th",
+    "ebaynyc.com",
+    "shopping.com",
+    "nexpartstaging.com",
+    "whisolutions.com",
+    "shutl.com",
+    "about.co.kr",
+    "ebaycom",
+    "mercenetwork.com",
+    "ebayinc.com",
+    "knownorigin.io",
+    "portal.knownorigin.io",
+    "tcgplayer.com",
+    "rocarobotics.com",
+    "binderpos.com",
+    "channelfireball.com",
+]
+
+[sites.apple]
+color = 0x000000
+pattern = '''apple\.com$'''
+domains = [
+    "aaplimg.com",
+    "apple",
+    "apple-dns.cn",
+    "apple-dns.net",
+    "apple-mapkit.com",
+    "apple.co",
+    "apple.com",
+    "apple.com.cn",
+    "apple.news",
+    "cdn-apple.com",
+    "mzstatic.com",
+]
+
+[sites.tumblr]
+color = 0x35465c
+pattern = '''tumblr\.com$'''
+
+# TODO: https://github.com/reimertz/brand-colors/blob/master/data/brandColors.json
