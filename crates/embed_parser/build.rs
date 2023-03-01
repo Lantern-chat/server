@@ -18,9 +18,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     regex_util::write_regex(
         "META_TAGS", // identifies HTML tags valid for metadata
-        r#"<(
+        r#"<(?i)( # NOTE: Tags are case-insensitive
             meta\x20|                   # Regular meta tags
-            title>|                     # <title> element
+            title[^>]*>|                # <title> element, skipping over attributes
             link\x20|                   # link elements
             ((div|span)[^>]+itemscope)  # itemscopes
         )"#,

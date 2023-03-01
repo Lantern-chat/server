@@ -126,7 +126,7 @@ pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
                 scope: scope.clone(),
             }),
             // special case, parse `<title>Title</title>`
-            Some("<title>") => {
+            Some(tag) if tag.starts_with("<title") => {
                 let title_start = tag_end;
 
                 if let Some(title_end) = memchr::memmem::find(&bytes[title_start..], b"</title>") {
