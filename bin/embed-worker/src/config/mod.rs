@@ -2,11 +2,22 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use regex::Regex;
+use reqwest::header::HeaderValue;
 
 pub mod pattern;
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ParsedConfig {
+    #[serde(default = "defaults::default_redirects")]
+    pub max_redirects: u32,
+
+    /// Request timeout, in milliseconds
+    #[serde(default = "defaults::default_timeout")]
+    pub timeout: u64,
+
+    #[serde(default = "defaults::default_resolve_media")]
+    pub resolve_media: bool,
+
     #[serde(default)]
     pub prefixes: Vec<String>,
 
@@ -21,6 +32,13 @@ pub struct ParsedConfig {
 
     #[serde(default)]
     pub user_agents: HashMap<String, String>,
+}
+
+#[rustfmt::skip]
+mod defaults {
+    pub const fn default_redirects() -> u32 { 2 }
+    pub const fn default_timeout() -> u64 { 4000 }
+    pub const fn default_resolve_media() -> bool { true }
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -77,6 +95,9 @@ pub enum ConfigError {
 
     #[error("Invalid Regex pattern in {0}")]
     InvalidRegex(&'static str),
+
+    #[error("Invalid user agent for {0}")]
+    InvalidUserAgent(String),
 }
 
 #[derive(Debug)]
@@ -132,31 +153,51 @@ impl SitePatterns {
 }
 
 #[derive(Debug)]
+pub enum UserAgent {
+    Named(String),
+    Literal(HeaderValue),
+}
+
+#[derive(Debug)]
 pub struct Config {
     pub parsed: ParsedConfig,
 
     pub allow_html: SitePatterns,
     pub skip_oembed: SitePatterns,
-    pub user_agents: Vec<(Regex, String)>,
+    pub user_agent_patterns: Vec<(Regex, UserAgent)>,
+    pub user_agent_lookup: HashMap<String, HeaderValue>,
 }
 
 impl ParsedConfig {
     pub fn build(self) -> Result<Config, ConfigError> {
+        let mut user_agent_patterns = Vec::new();
+        let mut user_agent_lookup = HashMap::new();
+
+        for (pattern, ua) in self.user_agents.iter() {
+            let Ok(value) = HeaderValue::from_str(ua.trim_start_matches('%')) else {
+                return Err(ConfigError::InvalidUserAgent(pattern.clone()))
+            };
+
+            let value = match pattern.starts_with('%') {
+                true => {
+                    user_agent_lookup.insert(pattern.clone(), value);
+
+                    UserAgent::Named(pattern.clone())
+                }
+                false => UserAgent::Literal(value),
+            };
+
+            user_agent_patterns.push(match Regex::new(pattern) {
+                Ok(re) => (re, value),
+                Err(_) => return Err(ConfigError::InvalidRegex("user_agents")),
+            })
+        }
+
         Ok(Config {
             allow_html: SitePatterns::new(&self, self.allow_html.iter(), "allow_html")?,
             skip_oembed: SitePatterns::new(&self, self.skip_oembed.iter(), "skip_oembed")?,
-            user_agents: {
-                let mut user_agents = Vec::new();
-
-                for (pattern, ua) in self.user_agents.iter() {
-                    user_agents.push(match Regex::new(pattern) {
-                        Ok(re) => (re, ua.clone()),
-                        Err(_) => return Err(ConfigError::InvalidRegex("user_agents")),
-                    })
-                }
-
-                user_agents
-            },
+            user_agent_patterns,
+            user_agent_lookup,
             parsed: self,
         })
     }
@@ -182,10 +223,13 @@ impl Config {
         domain
     }
 
-    pub fn user_agent(&self, domain: &str) -> Option<&str> {
-        for (re, ua) in &self.user_agents {
+    pub fn user_agent(&self, domain: &str) -> Option<&HeaderValue> {
+        for (re, ua) in &self.user_agent_patterns {
             if re.is_match(domain) {
-                return Some(ua);
+                return match ua {
+                    UserAgent::Literal(ua) => Some(ua),
+                    UserAgent::Named(name) => self.user_agent_lookup.get(name),
+                };
             }
         }
 

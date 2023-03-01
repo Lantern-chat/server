@@ -37,17 +37,17 @@ use base64::engine::{general_purpose::URL_SAFE_NO_PAD, Engine};
 async fn main() {
     dotenv::dotenv().expect("Unable to use .env");
 
+    let config = {
+        let config_path = std::env::var("EMBEDW_CONFIG_PATH").unwrap_or_else(|_| "./config.toml".to_owned());
+
+        let config_file = std::fs::read_to_string(config_path).expect("Unable to read config file");
+
+        let parsed: config::ParsedConfig = toml::de::from_str(&config_file).expect("Unable to parse config file");
+
+        parsed.build().expect("Unable to build config")
+    };
+
     let state = Arc::new(WorkerState {
-        config: {
-            let config_path = std::env::var("EMBEDW_CONFIG_PATH").unwrap_or_else(|_| "./config.toml".to_owned());
-
-            let config_file = std::fs::read_to_string(config_path).expect("Unable to read config file");
-
-            let parsed: config::ParsedConfig =
-                toml::de::from_str(&config_file).expect("Unable to parse config file");
-
-            parsed.build().expect("Unable to build config")
-        },
         signing_key: {
             let hex_key = std::env::var("CAMO_SIGNING_KEY").expect("CAMO_SIGNING_KEY not found");
             let mut raw_key = Key::<Hmac>::default();
@@ -57,33 +57,37 @@ async fn main() {
 
             raw_key
         },
-        client: reqwest::ClientBuilder::new()
-            .default_headers({
-                let mut headers = HeaderMap::new();
+        client: {
+            reqwest::ClientBuilder::new()
+                .default_headers({
+                    let mut headers = HeaderMap::new();
 
-                headers.insert(HeaderName::from_static("dnt"), HeaderValue::from_static("1"));
-                headers.insert(
-                    HeaderName::from_static("accept"),
-                    HeaderValue::from_static(
-                        "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-                    ),
-                );
-                headers.insert(
-                    HeaderName::from_static("user-agent"),
-                    HeaderValue::from_static("Lantern/1.0 (bot; +https://github.com/Lantern-chat)"),
-                );
+                    headers.insert(
+                       HeaderName::from_static("accept"),
+                       HeaderValue::from_static(
+                           "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                       ),
+                    );
 
-                headers
-            })
-            .gzip(true)
-            .deflate(true)
-            .brotli(true)
-            .redirect(reqwest::redirect::Policy::limited(2))
-            .connect_timeout(std::time::Duration::from_secs(4))
-            .danger_accept_invalid_certs(false)
-            .http2_adaptive_window(true)
-            .build()
-            .expect("Unable to build primary client"),
+                    headers.insert(HeaderName::from_static("dnt"), HeaderValue::from_static("1"));
+                    headers.insert(
+                        HeaderName::from_static("user-agent"),
+                        HeaderValue::from_static("Lantern/1.0 (bot; +https://github.com/Lantern-chat)"),
+                    );
+
+                    headers
+                })
+                .gzip(true)
+                .deflate(true)
+                .brotli(true)
+                .redirect(reqwest::redirect::Policy::limited(config.parsed.max_redirects as usize))
+                .connect_timeout(std::time::Duration::from_millis(config.parsed.timeout))
+                .danger_accept_invalid_certs(false)
+                .http2_adaptive_window(true)
+                .build()
+                .expect("Unable to build primary client")
+        },
+        config,
     });
 
     let addr = std::env::var("EMBEDW_BIND_ADDRESS").expect("EMBEDW_BIND_ADDRESS not found");
@@ -140,7 +144,7 @@ enum Error {
     #[error("Invalid URL")]
     InvalidUrl,
 
-    #[error("Failure")]
+    #[error("Failure: {0}")]
     Failure(StatusCode),
 
     #[error("Invalid MIME Type")]
@@ -272,7 +276,10 @@ async fn inner(state: Arc<WorkerState>, url: String, params: Params) -> Result<(
     }
 
     embed_parser::quirks::resolve_relative(root, https, &mut embed);
-    resolve_images(&state.client, &mut embed).await?;
+
+    if state.config.parsed.resolve_media {
+        resolve_images(&state.client, &mut embed).await?;
+    }
 
     if !state.config.allow_html(domain).is_match() {
         embed.obj = None;
