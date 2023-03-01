@@ -1,9 +1,12 @@
-use std::collections::{HashMap, HashSet};
+use hashbrown::{HashMap, HashSet};
 use std::sync::Arc;
 
 use regex::Regex;
-use reqwest::header::HeaderValue;
+use reqwest::header::HeaderName;
 
+use self::header::DeHeaderValue;
+
+pub mod header;
 pub mod pattern;
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -31,7 +34,7 @@ pub struct ParsedConfig {
     pub sites: HashMap<String, Arc<Site>>,
 
     #[serde(default)]
-    pub user_agents: HashMap<String, String>,
+    pub user_agents: HashMap<String, DeHeaderValue>,
 }
 
 #[rustfmt::skip]
@@ -41,20 +44,19 @@ mod defaults {
     pub const fn default_resolve_media() -> bool { true }
 }
 
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Default, Debug, Clone, serde::Deserialize)]
+#[serde(default)]
 pub struct Site {
-    #[serde(default)]
     pub color: Option<u32>,
-
-    #[serde(default)]
     pub pattern: Option<pattern::Pattern>,
-
-    #[serde(default)]
     pub domains: HashSet<String>,
+    pub user_agent: Option<String>,
+    pub cookie: Option<DeHeaderValue>,
 }
 
 impl Site {
     pub fn matches(&self, domain: &str) -> bool {
+        // Note: `contains` checks if the table is empty before hashing
         if self.domains.contains(domain) {
             return true;
         }
@@ -63,6 +65,22 @@ impl Site {
             Some(ref p) => p.is_match(domain),
             None => false,
         }
+    }
+
+    pub fn add_headers(&self, config: &Config, mut req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+        if let Some(ref ua) = self.user_agent {
+            if let Some(user_agent) = config.parsed.user_agents.get(ua) {
+                println!("Using {user_agent:?} for User Agent");
+
+                req = req.header(HeaderName::from_static("user-agent"), &**user_agent);
+            }
+        }
+
+        if let Some(ref cookie) = self.cookie {
+            req = req.header(HeaderName::from_static("cookie"), &**cookie);
+        }
+
+        req
     }
 }
 
@@ -153,50 +171,18 @@ impl SitePatterns {
 }
 
 #[derive(Debug)]
-pub enum UserAgent {
-    Named(String),
-    Literal(HeaderValue),
-}
-
-#[derive(Debug)]
 pub struct Config {
     pub parsed: ParsedConfig,
 
     pub allow_html: SitePatterns,
     pub skip_oembed: SitePatterns,
-    pub user_agent_patterns: Vec<(Regex, UserAgent)>,
-    pub user_agent_lookup: HashMap<String, HeaderValue>,
 }
 
 impl ParsedConfig {
     pub fn build(self) -> Result<Config, ConfigError> {
-        let mut user_agent_patterns = Vec::new();
-        let mut user_agent_lookup = HashMap::new();
-
-        for (pattern, ua) in self.user_agents.iter() {
-            let Ok(value) = HeaderValue::from_str(ua) else {
-                return Err(ConfigError::InvalidUserAgent(pattern.clone()))
-            };
-
-            if !pattern.starts_with('%') {
-                let value = match ua.starts_with('%') {
-                    true => UserAgent::Named(ua.clone()),
-                    false => UserAgent::Literal(value),
-                };
-                user_agent_patterns.push(match Regex::new(pattern) {
-                    Ok(re) => (re, value),
-                    Err(_) => return Err(ConfigError::InvalidRegex("user_agents")),
-                })
-            } else {
-                user_agent_lookup.insert(pattern.clone(), value);
-            }
-        }
-
         Ok(Config {
             allow_html: SitePatterns::new(&self, self.allow_html.iter(), "allow_html")?,
             skip_oembed: SitePatterns::new(&self, self.skip_oembed.iter(), "skip_oembed")?,
-            user_agent_patterns,
-            user_agent_lookup,
             parsed: self,
         })
     }
@@ -222,19 +208,6 @@ impl Config {
         domain
     }
 
-    pub fn user_agent(&self, domain: &str) -> Option<&HeaderValue> {
-        for (re, ua) in &self.user_agent_patterns {
-            if re.is_match(domain) {
-                return match ua {
-                    UserAgent::Literal(ua) => Some(ua),
-                    UserAgent::Named(name) => self.user_agent_lookup.get(name),
-                };
-            }
-        }
-
-        None
-    }
-
     pub fn allow_html(&self, domain: &str) -> DomainMatch {
         self.allow_html.find(self.clean_domain(domain))
     }
@@ -244,6 +217,8 @@ impl Config {
     }
 
     pub fn find_site(&self, domain: &str) -> Option<Arc<Site>> {
+        let domain = self.clean_domain(domain);
+
         self.parsed.sites.values().find(|&site| site.matches(domain)).cloned()
     }
 }

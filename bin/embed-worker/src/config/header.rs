@@ -1,11 +1,11 @@
-use regex::Regex;
+use reqwest::header::HeaderValue;
 
 #[derive(Debug, Clone)]
 #[repr(transparent)]
-pub struct Pattern(Regex);
+pub struct DeHeaderValue(pub HeaderValue);
 
-impl std::ops::Deref for Pattern {
-    type Target = Regex;
+impl std::ops::Deref for DeHeaderValue {
+    type Target = HeaderValue;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -14,7 +14,7 @@ impl std::ops::Deref for Pattern {
 
 use serde::de::{self, Deserialize, Deserializer};
 
-impl<'de> Deserialize<'de> for Pattern {
+impl<'de> Deserialize<'de> for DeHeaderValue {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -24,18 +24,18 @@ impl<'de> Deserialize<'de> for Pattern {
         struct Visitor;
 
         impl<'de> de::Visitor<'de> for Visitor {
-            type Value = Pattern;
+            type Value = DeHeaderValue;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("A valid regular expression")
+                formatter.write_str("A valid header value")
             }
 
             fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
             where
                 E: de::Error,
             {
-                match Regex::new(v) {
-                    Ok(re) => Ok(Pattern(re)),
+                match HeaderValue::from_str(v) {
+                    Ok(re) => Ok(DeHeaderValue(re)),
                     Err(e) => Err(E::custom(e)),
                 }
             }

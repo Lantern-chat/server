@@ -8,7 +8,7 @@ use axum::{
     routing::post,
     Json,
 };
-use config::Config;
+use config::{Config, Site};
 use embed_parser::{
     embed,
     oembed::{OEmbed, OEmbedFormat, OEmbedLink},
@@ -167,11 +167,13 @@ async fn inner(state: Arc<WorkerState>, url: String, params: Params) -> Result<(
 
     let (https, root, domain) = embed_parser::utils::url_root(&url);
 
+    let site = state.config.find_site(domain);
+
     let mut resp = retry_request(2, || {
         let mut req = state.client.get(url.as_str());
 
-        if let Some(user_agent) = state.config.user_agent(domain) {
-            req = req.header(HeaderName::from_static("user-agent"), user_agent);
+        if let Some(ref site) = site {
+            req = site.add_headers(&state.config, req);
         }
 
         if let Some(ref lang) = params.lang {
@@ -278,7 +280,7 @@ async fn inner(state: Arc<WorkerState>, url: String, params: Params) -> Result<(
     embed_parser::quirks::resolve_relative(root, https, &mut embed);
 
     if state.config.parsed.resolve_media {
-        resolve_images(&state.client, &mut embed).await?;
+        resolve_images(&state, &site, &mut embed).await?;
     }
 
     if !state.config.allow_html(domain).is_match() {
@@ -385,39 +387,39 @@ async fn read_bytes<'a>(resp: &'a mut reqwest::Response, bytes: &'a mut Vec<u8>,
     Ok(())
 }
 
-async fn resolve_images(client: &reqwest::Client, embed: &mut EmbedV1) -> Result<(), Error> {
+async fn resolve_images(state: &WorkerState, site: &Option<Arc<Site>>, embed: &mut EmbedV1) -> Result<(), Error> {
     use futures_util::stream::{FuturesUnordered, StreamExt};
 
     let f = FuturesUnordered::new();
 
     if let Some(ref mut media) = embed.img {
-        f.push(resolve_media(client, &mut *media, false));
+        f.push(resolve_media(state, site, &mut *media, false));
     }
 
     if let Some(ref mut media) = embed.thumb {
-        f.push(resolve_media(client, &mut *media, false));
+        f.push(resolve_media(state, site, &mut *media, false));
     }
 
     // assert this is html
     if let Some(ref mut media) = embed.obj {
-        f.push(resolve_media(client, &mut *media, true));
+        f.push(resolve_media(state, site, &mut *media, true));
     }
 
     if let Some(ref mut footer) = embed.footer {
         if let Some(ref mut media) = footer.icon {
-            f.push(resolve_media(client, &mut *media, false));
+            f.push(resolve_media(state, site, &mut *media, false));
         }
     }
 
     if let Some(ref mut author) = embed.author {
         if let Some(ref mut media) = author.icon {
-            f.push(resolve_media(client, &mut *media, false));
+            f.push(resolve_media(state, site, &mut *media, false));
         }
     }
 
     for field in &mut embed.fields {
         if let Some(ref mut media) = field.img {
-            f.push(resolve_media(client, &mut *media, true));
+            f.push(resolve_media(state, site, &mut *media, true));
         }
     }
 
@@ -445,7 +447,12 @@ where
     }
 }
 
-async fn resolve_media(client: &reqwest::Client, media: &mut EmbedMedia, head: bool) -> Result<(), Error> {
+async fn resolve_media(
+    state: &WorkerState,
+    site: &Option<Arc<Site>>,
+    media: &mut EmbedMedia,
+    head: bool,
+) -> Result<(), Error> {
     // already has dimensions
     if !head && !matches!((media.width, media.height), (None, None)) {
         return Ok(());
@@ -457,7 +464,15 @@ async fn resolve_media(client: &reqwest::Client, media: &mut EmbedMedia, head: b
     }
 
     let mut resp = retry_request(2, || {
-        client.request(if head { Method::HEAD } else { Method::GET }, &*media.url)
+        let mut req = state
+            .client
+            .request(if head { Method::HEAD } else { Method::GET }, &*media.url);
+
+        if let Some(ref site) = site {
+            req = site.add_headers(&state.config, req);
+        }
+
+        req
     })
     .await?;
 

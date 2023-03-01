@@ -1,3 +1,4 @@
+# General config
 max_redirects = 2
 timeout = 4000       # milliseconds
 resolve_media = true
@@ -31,19 +32,15 @@ skip_oembed = [
     '''fxtwitter\.com$''', # gives more generic information than the meta tags, so should be avoided
 ]
 
+# The % prefix is just convention at this point, these are just string literal keys
 [user_agents]
 "%browser" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/111.0"
 "%discord" = "Mozilla/5.0 (compatible; Discordbot/2.0; +https://discordapp.com)"
-
-# https://github.com/dylanpdx/BetterTwitFix/blob/7a1c00ebdb6479afbfcca6d84450039d29029a75/twitfix.py#L35
-"(?:vxtwitter\\.com|d\\.vx)$" = "test"
-"fxfuraffinity\\.net$" = "%discord"
-"linkedin\\.com$" = "%browser"
+"%test" = "test"
 
 # https://www.netify.ai/resources/applications/youtube
 [sites.youtube]
 color = 0xFF0000
-
 # https://www.javainuse.com/rexgenerator + manual tweaking
 pattern = '''youtube(?:\.com?)?(?:\.(?:c(?:at|[hlorz])|s(?:oy|[aegiknv])|ca|a[elmrtuz]|b[adeghory]|d[eko]|e[cegs]|f[ir]|g[ehrt]|h[knru]|i[delnqst]|j[mop]|k[erwz]|l[abkt-vy]|m[adekntxy]|n[giloz]|om|p[aehklrty]|qa|r[osu]|t[hnrvwz]|u[agky]|v[en]|z[aw]))?$'''
 # Domains are ADDITIVE to the pattern, checked before regex evaluation
@@ -167,6 +164,7 @@ domains = ["news.ycombinator.com"]
 [sites.linkedin]
 color = 0x0077b5
 pattern = '''linkedin\.com$'''
+user_agent = "%browser"
 
 # https://pages.ebay.com/securitycenter/security_researchers_eligible_domains.html
 [sites.ebay]
@@ -210,5 +208,14 @@ domains = [
 [sites.tumblr]
 color = 0x35465c
 pattern = '''tumblr\.com$'''
+
+# https://github.com/dylanpdx/BetterTwitFix/blob/7a1c00ebdb6479afbfcca6d84450039d29029a75/twitfix.py#L35
+[sites.vxtwitter]
+domains = ["vxtwitter.com", "d.vx"]
+user_agent = "%test"
+
+[sites.fxfuraffinity]
+domains = ["fxfuraffinity.net"]
+user_agent = "%discord"
 
 # TODO: https://github.com/reimertz/brand-colors/blob/master/data/brandColors.json
