@@ -111,7 +111,9 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                         }
                     }
 
-                    "description" | "og:description" | "twitter:description" => embed.description = content(),
+                    "description" | "og:description" | "twitter:description" => {
+                        embed.description = md_utils::trim_message(&meta.content, None).map(From::from);
+                    }
                     "theme-color" | "msapplication-TileColor" => embed.color = parse_color(&meta.content),
                     "og:site_name" => embed.provider.name = content(),
                     // TODO: This isn't quite correct, but good enough most of the time

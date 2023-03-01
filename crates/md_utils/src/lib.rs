@@ -1,6 +1,13 @@
+use std::borrow::Cow;
 use std::ops::Range;
 
 use smallvec::SmallVec;
+
+pub mod regexes {
+    use regex_automata::{DenseDFA, Regex};
+
+    include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -35,6 +42,10 @@ impl Span {
 
     pub const fn len(&self) -> usize {
         self.len as usize
+    }
+
+    pub const fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     pub const fn range(&self) -> Range<usize> {
@@ -305,4 +316,50 @@ fn scan_substr_inner(
     if !has_until {
         on_found(input.len());
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct TrimLimits {
+    pub len: Range<usize>,
+    pub max_newlines: usize,
+}
+
+/// If the message has more than 2 consecutive newlines, this will strip those and replace them with just two.
+///
+/// Carriage returns will be ignored unless it follows under the above condition, in which case they will be removed.
+pub fn trim_message(content: &str, limits: Option<TrimLimits>) -> Option<Cow<str>> {
+    let mut trimmed_content = Cow::Borrowed(content.trim());
+
+    if !trimmed_content.is_empty() {
+        let mut new_content = String::new();
+        let mut idx = 0;
+
+        for (start, end) in regexes::NEWLINES.find_iter(trimmed_content.as_bytes()) {
+            new_content.push_str(&trimmed_content[idx..start]);
+            new_content.push_str("\n\n");
+            idx = end;
+        }
+
+        if idx != 0 {
+            new_content.push_str(&trimmed_content[idx..]);
+
+            // trim any ending whitespace
+            new_content.truncate(new_content.trim_end().len());
+
+            trimmed_content = new_content.into();
+        }
+
+        if let Some(limits) = limits {
+            let newlines = bytecount::count(trimmed_content.as_bytes(), b'\n');
+
+            let too_large = !limits.len.contains(&trimmed_content.len());
+            let too_long = newlines > limits.max_newlines;
+
+            if too_large || too_long {
+                return None;
+            }
+        }
+    }
+
+    Some(trimmed_content)
 }

@@ -70,8 +70,16 @@ pub async fn edit_message(
     let prev_content: Option<&str> = row.try_get(2)?;
     let prev_files: Option<Vec<Snowflake>> = row.try_get(3)?;
 
-    // do full trimming after possible error locations
-    let trimmed_content = super::create::trim::trim_message(&state, &trimmed_content)?;
+    // do full trimming
+    let Some(trimmed_content) = ({
+        let config = state.config();
+        md_utils::trim_message(trimmed_content.into(), Some(md_utils::TrimLimits {
+            len: config.message.message_len.clone(),
+            max_newlines: config.message.max_newlines
+        }))
+    }) else {
+        return Err(Error::BadRequest);
+    };
 
     // edits cannot perform actions, but are subject to replacements
     let modified_content = match super::create::slash::process_slash(&trimmed_content, false) {

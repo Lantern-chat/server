@@ -7,6 +7,14 @@ edition = "2021"
 
 [dependencies]
 smallvec = "1.7.0"
+bytecount = "0.6.2"
+
+regex_util = { path = "../regex_util" }
+regex-automata = { version = "0.1.10", default_features = false }
+once_cell = "1.13"
+
+[build-dependencies]
+regex_util = { path = "../regex_util", features = ["build"] }
 
 [dev-dependencies]
 criterion = "0.4"

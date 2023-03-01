@@ -7,7 +7,6 @@ use sdk::models::*;
 
 pub mod embed;
 pub mod slash;
-pub mod trim;
 pub mod verify;
 
 use sdk::api::commands::room::CreateMessageBody;
@@ -39,7 +38,15 @@ pub async fn create_message(
     }
 
     // do full trimming
-    let trimmed_content = trim::trim_message(&state, trimmed_content)?;
+    let Some(trimmed_content) = ({
+        let config = state.config();
+        md_utils::trim_message(trimmed_content.into(), Some(md_utils::TrimLimits {
+            len: config.message.message_len.clone(),
+            max_newlines: config.message.max_newlines
+        }))
+    }) else {
+        return Err(Error::BadRequest);
+    };
 
     // since acquiring the database connection may be expensive,
     // defer it until we need it, such as if the permissions cache didn't have a value
