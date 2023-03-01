@@ -174,23 +174,22 @@ impl ParsedConfig {
         let mut user_agent_lookup = HashMap::new();
 
         for (pattern, ua) in self.user_agents.iter() {
-            let Ok(value) = HeaderValue::from_str(ua.trim_start_matches('%')) else {
+            let Ok(value) = HeaderValue::from_str(ua) else {
                 return Err(ConfigError::InvalidUserAgent(pattern.clone()))
             };
 
-            let value = match pattern.starts_with('%') {
-                true => {
-                    user_agent_lookup.insert(pattern.clone(), value);
-
-                    UserAgent::Named(pattern.clone())
-                }
-                false => UserAgent::Literal(value),
-            };
-
-            user_agent_patterns.push(match Regex::new(pattern) {
-                Ok(re) => (re, value),
-                Err(_) => return Err(ConfigError::InvalidRegex("user_agents")),
-            })
+            if !pattern.starts_with('%') {
+                let value = match ua.starts_with('%') {
+                    true => UserAgent::Named(ua.clone()),
+                    false => UserAgent::Literal(value),
+                };
+                user_agent_patterns.push(match Regex::new(pattern) {
+                    Ok(re) => (re, value),
+                    Err(_) => return Err(ConfigError::InvalidRegex("user_agents")),
+                })
+            } else {
+                user_agent_lookup.insert(pattern.clone(), value);
+            }
         }
 
         Ok(Config {
