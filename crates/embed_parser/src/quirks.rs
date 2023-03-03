@@ -2,7 +2,7 @@ use sdk::models::*;
 
 use url::Url;
 
-pub fn resolve_relative(root: &str, https: bool, embed: &mut EmbedV1) {
+pub fn resolve_relative(base_url: &Url, embed: &mut EmbedV1) {
     embed.visit_media_mut(|media| {
         // assume these are well-formed
         if media.url.starts_with("https://") || media.url.starts_with("http://") {
@@ -16,12 +16,13 @@ pub fn resolve_relative(root: &str, https: bool, embed: &mut EmbedV1) {
         let old = media.url.as_str();
 
         let new_url = Url::parse(&'media_url: {
-            let mut url = root.to_owned();
+            let mut url = base_url.origin().ascii_serialization();
 
             // I've seen this before, where "https://" is replaced with "undefined//"
             for prefix in ["undefined//", "//"] {
                 if let Some(old) = old.strip_prefix(prefix) {
-                    url = if https { "https://" } else { "http://" }.to_owned();
+                    url = base_url.scheme().to_owned();
+                    url += "//";
                     url += old;
                     break 'media_url url;
                 }
