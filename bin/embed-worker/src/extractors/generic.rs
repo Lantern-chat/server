@@ -23,6 +23,10 @@ impl Extractor for GenericExtractor {
         url: url::Url,
         params: Params,
     ) -> Result<super::EmbedWithExpire, Error> {
+        if !url.scheme().starts_with("http") {
+            return Err(Error::InvalidUrl);
+        }
+
         let site = url.domain().and_then(|domain| state.config.find_site(domain));
 
         let mut resp = retry_request(2, || {

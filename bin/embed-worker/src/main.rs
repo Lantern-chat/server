@@ -92,9 +92,5 @@ async fn inner(
 ) -> Result<extractors::EmbedWithExpire, Error> {
     let url = url::Url::parse(&url)?;
 
-    if !matches!(url.scheme(), "https" | "http") {
-        return Err(Error::InvalidUrl);
-    }
-
     extractors::generic::GenericExtractor.extract(state, url, params).await
 }
