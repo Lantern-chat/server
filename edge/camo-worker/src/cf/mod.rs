@@ -33,8 +33,8 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
         return Response::error("Missing signature", 400);
     };
 
-    // strip any kind of file extension
-    let Some(raw_sig) = raw_sig.split('.').next() else {
+    // skip anything after the signature
+    let Some(raw_sig) = raw_sig.split('/').next() else {
         return Response::error("This shouldn't happen", 500);
     };
 
@@ -55,7 +55,7 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
     }
 
     // decode signature
-    let Ok(sig) = URL_SAFE_NO_PAD.decode(&raw_sig) else {
+    let Ok(sig) = URL_SAFE_NO_PAD.decode(raw_sig) else {
         return Response::error("Invalid Encoding", 400);
     };
 

@@ -70,8 +70,8 @@ async fn root(State(state): State<Arc<CamoState>>, req: Request<Body>) -> impl I
         return Err((StatusCode::BAD_REQUEST, "Missing signature"));
     };
 
-    // strip any kind of file extension
-    let Some(raw_sig) = raw_sig.split('.').next() else {
+    // skip anything after the signature
+    let Some(raw_sig) = raw_sig.split('/').next() else {
         return Err((StatusCode::INTERNAL_SERVER_ERROR, "This shouldn't happen"));
     };
 
