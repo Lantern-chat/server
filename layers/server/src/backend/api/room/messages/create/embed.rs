@@ -110,26 +110,26 @@ pub async fn run_embed(
     let db = state.db.read.get().await?;
 
     let mut embed_id = None;
-    let mut fetch = true;
+    let mut refresh = true;
 
     if let Some(row) = db.query_opt_cached_typed(|| get_embed(), &[&url]).await? {
         let existing_id: Snowflake = row.try_get(0)?;
         let expires: Timestamp = row.try_get(1)?;
 
         embed_id = Some(existing_id);
-        fetch = expires <= Timestamp::now_utc();
+        refresh = expires <= Timestamp::now_utc();
     }
 
     drop(db); // free connection early. Need to reacquire a write connection anyway after fetching.
 
-    let embed_id = embed_id.unwrap_or_else(Snowflake::now);
+    let mut embed_id = embed_id.unwrap_or_else(Snowflake::now);
     let flags = spoilered.then_some(EmbedFlags::SPOILER);
 
     // if we happen to get a db object after fetching, keep it around to reuse it
     let mut maybe_db = None;
 
-    if fetch {
-        let Some((expires, embed)) = state.services.embed.fetch(&state, url, None).await? else {
+    if refresh {
+        let Some((expires, embed)) = state.services.embed.fetch(&state, url.clone(), None).await? else {
             return Ok(());
         };
 
@@ -137,11 +137,14 @@ pub async fn run_embed(
 
         use thorn::pg::Json;
 
-        db.execute_cached_typed(
-            || query::insert_embed(),
-            &[&embed_id, &embed.url(), &Json(&embed), &expires],
-        )
-        .await?;
+        // NOTE: The original URL should be used, not embed.url(), do to potential odd duplicates
+        let row = db
+            .query_one_cached_typed(|| query::insert_embed(), &[&embed_id, &url, &Json(&embed), &expires])
+            .await?;
+
+        // if another embed of the exact same url was found during insertion,
+        // we should reuse its ID returned here
+        embed_id = row.try_get(0)?;
 
         maybe_db = Some(db);
     }
@@ -221,6 +224,7 @@ mod query {
                 [Embeds::Id],
                 ConflictAction::DoUpdateSet(DoUpdate.set(Embeds::Embed, embed).set(Embeds::Expires, expires)),
             )
+            .returning(Embeds::Id)
     }
 
     pub fn insert_message_embed() -> impl AnyQuery {

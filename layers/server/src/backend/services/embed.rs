@@ -1,5 +1,6 @@
 use crate::{Error, ServerState};
 
+use headers::{HeaderName, HeaderValue};
 use sdk::models::{Embed, Timestamp};
 
 pub struct EmbedClient {
@@ -25,13 +26,22 @@ impl EmbedClient {
             None => uri.clone(),
         };
 
-        let res = self.client.post(uri).body(url).send().await?;
+        let resp = self
+            .client
+            .post(uri)
+            .body(url)
+            .header(
+                HeaderName::from_static("content-type"),
+                HeaderValue::from_static("text/plain; charset=utf-8"),
+            )
+            .send()
+            .await?;
 
         // embed worker may not succeed, and that's okay, just don't return an embed
-        if !res.status().is_success() {
+        if !resp.status().is_success() {
             return Ok(None);
         }
 
-        res.json().await.map_err(Error::from)
+        resp.json().await.map_err(Error::from)
     }
 }
