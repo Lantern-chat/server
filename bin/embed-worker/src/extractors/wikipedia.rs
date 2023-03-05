@@ -24,11 +24,29 @@ pub struct WikipediaExtractor {
 }
 
 impl ExtractorFactory for WikipediaExtractorFactory {
-    fn create(&self, _config: &Config) -> Result<Option<Box<dyn Extractor>>, ConfigError> {
-        Ok(Some(Box::new(WikipediaExtractor {
+    fn create(&self, config: &Config) -> Result<Option<Box<dyn Extractor>>, ConfigError> {
+        let mut wiki = Box::new(WikipediaExtractor {
             max_sentences: 4,
             thumbnail_size: 256,
-        })))
+        });
+
+        if let Some(extractor) = config.parsed.extractors.get("wikipedia") {
+            if let Some(max_sentences) = extractor.get("max_sentences") {
+                match max_sentences.parse() {
+                    Ok(max_sentences) => wiki.max_sentences = max_sentences,
+                    Err(_) => return Err(ConfigError::InvalidExtractorField("wikipedia.max_sentences")),
+                }
+            }
+
+            if let Some(thumbnail_size) = extractor.get("thumbnail_size") {
+                match thumbnail_size.parse() {
+                    Ok(thumbnail_size) => wiki.thumbnail_size = thumbnail_size,
+                    Err(_) => return Err(ConfigError::InvalidExtractorField("wikipedia.thumbnail_size")),
+                }
+            }
+        };
+
+        Ok(Some(wiki))
     }
 }
 
