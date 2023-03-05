@@ -16,6 +16,7 @@ tokio = { version = "1", features = ["full"] }
 axum = { version = "0.6", features = ["http2"] }
 
 embed_parser = { path = "../../crates/embed_parser", default_features = false }
+md_utils = { path = "../../crates/md_utils" }
 client-sdk = { path = "../../../client-sdk-rs", default_features = false }
 
 hashbrown = { version = "0.13", features = ["inline-more", "serde"] }
@@ -36,3 +37,7 @@ regex = "1"
 toml = "0.7"
 async-trait = "0.1.64"
 url = "2"
+monostate = "0.1"
+smol_str = "0.1"
+heck = "0.4.1"
+mime_guess = "2.0.4"

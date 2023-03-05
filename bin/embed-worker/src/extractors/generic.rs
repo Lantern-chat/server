@@ -7,13 +7,20 @@ use embed_parser::oembed::{OEmbed, OEmbedFormat, OEmbedLink};
 use futures_util::FutureExt;
 use reqwest::{header::HeaderName, Method};
 
-use super::Extractor;
+use super::{Config, ConfigError, EmbedWithExpire, Extractor, ExtractorFactory};
 
+#[derive(Debug)]
 pub struct GenericExtractor;
+
+impl ExtractorFactory for GenericExtractor {
+    fn create(&self, _config: &Config) -> Result<Option<Box<dyn Extractor>>, ConfigError> {
+        Ok(Some(Box::new(GenericExtractor)))
+    }
+}
 
 #[async_trait::async_trait]
 impl Extractor for GenericExtractor {
-    fn matches(&self, _: &str) -> bool {
+    fn matches(&self, _: &url::Url) -> bool {
         true
     }
 
@@ -22,7 +29,7 @@ impl Extractor for GenericExtractor {
         state: Arc<WorkerState>,
         url: url::Url,
         params: Params,
-    ) -> Result<super::EmbedWithExpire, Error> {
+    ) -> Result<EmbedWithExpire, Error> {
         if !url.scheme().starts_with("http") {
             return Err(Error::InvalidUrl);
         }
@@ -167,21 +174,24 @@ impl Extractor for GenericExtractor {
             media.signature = state.sign(&media.url);
         });
 
-        // compute expirey
-        let expires = {
-            use iso8601_timestamp::{Duration, Timestamp};
-
-            embed.ts = Timestamp::now_utc();
-
-            // limit max_age to 1 month, minimum 15 minutes
-            embed
-                .ts
-                .checked_add(Duration::seconds(max_age.min(60 * 60 * 24 * 30).max(60 * 15) as i64))
-                .unwrap()
-        };
-
-        Ok((expires, sdk::models::Embed::V1(embed)))
+        Ok(compute_expirey(embed, max_age))
     }
+}
+
+pub fn compute_expirey(mut embed: EmbedV1, max_age: u64) -> EmbedWithExpire {
+    let expires = {
+        use iso8601_timestamp::{Duration, Timestamp};
+
+        embed.ts = Timestamp::now_utc();
+
+        // limit max_age to 1 month, minimum 15 minutes
+        embed
+            .ts
+            .checked_add(Duration::seconds(max_age.min(60 * 60 * 24 * 30).max(60 * 15) as i64))
+            .unwrap()
+    };
+
+    (expires, sdk::models::Embed::V1(embed))
 }
 
 pub async fn fetch_oembed<'a>(

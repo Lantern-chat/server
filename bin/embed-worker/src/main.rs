@@ -1,13 +1,15 @@
+#![allow(clippy::redundant_pattern_matching)]
+
 extern crate client_sdk as sdk;
 
 pub mod config;
 pub mod error;
 pub mod extractors;
 pub mod state;
+pub mod util;
 
 use config::Site;
 use error::Error;
-use extractors::Extractor;
 use state::WorkerState;
 
 use axum::{
@@ -35,6 +37,10 @@ async fn main() {
         config,
         std::env::var("CAMO_SIGNING_KEY").expect("CAMO_SIGNING_KEY not found"),
     ));
+
+    for extractor in &state.extractors {
+        extractor.setup(state.clone()).await.expect("Failed to setup extractor");
+    }
 
     let addr = std::env::var("EMBEDW_BIND_ADDRESS").expect("EMBEDW_BIND_ADDRESS not found");
     let addr = SocketAddr::from_str(&addr).expect("Unable to parse bind address");
@@ -92,5 +98,11 @@ async fn inner(
 ) -> Result<extractors::EmbedWithExpire, Error> {
     let url = url::Url::parse(&url)?;
 
-    extractors::generic::GenericExtractor.extract(state, url, params).await
+    for extractor in &state.extractors {
+        if extractor.matches(&url) {
+            return extractor.extract(state.clone(), url, params).await;
+        }
+    }
+
+    Err(Error::Failure(StatusCode::NOT_FOUND))
 }

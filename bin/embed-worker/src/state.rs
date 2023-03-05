@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::{config::Config, extractors::Extractor};
 
 use hmac::{digest::Key, Mac};
 pub type Hmac = hmac::SimpleHmac<sha1::Sha1>;
@@ -9,6 +9,7 @@ pub struct WorkerState {
     pub config: Config,
     pub signing_key: Key<Hmac>,
     pub client: reqwest::Client,
+    pub extractors: Vec<Box<dyn Extractor>>,
 }
 
 use sdk::util::fixed::FixedStr;
@@ -53,6 +54,17 @@ impl WorkerState {
                     .http2_adaptive_window(true)
                     .build()
                     .expect("Unable to build primary client")
+            },
+            extractors: {
+                let mut extractors = Vec::new();
+
+                for factory in crate::extractors::extractor_factories() {
+                    if let Some(extractor) = factory.create(&config).expect("Could not create extractor") {
+                        extractors.push(extractor);
+                    }
+                }
+
+                extractors
             },
             config,
         }

@@ -9,6 +9,21 @@ use self::header::DeHeaderValue;
 pub mod header;
 pub mod pattern;
 
+#[derive(Debug, thiserror::Error)]
+pub enum ConfigError {
+    #[error("Missing site declaration for \"{0}\"")]
+    MissingSite(String),
+
+    #[error("Invalid Regex pattern in {0}")]
+    InvalidRegex(&'static str),
+
+    #[error("Invalid user agent for {0}")]
+    InvalidUserAgent(String),
+
+    #[error("Missing extractor field: {0}")]
+    MissingExtractorField(&'static str),
+}
+
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ParsedConfig {
     #[serde(default = "defaults::default_redirects")]
@@ -35,6 +50,9 @@ pub struct ParsedConfig {
 
     #[serde(default)]
     pub user_agents: HashMap<String, DeHeaderValue>,
+
+    #[serde(default)]
+    pub extractors: HashMap<String, HashMap<String, String>>,
 }
 
 #[rustfmt::skip]
@@ -104,18 +122,6 @@ impl From<DomainMatch> for Option<Arc<Site>> {
             _ => None,
         }
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum ConfigError {
-    #[error("Missing site declaration for \"{0}\"")]
-    MissingSite(String),
-
-    #[error("Invalid Regex pattern in {0}")]
-    InvalidRegex(&'static str),
-
-    #[error("Invalid user agent for {0}")]
-    InvalidUserAgent(String),
 }
 
 #[derive(Debug)]
