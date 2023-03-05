@@ -85,7 +85,7 @@ impl Extractor for WikipediaExtractor {
             embed.thumb = Some(media);
         }
 
-        embed.url = Some(smol_str::format_smolstr!("{origin}/pages/{title}"));
+        embed.url = Some(smol_str::format_smolstr!("{origin}/wiki/{title}"));
         embed.color = Some(0xFFFFFF); // white
         embed.provider.name = Some(SmolStr::new_inline("Wikipedia"));
         embed.provider.icon = Some({
@@ -100,7 +100,7 @@ impl Extractor for WikipediaExtractor {
             media.signature = state.sign(&media.url);
         });
 
-        Ok(super::generic::compute_expirey(embed, 60 * 15))
+        Ok(super::generic::compute_expirey(embed, 60 * 60))
     }
 }
 
