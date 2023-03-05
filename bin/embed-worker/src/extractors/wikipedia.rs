@@ -75,14 +75,8 @@ impl Extractor for WikipediaExtractor {
         );
 
         let (text, image) = tokio::try_join! {
-            async {
-                std::fs::write("./text.json", state.client.get(text_extract_uri.clone()).send().await?.text().await?).unwrap();
-                state.client.get(text_extract_uri).send().await?.json::<WikipediaTextResult>().await
-            },
-            async {
-                std::fs::write("./image.json", state.client.get(thumbnail_extract_uri.clone()).send().await?.text().await?).unwrap();
-                state.client.get(thumbnail_extract_uri).send().await?.json::<WikipediaImageResult>().await
-            },
+            async { state.client.get(text_extract_uri).send().await?.json::<WikipediaTextResult>().await },
+            async { state.client.get(thumbnail_extract_uri).send().await?.json::<WikipediaImageResult>().await },
         }?;
 
         let mut embed = EmbedV1::default();
