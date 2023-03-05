@@ -105,11 +105,9 @@ impl Extractor for GenericExtractor {
 
                 drop(html); // ensure it lives long enough
             } else {
-                let mut media = Box::new(EmbedMedia {
-                    url: url.as_str().into(),
-                    mime: Some(mime.into()),
-                    ..EmbedMedia::default()
-                });
+                let mut media = BoxedEmbedMedia::default();
+                media.url = url.as_str().into();
+                media.mime = Some(mime.into());
 
                 match mime.get(0..5) {
                     Some("image") => {

@@ -89,7 +89,7 @@ impl Extractor for WikipediaExtractor {
         }
 
         if let Some(ImagePage::Found { thumbnail, pageimage }) = image.query.pages.values().next() {
-            let mut media = Box::<EmbedMedia>::default();
+            let mut media = BoxedEmbedMedia::default();
             media.url = (&thumbnail.source).into();
             media.width = thumbnail.width;
             media.height = thumbnail.height;
@@ -101,7 +101,7 @@ impl Extractor for WikipediaExtractor {
         embed.color = Some(0xFFFFFF); // white
         embed.provider.name = Some(SmolStr::new_inline("Wikipedia"));
         embed.provider.icon = Some({
-            let mut media = Box::<EmbedMedia>::default();
+            let mut media = BoxedEmbedMedia::default();
             media.url = smol_str::format_smolstr!("{origin}/static/favicon/wikipedia.ico");
             media
         });

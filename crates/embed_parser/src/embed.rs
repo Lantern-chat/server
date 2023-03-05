@@ -155,9 +155,9 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                     "og:video:type" => get!(video).mime = content(),
                     "og:audio:type" => get!(audio).mime = content(),
 
-                    "og:image:alt" => get!(img).alt = content(),
-                    "og:video:alt" => get!(video).alt = content(),
-                    "og:audio:alt" => get!(audio).alt = content(),
+                    "og:image:alt" => get!(img).description = content(),
+                    "og:video:alt" => get!(video).description = content(),
+                    "og:audio:alt" => get!(audio).description = content(),
 
                     "og:ttl" => match content_int() {
                         None => {}
@@ -280,7 +280,7 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
 }
 
 pub(crate) fn determine_embed_type(embed: &mut EmbedV1) {
-    let mut check_type = |media: &MaybeEmbedMedia, ty: EmbedType| {
+    let mut check_type = |media: &Option<BoxedEmbedMedia>, ty: EmbedType| {
         if !EmbedMedia::is_empty(media) {
             embed.ty = ty;
         } else if embed.ty == ty {
@@ -379,7 +379,7 @@ pub fn parse_oembed_to_embed(embed: &mut EmbedV1, o: OEmbed) -> ExtraFields {
     }
 
     if let Some(thumbnail_url) = o.thumbnail_url {
-        let mut thumb = Box::<EmbedMedia>::default();
+        let mut thumb = BoxedEmbedMedia::default();
 
         thumb.url = thumbnail_url;
         thumb.width = o.thumbnail_width;

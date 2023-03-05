@@ -17,3 +17,24 @@ pub mod regexes {
 
     include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
 }
+
+/// We can't embed infinite text, so this attempts to trim it below `max_len` without abrubtly
+/// cutting off. It will find punctuation nearest to the limit and trim to there, or
+pub fn trim_text(mut text: &str, max_len: usize) -> &str {
+    text = text.trim(); // basic ws trim first
+
+    if text.len() <= max_len {
+        return text;
+    }
+
+    text = &text[..max_len];
+
+    // try to find punctuation
+    for (idx, char) in text.char_indices().rev() {
+        if matches!(char, '.' | ',' | '!' | '?' | '\n') {
+            return text[..idx].trim_end();
+        }
+    }
+
+    text
+}

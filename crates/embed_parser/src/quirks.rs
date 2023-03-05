@@ -43,6 +43,20 @@ pub fn resolve_relative(base_url: &Url, embed: &mut EmbedV1) {
     });
 }
 
+fn trim_text(text: &mut SmolStr, max_len: usize) {
+    let trimmed = crate::trim_text(text, max_len);
+
+    if trimmed.len() < text.len() {
+        *text = trimmed.into();
+    }
+}
+
+fn maybe_trim_text(text: &mut Option<SmolStr>, max_len: usize) {
+    if let Some(ref mut text) = text {
+        trim_text(text, max_len);
+    }
+}
+
 pub fn fix_embed(embed: &mut EmbedV1) {
     // get rid of invalid images introduced through bad embeds
     {
@@ -120,10 +134,24 @@ pub fn fix_embed(embed: &mut EmbedV1) {
         let desc = embed.description.clone();
 
         embed.visit_media_mut(|media| {
-            if media.alt == desc {
-                media.alt = None;
+            if media.description == desc {
+                media.description = None;
             }
         });
+    }
+
+    embed.visit_media_mut(|media| {
+        EmbedMedia::normalize(media);
+
+        maybe_trim_text(&mut media.description, 512);
+    });
+
+    maybe_trim_text(&mut embed.title, 1024);
+    maybe_trim_text(&mut embed.description, 2048);
+    maybe_trim_text(&mut embed.provider.name, 196);
+
+    if let Some(ref mut author) = embed.author {
+        trim_text(&mut author.name, 196);
     }
 
     super::embed::determine_embed_type(embed);
