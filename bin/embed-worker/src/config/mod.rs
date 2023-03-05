@@ -20,8 +20,11 @@ pub enum ConfigError {
     #[error("Invalid user agent for {0}")]
     InvalidUserAgent(String),
 
-    #[error("Missing extractor field: {0}")]
+    #[error("Missing extractor field: extractors.{0}")]
     MissingExtractorField(&'static str),
+
+    #[error("Invalid extractor field: extractors.{0}")]
+    InvalidExtractorField(&'static str),
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
