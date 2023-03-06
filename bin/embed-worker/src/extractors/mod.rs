@@ -29,11 +29,13 @@ pub trait Extractor: Send + Sync + std::fmt::Debug {
 
 pub mod generic;
 
+pub mod deviantart;
 pub mod wikipedia;
 #[rustfmt::skip]
 pub fn extractor_factories() -> Vec<Box<dyn ExtractorFactory>> {
     vec![
         Box::new(wikipedia::WikipediaExtractorFactory),
+        Box::new(deviantart::DeviantArtExtractor),
         Box::new(generic::GenericExtractor),
     ]
 }
