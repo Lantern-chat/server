@@ -92,45 +92,52 @@ impl Extractor for ImgurExtractor {
 
         let mut embed = EmbedV1::default();
 
-        embed.img = Some({
-            #[rustfmt::skip]
-            let image = match &mut data.kind {
-                | ImgurDataKind::Gallery { images, .. }
-                | ImgurDataKind::Album { images, .. } => match data.cover {
-                    Some(ref cover) => match images.iter_mut().find(|img| img.id == *cover) {
-                        Some(image) => Some(image),
-                        None => images.get_mut(0),
-                    },
-                    None => images.get_mut(0)
+        #[rustfmt::skip]
+        let image = match &mut data.kind {
+            | ImgurDataKind::Gallery { images, .. }
+            | ImgurDataKind::Album { images, .. } => match data.cover {
+                Some(ref cover) => match images.iter_mut().find(|img| img.id == *cover) {
+                    Some(image) => Some(image),
+                    None => images.get_mut(0),
                 },
-                ImgurDataKind::Image { image } => Some(image),
-            };
+                None => images.get_mut(0)
+            },
+            ImgurDataKind::Image { image } => Some(image),
+        };
 
-            let Some(image) = image else {
-                return Err(Error::Failure(StatusCode::NOT_FOUND));
-            };
+        let Some(image) = image else {
+            return Err(Error::Failure(StatusCode::NOT_FOUND));
+        };
 
-            let mut media = BoxedEmbedMedia::default();
+        let mut media = BoxedEmbedMedia::default();
 
-            // add ?noredirect to imgur links because they're annoying
-            media.url = {
-                let mut url = std::mem::take(&mut image.link);
-                if !url.ends_with("?noredirect") {
-                    url += "?noredirect";
+        // add ?noredirect to imgur links because they're annoying
+        media.url = add_noredirect(std::mem::take(&mut image.link)).into();
+
+        media.width = image.width;
+        media.height = image.height;
+
+        match image.mime.take() {
+            Some(mime) if mime.contains('/') => media.mime = Some(mime),
+            _ => {}
+        }
+
+        match media.mime {
+            Some(ref mime) if mime.starts_with("video") => {
+                match image.mp4.take() {
+                    Some(mp4) if mime.ends_with("webm") => {
+                        let mut alt = media.clone();
+                        alt.mime = Some(SmolStr::new_inline("video/mp4"));
+                        alt.url = add_noredirect(mp4).into();
+                        media.alternate = Some(alt);
+                    }
+                    _ => {}
                 }
-                url.into()
-            };
 
-            media.width = image.width;
-            media.height = image.height;
-
-            match image.mime.take() {
-                Some(mime) if mime.contains('/') => media.mime = Some(mime),
-                _ => {}
+                embed.video = Some(media);
             }
-
-            media
-        });
+            _ => embed.img = Some(media),
+        }
 
         embed.provider.name = Some("imgur".into());
         embed.provider.url = Some(SmolStr::new_inline("https://imgur.com"));
@@ -229,10 +236,20 @@ pub struct ImgurImageData {
     pub height: Option<i32>,
 
     pub link: String,
+
+    #[serde(default)]
+    pub mp4: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize)]
 pub struct ImgurAdConfig {
     #[serde(default)]
     pub nsfw_score: f32,
+}
+
+fn add_noredirect(mut url: String) -> String {
+    if !url.ends_with("?noredirect") {
+        url += "?noredirect";
+    }
+    url
 }
