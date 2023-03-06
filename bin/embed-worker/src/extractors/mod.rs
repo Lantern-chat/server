@@ -53,11 +53,13 @@ mod prelude {
 pub mod generic;
 
 pub mod deviantart;
+pub mod e621;
 pub mod wikipedia;
 
 #[rustfmt::skip]
 pub fn extractor_factories() -> Vec<Box<dyn ExtractorFactory>> {
     vec![
+        Box::new(e621::E621ExtractorFactory),
         Box::new(wikipedia::WikipediaExtractorFactory),
         Box::new(deviantart::DeviantArtExtractor),
         Box::new(generic::GenericExtractor),
