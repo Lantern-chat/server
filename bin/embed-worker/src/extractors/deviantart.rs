@@ -36,11 +36,13 @@ impl Extractor for DeviantArtExtractor {
     }
 
     async fn extract(&self, state: Arc<WorkerState>, url: Url, params: Params) -> Result<EmbedWithExpire, Error> {
-        let oembed_uri = format!(
-            "https://backend.deviantart.com/oembed?url={}{}",
-            url.origin().ascii_serialization(),
-            url.path()
-        );
+        let canonical_url = {
+            let mut origin = url.origin().ascii_serialization();
+            origin += url.path();
+            origin
+        };
+
+        let oembed_uri = format!("https://backend.deviantart.com/oembed?url={canonical_url}");
 
         let resp = state.client.get(oembed_uri).send().await?;
         let oembed = resp.json::<DeviantArtOEmbed>().await?;
@@ -90,6 +92,7 @@ impl Extractor for DeviantArtExtractor {
         });
 
         embed.color = Some(0x05cc47);
+        embed.url = Some(canonical_url.into());
 
         Ok(compute_expirey(embed, 60 * 60))
     }
