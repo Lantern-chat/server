@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     regex_util::write_regex(
         "ADULT_RATING", // case-insensitive rating
-        r#"(?i)adult|mature|RTA\-5042\-1996\-1400\-1577\-RTA"#,
+        r#"(?i)(?-u)adult|mature|RTA\-5042\-1996\-1400\-1577\-RTA"#,
         &mut file,
     )?;
 

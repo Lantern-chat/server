@@ -10,18 +10,15 @@ impl ExtractorFactory for E621ExtractorFactory {
             return Ok(None);
         };
 
-        let Some(login) = extractor.get("login") else {
+        let Some(login) = extractor.get("login").cloned() else {
             return Err(ConfigError::MissingExtractorField("e621.login"));
         };
 
-        let Some(api_key) = extractor.get("api_key") else {
+        let Some(api_key) = extractor.get("api_key").cloned() else {
             return Err(ConfigError::MissingExtractorField("e621.api_key"));
         };
 
-        Ok(Some(Box::new(E621Extractor {
-            login: login.clone(),
-            api_key: api_key.clone(),
-        })))
+        Ok(Some(Box::new(E621Extractor { login, api_key })))
     }
 }
 
@@ -237,6 +234,6 @@ async fn fetch_single_id(
         Which::E926 => "https://e926.net/apple-touch-icon.png",
     }));
 
-    // 30-minute expire
-    Ok(finalize_embed(state, embed, 60 * 30))
+    // 1-hour expire
+    Ok(generic::finalize_embed(state, embed, Some(60 * 60)))
 }

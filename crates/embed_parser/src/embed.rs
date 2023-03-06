@@ -5,18 +5,10 @@ use sdk::models::*;
 use crate::html::{Header, LinkType, MetaProperty, Scope};
 use crate::oembed::{OEmbed, OEmbedFormat, OEmbedLink, OEmbedType};
 
+#[derive(Debug, Default)]
 pub struct ExtraFields<'a> {
-    pub max_age: u64,
+    pub max_age: Option<u64>,
     pub link: Option<OEmbedLink<'a>>,
-}
-
-impl Default for ExtraFields<'_> {
-    fn default() -> Self {
-        ExtraFields {
-            max_age: 60 * 15, // 15 minutes
-            link: None,
-        }
-    }
 }
 
 fn parse_color(color: &str) -> Option<u32> {
@@ -161,7 +153,7 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
 
                     "og:ttl" => match content_int() {
                         None => {}
-                        Some(ttl) => extra.max_age = ttl as u64,
+                        Some(ttl) => extra.max_age = Some(ttl as u64),
                     },
 
                     "twitter:label1" | "twitter:label2" | "twitter:label3" | "twitter:label4" => {
@@ -303,12 +295,19 @@ pub fn parse_rating(embed: &mut EmbedV1, rating: &str) {
 }
 
 /// Add to/overwrite embed profile with oEmbed data
-pub fn parse_oembed_to_embed(embed: &mut EmbedV1, o: OEmbed) -> ExtraFields {
+pub fn parse_oembed_to_embed(embed: &mut EmbedV1, mut o: OEmbed) -> ExtraFields {
     macro_rules! get {
         ($e:ident) => {
             embed.$e.get_or_insert_with(Default::default)
         };
     }
+
+    // oEmbed cannot be trusted, see Matrix Synapse issue 14708
+    o.visit_text_mut(|t| {
+        if let Cow::Owned(e) = html_escape::decode_html_entities(t.as_str()) {
+            *t = e.into();
+        }
+    });
 
     let mut extra = ExtraFields::default();
 
@@ -374,25 +373,23 @@ pub fn parse_oembed_to_embed(embed: &mut EmbedV1, o: OEmbed) -> ExtraFields {
     media.mime = mime;
 
     if overwrite {
-        media.width = o.width;
-        media.height = o.height;
+        media.width = o.width.map(|x| x.0 as _);
+        media.height = o.height.map(|x| x.0 as _);
     }
 
     if let Some(thumbnail_url) = o.thumbnail_url {
         let mut thumb = BoxedEmbedMedia::default();
 
         thumb.url = thumbnail_url;
-        thumb.width = o.thumbnail_width;
-        thumb.height = o.thumbnail_height;
+        thumb.width = o.thumbnail_width.map(|x| x.0 as _);
+        thumb.height = o.thumbnail_height.map(|x| x.0 as _);
 
         thumb.mime = None; // unknown from here
 
         embed.thumb = Some(thumb);
     }
 
-    if let Some(cache_age) = o.cache_age {
-        extra.max_age = cache_age as u64;
-    }
+    extra.max_age.overwrite_with(o.cache_age);
 
     extra
 }

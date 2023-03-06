@@ -93,7 +93,8 @@ impl Extractor for WikipediaExtractor {
                 .with_url(smol_str::format_smolstr!("{origin}/static/favicon/wikipedia.ico")),
         );
 
-        Ok(super::generic::finalize_embed(state, embed, 60 * 60))
+        // 4-hour expire
+        Ok(generic::finalize_embed(state, embed, Some(60 * 60 * 4)))
     }
 }
 

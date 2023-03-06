@@ -55,6 +55,7 @@ impl Extractor for DeviantArtExtractor {
         }
 
         let extra = embed_parser::embed::parse_oembed_to_embed(&mut embed, oembed.basic);
+        let max_age = extra.max_age;
 
         // don't allow HTML embeds
         embed.obj = None;
@@ -70,7 +71,8 @@ impl Extractor for DeviantArtExtractor {
         embed.color = Some(0x05cc47);
         embed.url = Some(canonical_url.into());
 
-        Ok(finalize_embed(state, embed, 60 * 60))
+        // 1-hour expire
+        Ok(generic::finalize_embed(state, embed, max_age.or(Some(60 * 60))))
     }
 }
 

@@ -95,22 +95,22 @@ pub struct OEmbed {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_url: Option<SmolStr>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cache_age: Option<u32>,
+    pub cache_age: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thumbnail_url: Option<SmolStr>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thumbnail_width: Option<i32>,
+    pub thumbnail_width: Option<Integer64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thumbnail_height: Option<i32>,
+    pub thumbnail_height: Option<Integer64>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<SmolStr>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub html: Option<SmolStr>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub width: Option<i32>,
+    pub width: Option<Integer64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub height: Option<i32>,
+    pub height: Option<Integer64>,
 }
 
 impl OEmbed {
@@ -122,6 +122,24 @@ impl OEmbed {
             OEmbedType::Photo => self.url.is_some() && has_dimensions,
             _ => true,
         }
+    }
+
+    pub fn visit_text_mut<F>(&mut self, mut f: F)
+    where
+        F: FnMut(&mut SmolStr),
+    {
+        fn visit_text_opt_mut<F>(text: &mut Option<SmolStr>, mut f: F)
+        where
+            F: FnMut(&mut SmolStr),
+        {
+            if let Some(ref mut value) = *text {
+                f(value);
+            }
+        }
+
+        visit_text_opt_mut(&mut self.title, &mut f);
+        visit_text_opt_mut(&mut self.author_name, &mut f);
+        visit_text_opt_mut(&mut self.provider_name, &mut f);
     }
 }
 
@@ -200,6 +218,67 @@ const _: () = {
                     }
 
                     Err(E::custom(format!("Invalid OEmbed Version: \"{v}\"")))
+                }
+            }
+        }
+    }
+};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct Integer64(pub i64);
+
+const _: () = {
+    use serde::de::{self, Deserialize, Deserializer};
+    use serde::ser::{Serialize, Serializer};
+
+    impl Serialize for Integer64 {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            serializer.serialize_i64(self.0)
+        }
+    }
+
+    impl<'de> Deserialize<'de> for Integer64 {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            return deserializer.deserialize_any(Visitor);
+
+            struct Visitor;
+
+            impl<'de> de::Visitor<'de> for Visitor {
+                type Value = Integer64;
+
+                fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    formatter.write_str("Literal Integer of numeric String")
+                }
+
+                fn visit_i64<E>(self, v: i64) -> Result<Self::Value, E>
+                where
+                    E: de::Error,
+                {
+                    Ok(Integer64(v))
+                }
+
+                fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+                where
+                    E: de::Error,
+                {
+                    Ok(Integer64(v.try_into().map_err(E::custom)?))
+                }
+
+                fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                where
+                    E: de::Error,
+                {
+                    match v.parse() {
+                        Ok(v) => Ok(Integer64(v)),
+                        Err(e) => Err(E::custom(e)),
+                    }
                 }
             }
         }

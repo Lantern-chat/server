@@ -10,13 +10,24 @@ pub mod rt {
 }
 
 #[cfg(feature = "build")]
-pub fn write_regex<W: std::io::Write>(name: &str, re: &str, mut out: W) -> Result<(), Box<dyn std::error::Error>> {
+pub fn write_regex<W: std::io::Write>(
+    name: &str,
+    mut re: &str,
+    mut out: W,
+) -> Result<(), Box<dyn std::error::Error>> {
     use regex_automata::RegexBuilder;
+
+    let mut anchored = false;
+    if let Some(re2) = re.strip_prefix('^') {
+        re = re2;
+        anchored = true;
+    }
 
     let re = RegexBuilder::new()
         .minimize(true)
         .ignore_whitespace(true)
         .unicode(true)
+        .anchored(anchored)
         .build_with_size::<u16>(re)?;
 
     let mut size = 16;

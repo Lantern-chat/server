@@ -48,7 +48,7 @@ impl Extractor for GenericExtractor {
 
         let mut embed = sdk::models::EmbedV1::default();
         let mut oembed: Option<OEmbed> = None;
-        let mut max_age = 0;
+        let mut max_age = None;
 
         if let Some(rating) = resp.headers().get(HeaderName::from_static("rating")) {
             if embed_parser::regexes::ADULT_RATING.is_match(rating.as_bytes()) {
@@ -161,7 +161,7 @@ impl Extractor for GenericExtractor {
     }
 }
 
-pub fn finalize_embed(state: Arc<WorkerState>, mut embed: EmbedV1, max_age: u64) -> EmbedWithExpire {
+pub fn finalize_embed(state: Arc<WorkerState>, mut embed: EmbedV1, max_age: Option<u64>) -> EmbedWithExpire {
     embed_parser::quirks::fix_embed(&mut embed);
 
     embed.visit_media_mut(|media| {
@@ -176,7 +176,9 @@ pub fn finalize_embed(state: Arc<WorkerState>, mut embed: EmbedV1, max_age: u64)
         // limit max_age to 1 month, minimum 15 minutes
         embed
             .ts
-            .checked_add(Duration::seconds(max_age.min(60 * 60 * 24 * 30).max(60 * 15) as i64))
+            .checked_add(Duration::seconds(
+                max_age.unwrap_or(60 * 15).min(60 * 60 * 24 * 30).max(60 * 15) as i64,
+            ))
             .unwrap()
     };
 
