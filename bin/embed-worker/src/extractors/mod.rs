@@ -47,7 +47,7 @@ mod prelude {
         Error, Params, Site, WorkerState,
     };
 
-    pub use super::{generic::compute_expirey, EmbedWithExpire, Extractor, ExtractorFactory};
+    pub use super::{generic::finalize_embed, EmbedWithExpire, Extractor, ExtractorFactory};
 }
 
 pub mod generic;

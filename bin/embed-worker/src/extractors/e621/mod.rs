@@ -82,28 +82,6 @@ pub enum Section {
 pub mod models;
 use models::*;
 
-fn finalize_embed(mut embed: EmbedV1, state: Arc<WorkerState>, url: &Url, which: Which) -> EmbedWithExpire {
-    embed.color = Some(0x00549e);
-
-    embed.provider.icon = Some({
-        let mut media = BoxedEmbedMedia::default();
-        media.url = SmolStr::new(match which {
-            // technically the same icon, but still
-            Which::E621 => "https://e621.net/apple-touch-icon.png",
-            Which::E926 => "https://e926.net/apple-touch-icon.png",
-        });
-        media
-    });
-
-    embed_parser::quirks::fix_embed(&mut embed);
-
-    embed.visit_media_mut(|media| {
-        media.signature = state.sign(&media.url);
-    });
-
-    super::generic::compute_expirey(embed, 60 * 15)
-}
-
 #[allow(clippy::field_reassign_with_default)]
 async fn fetch_single_id(
     extractor: &E621Extractor,
@@ -149,10 +127,9 @@ async fn fetch_single_id(
         embed.flags |= EmbedFlags::ADULT;
     }
 
-    let mut main_embed = BoxedEmbedMedia::default();
-    main_embed.url = file_url.into();
-    main_embed.width = Some(main_file.width as _);
-    main_embed.height = Some(main_file.height as _);
+    let mut main_embed = BoxedEmbedMedia::default()
+        .with_url(file_url)
+        .with_dims(main_file.width as _, main_file.height as _);
 
     if let Some(ext) = main_embed.url.split('.').last() {
         let mime = mime_guess::from_ext(ext).first();
@@ -213,11 +190,10 @@ async fn fetch_single_id(
             break 'vid_alt;
         };
 
-        let mut alt_media = BoxedEmbedMedia::default();
+        let mut alt_media = BoxedEmbedMedia::default()
+            .with_url(url)
+            .with_dims(alt.width as _, alt.height as _);
 
-        alt_media.url = url.into();
-        alt_media.width = Some(alt.width as _);
-        alt_media.height = Some(alt.height as _);
         alt_media.mime = url
             .split('.')
             .last()
@@ -253,5 +229,14 @@ async fn fetch_single_id(
         other => other.map(From::from),
     };
 
-    Ok(finalize_embed(embed, state, url, which))
+    embed.color = Some(0x00549e);
+
+    embed.provider.icon = Some(BoxedEmbedMedia::default().with_url(match which {
+        // technically the same icon, but still
+        Which::E621 => "https://e621.net/apple-touch-icon.png",
+        Which::E926 => "https://e926.net/apple-touch-icon.png",
+    }));
+
+    // 30-minute expire
+    Ok(finalize_embed(state, embed, 60 * 30))
 }

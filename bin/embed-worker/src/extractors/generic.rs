@@ -157,17 +157,17 @@ impl Extractor for GenericExtractor {
             }
         }
 
-        embed_parser::quirks::fix_embed(&mut embed);
-
-        embed.visit_media_mut(|media| {
-            media.signature = state.sign(&media.url);
-        });
-
-        Ok(compute_expirey(embed, max_age))
+        Ok(finalize_embed(state, embed, max_age))
     }
 }
 
-pub fn compute_expirey(mut embed: EmbedV1, max_age: u64) -> EmbedWithExpire {
+pub fn finalize_embed(state: Arc<WorkerState>, mut embed: EmbedV1, max_age: u64) -> EmbedWithExpire {
+    embed_parser::quirks::fix_embed(&mut embed);
+
+    embed.visit_media_mut(|media| {
+        media.signature = state.sign(&media.url);
+    });
+
     let expires = {
         use iso8601_timestamp::{Duration, Timestamp};
 

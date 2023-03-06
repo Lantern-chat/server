@@ -59,27 +59,18 @@ impl Extractor for DeviantArtExtractor {
         // don't allow HTML embeds
         embed.obj = None;
 
-        embed.provider.icon = Some({
-            let mut media = BoxedEmbedMedia::default();
-            media.url = SmolStr::new("https://st.deviantart.net/eclipse/icons/da_favicon_v2.ico");
-            media
-        });
+        embed.provider.icon =
+            Some(BoxedEmbedMedia::default().with_url("https://st.deviantart.net/eclipse/icons/da_favicon_v2.ico"));
 
         // thumbnails are often unnecessary for DA
         if embed.has_fullsize_media() {
             embed.thumb = None;
         }
 
-        embed_parser::quirks::fix_embed(&mut embed);
-
-        embed.visit_media_mut(|media| {
-            media.signature = state.sign(&media.url);
-        });
-
         embed.color = Some(0x05cc47);
         embed.url = Some(canonical_url.into());
 
-        Ok(compute_expirey(embed, 60 * 60))
+        Ok(finalize_embed(state, embed, 60 * 60))
     }
 }
 
