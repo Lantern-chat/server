@@ -27,10 +27,34 @@ pub trait Extractor: Send + Sync + std::fmt::Debug {
     async fn extract(&self, state: Arc<WorkerState>, url: Url, params: Params) -> Result<EmbedWithExpire, Error>;
 }
 
+mod prelude {
+    pub use std::fmt::Write;
+    pub use std::sync::Arc;
+
+    pub use embed_parser::oembed::{OEmbed, OEmbedFormat, OEmbedLink};
+    pub use futures_util::FutureExt;
+    pub use reqwest::{
+        header::{HeaderName, HeaderValue},
+        Method, StatusCode,
+    };
+    pub use smol_str::{SmolStr, ToSmolStr};
+    pub use url::Url;
+
+    pub use sdk::models::embed::v1::*;
+
+    pub(crate) use crate::{
+        config::{Config, ConfigError},
+        Error, Params, Site, WorkerState,
+    };
+
+    pub use super::{generic::compute_expirey, EmbedWithExpire, Extractor, ExtractorFactory};
+}
+
 pub mod generic;
 
 pub mod deviantart;
 pub mod wikipedia;
+
 #[rustfmt::skip]
 pub fn extractor_factories() -> Vec<Box<dyn ExtractorFactory>> {
     vec![

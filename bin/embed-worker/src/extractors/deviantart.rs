@@ -1,19 +1,4 @@
-use std::fmt::Write;
-use std::sync::Arc;
-
-use crate::{Error, Params, Site, WorkerState};
-use axum::http::HeaderValue;
-use hashbrown::HashMap;
-use sdk::models::embed::v1::*;
-use sdk::models::SmolStr;
-use smol_str::ToSmolStr;
-use url::Url;
-
-use embed_parser::oembed::{OEmbed, OEmbedFormat, OEmbedLink};
-use futures_util::FutureExt;
-use reqwest::{header::HeaderName, Method, StatusCode};
-
-use super::{generic::compute_expirey, Config, ConfigError, EmbedWithExpire, Extractor, ExtractorFactory};
+use super::prelude::*;
 
 /// https://www.deviantart.com/developers/oembed
 #[derive(Debug)]

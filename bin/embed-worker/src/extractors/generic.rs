@@ -1,13 +1,4 @@
-use std::sync::Arc;
-
-use crate::{Error, Params, Site, WorkerState};
-use sdk::models::embed::v1::*;
-
-use embed_parser::oembed::{OEmbed, OEmbedFormat, OEmbedLink};
-use futures_util::FutureExt;
-use reqwest::{header::HeaderName, Method};
-
-use super::{Config, ConfigError, EmbedWithExpire, Extractor, ExtractorFactory};
+use super::prelude::*;
 
 #[derive(Debug)]
 pub struct GenericExtractor;
