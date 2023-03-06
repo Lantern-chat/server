@@ -234,6 +234,6 @@ async fn fetch_single_id(
         Which::E926 => "https://e926.net/apple-touch-icon.png",
     }));
 
-    // 1-hour expire
-    Ok(generic::finalize_embed(state, embed, Some(60 * 60)))
+    // 4-hour expire
+    Ok(generic::finalize_embed(state, embed, Some(60 * 60 * 4)))
 }

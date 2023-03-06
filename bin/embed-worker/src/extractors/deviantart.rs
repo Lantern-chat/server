@@ -71,8 +71,8 @@ impl Extractor for DeviantArtExtractor {
         embed.color = Some(0x05cc47);
         embed.url = Some(canonical_url.into());
 
-        // 1-hour expire
-        Ok(generic::finalize_embed(state, embed, max_age.or(Some(60 * 60))))
+        // 4-hour expire
+        Ok(generic::finalize_embed(state, embed, max_age.or(Some(60 * 60 * 4))))
     }
 }
 

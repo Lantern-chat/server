@@ -54,6 +54,7 @@ pub mod generic;
 
 pub mod deviantart;
 pub mod e621;
+pub mod imgur;
 pub mod wikipedia;
 
 #[rustfmt::skip]
@@ -62,6 +63,7 @@ pub fn extractor_factories() -> Vec<Box<dyn ExtractorFactory>> {
         Box::new(e621::E621ExtractorFactory),
         Box::new(wikipedia::WikipediaExtractorFactory),
         Box::new(deviantart::DeviantArtExtractor),
+        Box::new(imgur::ImgurExtractorFactory),
         Box::new(generic::GenericExtractor),
     ]
 }
