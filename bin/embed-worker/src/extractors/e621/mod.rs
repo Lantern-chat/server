@@ -110,9 +110,17 @@ async fn fetch_single_id(
         return Err(Error::Failure(StatusCode::NOT_FOUND));
     }
 
-    let main_file = &post.file;
+    let mut file = &post.file;
 
-    let Some(ref file_url) = main_file.url else {
+    match post.sample {
+        // very large file, revert to sample
+        Some(ref sample) if file.height > 4096 || file.width > 4096 => {
+            file = &sample.file;
+        }
+        _ => {}
+    }
+
+    let Some(ref file_url) = file.url else {
         return Err(Error::Failure(StatusCode::NOT_FOUND));
     };
 
@@ -126,7 +134,7 @@ async fn fetch_single_id(
 
     let mut main_embed = BoxedEmbedMedia::default()
         .with_url(file_url)
-        .with_dims(main_file.width as _, main_file.height as _);
+        .with_dims(file.width as _, file.height as _);
 
     if let Some(ext) = main_embed.url.split('.').last() {
         let mime = mime_guess::from_ext(ext).first();
