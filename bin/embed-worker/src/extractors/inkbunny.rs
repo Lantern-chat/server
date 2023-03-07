@@ -4,9 +4,14 @@ use embed_parser::oembed::Integer64;
 
 pub struct InkbunnyExtractorFactory;
 
-#[derive(Debug)]
+use arc_swap::ArcSwapOption;
+
+#[derive(Default, Debug)]
 pub struct InkbunnyExtractor {
-    pub session_id: String,
+    pub username: Option<String>,
+    pub password: Option<String>,
+
+    pub session_id: ArcSwapOption<String>,
 }
 
 impl ExtractorFactory for InkbunnyExtractorFactory {
@@ -15,11 +20,32 @@ impl ExtractorFactory for InkbunnyExtractorFactory {
             return Ok(None);
         };
 
-        let Some(session_id) = extractor.get("session_id").cloned() else {
-            return Err(ConfigError::MissingExtractorField("inkbunny.session_id"));
-        };
+        let mut ibe = Box::<InkbunnyExtractor>::default();
 
-        Ok(Some(Box::new(InkbunnyExtractor { session_id })))
+        match (
+            extractor.get("session_id"),
+            extractor.get("username"),
+            extractor.get("password"),
+        ) {
+            (Some(session_id), _, _) => ibe.session_id.store(Some(Arc::new(session_id.clone()))),
+            (None, Some(username), Some(password)) => {
+                ibe.username = Some(username.clone());
+                ibe.password = Some(password.clone());
+            }
+            (None, None, None) => {
+                return Err(ConfigError::MissingExtractorField(
+                    "inkbunny.(session_id|username|password)",
+                ));
+            }
+            (None, Some(_), None) => {
+                return Err(ConfigError::MissingExtractorField("inkbunny.password"));
+            }
+            (None, None, Some(_)) => {
+                return Err(ConfigError::MissingExtractorField("inkbunny.username"));
+            }
+        }
+
+        Ok(Some(ibe))
     }
 }
 
@@ -27,6 +53,39 @@ impl ExtractorFactory for InkbunnyExtractorFactory {
 impl Extractor for InkbunnyExtractor {
     fn matches(&self, url: &Url) -> bool {
         matches!(url.domain(), Some("inkbunny.net")) && url.path().starts_with("/s/")
+    }
+
+    async fn setup(&self, state: Arc<WorkerState>) -> Result<(), Error> {
+        if self.session_id.load().is_some() {
+            return Ok(());
+        }
+
+        let login_uri = match (&self.username, &self.password) {
+            (Some(username), Some(password)) => {
+                println!("Logging into Inkbunny as {username}!");
+
+                format!(
+                    "https://inkbunny.net/api_login.php?output_mode=json&username={username}&password={password}"
+                )
+            }
+            _ => return Err(Error::Failure(StatusCode::UNAUTHORIZED)),
+        };
+
+        let resp = state
+            .client
+            .post(login_uri)
+            .send()
+            .await?
+            .json::<InkbunnyLoginResult>()
+            .await?;
+
+        let InkbunnyLoginResult::Success { sid } = resp else {
+            return Err(Error::Failure(StatusCode::UNAUTHORIZED));
+        };
+
+        self.session_id.store(Some(Arc::new(sid)));
+
+        Ok(())
     }
 
     async fn extract(&self, state: Arc<WorkerState>, url: Url, params: Params) -> Result<EmbedWithExpire, Error> {
@@ -39,13 +98,12 @@ impl Extractor for InkbunnyExtractor {
             return Err(Error::Failure(StatusCode::NOT_FOUND));
         };
 
-        let resp = state
-            .client
-            .get(format!(
-                "https://inkbunny.net/api_submissions.php?output_mode=json&show_description=yes&sid={}&submission_ids={image_id}",
-                self.session_id
-            ))
-            .send().await?.json().await?;
+        let sid_guard = self.session_id.load();
+        let sid = sid_guard.as_ref().unwrap();
+        let api_uri = format!("https://inkbunny.net/api_submissions.php?output_mode=json&show_description=yes&sid={sid}&submission_ids={image_id}");
+        drop(sid_guard);
+
+        let resp = state.client.get(api_uri).send().await?.json().await?;
 
         let InkbunnyResult::Success { submissions: [mut submission] } = resp else {
             return Err(Error::Failure(StatusCode::NOT_FOUND));
@@ -169,6 +227,13 @@ impl Extractor for InkbunnyExtractor {
         // 4-hour expire
         Ok(generic::finalize_embed(state, embed, Some(60 * 60 * 4)))
     }
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(untagged)]
+pub enum InkbunnyLoginResult {
+    Success { sid: String },
+    Failure {},
 }
 
 #[derive(Debug, serde::Deserialize)]
