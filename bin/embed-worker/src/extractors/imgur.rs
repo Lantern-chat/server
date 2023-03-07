@@ -139,7 +139,7 @@ impl Extractor for ImgurExtractor {
             _ => embed.img = Some(media),
         }
 
-        embed.provider.name = Some("imgur".into());
+        embed.provider.name = Some(SmolStr::new_inline("imgur"));
         embed.provider.url = Some(SmolStr::new_inline("https://imgur.com"));
         embed.provider.icon = BoxedEmbedMedia::default()
             .with_url("https://s.imgur.com/images/favicon.png")
@@ -164,6 +164,20 @@ impl Extractor for ImgurExtractor {
 
         embed.color = Some(0x85bf25);
 
+        if data.images_count > 1 {
+            let rem = data.images_count - 1;
+            embed.footer = Some(EmbedFooter {
+                text: smol_str::format_smolstr!(
+                    "and {rem} more {}",
+                    match rem {
+                        1 => "file",
+                        _ => "files",
+                    }
+                ),
+                icon: None,
+            });
+        }
+
         // 4-hour expire
         Ok(generic::finalize_embed(state, embed, Some(60 * 60 * 4)))
     }
@@ -185,6 +199,9 @@ pub enum ImgurResult {
 pub struct ImgurData {
     #[serde(default)]
     pub ad_config: Option<ImgurAdConfig>,
+
+    #[serde(default)]
+    pub images_count: usize,
 
     #[serde(flatten)]
     pub kind: ImgurDataKind,

@@ -1,4 +1,8 @@
-#![allow(clippy::redundant_pattern_matching, clippy::field_reassign_with_default)]
+#![allow(
+    clippy::redundant_pattern_matching,
+    clippy::field_reassign_with_default,
+    clippy::large_enum_variant
+)]
 
 extern crate client_sdk as sdk;
 
