@@ -60,6 +60,7 @@ impl Extractor for DeviantArtExtractor {
         // don't allow HTML embeds
         embed.obj = None;
 
+        // oEmbed provides name/url
         embed.provider.icon =
             Some(BoxedEmbedMedia::default().with_url("https://st.deviantart.net/eclipse/icons/da_favicon_v2.ico"));
 

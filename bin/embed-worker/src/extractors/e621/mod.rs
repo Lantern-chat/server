@@ -236,12 +236,27 @@ async fn fetch_single_id(
 
     embed.color = Some(0x00549e);
 
-    embed.provider.icon = Some(BoxedEmbedMedia::default().with_url(match which {
-        // technically the same icon, but still
-        Which::E621 => "https://e621.net/apple-touch-icon.png",
-        Which::E926 => "https://e926.net/apple-touch-icon.png",
-    }));
+    embed.provider = match which {
+        Which::E621 => E621_PROVIDER.clone(),
+        Which::E926 => E926_PROVIDER.clone(),
+    };
 
     // 4-hour expire
     Ok(generic::finalize_embed(state, embed, Some(60 * 60 * 4)))
 }
+
+static E621_PROVIDER: Lazy<EmbedProvider> = Lazy::new(|| {
+    let mut provider = EmbedProvider::default();
+    provider.name = Some(SmolStr::new_inline("e621"));
+    provider.url = Some(SmolStr::new_inline("https://e621.net"));
+    provider.icon = Some(BoxedEmbedMedia::default().with_url("https://e621.net/apple-touch-icon.png"));
+    provider
+});
+
+static E926_PROVIDER: Lazy<EmbedProvider> = Lazy::new(|| {
+    let mut provider = EmbedProvider::default();
+    provider.name = Some(SmolStr::new_inline("e926"));
+    provider.url = Some(SmolStr::new_inline("https://e926.net"));
+    provider.icon = Some(BoxedEmbedMedia::default().with_url("https://e926.net/apple-touch-icon.png"));
+    provider
+});

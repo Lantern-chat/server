@@ -225,13 +225,18 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
 
     embed.color = Some(0xadd8f5);
 
-    embed.provider.name = Some(SmolStr::new_inline("FurAffinity"));
-    embed.provider.url = Some(SmolStr::new("https://www.furaffinity.net"));
-    embed.provider.icon = Some({
-        let mut media = BoxedEmbedMedia::default();
-        media.url = "https://www.furaffinity.net/themes/beta/img/favicon.ico".into();
-        media
+    static FA_PROVIDER: Lazy<EmbedProvider> = Lazy::new(|| {
+        let mut provider = EmbedProvider::default();
+
+        provider.name = Some(SmolStr::new_inline("FurAffinity"));
+        provider.url = Some(SmolStr::new("https://www.furaffinity.net"));
+        provider.icon =
+            Some(BoxedEmbedMedia::default().with_url("https://www.furaffinity.net/themes/beta/img/favicon.ico"));
+
+        provider
     });
+
+    embed.provider = FA_PROVIDER.clone();
 
     Ok(embed)
 }

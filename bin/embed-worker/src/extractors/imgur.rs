@@ -139,11 +139,17 @@ impl Extractor for ImgurExtractor {
             _ => embed.img = Some(media),
         }
 
-        embed.provider.name = Some(SmolStr::new_inline("imgur"));
-        embed.provider.url = Some(SmolStr::new_inline("https://imgur.com"));
-        embed.provider.icon = BoxedEmbedMedia::default()
-            .with_url("https://s.imgur.com/images/favicon.png")
-            .into();
+        static IMGUR_PROVIDER: Lazy<EmbedProvider> = Lazy::new(|| {
+            let mut provider = EmbedProvider::default();
+
+            provider.name = Some(SmolStr::new_inline("imgur"));
+            provider.url = Some(SmolStr::new_inline("https://imgur.com"));
+            provider.icon = Some(BoxedEmbedMedia::default().with_url("https://s.imgur.com/images/favicon.png"));
+
+            provider
+        });
+
+        embed.provider = IMGUR_PROVIDER.clone();
 
         if match (data.nsfw, data.ad_config) {
             (Some(true), _) => true,

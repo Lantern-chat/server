@@ -33,6 +33,7 @@ mod prelude {
 
     pub use embed_parser::oembed::{OEmbed, OEmbedFormat, OEmbedLink};
     pub use futures_util::FutureExt;
+    pub use once_cell::sync::Lazy;
     pub use reqwest::{
         header::{HeaderName, HeaderValue},
         Method, StatusCode,

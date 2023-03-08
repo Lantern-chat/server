@@ -87,6 +87,7 @@ impl Extractor for WikipediaExtractor {
 
         embed.url = Some(smol_str::format_smolstr!("{origin}/wiki/{title}"));
         embed.color = Some(0xFFFFFF); // white
+
         embed.provider.name = Some(SmolStr::new_inline("Wikipedia"));
         embed.provider.icon = Some(
             BoxedEmbedMedia::default()
