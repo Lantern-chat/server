@@ -54,6 +54,7 @@ pub mod generic;
 
 pub mod deviantart;
 pub mod e621;
+pub mod furaffinity;
 pub mod imgur;
 pub mod inkbunny;
 pub mod wikipedia;
@@ -66,6 +67,7 @@ pub fn extractor_factories() -> Vec<Box<dyn ExtractorFactory>> {
         Box::new(deviantart::DeviantArtExtractor),
         Box::new(imgur::ImgurExtractorFactory),
         Box::new(inkbunny::InkbunnyExtractorFactory),
+        Box::new(furaffinity::FurAffinityExtractorFactory),
         Box::new(generic::GenericExtractor),
     ]
 }
