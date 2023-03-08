@@ -7,7 +7,6 @@ use scraper::{CaseSensitivity::AsciiCaseInsensitive, ElementRef, Node, Selector}
 
 macro_rules! selector {
     ($e: expr) => {{
-        use once_cell::sync::Lazy;
         static SELECTOR: Lazy<Selector> = Lazy::new(|| Selector::parse($e).unwrap());
         &*SELECTOR
     }};
@@ -86,6 +85,13 @@ fn fix_relative_scheme(url: &str) -> Cow<str> {
     }
 }
 
+fn accumulate_text(el: ElementRef) -> String {
+    el.text().fold(String::new(), |mut a, chunk| {
+        a += chunk;
+        a
+    })
+}
+
 fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
     let doc = scraper::Html::parse_document(html);
 
@@ -105,29 +111,29 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
         let mut alt = None;
         let mut kind = Kind::Unsupported;
 
-        let use_thumbnail = node.value().has_class("submission-writing", AsciiCaseInsensitive);
-
         for e in node.traverse() {
             let Edge::Open(node) = e else { continue; };
-            let Node::Element(el) = node.value() else { continue; };
-            kind = match el.name() {
-                "img" => Kind::Image,
-                "audio" => Kind::Audio,
-                "vid" => Kind::Video,
-                "object" => break,
-                _ => continue,
-            };
+            if let Node::Element(el) = node.value() {
+                kind = match el.name() {
+                    "img" => Kind::Image,
+                    "audio" => Kind::Audio,
+                    "vid" => Kind::Video,
+                    "object" => break,
+                    _ => continue,
+                };
 
-            src = el.attr("src");
-            alt = el.attr("alt");
-            break;
+                src = el.attr("src");
+                alt = el.attr("alt");
+                break;
+            }
         }
 
         match src {
             Some(src) if kind != Kind::Unsupported => {
-                let mut media = BoxedEmbedMedia::default();
+                let use_thumbnail = node.value().has_class("submission-writing", AsciiCaseInsensitive);
 
-                media.url = fix_relative_scheme(src).into();
+                let mut media = BoxedEmbedMedia::default().with_url(fix_relative_scheme(src));
+
                 media.description = alt.map(SmolStr::new);
 
                 match kind {
@@ -162,50 +168,33 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
             };
         }
 
-        let truncate_to = description.trim_end().len();
-        description.truncate(truncate_to);
-
+        description.truncate(description.trim_end().len());
         embed.description = Some(description.into());
     }
 
     let mut author = EmbedAuthor::default();
 
     if let Some(node) = doc.select(selector!("div.submission-title")).next() {
-        let mut title = String::new();
-        for chunk in node.text() {
-            title += chunk;
-        }
-        embed.title = Some(title.into());
+        embed.title = Some(accumulate_text(node).into());
 
         for sibling in node.next_siblings() {
-            let Node::Element(el) = sibling.value() else { continue; };
-
-            match el.attr("href") {
+            if let Some(a) = ElementRef::wrap(sibling) {
                 // <a href="/user/AUTHOR">
-                Some(href) if href.starts_with("/user/") => {
-                    author.url = Some(format!("https://www.furaffinity.net{href}").into());
-
-                    // <strong>AUTHOR NAME
-                    if let Some(el) = ElementRef::wrap(sibling) {
-                        let mut name = String::new();
-                        for chunk in el.text() {
-                            name += chunk;
-                        }
-                        author.name = name.into();
+                match a.value().attr("href") {
+                    Some(href) if href.starts_with("/user/") => {
+                        author.url = Some(format!("https://www.furaffinity.net{href}").into());
+                        author.name = accumulate_text(a).into();
+                        break;
                     }
-
-                    break;
+                    _ => continue,
                 }
-                _ => {}
             }
         }
     }
 
     if let Some(node) = doc.select(selector!("img.submission-user-icon")).next() {
         if let Some(src) = node.value().attr("src") {
-            let mut media = BoxedEmbedMedia::default();
-            media.url = fix_relative_scheme(src).into();
-            author.icon = Some(media);
+            author.icon = Some(BoxedEmbedMedia::default().with_url(fix_relative_scheme(src)));
         }
     }
 
