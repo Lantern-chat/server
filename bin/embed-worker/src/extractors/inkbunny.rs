@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use super::prelude::*;
 
 use embed_parser::oembed::Integer64;
@@ -109,12 +111,10 @@ impl Extractor for InkbunnyExtractor {
             return Err(Error::Failure(StatusCode::NOT_FOUND));
         };
 
-        if submission.files.is_empty() {
-            return Err(Error::Failure(StatusCode::NOT_FOUND));
-        }
-
         // get first file
-        let file = submission.files.swap_remove(0);
+        let Some(file) = submission.files.pop_front() else {
+            return Err(Error::Failure(StatusCode::NOT_FOUND));
+        };
 
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         enum Kind {
@@ -256,7 +256,7 @@ pub struct InkbunnySubmission {
     pub user_icon_url_small: Option<SmolStr>,
 
     #[serde(default)]
-    pub files: Vec<InkbunnyFile>,
+    pub files: VecDeque<InkbunnyFile>,
 
     pub rating_id: Integer64,
 }

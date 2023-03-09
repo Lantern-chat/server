@@ -159,7 +159,16 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
                 Node::Element(el) => match el.name() {
                     "br" if !description.ends_with("\n\n") => "\n",
                     "img" => match el.attr("alt") {
-                        Some(alt_text) => alt_text,
+                        Some(alt_text) => {
+                            // in some cases, there can be duplicate text of the alt name right next to the img element
+                            if let Some(text) = node.next_sibling().and_then(|s| s.value().as_text()) {
+                                if alt_text == text.trim() {
+                                    continue;
+                                }
+                            }
+
+                            alt_text
+                        }
                         None => continue,
                     },
                     _ => continue,
