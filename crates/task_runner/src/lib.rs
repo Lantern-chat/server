@@ -168,13 +168,9 @@ where
         AsyncFnTask(move |mut alive: watch::Receiver<bool>| async move {
             let IntervalFnTask(state, i, f) = self;
 
-            let interval = i.interval(&state);
-            futures::pin_mut!(interval);
-
+            let mut interval = std::pin::pin!(i.interval(&state));
             let mut current_interval = interval.next().await.unwrap_or_default();
-
-            let sleep = tokio::time::sleep(clean_interval(current_interval));
-            futures::pin_mut!(sleep);
+            let mut sleep = std::pin::pin!(tokio::time::sleep(clean_interval(current_interval)));
 
             while *alive.borrow_and_update() {
                 let mut deadline = sleep.deadline();

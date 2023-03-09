@@ -44,10 +44,8 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
             }
         }
 
-        let sleep = tokio::time::sleep(DEBOUNCE_PERIOD);
+        let mut sleep = std::pin::pin!(tokio::time::sleep(DEBOUNCE_PERIOD));
         let mut is_sleeping = true;
-
-        futures::pin_mut!(sleep);
 
         let mut party_events: HashMap<Snowflake, Vec<RawEvent>> = HashMap::new();
         let mut direct_events: HashMap<Snowflake, Vec<RawEvent>> = HashMap::new();
@@ -94,7 +92,7 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
                 .await?;
 
             // partition events by party or generic user events
-            futures::pin_mut!(stream);
+            let mut stream = std::pin::pin!(stream);
 
             while let Some(row) = stream.try_next().await? {
                 let event = RawEvent {

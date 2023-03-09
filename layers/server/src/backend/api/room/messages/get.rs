@@ -33,7 +33,7 @@ pub async fn get_one(
     )
     .await?;
 
-    futures::pin_mut!(stream);
+    let mut stream = std::pin::pin!(stream);
 
     match stream.next().await {
         Some(res) => res,
@@ -500,9 +500,7 @@ pub async fn parse_first<S>(state: ServerState, stream: S) -> Result<Message, Er
 where
     S: Stream<Item = Result<db::Row, db::pool::Error>>,
 {
-    let msg_stream = parse_stream(state, stream);
-
-    futures::pin_mut!(msg_stream);
+    let mut msg_stream = std::pin::pin!(parse_stream(state, stream));
 
     match msg_stream.next().await {
         Some(res) => res,

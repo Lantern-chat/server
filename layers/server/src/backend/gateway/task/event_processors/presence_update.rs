@@ -17,9 +17,9 @@ pub async fn presence_updated(
         let params = Params { user_id, party_id };
 
         #[rustfmt::skip]
-        let stream = db.query_stream_cached_typed(|| q::query(), &params.as_params()).await?;
-
-        futures::pin_mut!(stream);
+        let mut stream = std::pin::pin!(
+            db.query_stream_cached_typed(|| q::query(), &params.as_params()).await?
+        );
 
         // TODO: Accumulate events then shotgun them or do one broadcast per iteration?
         while let Some(row_res) = stream.next().await {

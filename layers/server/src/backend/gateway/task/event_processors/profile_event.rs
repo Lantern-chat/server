@@ -17,9 +17,9 @@ pub async fn profile_updated(
         let params = q::Params { user_id, party_id };
 
         #[rustfmt::skip]
-        let stream = db.query_stream_cached_typed(|| q::query(), &params.as_params()).await?;
-
-        futures::pin_mut!(stream);
+        let mut stream = std::pin::pin!(
+            db.query_stream_cached_typed(|| q::query(), &params.as_params()).await?
+        );
 
         let mut last_avatar: Option<(Snowflake, SmolStr)> = None;
 

@@ -26,8 +26,8 @@ pub async fn refresh_room_perms(
         .await?;
 
     let mut cache = Vec::new();
+    let mut stream = std::pin::pin!(stream);
 
-    futures::pin_mut!(stream);
     while let Some(row) = stream.next().await {
         let row = row?;
 

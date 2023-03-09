@@ -162,7 +162,7 @@ impl ServerState {
 
         let mut emojis = Vec::new();
 
-        futures::pin_mut!(stream);
+        let mut stream = std::pin::pin!(stream);
         while let Some(row) = stream.next().await {
             let row = row?;
 

@@ -70,7 +70,7 @@ impl IpBans {
 
         let mut hashes = Vec::new();
 
-        futures::pin_mut!(stream);
+        let mut stream = std::pin::pin!(stream);
         while let Some(row) = stream.next().await {
             let row = row?;
             let ip: IpAddr = row.try_get(0)?;
