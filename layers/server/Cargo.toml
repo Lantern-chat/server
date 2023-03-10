@@ -86,7 +86,7 @@ cache-padded = "1.1.1"
 bitflags = "1.2"
 pin-project-lite = "0.2.8"
 urlencoding = "2.1.0"
-socket2 = "0.4.2"
+socket2 = "0.5"
 anyhow = "1.0.44"
 itoa = "1.0.1"
 quick-xml = { version = "0.27.0", features = ["serialize"] }
