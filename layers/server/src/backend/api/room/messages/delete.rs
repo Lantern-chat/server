@@ -13,9 +13,9 @@ pub async fn delete_msg(
 ) -> Result<(), Error> {
     let perm = state.perm_cache.get(auth.user_id, room_id).await;
 
-    if let Some(ref perm) = perm {
+    if let Some(ref perms) = perm {
         // user cannot view channel at all
-        if !perm.contains(RoomPermissions::READ_MESSAGE_HISTORY) {
+        if !perms.contains(Permissions::READ_MESSAGE_HISTORY) {
             return Err(Error::Unauthorized);
         }
     }
@@ -29,7 +29,7 @@ pub async fn delete_msg(
 
     let query = match perm {
         Some(perm) => {
-            if perm.contains(RoomPermissions::MANAGE_MESSAGES) {
+            if perm.contains(Permissions::MANAGE_MESSAGES) {
                 params.truncate(1); // only needs msg_id
                 db.prepare_cached_typed(|| delete_without_perms()).await
             } else {
@@ -80,11 +80,10 @@ fn delete_with_perms() -> impl AnyQuery {
 
     tables! {
         struct AggPerm {
-            Perms: AggRoomPerms::Perms,
+            Permissions1: AggRoomPerms::Permissions1,
+            Permissions2: AggRoomPerms::Permissions2,
         }
     }
-
-    const MANAGE_MESSAGE: i64 = sdk::perms!(Room::MANAGE_MESSAGES).pack() as i64;
 
     let msg_id_var = Var::at(Messages::Id, 1);
     let user_id_var = Var::at(Users::Id, 2);
@@ -92,7 +91,8 @@ fn delete_with_perms() -> impl AnyQuery {
 
     let permissions = AggPerm::as_query(
         Query::select()
-            .expr(AggRoomPerms::Perms.alias_to(AggPerm::Perms))
+            .expr(AggRoomPerms::Permissions1.alias_to(AggPerm::Permissions1))
+            .expr(AggRoomPerms::Permissions2.alias_to(AggPerm::Permissions2))
             .from_table::<AggRoomPerms>()
             .and_where(AggRoomPerms::UserId.equals(user_id_var.clone()))
             .and_where(AggRoomPerms::RoomId.equals(room_id_var)),
@@ -103,9 +103,11 @@ fn delete_with_perms() -> impl AnyQuery {
         .update()
         .table::<Messages>()
         .and_where(
-            AggPerm::Perms
-                .has_all_bits(MANAGE_MESSAGE.lit())
-                .or(Messages::UserId.equals(user_id_var)),
+            schema::has_all_permission_bits(
+                Permissions::MANAGE_MESSAGES,
+                (AggPerm::Permissions1, AggPerm::Permissions2),
+            )
+            .or(Messages::UserId.equals(user_id_var)),
         )
         .set(Messages::Flags, Messages::Flags.bit_or(DELETED_FLAG.lit()))
         .and_where(Messages::Id.equals(msg_id_var))

@@ -32,7 +32,7 @@ pub async fn get_one_anonymouse(
 
     let row = db.query_one(&stmt.await?, &params.as_params()).await?;
 
-    parse_member(row, &state, full)
+    parse_member(row, state, full)
 }
 
 /// `full` indicates it should also include extra profile information
@@ -203,7 +203,7 @@ fn parse_member(row: db::Row, state: &ServerState, full: bool) -> Result<PartyMe
                     let last_active = match full {
                         false => None,
                         true => crate::backend::util::relative::approximate_relative_time(
-                            &state,
+                            state,
                             user_id,
                             row.try_get(MemberColumns::last_active())?,
                             None,

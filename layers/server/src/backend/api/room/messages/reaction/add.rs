@@ -14,10 +14,9 @@ pub async fn add_reaction(
     emote: EmoteOrEmojiId,
 ) -> Result<(), Error> {
     // TODO: Merge permission check into below CTEs
-    let permissions =
-        crate::backend::api::perm::get_cached_room_permissions(&state, auth.user_id, room_id).await?;
+    let perms = crate::backend::api::perm::get_cached_room_permissions(&state, auth.user_id, room_id).await?;
 
-    if !permissions.contains(RoomPermissions::ADD_REACTIONS) {
+    if !perms.contains(Permissions::ADD_REACTIONS) {
         return Err(Error::Unauthorized);
     }
 
@@ -37,7 +36,7 @@ pub async fn add_reaction(
 
     #[rustfmt::skip]
     let res = match (
-        permissions.contains(RoomPermissions::USE_EXTERNAL_EMOTES),
+        perms.contains(Permissions::USE_EXTERNAL_EMOTES),
         params.emoji_id.is_some(),
     ) {
         (false, false) => db.query_opt_cached_typed(|| q::query(false, false), params_p).boxed(),

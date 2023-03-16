@@ -1,10 +1,7 @@
 use std::borrow::Cow;
 
 use futures::FutureExt;
-use sdk::{
-    models::{Permission, RoomPermissions},
-    Snowflake,
-};
+use sdk::{models::Permissions, Snowflake};
 use smallvec::SmallVec;
 
 use crate::{Authorization, Error, ServerState};
@@ -16,7 +13,7 @@ pub async fn verify<'a>(
     _state: &ServerState,
     auth: Authorization,
     room_id: Snowflake,
-    perm: Permission,
+    perms: Permissions,
     content: Cow<'a, str>,
     spans: &[Span],
 ) -> Result<Cow<'a, str>, Error> {
@@ -41,7 +38,7 @@ pub async fn verify<'a>(
     emote_ids.sort_unstable();
     emote_ids.dedup();
 
-    let can_use_external = perm.contains(RoomPermissions::USE_EXTERNAL_EMOTES);
+    let can_use_external = perms.contains(Permissions::USE_EXTERNAL_EMOTES);
 
     use q::{Columns, Parameters, Params};
 

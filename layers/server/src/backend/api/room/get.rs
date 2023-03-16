@@ -10,12 +10,12 @@ use sdk::models::*;
 pub async fn get_room(state: ServerState, auth: Authorization, room_id: Snowflake) -> Result<Room, Error> {
     // TODO: Ensure the room permissions are cached after this
     let perms = match state.perm_cache.get(auth.user_id, room_id).await {
-        Some(PermMute { perm, .. }) => {
-            if !perm.contains(RoomPermissions::VIEW_ROOM) {
+        Some(PermMute { perms, .. }) => {
+            if !perms.contains(Permissions::VIEW_ROOM) {
                 return Err(Error::NotFound);
             }
 
-            Some(perm)
+            Some(perms)
         }
         None => None,
     };
@@ -25,23 +25,17 @@ pub async fn get_room(state: ServerState, auth: Authorization, room_id: Snowflak
     if let Some(perms) = perms {
         // simple fast-path for cached permissions AND without needing overwrites, so most connected users
         // NOTE: Having a cached permission implies they are in the party/DM of where that room exists
-        if !perms.contains(PartyPermissions::MANAGE_PERMS) {
+        if !perms.contains(Permissions::MANAGE_PERMS) {
             return get_room_simple(state, db, room_id).await;
         }
     }
 
-    get_room_full(state, db, auth.user_id, room_id, perms)
-        .boxed()
-        .await
+    get_room_full(state, db, auth.user_id, room_id, perms).boxed().await
 }
 
 /// Simple version for regular users with cached permissions saying they cannot view overwrites
 /// which results in just a simple single lookup
-async fn get_room_simple(
-    state: ServerState,
-    db: db::pool::Object,
-    room_id: Snowflake,
-) -> Result<Room, Error> {
+async fn get_room_simple(state: ServerState, db: db::pool::Object, room_id: Snowflake) -> Result<Room, Error> {
     let row = db
         .query_opt_cached_typed(
             || {
@@ -87,7 +81,7 @@ async fn get_room_full(
     db: db::pool::Object,
     user_id: Snowflake,
     room_id: Snowflake,
-    perms: Option<Permission>,
+    perms: Option<Permissions>,
 ) -> Result<Room, Error> {
     let base_perm_future = async {
         let row = db
@@ -102,7 +96,8 @@ async fn get_room_full(
                     Query::select()
                         .col(Party::OwnerId)
                         .expr(Builtin::array_agg_nonnull(Roles::Id))
-                        .expr(Builtin::bit_or(Roles::Permissions))
+                        .expr(Builtin::bit_or(Roles::Permissions1))
+                        .expr(Builtin::bit_or(Roles::Permissions2))
                         .from(
                             // select rooms and everything else dervied
                             Rooms::inner_join(
@@ -114,11 +109,7 @@ async fn get_room_full(
                             .on(Party::Id.equals(Rooms::PartyId)),
                         )
                         .and_where(Rooms::Id.equals(room_id_var))
-                        .and_where(
-                            RoleMembers::UserId
-                                .equals(user_id_var)
-                                .or(Roles::Id.equals(Party::Id)),
-                        )
+                        .and_where(RoleMembers::UserId.equals(user_id_var).or(Roles::Id.equals(Party::Id)))
                 },
                 &[&room_id, &user_id],
             )

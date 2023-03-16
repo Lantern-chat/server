@@ -7,14 +7,10 @@ use crate::{Authorization, Error, ServerState};
 
 use sdk::models::gateway::message::ServerMsg;
 
-pub async fn trigger_typing(
-    state: ServerState,
-    auth: Authorization,
-    room_id: Snowflake,
-) -> Result<(), Error> {
+pub async fn trigger_typing(state: ServerState, auth: Authorization, room_id: Snowflake) -> Result<(), Error> {
     let permissions = get_cached_room_permissions(&state, auth.user_id, room_id).await?;
 
-    if !permissions.contains(RoomPermissions::SEND_MESSAGES) {
+    if !permissions.contains(Permissions::SEND_MESSAGES) {
         return Err(Error::NotFound);
     }
 

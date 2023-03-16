@@ -1,7 +1,7 @@
 use std::{
     hash::BuildHasher,
     sync::{
-        atomic::{AtomicIsize, Ordering},
+        atomic::{AtomicIsize, AtomicU64, Ordering},
         Arc,
     },
 };
@@ -21,9 +21,8 @@ impl<S: BuildHasher> BuildHasher for SharedBuildHasher<S> {
     }
 }
 
-use schema::Snowflake;
-
-use sdk::models::Permission;
+use schema::flags::RoomMemberFlags;
+use sdk::models::{Permissions, Snowflake};
 
 type UserId = Snowflake;
 type RoomId = Snowflake;
@@ -32,16 +31,16 @@ type SHB = SharedBuildHasher<DefaultHashBuilder>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PermMute {
-    pub perm: Permission,
-    pub muted: bool,
+    pub perms: Permissions,
+    pub flags: RoomMemberFlags,
 }
 
 impl std::ops::Deref for PermMute {
-    type Target = Permission;
+    type Target = Permissions;
 
-    #[inline]
-    fn deref(&self) -> &Permission {
-        &self.perm
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        &self.perms
     }
 }
 
@@ -55,8 +54,8 @@ pub struct PermissionCache {
     map: CHashMap<UserId, UserCache, SHB>,
 }
 
-impl PermissionCache {
-    pub fn new() -> Self {
+impl Default for PermissionCache {
+    fn default() -> Self {
         PermissionCache {
             map: CHashMap::with_hasher(
                 CHashMap::<(), ()>::default_num_shards(),
@@ -64,7 +63,9 @@ impl PermissionCache {
             ),
         }
     }
+}
 
+impl PermissionCache {
     pub async fn has_user(&self, user_id: Snowflake) -> bool {
         self.map.contains(&user_id).await
     }
@@ -126,8 +127,6 @@ impl PermissionCache {
 
     /// Cleanup any cache entries with no active users
     pub async fn cleanup(&self) {
-        self.map
-            .retain(|_, cache| cache.rc.load(Ordering::Acquire) > 0)
-            .await
+        self.map.retain(|_, cache| cache.rc.load(Ordering::Acquire) > 0).await
     }
 }

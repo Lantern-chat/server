@@ -25,10 +25,7 @@ pub async fn role_event(
             .gateway
             .broadcast_event(
                 Event::new(
-                    ServerMsg::new_role_delete(RoleDeleteEvent {
-                        id: role_id,
-                        party_id,
-                    }),
+                    ServerMsg::new_role_delete(RoleDeleteEvent { id: role_id, party_id }),
                     None,
                 )?,
                 party_id,
@@ -47,7 +44,8 @@ pub async fn role_event(
                 Roles::PartyId,
                 Roles::AvatarId,
                 Roles::Name,
-                Roles::Permissions,
+                Roles::Permissions1,
+                Roles::Permissions2,
                 Roles::Color,
                 Roles::Position,
                 Roles::Flags,
@@ -78,11 +76,11 @@ pub async fn role_event(
         party_id,
         avatar: encrypt_snowflake_opt(state, row.try_get(RoleColumns::avatar_id())?),
         name: row.try_get(RoleColumns::name())?,
-        permissions: Permission::unpack_i64(row.try_get(RoleColumns::permissions())?),
-        color: {
-            row.try_get::<_, Option<i32>>(RoleColumns::color())?
-                .map(|c| c as u32)
-        },
+        permissions: Permissions::from_i64(
+            row.try_get(RoleColumns::permissions1())?,
+            row.try_get(RoleColumns::permissions2())?,
+        ),
+        color: { row.try_get::<_, Option<i32>>(RoleColumns::color())?.map(|c| c as u32) },
         position: row.try_get(RoleColumns::position())?,
         flags: row.try_get(RoleColumns::flags())?,
     };
@@ -93,10 +91,7 @@ pub async fn role_event(
         _ => unreachable!(),
     };
 
-    state
-        .gateway
-        .broadcast_event(Event::new(event, None)?, party_id)
-        .await;
+    state.gateway.broadcast_event(Event::new(event, None)?, party_id).await;
 
     Ok(())
 }

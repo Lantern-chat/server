@@ -14,25 +14,21 @@ struct RawOverwrite {
     room_id: Snowflake,
     user_id: Option<Snowflake>,
     role_id: Option<Snowflake>,
-    deny: u64,
-    allow: u64,
+    deny_packed: (i64, i64),
+    allow_packed: (i64, i64),
 }
 
 impl From<RawOverwrite> for Overwrite {
     fn from(raw: RawOverwrite) -> Self {
         Overwrite {
             id: raw.user_id.or(raw.role_id).expect("No valid ID given"),
-            allow: Permission::unpack(raw.allow),
-            deny: Permission::unpack(raw.deny),
+            allow: Permissions::from_i64(raw.allow_packed.0, raw.allow_packed.1),
+            deny: Permissions::from_i64(raw.deny_packed.0, raw.deny_packed.1),
         }
     }
 }
 
-pub async fn get_rooms(
-    state: ServerState,
-    auth: Authorization,
-    party_id: Snowflake,
-) -> Result<Vec<Room>, Error> {
+pub async fn get_rooms(state: ServerState, auth: Authorization, party_id: Snowflake) -> Result<Vec<Room>, Error> {
     let db = state.db.read.get().await?;
 
     let base_perm_future = async {
@@ -45,7 +41,8 @@ pub async fn get_rooms(
                     Query::select()
                         .col(Party::OwnerId)
                         .expr(Builtin::array_agg_nonnull(Roles::Id))
-                        .expr(Builtin::bit_or(Roles::Permissions))
+                        .expr(Builtin::bit_or(Roles::Permissions1))
+                        .expr(Builtin::bit_or(Roles::Permissions2))
                         .from(
                             Roles::left_join_table::<Party>()
                                 .on(Roles::PartyId.equals(Party::Id))
@@ -69,9 +66,9 @@ pub async fn get_rooms(
         let role_ids: Vec<Snowflake> = row.try_get(1)?;
 
         let permissions = if owner_id == auth.user_id {
-            Permission::ALL
+            Permissions::all()
         } else {
-            Permission::unpack(row.try_get::<_, i64>(2)? as u64)
+            Permissions::from_i64(row.try_get(2)?, row.try_get(3)?)
         };
 
         Ok((permissions, role_ids))
@@ -138,8 +135,10 @@ pub async fn get_rooms(
                     Query::select()
                         .cols(&[
                             Overwrites::RoomId,
-                            Overwrites::Allow,
-                            Overwrites::Deny,
+                            Overwrites::Allow1,
+                            Overwrites::Allow2,
+                            Overwrites::Deny1,
+                            Overwrites::Deny2,
                             Overwrites::RoleId,
                             Overwrites::UserId,
                         ])
@@ -157,10 +156,10 @@ pub async fn get_rooms(
         for row in rows {
             raw_overwrites.push(RawOverwrite {
                 room_id: row.try_get(0)?,
-                allow: row.try_get::<_, i64>(1)? as u64,
-                deny: row.try_get::<_, i64>(2)? as u64,
-                role_id: row.try_get(3)?,
-                user_id: row.try_get(4)?,
+                allow_packed: (row.try_get(1)?, row.try_get(2)?),
+                deny_packed: (row.try_get(3)?, row.try_get(4)?),
+                role_id: row.try_get(5)?,
+                user_id: row.try_get(6)?,
             });
         }
 
@@ -188,11 +187,11 @@ pub async fn get_rooms(
         }
     }
 
-    if !base_perm.is_admin() {
+    if !base_perm.contains(Permissions::ADMINISTRATOR) {
         rooms.retain(|_, room| {
             let room_perm = base_perm.compute_overwrites(&room.overwrites, &roles, auth.user_id);
 
-            let can_view = room_perm.contains(RoomPermissions::VIEW_ROOM);
+            let can_view = room_perm.contains(Permissions::VIEW_ROOM);
 
             // TODO: Determine the usefulness of hiding stuff
             //// Do not display overwrites to users without the permission to manage permissions

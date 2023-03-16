@@ -11,9 +11,9 @@ pub async fn get_cached_room_permissions_with_conn(
     db: &Client,
     user_id: Snowflake,
     room_id: Snowflake,
-) -> Result<Permission, Error> {
+) -> Result<Permissions, Error> {
     if let Some(perm) = state.perm_cache.get(user_id, room_id).await {
-        return Ok(perm.perm);
+        return Ok(perm.perms);
     }
 
     get_room_permissions(db, user_id, room_id).await
@@ -23,9 +23,9 @@ pub async fn get_cached_room_permissions(
     state: &ServerState,
     user_id: Snowflake,
     room_id: Snowflake,
-) -> Result<Permission, Error> {
+) -> Result<Permissions, Error> {
     if let Some(perm) = state.perm_cache.get(user_id, room_id).await {
-        return Ok(perm.perm);
+        return Ok(perm.perms);
     }
 
     let db = state.db.read.get().await?;
@@ -37,7 +37,7 @@ pub async fn get_room_permissions(
     db: &Client,
     user_id: Snowflake,
     room_id: Snowflake,
-) -> Result<Permission, Error> {
+) -> Result<Permissions, Error> {
     let row = db
         .query_opt_cached_typed(
             || {
@@ -45,7 +45,7 @@ pub async fn get_room_permissions(
                 use thorn::*;
 
                 Query::select()
-                    .col(AggRoomPerms::Perms)
+                    .cols(&[AggRoomPerms::Permissions1, AggRoomPerms::Permissions2])
                     .from_table::<AggRoomPerms>()
                     .and_where(AggRoomPerms::UserId.equals(Var::of(Users::Id)))
                     .and_where(AggRoomPerms::RoomId.equals(Var::of(Rooms::Id)))
@@ -54,15 +54,13 @@ pub async fn get_room_permissions(
         )
         .await?;
 
-    let mut perm = Permission::empty();
+    let mut perm = Permissions::empty();
 
     if let Some(row) = row {
-        let raw_perm = row.try_get::<_, i64>(0)? as u64;
+        perm = Permissions::from_i64(row.try_get(0)?, row.try_get(1)?);
 
-        if (raw_perm & Permission::PACKED_ADMIN) == Permission::PACKED_ADMIN {
-            perm = Permission::ALL;
-        } else {
-            perm = Permission::unpack(raw_perm);
+        if perm.contains(Permissions::ADMINISTRATOR) {
+            perm = Permissions::all();
         }
     }
 

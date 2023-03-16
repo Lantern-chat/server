@@ -1,4 +1,4 @@
-#![allow(unused_imports)]
+#![allow(unused_imports, clippy::redundant_pattern_matching)]
 #![deny(deprecated)]
 
 #[macro_use]

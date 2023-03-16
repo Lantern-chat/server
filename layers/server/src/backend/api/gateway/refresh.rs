@@ -1,6 +1,7 @@
 use futures::StreamExt;
 
-use sdk::models::{Permission, Snowflake};
+use schema::flags::RoomMemberFlags;
+use sdk::models::{Permissions, Snowflake};
 
 use crate::backend::cache::permission_cache::PermMute;
 use crate::{Error, ServerState};
@@ -18,7 +19,11 @@ pub async fn refresh_room_perms(
 
                 Query::select()
                     .from_table::<AggRoomPerms>()
-                    .cols(&[AggRoomPerms::RoomId, AggRoomPerms::Perms])
+                    .cols(&[
+                        AggRoomPerms::RoomId,
+                        AggRoomPerms::Permissions1,
+                        AggRoomPerms::Permissions2,
+                    ])
                     .and_where(AggRoomPerms::UserId.equals(Var::of(Users::Id)))
             },
             &[&user_id],
@@ -32,13 +37,12 @@ pub async fn refresh_room_perms(
         let row = row?;
 
         let room_id: Snowflake = row.try_get(0)?;
-        let perm: i64 = row.try_get(1)?;
 
         cache.push((
             room_id,
             PermMute {
-                perm: Permission::unpack(perm as u64),
-                muted: false,
+                perms: Permissions::from_i64(row.try_get(1)?, row.try_get(2)?),
+                flags: RoomMemberFlags::empty(),
             },
         ));
     }

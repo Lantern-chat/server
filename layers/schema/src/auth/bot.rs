@@ -126,7 +126,7 @@ impl FromStr for SplitBotToken {
         }
 
         let mut bytes = [0; Self::SPLIT_BOT_TOKEN_SIZE];
-        if let Err(_) = STANDARD_NO_PAD.decode_slice_unchecked(s, &mut bytes) {
+        if STANDARD_NO_PAD.decode_slice_unchecked(s, &mut bytes).is_err() {
             return Err(InvalidAuthToken);
         }
         SplitBotToken::try_from(&bytes[..])

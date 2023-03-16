@@ -48,8 +48,8 @@ pub async fn get_many(
     form: GetMessagesQuery,
 ) -> Result<impl Stream<Item = Result<Message, Error>>, Error> {
     let had_perms = match state.perm_cache.get(auth.user_id, room_id).await {
-        Some(perm) => {
-            if !perm.contains(RoomPermissions::READ_MESSAGE_HISTORY) {
+        Some(perms) => {
+            if !perms.contains(Permissions::READ_MESSAGE_HISTORY) {
                 return Err(Error::NotFound);
             }
 
@@ -168,7 +168,7 @@ mod p {
 }
 
 mod q {
-    use super::{Cursor, MessageFlags, Permission};
+    use super::{Cursor, MessageFlags, Permissions};
     use db::Row;
     use sdk::models::UserRelationship;
 
@@ -187,7 +187,8 @@ mod q {
         }
 
         struct AggPerm {
-            Perms: AggRoomPerms::Perms,
+            Permissions1: AggRoomPerms::Permissions1,
+            Permissions2: AggRoomPerms::Permissions2,
         }
 
         pub struct TempReactions {
@@ -475,12 +476,11 @@ mod q {
             );
 
         if check_perms {
-            const READ_MESSAGES: i64 = Permission::PACKED_READ_MESSAGE_HISTORY as i64;
-
             query = query
                 .with(AggPerm::as_query(
                     Query::select()
-                        .expr(AggRoomPerms::Perms.alias_to(AggPerm::Perms))
+                        .expr(AggRoomPerms::Permissions1.alias_to(AggPerm::Permissions1))
+                        .expr(AggRoomPerms::Permissions2.alias_to(AggPerm::Permissions2))
                         .from_table::<AggRoomPerms>()
                         .and_where(AggRoomPerms::UserId.equals(Params::user_id()))
                         .and_where(
@@ -489,7 +489,10 @@ mod q {
                                 .or(Params::room_id().is_null()),
                         ),
                 ))
-                .and_where(AggPerm::Perms.has_all_bits(READ_MESSAGES.lit()))
+                .and_where(schema::has_all_permission_bits(
+                    Permissions::READ_MESSAGE_HISTORY,
+                    (AggPerm::Permissions1, AggPerm::Permissions2),
+                ))
         }
 
         query

@@ -76,7 +76,7 @@ impl ServerState {
             mem_semaphore: Semaphore::new(config.general.memory_limit as usize),
             cpu_semaphore: Semaphore::new(config.general.cpu_limit as usize),
             fs_semaphore: Semaphore::new(1024),
-            perm_cache: PermissionCache::new(),
+            perm_cache: PermissionCache::default(),
             session_cache: SessionCache::default(),
             services: Services::start().expect("Services failed to start correctly"),
             queues: Queues::default(),

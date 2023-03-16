@@ -19,13 +19,13 @@ pub async fn create_message(
     body: CreateMessageBody,
 ) -> Result<Option<Message>, Error> {
     // fast-path for if the perm_cache does contain a value, otherwise defer until content is checked
-    let perm = match state.perm_cache.get(auth.user_id, room_id).await {
-        Some(PermMute { perm, .. }) => {
-            if !perm.contains(RoomPermissions::SEND_MESSAGES) {
+    let perms = match state.perm_cache.get(auth.user_id, room_id).await {
+        Some(PermMute { perms, .. }) => {
+            if !perms.contains(Permissions::SEND_MESSAGES) {
                 return Err(Error::Unauthorized);
             }
 
-            Some(perm)
+            Some(perms)
         }
         None => None,
     };
@@ -52,37 +52,35 @@ pub async fn create_message(
     // defer it until we need it, such as if the permissions cache didn't have a value
     let mut maybe_db = None;
 
-    let perm = match perm {
+    let perms = match perms {
         Some(perm) => perm,
         None => {
             let db = state.db.write.get().await?;
 
-            let perm = crate::backend::api::perm::get_room_permissions(&db, auth.user_id, room_id).await?;
+            let perms = crate::backend::api::perm::get_room_permissions(&db, auth.user_id, room_id).await?;
 
-            if !perm.contains(RoomPermissions::SEND_MESSAGES) {
+            if !perms.contains(Permissions::SEND_MESSAGES) {
                 return Err(Error::Unauthorized);
             }
 
             maybe_db = Some(db);
 
-            perm
+            perms
         }
     };
 
     // check this before acquiring database connection
-    if !body.attachments.is_empty() && !perm.contains(RoomPermissions::ATTACH_FILES) {
+    if !body.attachments.is_empty() && !perms.contains(Permissions::ATTACH_FILES) {
         return Err(Error::Unauthorized);
     }
 
     // modify content before inserting it into the database
-    let modified_content = match slash::process_slash(
-        &trimmed_content,
-        perm.room.contains(RoomPermissions::USE_SLASH_COMMANDS),
-    ) {
-        Ok(Some(content)) => content,
-        Ok(None) => return Ok(None),
-        Err(e) => return Err(e),
-    };
+    let modified_content =
+        match slash::process_slash(&trimmed_content, perms.contains(Permissions::USE_SLASH_COMMANDS)) {
+            Ok(Some(content)) => content,
+            Ok(None) => return Ok(None),
+            Err(e) => return Err(e),
+        };
 
     let spans = md_utils::scan_markdown(&modified_content);
 
@@ -99,14 +97,14 @@ pub async fn create_message(
 
     // NOTE: This can potentially modify the content, hence why it takes ownership. Do not assume
     // spans are valid after this call
-    let modified_content = verify::verify(&t, &state, auth, room_id, perm, modified_content, &spans).await?;
+    let modified_content = verify::verify(&t, &state, auth, room_id, perms, modified_content, &spans).await?;
 
     let msg = insert_message(t, state.clone(), auth, room_id, msg_id, &body, &modified_content)
         .boxed()
         .await?;
 
     // message has been inserted, so fire off the embed processing
-    if !spans.is_empty() && perm.contains(RoomPermissions::EMBED_LINKS) {
+    if !spans.is_empty() && perms.contains(Permissions::EMBED_LINKS) {
         embed::process_embeds(state, msg_id, &modified_content, &spans);
     }
 

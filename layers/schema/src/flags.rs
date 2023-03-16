@@ -17,5 +17,8 @@ bitflags::bitflags! {
         /// This is required to preserve existing links, but not include it in queries.
         const ORPHANED = 1 << 0;
     }
-}
 
+    pub struct RoomMemberFlags: i32 {
+        const MUTED = 1 << 0;
+    }
+}

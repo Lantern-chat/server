@@ -33,7 +33,7 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
         party_id,
         avatar: None,
         name: SmolStr::new_inline("@everyone"),
-        permissions: Permission::default(),
+        permissions: Permissions::default(),
         color: None,
         position: 0,
         flags: RoleFlags::default(),
@@ -94,7 +94,8 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
                 &default_role.name,
                 &default_role.id,
                 &party.id,
-                &(default_role.permissions.pack() as i64),
+                &default_role.permissions.to_i64()[0],
+                &default_role.permissions.to_i64()[1],
             ],
         ),
         t.execute_cached_typed(
@@ -158,12 +159,19 @@ fn insert_role() -> impl AnyQuery {
 
     Query::insert()
         .into::<Roles>()
-        .cols(&[Roles::Name, Roles::Id, Roles::PartyId, Roles::Permissions])
+        .cols(&[
+            Roles::Name,
+            Roles::Id,
+            Roles::PartyId,
+            Roles::Permissions1,
+            Roles::Permissions2,
+        ])
         .values([
             Var::of(Roles::Name),
             Var::of(Roles::Id),
             Var::of(Roles::PartyId),
-            Var::of(Roles::Permissions),
+            Var::of(Roles::Permissions1),
+            Var::of(Roles::Permissions2),
         ])
 }
 

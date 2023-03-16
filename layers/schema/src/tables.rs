@@ -63,7 +63,7 @@ thorn::enums! {
 
 lazy_static::lazy_static! {
     /// See [EventCode] for full documentation
-    pub static ref EVENT_CODE: Type = <EventCode as EnumType>::ty(30023);
+    pub static ref EVENT_CODE: Type = <EventCode as EnumType>::ty(30849);
 }
 
 thorn::tables! {
@@ -159,10 +159,14 @@ thorn::tables! {
         RoomId: Nullable(Type::INT8),
         UserId: Nullable(Type::INT8),
         RoleId: Nullable(Type::INT8),
-        UserAllow: Nullable(Type::INT8),
-        UserDeny: Nullable(Type::INT8),
-        Allow: Nullable(Type::INT8),
-        Deny: Nullable(Type::INT8),
+        UserAllow1: Nullable(Type::INT8),
+        UserAllow2: Nullable(Type::INT8),
+        UserDeny1: Nullable(Type::INT8),
+        UserDeny2: Nullable(Type::INT8),
+        Allow1: Nullable(Type::INT8),
+        Allow2: Nullable(Type::INT8),
+        Deny1: Nullable(Type::INT8),
+        Deny2: Nullable(Type::INT8),
     }
 
     /// Returns the single most recent/priority presence
@@ -193,7 +197,8 @@ thorn::tables! {
     pub struct AggRoomPerms in Lantern {
         RoomId: Nullable(Type::INT8),
         UserId: Nullable(Type::INT8),
-        Perms: Nullable(Type::INT8),
+        Permissions1: Nullable(Type::INT8),
+        Permissions2: Nullable(Type::INT8),
     }
 
     pub struct AggUsedFiles in Lantern {
@@ -386,8 +391,10 @@ thorn::tables! {
 
     pub struct Overwrites in Lantern {
         RoomId: Type::INT8,
-        Allow: Type::INT8,
-        Deny: Type::INT8,
+        Allow1: Type::INT8,
+        Allow2: Type::INT8,
+        Deny1: Type::INT8,
+        Deny2: Type::INT8,
         RoleId: Nullable(Type::INT8),
         UserId: Nullable(Type::INT8),
     }
@@ -415,7 +422,8 @@ thorn::tables! {
     pub struct PartyMember in Lantern {
         PartyId: Type::INT8,
         UserId: Type::INT8,
-        Perms: Type::INT8,
+        Permissions1: Type::INT8,
+        Permissions2: Type::INT8,
         InviteId: Nullable(Type::INT8),
         JoinedAt: Type::TIMESTAMPTZ,
         MuteUntil: Nullable(Type::TIMESTAMPTZ),
@@ -477,8 +485,8 @@ thorn::tables! {
         Id: Type::INT8,
         PartyId: Type::INT8,
         AvatarId: Nullable(Type::INT8),
-        /// Actually contains 3 16-bit fields
-        Permissions: Type::INT8,
+        Permissions1: Type::INT8,
+        Permissions2: Type::INT8,
         Color: Nullable(Type::INT4),
         Position: Type::INT2,
         Flags: Type::INT2,
@@ -489,10 +497,10 @@ thorn::tables! {
     pub struct RoomMembers in Lantern {
         UserId: Type::INT8,
         RoomId: Type::INT8,
-        /// `(user_allow | (role_allow & !user_deny))`
-        Allow: Nullable(Type::INT8),
-        /// `(role_deny | user_deny)`
-        Deny: Nullable(Type::INT8),
+        Allow1: Nullable(Type::INT8),
+        Allow2: Nullable(Type::INT8),
+        Deny1: Nullable(Type::INT8),
+        Deny2: Nullable(Type::INT8),
         LastRead: Nullable(Type::INT8),
         WallpaperId: Nullable(Type::INT8),
         /// If NULL, there is no mute

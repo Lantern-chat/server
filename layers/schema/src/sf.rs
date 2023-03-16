@@ -45,9 +45,7 @@ pub trait SnowflakeExt {
     fn at_ms_since_lantern_epoch(ms: u64) -> Snowflake {
         // update incremenent counter, making sure it wraps at 12 bits
         let incr = INCR
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |incr| {
-                Some((incr + 1) & 0xFFF)
-            })
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |incr| Some((incr + 1) & 0xFFF))
             .unwrap() as u64;
 
         // get global IDs
@@ -159,6 +157,6 @@ mod test {
 
     #[test]
     fn test_snowflake_ser() {
-        assert!(serde_json::to_string(&Snowflake::now()).unwrap().contains("\""));
+        assert!(serde_json::to_string(&Snowflake::now()).unwrap().contains('"'));
     }
 }

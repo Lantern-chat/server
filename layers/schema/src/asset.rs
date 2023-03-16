@@ -25,6 +25,7 @@ pub fn parse(s: &str) -> Result<AssetQuery, AssetQueryParseError> {
                     } else if let Some(value) = value.strip_prefix("0x") {
                         u16::from_str_radix(value, 16)?
                     } else {
+                        #[allow(clippy::from_str_radix_10)]
                         u16::from_str_radix(&value, 10)?
                     },
                 });

@@ -18,14 +18,14 @@ pub async fn edit_message(
     body: EditMessageBody,
 ) -> Result<Option<Message>, Error> {
     // fast-path for if the perm_cache does contain a value
-    let perm = match state.perm_cache.get(auth.user_id, room_id).await {
-        Some(PermMute { perm, .. }) => {
+    let perms = match state.perm_cache.get(auth.user_id, room_id).await {
+        Some(PermMute { perms, .. }) => {
             // Mostly same rules as creating messages, as they are sending new content
-            if !perm.contains(RoomPermissions::SEND_MESSAGES) {
+            if !perms.contains(Permissions::SEND_MESSAGES) {
                 return Err(Error::Unauthorized);
             }
 
-            Some(perm)
+            Some(perms)
         }
         None => None,
     };
@@ -40,16 +40,16 @@ pub async fn edit_message(
 
     let mut db = state.db.write.get().await?;
 
-    let perm = match perm {
+    let perms = match perms {
         Some(perm) => perm,
         None => {
-            let perm = crate::backend::api::perm::get_room_permissions(&db, auth.user_id, room_id).await?;
+            let perms = crate::backend::api::perm::get_room_permissions(&db, auth.user_id, room_id).await?;
 
-            if !perm.contains(RoomPermissions::SEND_MESSAGES) {
+            if !perms.contains(Permissions::SEND_MESSAGES) {
                 return Err(Error::Unauthorized);
             }
 
-            perm
+            perms
         }
     };
 
@@ -73,7 +73,7 @@ pub async fn edit_message(
     // do full trimming
     let Some(trimmed_content) = ({
         let config = state.config();
-        md_utils::trim_message(trimmed_content.into(), Some(md_utils::TrimLimits {
+        md_utils::trim_message(trimmed_content, Some(md_utils::TrimLimits {
             len: config.message.message_len.clone(),
             max_newlines: config.message.max_newlines
         }))
@@ -88,7 +88,7 @@ pub async fn edit_message(
         Err(e) => return Err(e),
     };
 
-    if !modified_content.is_empty() && perm.contains(RoomPermissions::EMBED_LINKS) {
+    if !modified_content.is_empty() && perms.contains(Permissions::EMBED_LINKS) {
         // TODO: Reprocess embeds
     }
 
@@ -110,7 +110,7 @@ pub async fn edit_message(
         if pre_set != new_set {
             let added = new_set.difference(&pre_set).copied().collect::<Vec<_>>();
 
-            if !added.is_empty() && !perm.contains(RoomPermissions::EDIT_NEW_ATTACHMENT) {
+            if !added.is_empty() && !perms.contains(Permissions::EDIT_NEW_ATTACHMENT) {
                 return Err(Error::Unauthorized);
             }
 

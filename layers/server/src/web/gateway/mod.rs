@@ -13,7 +13,7 @@ use futures::{
     Future, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
 };
 
-use sdk::{api::gateway::GatewayQueryParams, driver::Encoding, models::RoomPermissions};
+use sdk::{api::gateway::GatewayQueryParams, driver::Encoding, models::Permissions};
 use tokio::sync::{broadcast::error::RecvError, mpsc};
 use tokio_stream::wrappers::{errors::BroadcastStreamRecvError, BroadcastStream, ReceiverStream};
 
@@ -223,7 +223,7 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr,
                                         continue 'event_loop;
                                     }
                                     // skip event if user can't view room
-                                    Some(perms) if !perms.room.contains(RoomPermissions::VIEW_ROOM) => continue 'event_loop,
+                                    Some(perms) if !perms.contains(Permissions::VIEW_ROOM) => continue 'event_loop,
                                     _ => { /* send message as normal*/ }
                                 }
                             }
