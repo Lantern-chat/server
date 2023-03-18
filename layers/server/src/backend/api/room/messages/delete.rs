@@ -59,7 +59,7 @@ fn delete_without_perms() -> impl AnyQuery {
 
     Query::update()
         .table::<Messages>()
-        .set(Messages::Flags, Messages::Flags.bit_or(DELETED_FLAG.lit()))
+        .set(Messages::Flags, Messages::Flags.bitor(DELETED_FLAG.lit()))
         .and_where(Messages::Id.equals(Var::of(Messages::Id)))
         .and_where(Messages::Flags.has_no_bits(DELETED_FLAG.lit())) // prevent double-updates
 }
@@ -69,7 +69,7 @@ fn delete_if_own() -> impl AnyQuery {
 
     Query::update()
         .table::<Messages>()
-        .set(Messages::Flags, Messages::Flags.bit_or(DELETED_FLAG.lit()))
+        .set(Messages::Flags, Messages::Flags.bitor(DELETED_FLAG.lit()))
         .and_where(Messages::Id.equals(Var::of(Messages::Id)))
         .and_where(Messages::UserId.equals(Var::of(Users::Id)))
         .and_where(Messages::Flags.has_no_bits(DELETED_FLAG.lit())) // prevent double-updates
@@ -109,7 +109,7 @@ fn delete_with_perms() -> impl AnyQuery {
             )
             .or(Messages::UserId.equals(user_id_var)),
         )
-        .set(Messages::Flags, Messages::Flags.bit_or(DELETED_FLAG.lit()))
+        .set(Messages::Flags, Messages::Flags.bitor(DELETED_FLAG.lit()))
         .and_where(Messages::Id.equals(msg_id_var))
         .and_where(Messages::Flags.has_no_bits(DELETED_FLAG.lit())) // prevent double-updates
 }

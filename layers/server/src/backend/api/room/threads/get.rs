@@ -101,7 +101,7 @@ pub async fn get_thread(
 //         .and_where(Threads::Id.equals(thread_id_var))
 //         .and_where(
 //             AggPerm::Perms
-//                 .bit_and(READ_MESSAGES.lit())
+//                 .bitand(READ_MESSAGES.lit())
 //                 .equals(READ_MESSAGES.lit()),
 //         )
 //         .cols(get_one::Columns::default())

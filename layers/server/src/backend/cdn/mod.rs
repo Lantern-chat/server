@@ -9,8 +9,8 @@ use ftl::{
 use filesystem::store::{CipherOptions, OpenMode};
 use futures::FutureExt;
 use headers::{
-    AcceptRanges, ContentLength, ContentRange, ContentType, HeaderMap, HeaderMapExt, HeaderValue,
-    IfModifiedSince, LastModified, Range,
+    AcceptRanges, ContentLength, ContentRange, ContentType, HeaderMap, HeaderMapExt, HeaderValue, IfModifiedSince,
+    LastModified, Range,
 };
 use hyper::Body;
 use smol_str::SmolStr;
@@ -192,29 +192,28 @@ mod query {
     }
 
     pub fn select_asset(kind: AssetKind) -> impl thorn::AnyQuery {
-        let quality = UserAssetFiles::Flags.bit_and(AssetFlags::QUALITY.bits().lit());
+        let quality = UserAssetFiles::Flags.bitand(AssetFlags::QUALITY.bits().lit());
 
         let mut q = Query::select()
             .cols(Columns::default())
             // select files of at least the given quality
             .and_where(quality.greater_than_equal(Builtin::least((
-                AssetParams::flags().bit_and(AssetFlags::QUALITY.bits().lit()),
+                AssetParams::flags().bitand(AssetFlags::QUALITY.bits().lit()),
                 100i16.lit(),
             ))))
             .and_where(
-                UserAssetFiles::Flags
-                    .has_any_bits(AssetParams::flags().bit_and(AssetFlags::FORMATS.bits().lit())),
+                UserAssetFiles::Flags.has_any_bits(AssetParams::flags().bitand(AssetFlags::FORMATS.bits().lit())),
             )
             .and_where(
                 UserAssetFiles::Flags
-                    .has_any_bits(AssetParams::flags().bit_and(AssetFlags::FLAGS.bits().lit()))
+                    .has_any_bits(AssetParams::flags().bitand(AssetFlags::FLAGS.bits().lit()))
                     .or(UserAssetFiles::Flags.has_no_bits(AssetFlags::FLAGS.bits().lit())),
             )
             .order_by(
                 // prioritize images with animation, then alpha, then without alpha
                 // this is possible because the ANIMATED flag is higher than HAS_ALPHA
                 UserAssetFiles::Flags
-                    .bit_and(AssetFlags::FLAGS.bits().lit())
+                    .bitand(AssetFlags::FLAGS.bits().lit())
                     .descending(),
             )
             // order by file size, to pick the smallest one first

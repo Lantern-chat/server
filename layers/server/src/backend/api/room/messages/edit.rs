@@ -230,7 +230,7 @@ fn orphan_attachments_query() -> impl thorn::AnyQuery {
         .table::<Attachments>()
         .set(
             Attachments::Flags,
-            Attachments::Flags.bit_or(flags::AttachmentFlags::ORPHANED.bits().lit()),
+            Attachments::Flags.bitor(flags::AttachmentFlags::ORPHANED.bits().lit()),
         )
         .and_where(Attachments::FileId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))
 }

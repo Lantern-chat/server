@@ -16,7 +16,7 @@ pub async fn ban_user(state: ServerState, user_id: Snowflake) -> Result<(), Erro
                 Query::update()
                     .table::<Users>()
                     .and_where(Users::Id.equals(Var::of(Users::Id)))
-                    .set(Users::Flags, Users::Flags.bit_or(UserFlags::BANNED.bits().lit()))
+                    .set(Users::Flags, Users::Flags.bitor(UserFlags::BANNED.bits().lit()))
             },
             &[&user_id],
         )

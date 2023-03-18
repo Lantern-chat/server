@@ -14,7 +14,7 @@ pub async fn unban_user(state: ServerState, user_id: Snowflake) -> Result<(), Er
             Query::update()
                 .table::<Users>()
                 .and_where(Users::Id.equals(Var::of(Users::Id)))
-                .set(Users::Flags, Users::Flags.bit_and(not_banned_flags.lit()))
+                .set(Users::Flags, Users::Flags.bitand(not_banned_flags.lit()))
         },
         &[&user_id],
     )
