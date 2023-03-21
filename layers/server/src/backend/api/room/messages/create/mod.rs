@@ -1,4 +1,5 @@
 use futures::FutureExt;
+use md_utils::SpanType;
 use schema::{Snowflake, SnowflakeExt};
 
 use crate::{backend::cache::permission_cache::PermMute, Authorization, Error, ServerState};
@@ -33,14 +34,14 @@ pub async fn create_message(
     let trimmed_content = body.content.trim();
 
     // if empty but not containing attachments
-    if trimmed_content.is_empty() && body.attachments.is_empty() {
+    if trimmed_content.is_empty() && body.attachments.is_empty() && body.embeds.is_empty() {
         return Err(Error::BadRequest);
     }
 
     // do full trimming
     let Some(trimmed_content) = ({
         let config = state.config();
-        md_utils::trim_message(trimmed_content.into(), Some(md_utils::TrimLimits {
+        md_utils::trim_message(trimmed_content, Some(md_utils::TrimLimits {
             len: config.message.message_len.clone(),
             max_newlines: config.message.max_newlines
         }))
@@ -99,7 +100,15 @@ pub async fn create_message(
     // spans are valid after this call
     let modified_content = verify::verify(&t, &state, auth, room_id, perms, modified_content, &spans).await?;
 
-    let msg = insert_message(t, state.clone(), auth, room_id, msg_id, &body, &modified_content)
+    let mut flags = MessageFlags::empty();
+
+    for span in &spans {
+        if span.kind() == SpanType::Url {
+            flags |= MessageFlags::HAS_LINK;
+        }
+    }
+
+    let msg = insert_message(t, state.clone(), auth, room_id, msg_id, &body, &modified_content, flags)
         .boxed()
         .await?;
 
@@ -111,6 +120,7 @@ pub async fn create_message(
     Ok(Some(msg))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn insert_message(
     t: db::pool::Transaction<'_>,
     state: ServerState,
@@ -119,6 +129,7 @@ pub(crate) async fn insert_message(
     msg_id: Snowflake,
     body: &CreateMessageBody,
     content: &str,
+    flags: MessageFlags,
 ) -> Result<Message, Error> {
     // allow it to be null
     let content = if content.is_empty() { None } else { Some(content) };
@@ -138,6 +149,7 @@ pub(crate) async fn insert_message(
                 pub thread_id: Snowflake = Threads::Id,
                 pub new_thread_flags: ThreadFlags = Threads::Flags,
                 pub content: Option<&'a str> = Messages::Content,
+                pub flags: i16 = Messages::Flags,
             }
         }
 
@@ -150,6 +162,7 @@ pub(crate) async fn insert_message(
                         Messages::Id,
                         Messages::UserId,
                         Messages::RoomId,
+                        Messages::Flags,
                         Messages::Content,
                     ])
                     .value(
@@ -166,6 +179,7 @@ pub(crate) async fn insert_message(
                         Params::user_id(),
                         Params::room_id(),
                         Params::content(),
+                        Params::flags(),
                     ])
             },
             &Params {
@@ -176,6 +190,7 @@ pub(crate) async fn insert_message(
                 thread_id,
                 new_thread_flags: ThreadFlags::empty(), // TODO
                 content,
+                flags: flags.bits(),
             }
             .as_params(),
         )
