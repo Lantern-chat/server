@@ -54,7 +54,7 @@ pub async fn trigger_typing(state: ServerState, auth: Authorization, room_id: Sn
             }
 
             pub enum MemberColumns continue UserColumns {
-                PartyMember::JoinedAt,
+                PartyMembers::JoinedAt,
             }
 
             pub enum ProfileColumns continue MemberColumns {
@@ -107,10 +107,10 @@ pub async fn trigger_typing(state: ServerState, auth: Authorization, room_id: Sn
                     .cols(RoleColumns::default())
                     .from(
                         Users::left_join(
-                            PartyMember::inner_join_table::<AggRoom>()
-                                .on(PartyMember::PartyId.equals(AggRoom::PartyId)),
+                            PartyMembers::inner_join_table::<AggRoom>()
+                                .on(PartyMembers::PartyId.equals(AggRoom::PartyId)),
                         )
-                        .on(PartyMember::UserId.equals(Users::Id))
+                        .on(PartyMembers::UserId.equals(Users::Id))
                         .left_join_table::<BaseProfile>()
                         .on(BaseProfile::col(Profiles::UserId)
                             .equals(Users::Id)

@@ -9,11 +9,7 @@ use sdk::models::gateway::{
 
 use super::prelude::*;
 
-pub async fn user_update(
-    state: &ServerState,
-    db: &db::pool::Client,
-    user_id: Snowflake,
-) -> Result<(), Error> {
+pub async fn user_update(state: &ServerState, db: &db::pool::Client, user_id: Snowflake) -> Result<(), Error> {
     let self_future = self_update(state, db, user_id, None);
 
     let user_future = async {
@@ -89,9 +85,9 @@ pub async fn user_update(
                     use schema::*;
 
                     Query::select()
-                        .expr(Builtin::array_agg_nonnull(PartyMember::PartyId))
-                        .from_table::<PartyMember>()
-                        .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
+                        .expr(Builtin::array_agg_nonnull(PartyMembers::PartyId))
+                        .from_table::<PartyMembers>()
+                        .and_where(PartyMembers::UserId.equals(Var::of(Users::Id)))
                 },
                 &[&user_id],
             )
@@ -155,10 +151,10 @@ async fn party_position_update(
                 use schema::*;
 
                 Query::select()
-                    .col(PartyMember::Position)
-                    .from_table::<PartyMember>()
-                    .and_where(PartyMember::PartyId.equals(Var::of(Party::Id)))
-                    .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
+                    .col(PartyMembers::Position)
+                    .from_table::<PartyMembers>()
+                    .and_where(PartyMembers::PartyId.equals(Var::of(Party::Id)))
+                    .and_where(PartyMembers::UserId.equals(Var::of(Users::Id)))
             },
             &[&party_id, &user_id],
         )

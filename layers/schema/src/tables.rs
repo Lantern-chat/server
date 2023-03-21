@@ -419,7 +419,7 @@ thorn::tables! {
     }
 
     /// Association map between parties and users
-    pub struct PartyMember in Lantern {
+    pub struct PartyMembers in Lantern {
         PartyId: Type::INT8,
         UserId: Type::INT8,
         Permissions1: Type::INT8,

@@ -107,8 +107,8 @@ mod q {
     thorn::params! {
         pub struct Params {
             pub user_id: Option<Snowflake> = Users::Id,
-            pub party_id: Snowflake = PartyMember::PartyId,
-            pub member_id: Option<Snowflake> = PartyMember::UserId,
+            pub party_id: Snowflake = PartyMembers::PartyId,
+            pub member_id: Option<Snowflake> = PartyMembers::UserId,
         }
     }
 
@@ -143,9 +143,9 @@ mod q {
 
     pub fn query(single: bool, full: bool, anonymous: bool) -> impl thorn::AnyQuery {
         let is_member = Query::select()
-            .from_table::<PartyMember>()
-            .and_where(PartyMember::UserId.equals(Params::user_id()))
-            .and_where(PartyMember::PartyId.equals(Params::party_id()))
+            .from_table::<PartyMembers>()
+            .and_where(PartyMembers::UserId.equals(Params::user_id()))
+            .and_where(PartyMembers::PartyId.equals(Params::party_id()))
             .exists();
 
         let mut q = Query::select()

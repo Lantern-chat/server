@@ -100,7 +100,7 @@ mod q {
         }
 
         pub enum PartyColumns continue UserColumns {
-            PartyMember::PartyId,
+            PartyMembers::PartyId,
         }
 
         pub enum ProfileColumns continue PartyColumns {
@@ -145,15 +145,15 @@ mod q {
                 PartyProfile::col(Profiles::CustomStatus),
                 BaseProfile::col(Profiles::CustomStatus),
             )))
-            .and_where(PartyMember::UserId.equals(Params::user_id()))
+            .and_where(PartyMembers::UserId.equals(Params::user_id()))
             .and_where(
-                PartyMember::PartyId
+                PartyMembers::PartyId
                     .equals(Params::party_id())
                     .or(Params::party_id().is_null()),
             )
             .from(
-                PartyMember::inner_join_table::<Users>()
-                    .on(Users::Id.equals(PartyMember::UserId))
+                PartyMembers::inner_join_table::<Users>()
+                    .on(Users::Id.equals(PartyMembers::UserId))
                     .left_join_table::<BaseProfile>()
                     .on(BaseProfile::col(Profiles::UserId)
                         .equals(Params::user_id())

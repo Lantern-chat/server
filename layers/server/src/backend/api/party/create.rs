@@ -139,18 +139,18 @@ fn query_max_position() -> impl AnyQuery {
     use schema::*;
 
     Query::select()
-        .expr(Builtin::max(PartyMember::Position))
-        .from_table::<PartyMember>()
-        .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
+        .expr(Builtin::max(PartyMembers::Position))
+        .from_table::<PartyMembers>()
+        .and_where(PartyMembers::UserId.equals(Var::of(Users::Id)))
 }
 
 fn insert_member() -> impl AnyQuery {
     use schema::*;
 
     Query::insert()
-        .into::<PartyMember>()
-        .cols(&[PartyMember::PartyId, PartyMember::UserId, PartyMember::Position])
-        .values([Var::of(Party::Id), Var::of(Users::Id), Var::of(PartyMember::Position)])
+        .into::<PartyMembers>()
+        .cols(&[PartyMembers::PartyId, PartyMembers::UserId, PartyMembers::Position])
+        .values([Var::of(Party::Id), Var::of(Users::Id), Var::of(PartyMembers::Position)])
 }
 
 // NOTE: Does not set sort order manually, defaults to 0

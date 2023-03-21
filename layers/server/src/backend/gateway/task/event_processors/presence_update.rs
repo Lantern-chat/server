@@ -79,7 +79,7 @@ mod q {
     thorn::params! {
         pub struct Params {
             pub user_id: Snowflake = Users::Id,
-            pub party_id: Option<Snowflake> = PartyMember::PartyId,
+            pub party_id: Option<Snowflake> = PartyMembers::PartyId,
         }
     }
 
@@ -91,7 +91,7 @@ mod q {
         }
 
         pub enum PartyColumns continue UserColumns {
-            PartyMember::PartyId,
+            PartyMembers::PartyId,
         }
 
         pub enum PresenceColumns continue PartyColumns {
@@ -108,13 +108,13 @@ mod q {
             .cols(PresenceColumns::default())
             .and_where(Users::Id.equals(Params::user_id()))
             .and_where(
-                PartyMember::PartyId
+                PartyMembers::PartyId
                     .equals(Params::party_id())
                     .or(Params::party_id().is_null()),
             )
             .from(
-                Users::inner_join_table::<PartyMember>()
-                    .on(PartyMember::UserId.equals(Users::Id))
+                Users::inner_join_table::<PartyMembers>()
+                    .on(PartyMembers::UserId.equals(Users::Id))
                     .left_join_table::<AggPresence>()
                     .on(AggPresence::UserId.equals(Users::Id)),
             )

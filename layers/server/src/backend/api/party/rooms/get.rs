@@ -83,10 +83,10 @@ pub async fn get_rooms(state: ServerState, auth: Authorization, party_id: Snowfl
 
                     Query::select()
                         .from(
-                            Rooms::inner_join_table::<PartyMember>()
-                                .on(Rooms::PartyId.equals(PartyMember::PartyId)),
+                            Rooms::inner_join_table::<PartyMembers>()
+                                .on(Rooms::PartyId.equals(PartyMembers::PartyId)),
                         )
-                        .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
+                        .and_where(PartyMembers::UserId.equals(Var::of(Users::Id)))
                         .cols(&[
                             Rooms::Id,
                             Rooms::Name,

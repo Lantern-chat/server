@@ -40,7 +40,7 @@ pub async fn get_party_inner(
             }
 
             pub enum PartyMemberColumns continue PartyColumns {
-                PartyMember::Position,
+                PartyMembers::Position,
             }
         }
     }
@@ -54,8 +54,8 @@ pub async fn get_party_inner(
                     .cols(PartyColumns::default())
                     .cols(PartyMemberColumns::default())
                     .and_where(Party::Id.equals(Var::of(Party::Id)))
-                    .from(Party::left_join_table::<PartyMember>().on(PartyMember::PartyId.equals(Party::Id)))
-                    .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
+                    .from(Party::left_join_table::<PartyMembers>().on(PartyMembers::PartyId.equals(Party::Id)))
+                    .and_where(PartyMembers::UserId.equals(Var::of(Users::Id)))
                     .and_where(Party::DeletedAt.is_null())
             },
             &[&party_id, &user_id],

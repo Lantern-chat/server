@@ -28,7 +28,7 @@ pub async fn update_prefs(
                     // defaults are set to null, so strip them to save space
                     Call::custom("jsonb_strip_nulls").arg(
                         // Coalesce in case user never had prefs
-                        Builtin::coalesce((Users::Preferences, Literal::EMPTY_ARRAY.cast(Type::JSONB)))
+                        Builtin::coalesce((Users::Preferences, [(); 0].lit().cast(Type::JSONB)))
                             // concat to overwrite old prefs
                             .concat(Var::of(Users::Preferences)),
                     ),

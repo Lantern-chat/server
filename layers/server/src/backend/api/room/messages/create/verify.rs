@@ -114,8 +114,8 @@ mod q {
     pub fn match_all_usable_emotes() -> impl AnyQuery {
         Query::select()
             .cols(Columns::default())
-            .from(PartyMember::inner_join_table::<Emotes>().on(Emotes::PartyId.equals(PartyMember::PartyId)))
-            .and_where(PartyMember::UserId.equals(Params::kind_id()))
+            .from(PartyMembers::inner_join_table::<Emotes>().on(Emotes::PartyId.equals(PartyMembers::PartyId)))
+            .and_where(PartyMembers::UserId.equals(Params::kind_id()))
             .and_where(Emotes::Id.equals(Builtin::any((Params::ids(),))))
     }
 

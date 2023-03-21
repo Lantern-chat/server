@@ -35,9 +35,9 @@ pub async fn patch_profile(
 
                     Query::select()
                         .expr(1.lit())
-                        .from_table::<PartyMember>()
-                        .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
-                        .and_where(PartyMember::PartyId.equals(Var::of(Party::Id)))
+                        .from_table::<PartyMembers>()
+                        .and_where(PartyMembers::UserId.equals(Var::of(Users::Id)))
+                        .and_where(PartyMembers::PartyId.equals(Var::of(Party::Id)))
                 },
                 &[&auth.user_id, &party_id],
             )
@@ -93,12 +93,8 @@ pub async fn patch_profile(
                 use thorn::*;
 
                 Query::select()
-                    .and_where(
-                        AggOriginalProfileFiles::UserId.equals(Var::of(AggOriginalProfileFiles::UserId)),
-                    )
-                    .and_where(
-                        AggOriginalProfileFiles::PartyId.equals(Var::of(AggOriginalProfileFiles::PartyId)),
-                    )
+                    .and_where(AggOriginalProfileFiles::UserId.equals(Var::of(AggOriginalProfileFiles::UserId)))
+                    .and_where(AggOriginalProfileFiles::PartyId.equals(Var::of(AggOriginalProfileFiles::PartyId)))
                     .from_table::<AggOriginalProfileFiles>()
                     .cols(&[
                         AggOriginalProfileFiles::AvatarFileId,

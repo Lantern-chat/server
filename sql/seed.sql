@@ -248,7 +248,7 @@ CREATE TABLE lantern.party (
 );
 
 -- Association map between parties and users
-CREATE TABLE lantern.party_member (
+CREATE TABLE lantern.party_members (
     party_id        bigint          NOT NULL,
     user_id         bigint          NOT NULL,
     permissions1    bigint          NOT NULL DEFAULT 0,
@@ -263,7 +263,7 @@ CREATE TABLE lantern.party_member (
     -- Composite primary key
     CONSTRAINT party_member_pk PRIMARY KEY (party_id, user_id)
 );
-COMMENT ON TABLE lantern.party_member IS 'Association map between parties and users';
+COMMENT ON TABLE lantern.party_members IS 'Association map between parties and users';
 
 CREATE TABLE lantern.rooms (
     id              bigint      NOT NULL,
@@ -284,8 +284,8 @@ CREATE TABLE lantern.room_members (
     user_id         bigint      NOT NULL,
     room_id         bigint      NOT NULL,
 
-    -- if NULL, there is no difference between these and party_member perms
-    -- full permissions can be computed from `(party_member.permissions & !deny) | allow`
+    -- if NULL, there is no difference between these and party_members perms
+    -- full permissions can be computed from `(party_members.permissions & !deny) | allow`
     allow1          bigint, -- (user_allow | (role_allow & !user_deny))
     allow2          bigint, -- (user_allow | (role_allow & !user_deny))
     deny1           bigint, -- (role_deny | user_deny)
@@ -686,11 +686,11 @@ ALTER TABLE lantern.party ADD CONSTRAINT owner_fk FOREIGN KEY (owner_id)
     REFERENCES lantern.users (id) MATCH FULL
     ON DELETE RESTRICT ON UPDATE CASCADE; -- Don't allow users to delete accounts if they own parties
 
-ALTER TABLE lantern.party_member ADD CONSTRAINT party_fk FOREIGN KEY (party_id)
+ALTER TABLE lantern.party_members ADD CONSTRAINT party_fk FOREIGN KEY (party_id)
     REFERENCES lantern.party (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE; -- When a party is deleted cascade to delete memberships
 
-ALTER TABLE lantern.party_member ADD CONSTRAINT member_fk FOREIGN KEY (user_id)
+ALTER TABLE lantern.party_members ADD CONSTRAINT member_fk FOREIGN KEY (user_id)
     REFERENCES lantern.users (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE; -- When a user is deleted cascade to delete their membership
 
@@ -756,7 +756,7 @@ ALTER TABLE lantern.profiles ADD CONSTRAINT party_fk FOREIGN KEY(party_id)
     ON DELETE CASCADE ON UPDATE CASCADE;
 
 ALTER TABLE lantern.profiles ADD CONSTRAINT member_fk FOREIGN KEY (user_id, party_id)
-    REFERENCES lantern.party_member (user_id, party_id) MATCH PARTIAL
+    REFERENCES lantern.party_members (user_id, party_id) MATCH PARTIAL
     ON DELETE CASCADE ON UPDATE NO ACTION; -- ON UPDATE handled by other foreign keys
 
 ALTER TABLE lantern.profiles ADD CONSTRAINT avatar_fk FOREIGN KEY(avatar_id)
@@ -823,7 +823,7 @@ ALTER TABLE lantern.invite ADD CONSTRAINT user_fk FOREIGN KEY (user_id)
     REFERENCES lantern.users (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
-ALTER TABLE lantern.party_member ADD CONSTRAINT invite_fk FOREIGN KEY (invite_id)
+ALTER TABLE lantern.party_members ADD CONSTRAINT invite_fk FOREIGN KEY (invite_id)
     REFERENCES lantern.invite (id) MATCH FULL
     ON DELETE SET NULL ON UPDATE CASCADE;
 
@@ -951,7 +951,7 @@ ALTER TABLE lantern.pin_tags ADD CONSTRAINT icon_fk FOREIGN KEY (icon_id)
 ----------------------------------------
 
 -- per-user, their parties must be sorted with unique positions
-ALTER TABLE lantern.party_member ADD CONSTRAINT unique_party_position
+ALTER TABLE lantern.party_members ADD CONSTRAINT unique_party_position
     UNIQUE(user_id, position) DEFERRABLE INITIALLY DEFERRED;
 
 -- per-party, their rooms must be sorted with unique positions
@@ -1046,7 +1046,7 @@ CREATE INDEX user_freelist_username_idx     ON lantern.user_freelist    USING bt
 CREATE INDEX user_tokens_token_idx          ON lantern.user_tokens      USING hash(token);
 CREATE INDEX user_tokens_expires_idx        ON lantern.user_tokens      USING btree(expires);
 CREATE INDEX party_name_idx                 ON lantern.party            USING btree(name);
-CREATE INDEX party_member_user_idx          ON lantern.party_member     USING btree(user_id);
+CREATE INDEX party_member_user_idx          ON lantern.party_members    USING btree(user_id);
 CREATE INDEX room_name_idx                  ON lantern.rooms            USING btree(name);
 CREATE INDEX room_avatar_idx                ON lantern.rooms            USING btree(avatar_id) WHERE avatar_id IS NOT NULL;
 CREATE INDEX file_idx                       ON lantern.files            USING btree(user_id, id)        INCLUDE (size);
@@ -1281,14 +1281,14 @@ BEGIN
 END
 $$;
 
-CREATE TRIGGER member_insert_event AFTER INSERT ON lantern.party_member
+CREATE TRIGGER member_insert_event AFTER INSERT ON lantern.party_members
 FOR EACH ROW EXECUTE FUNCTION lantern.on_member_insert();
 
-CREATE TRIGGER member_update_event AFTER UPDATE ON lantern.party_member
+CREATE TRIGGER member_update_event AFTER UPDATE ON lantern.party_members
 FOR EACH ROW WHEN (pg_trigger_depth() = 0)
 EXECUTE FUNCTION lantern.on_member_update();
 
-CREATE TRIGGER member_delete_event AFTER DELETE ON lantern.party_member
+CREATE TRIGGER member_delete_event AFTER DELETE ON lantern.party_members
 FOR EACH ROW EXECUTE FUNCTION lantern.on_member_delete();
 
 --
@@ -1412,7 +1412,7 @@ FOR EACH ROW EXECUTE FUNCTION lantern.profile_trigger();
 
 --
 
--- When a party_member row is deleted, also delete their per-party profile override entry
+-- When a party_members row is deleted, also delete their per-party profile override entry
 CREATE OR REPLACE FUNCTION lantern.party_member_delete_profile_trigger()
 RETURNS trigger
 LANGUAGE plpgsql AS
@@ -1423,7 +1423,7 @@ BEGIN
 END
 $$;
 
-CREATE TRIGGER party_member_delete_profile_event AFTER DELETE ON lantern.party_member
+CREATE TRIGGER party_member_delete_profile_event AFTER DELETE ON lantern.party_members
 FOR EACH ROW EXECUTE FUNCTION lantern.party_member_delete_profile_trigger();
 
 --
@@ -1457,8 +1457,8 @@ $$
 BEGIN
     -- TODO: See if this can be made more efficient for the conflcit query
     WITH rm AS (
-        SELECT party_member.user_id, rooms.id AS room_id
-        FROM lantern.party_member LEFT JOIN lantern.rooms ON rooms.party_id = party_member.party_id
+        SELECT party_members.user_id, rooms.id AS room_id
+        FROM lantern.party_members LEFT JOIN lantern.rooms ON rooms.party_id = party_members.party_id
     ), perms AS (
         SELECT
             rm.user_id, rm.room_id,
@@ -1481,13 +1481,13 @@ BEGIN
     -- user roles
     WITH ur AS (
         SELECT p.party_id, p.user_id, roles.permissions1, roles.permissions2
-        FROM lantern.party_member p
+        FROM lantern.party_members p
         INNER JOIN lantern.roles ON roles.party_id = p.party_id
         INNER JOIN lantern.role_members ON role_members.role_id = roles.id AND role_members.user_id = p.user_id
         UNION ALL
         -- Also select @everyone
         SELECT p.party_id, p.user_id, roles.permissions1, roles.permissions2
-        FROM lantern.party_member p
+        FROM lantern.party_members p
         INNER JOIN lantern.roles ON roles.party_id = p.party_id AND roles.party_id = roles.id
     ), perms AS (
         SELECT ur.party_id, ur.user_id,
@@ -1495,12 +1495,12 @@ BEGIN
             bit_or(ur.permissions2) AS permissions2
         FROM ur GROUP BY ur.user_id, ur.party_id
     )
-    UPDATE lantern.party_member SET
+    UPDATE lantern.party_members SET
         permissions1 = perms.permissions1,
         permissions2 = perms.permissions2
     FROM perms
-    WHERE party_member.user_id = perms.user_id AND party_member.party_id = perms.party_id
-    AND (party_member.permissions1 != perms.permissions1 OR party_member.permissions2 != perms.permissions2);
+    WHERE party_members.user_id = perms.user_id AND party_members.party_id = perms.party_id
+    AND (party_members.permissions1 != perms.permissions1 OR party_members.permissions2 != perms.permissions2);
 END
 $$;
 
@@ -1527,19 +1527,19 @@ BEGIN
     -- Handle @everyone special case
     IF _role_id = _party_id THEN
         WITH perms AS (
-            SELECT party_member.user_id,
+            SELECT party_members.user_id,
                 bit_or(roles.permissions1) AS permissions1,
                 bit_or(roles.permissions2) as permissions2
-            FROM lantern.party_member
-            INNER JOIN lantern.roles ON roles.id = party_member.party_id AND roles.party_id = party_member.party_id
-            GROUP BY party_member.user_id
+            FROM lantern.party_members
+            INNER JOIN lantern.roles ON roles.id = party_members.party_id AND roles.party_id = party_members.party_id
+            GROUP BY party_members.user_id
         )
-        UPDATE party_member SET
+        UPDATE party_members SET
             permissions1 = perms.permissions1,
             permissions2 = perms.permissions2
-        FROM perms WHERE party_member.user_id = perms.user_id
-        AND party_member.party_id = _party_id
-        AND (party_member.permissions1 != perms.permissions1 OR party_member.permissions2 != perms.permissions2);
+        FROM perms WHERE party_members.user_id = perms.user_id
+        AND party_members.party_id = _party_id
+        AND (party_members.permissions1 != perms.permissions1 OR party_members.permissions2 != perms.permissions2);
     ELSE
         WITH members_to_update AS (
             -- get a list of members relevant to this role
@@ -1558,13 +1558,13 @@ BEGIN
             GROUP BY m.user_id
         )
         -- apply updated base permissions
-        UPDATE lantern.party_member SET
+        UPDATE lantern.party_members SET
             permissions1 = perms.permissions1,
             permissions2 = perms.permissions2
-        FROM perms WHERE party_member.user_id = perms.user_id
-        AND party_member.party_id = _party_id
+        FROM perms WHERE party_members.user_id = perms.user_id
+        AND party_members.party_id = _party_id
         -- but don't modify if unchanged, avoiding triggers
-        AND (party_member.permissions1 != perms.permissions1 OR party_member.permissions2 != perms.permissions2);
+        AND (party_members.permissions1 != perms.permissions1 OR party_members.permissions2 != perms.permissions2);
     END IF;
 
     RETURN NEW;
@@ -1600,8 +1600,8 @@ BEGIN
             SELECT role_members.user_id FROM lantern.role_members WHERE role_members.role_id = _role_id
             UNION ALL
             -- will only return rows when roles.id = roles.party_id, indicating @everyone
-            SELECT party_member.user_id
-            FROM lantern.roles INNER JOIN lantern.party_members ON party_member.party_id = roles.party_id
+            SELECT party_members.user_id
+            FROM lantern.roles INNER JOIN lantern.party_members ON party_members.party_id = roles.party_id
             WHERE roles.id = _role_id
             AND   roles.id = roles.party_id
         ), perms AS (
@@ -1719,10 +1719,10 @@ BEGIN
 END
 $$;
 
-CREATE TRIGGER room_member_delete AFTER DELETE ON lantern.party_member
+CREATE TRIGGER room_member_delete AFTER DELETE ON lantern.party_members
 FOR EACH ROW EXECUTE FUNCTION lantern.on_party_member_delete();
 
-CREATE TRIGGER room_member_insert BEFORE INSERT ON lantern.party_member
+CREATE TRIGGER room_member_insert BEFORE INSERT ON lantern.party_members
 FOR EACH ROW EXECUTE FUNCTION lantern.on_party_member_insert();
 
 -- When a new room is created, the room_members must have values inserted
@@ -1732,8 +1732,8 @@ LANGUAGE plpgsql AS
 $$
 BEGIN
     INSERT INTO lantern.room_members (user_id, room_id, allow1, allow2, deny1, deny2)
-    SELECT party_member.user_id, NEW.room_id, NULL, NULL, NULL, NULL
-    FROM lantern.party_member WHERE party_member.party_id = NEW.party_id;
+    SELECT party_members.user_id, NEW.room_id, NULL, NULL, NULL, NULL
+    FROM lantern.party_members WHERE party_members.party_id = NEW.party_id;
 
     RETURN NEW;
 END
@@ -1786,7 +1786,7 @@ BEGIN
         WHERE room_members.user_id = _user_id
         AND room_members.room_id = perms.room_id
         AND (
-                room_members.allow1 IS DISTINCT FROM perms.allow1
+               room_members.allow1 IS DISTINCT FROM perms.allow1
             OR room_members.allow2 IS DISTINCT FROM perms.allow2
             OR room_members.deny1  IS DISTINCT FROM perms.deny1
             OR room_members.deny2  IS DISTINCT FROM perms.deny2
@@ -1799,19 +1799,19 @@ BEGIN
         FROM lantern.roles
         WHERE roles.id = _role_id
     ), perms AS (
-        -- pass through p.party_id to limit party_member below
+        -- pass through p.party_id to limit party_members below
         SELECT p.party_id, bit_or(roles.permissions1) AS permissions1, bit_or(roles.permissions2) AS permissions2
         FROM lantern.role_members
         INNER JOIN lantern.roles ON roles.id = role_members.role_id
         INNER JOIN p ON roles.party_id = p.party_id
         GROUP BY p.party_id
     )
-    UPDATE lantern.party_member SET
+    UPDATE lantern.party_members SET
         permissions1 = perms.permissions1,
         permissions2 = perms.permissions2
-    FROM perms WHERE party_member.user_id = _user_id
-    AND party_member.party_id = perms.party_id
-    AND (party_member.permissions1 != perms.permissions1 OR party_member.permissions2 != perms.permissions2);
+    FROM perms WHERE party_members.user_id = _user_id
+    AND party_members.party_id = perms.party_id
+    AND (party_members.permissions1 != perms.permissions1 OR party_members.permissions2 != perms.permissions2);
 
     RETURN NEW;
 END
@@ -1948,7 +1948,7 @@ UNION ALL
 -- at-everyone role overrides, which are roles with the same id as the party
 SELECT
     overwrites.room_id,
-    party_member.user_id,
+    party_members.user_id,
     overwrites.role_id,
     0, 0, 0, 0,
     overwrites.allow1,
@@ -1957,22 +1957,22 @@ SELECT
     overwrites.deny2
 
 FROM
-    lantern.party_member INNER JOIN
+    lantern.party_members INNER JOIN
         lantern.roles INNER JOIN
             lantern.overwrites INNER JOIN lantern.rooms ON rooms.id = overwrites.room_id
         ON roles.id = rooms.party_id AND roles.id = overwrites.role_id
-    ON party_member.party_id = rooms.party_id;
+    ON party_members.party_id = rooms.party_id;
 
 --
 
 CREATE OR REPLACE VIEW lantern.agg_room_perms(room_id, user_id, permissions1, permissions2) AS
 SELECT
-    rooms.id, party_member.user_id,
-    COALESCE(allow1, 0) | (party_member.permissions1 & ~COALESCE(deny1, 0)) AS permissions1,
-    COALESCE(allow2, 0) | (party_member.permissions2 & ~COALESCE(deny2, 0)) AS permissions2
+    rooms.id, party_members.user_id,
+    COALESCE(allow1, 0) | (party_members.permissions1 & ~COALESCE(deny1, 0)) AS permissions1,
+    COALESCE(allow2, 0) | (party_members.permissions2 & ~COALESCE(deny2, 0)) AS permissions2
 FROM
-    lantern.party_member INNER JOIN lantern.rooms ON rooms.party_id = party_member.party_id
-    LEFT JOIN lantern.room_members ON room_members.room_id = rooms.id AND room_members.user_id = party_member.user_id
+    lantern.party_members INNER JOIN lantern.rooms ON rooms.party_id = party_members.party_id
+    LEFT JOIN lantern.room_members ON room_members.room_id = rooms.id AND room_members.user_id = party_members.user_id
 ;
 
 --
@@ -2068,21 +2068,21 @@ CREATE OR REPLACE VIEW lantern.agg_members(
     role_ids
 ) AS
 SELECT
-    party_member.user_id,
-    party_member.party_id,
-    party_member.flags,
-    party_member.joined_at,
+    party_members.user_id,
+    party_members.party_id,
+    party_members.flags,
+    party_members.joined_at,
     (
         SELECT
             ARRAY_AGG(role_id) as roles
         FROM
             lantern.role_members INNER JOIN lantern.roles
             ON  roles.id = role_members.role_id
-            AND roles.party_id = party_member.party_id
-            AND role_members.user_id = party_member.user_id
+            AND roles.party_id = party_members.party_id
+            AND role_members.user_id = party_members.user_id
     )
 FROM
-    lantern.party_member
+    lantern.party_members
 ;
 
 --
@@ -2108,16 +2108,16 @@ CREATE OR REPLACE VIEW lantern.agg_members_full(
     presence_activity
 ) AS
 SELECT
-    party_member.party_id,
-    party_member.user_id,
+    party_members.party_id,
+    party_members.user_id,
     agg_users.discriminator,
     agg_users.flags,
     agg_users.last_active,
     agg_users.username,
     agg_users.presence_flags,
     agg_users.presence_updated_at,
-    party_member.flags,
-    party_member.joined_at,
+    party_members.flags,
+    party_members.joined_at,
     lantern.combine_profile_bits(base_profile.bits, party_profile.bits, party_profile.avatar_id),
     COALESCE(party_profile.avatar_id, base_profile.avatar_id),
     COALESCE(party_profile.banner_id, base_profile.banner_id),
@@ -2127,9 +2127,9 @@ SELECT
     agg_roles.roles,
     agg_users.presence_activity
 FROM
-    lantern.party_member INNER JOIN lantern.agg_users ON (agg_users.id = party_member.user_id)
-    LEFT JOIN lantern.profiles base_profile ON (base_profile.user_id = party_member.user_id AND base_profile.party_id IS NULL)
-    LEFT JOIN lantern.profiles party_profile ON (party_profile.user_id = party_member.user_id AND party_profile.party_id = party_member.party_id)
+    lantern.party_members INNER JOIN lantern.agg_users ON (agg_users.id = party_members.user_id)
+    LEFT JOIN lantern.profiles base_profile ON (base_profile.user_id = party_members.user_id AND base_profile.party_id IS NULL)
+    LEFT JOIN lantern.profiles party_profile ON (party_profile.user_id = party_members.user_id AND party_profile.party_id = party_members.party_id)
 
     LEFT JOIN LATERAL (
         SELECT
@@ -2137,8 +2137,8 @@ FROM
         FROM
             lantern.role_members INNER JOIN lantern.roles
             ON  roles.id = role_members.role_id
-            AND roles.party_id = party_member.party_id
-            AND role_members.user_id = party_member.user_id
+            AND roles.party_id = party_members.party_id
+            AND role_members.user_id = party_members.user_id
     ) agg_roles ON TRUE
 ;
 
@@ -2149,7 +2149,7 @@ CREATE OR REPLACE VIEW lantern.agg_broadcast_visibility(user_id, other_id, party
 SELECT user_id, friend_id, NULL FROM lantern.agg_relationships WHERE rel_b = RELATION_FRIEND
 UNION ALL
 -- broadcast to shared party members
-SELECT p.user_id, NULL, p.party_id FROM lantern.party_member p
+SELECT p.user_id, NULL, p.party_id FROM lantern.party_members p
 -- UNION ALL
 -- Select users from DMs that are subscribed (open) by the other members
 ;
@@ -2160,7 +2160,7 @@ CREATE OR REPLACE VIEW lantern.agg_user_associations(user_id, other_id, party_id
 SELECT user_id, friend_id, NULL FROM lantern.agg_relationships WHERE rel_b = RELATION_FRIEND
 UNION ALL
 SELECT my.user_id, o.user_id, my.party_id FROM
-    lantern.party_member my INNER JOIN lantern.party_member o ON (o.party_id = my.party_id)
+    lantern.party_members my INNER JOIN lantern.party_members o ON (o.party_id = my.party_id)
 ;
 
 --
@@ -2222,7 +2222,7 @@ SELECT
     users.username,
     users.flags,
 
-    party_member.party_id,
+    party_members.party_id,
 
     lantern.combine_profile_bits(base_profile.bits, party_profile.bits, party_profile.avatar_id),
     COALESCE(party_profile.nickname, base_profile.nickname),
@@ -2235,12 +2235,12 @@ SELECT
     presence.flags,
     presence.activity
 FROM
-    users INNER JOIN party_member ON party_member.user_id = users.id
+    users INNER JOIN party_members ON party_members.user_id = users.id
 
     LEFT JOIN lantern.agg_presence presence ON presence.user_id = users.id
 
     LEFT JOIN lantern.profiles base_profile ON (base_profile.user_id = users.id AND base_profile.party_id IS NULL)
-    LEFT JOIN lantern.profiles party_profile ON (party_profile.user_id = users.id AND party_profile.party_id = party_member.party_id)
+    LEFT JOIN lantern.profiles party_profile ON (party_profile.user_id = users.id AND party_profile.party_id = party_members.party_id)
 ;
 
 -----------------------------------------
@@ -2283,14 +2283,14 @@ BEGIN
         )
         -- insert new one at the top
         -- NOTE: Using -1 and doing this insert first avoids extra rollback work on failure
-        INSERT INTO lantern.party_member(party_id, user_id, invite_id, joined_at, position, permissions1, permissions2)
+        INSERT INTO lantern.party_members(party_id, user_id, invite_id, joined_at, position, permissions1, permissions2)
         SELECT _party_id, _user_id, _invite_id, now(), -1, p.permissions1, p.permissions2 FROM p;
 
         -- move all parties down to normalize
-        UPDATE lantern.party_member
+        UPDATE lantern.party_members
             SET position = position + 1
         WHERE
-            party_member.user_id = _user_id;
+            party_members.user_id = _user_id;
     END IF;
 END
 $$;
@@ -2469,6 +2469,6 @@ BEGIN
     DELETE FROM lantern.party_bans WHERE user_id = _user_id;
     DELETE FROM lantern.overrides WHERE user_id = _user_id;
     DELETE FROM lantern.role_members WHERE user_id = _user_id;
-    DELETE FROM lantern.party_member WHERE user_id = _user_id;
+    DELETE FROM lantern.party_members WHERE user_id = _user_id;
 END
 $$;

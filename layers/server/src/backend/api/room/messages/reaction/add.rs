@@ -199,11 +199,12 @@ mod q {
         values = if !emoji {
             values = match allow_external {
                 true => values
-                    .expr(PartyMember::PartyId.alias_to(Values::PartyId))
+                    .expr(PartyMembers::PartyId.alias_to(Values::PartyId))
                     .from(
-                        PartyMember::inner_join_table::<Emotes>().on(Emotes::PartyId.equals(PartyMember::PartyId)),
+                        PartyMembers::inner_join_table::<Emotes>()
+                            .on(Emotes::PartyId.equals(PartyMembers::PartyId)),
                     )
-                    .and_where(PartyMember::UserId.equals(Params::user_id())),
+                    .and_where(PartyMembers::UserId.equals(Params::user_id())),
                 false => values
                     .expr(Rooms::PartyId.alias_to(Values::PartyId))
                     .from(Rooms::inner_join_table::<Emotes>().on(Emotes::PartyId.equals(Rooms::PartyId)))

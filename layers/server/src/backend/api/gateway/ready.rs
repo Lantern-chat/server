@@ -51,7 +51,7 @@ pub async fn ready(
                 }
 
                 pub enum MemberColumns continue PartyColumns {
-                    PartyMember::Position
+                    PartyMembers::Position
                 }
             }
         }
@@ -64,8 +64,10 @@ pub async fn ready(
                     Query::select()
                         .cols(PartyColumns::default())
                         .cols(MemberColumns::default())
-                        .from(Party::inner_join_table::<PartyMember>().on(PartyMember::PartyId.equals(Party::Id)))
-                        .and_where(PartyMember::UserId.equals(Var::of(Users::Id)))
+                        .from(
+                            Party::inner_join_table::<PartyMembers>().on(PartyMembers::PartyId.equals(Party::Id)),
+                        )
+                        .and_where(PartyMembers::UserId.equals(Var::of(Users::Id)))
                         .and_where(Party::DeletedAt.is_null())
                 },
                 &[&auth.user_id],
