@@ -482,12 +482,14 @@ impl Drop for Object {
 
 pub struct StatementCache {
     cache: ArcSwap<HashMap<TypeId, Statement>>,
+    cache2: ArcSwap<HashMap<Arc<str>, Statement>>,
 }
 
 impl Default for StatementCache {
     fn default() -> Self {
         StatementCache {
             cache: ArcSwap::new(Arc::new(HashMap::new())),
+            cache2: ArcSwap::new(Arc::new(HashMap::new())),
         }
     }
 }
@@ -501,12 +503,28 @@ impl StatementCache {
         });
     }
 
+    pub fn insert2(&self, key: Arc<str>, stmt: &Statement) {
+        self.cache2.rcu(|cache| {
+            let mut cache = HashMap::clone(cache);
+            cache.insert(key.clone(), stmt.clone());
+            cache
+        });
+    }
+
     pub fn get(&self, key: TypeId) -> Option<Statement> {
         self.cache.load().get(&key).cloned()
     }
 
+    pub fn get2(&self, key: &str) -> Option<Statement> {
+        self.cache2.load().get(key).cloned()
+    }
+
     pub fn clear(&self) {
         self.cache.store(Arc::new(HashMap::new()));
+    }
+
+    pub fn clear2(&self) {
+        self.cache2.store(Arc::new(HashMap::new()));
     }
 }
 
@@ -1051,5 +1069,133 @@ impl Transaction<'_> {
         Q: AnyQuery,
     {
         self.query_opt(&self.prepare_cached_typed(query).await?, params).await
+    }
+}
+
+use thorn::macros::Query;
+
+impl Client {
+    pub async fn prepare_cached2<'a, E: From<Row>>(&self, query: &mut Query<'a, E>) -> Result<Statement, Error> {
+        if let Some(stmt) = self.stmt_cache.get2(&query.q) {
+            return Ok(stmt);
+        }
+
+        log::debug!("Preparing query: \"{}\"", query.q);
+
+        let stmt = self.client.prepare_typed(&query.q, &query.param_tys).await?;
+
+        self.stmt_cache.insert2(std::mem::take(&mut query.q).into(), &stmt);
+
+        Ok(stmt)
+    }
+
+    pub async fn query_stream2<'a, E: From<Row>>(
+        &self,
+        mut query: Query<'a, E>,
+    ) -> Result<impl Stream<Item = Result<E, Error>>, Error> {
+        fn slice_iter<'a>(s: &'a [&'a (dyn ToSql + Sync)]) -> impl ExactSizeIterator<Item = &'a dyn ToSql> + 'a {
+            s.iter().map(|s| *s as _)
+        }
+
+        let stream = self
+            .query_raw(&self.prepare_cached2(&mut query).await?, slice_iter(&query.params))
+            .await?;
+
+        Ok(stream.map(|r| match r {
+            Ok(row) => Ok(E::from(row)),
+            Err(e) => Err(e.into()),
+        }))
+    }
+
+    pub async fn query2<'a, E: From<Row>>(&self, query: Query<'a, E>) -> Result<Vec<E>, Error> {
+        let mut stream = std::pin::pin!(self.query_stream2(query).await?);
+
+        let mut rows = Vec::new();
+        while let Some(row) = stream.next().await {
+            rows.push(row?);
+        }
+        Ok(rows)
+    }
+
+    pub async fn query_one2<'a, E: From<Row>>(&self, mut query: Query<'a, E>) -> Result<E, Error> {
+        let row = self
+            .query_one(&self.prepare_cached2(&mut query).await?, &query.params)
+            .await?;
+
+        Ok(E::from(row))
+    }
+
+    pub async fn query_opt2<'a, E: From<Row>>(&self, mut query: Query<'a, E>) -> Result<Option<E>, Error> {
+        let row = self
+            .query_opt(&self.prepare_cached2(&mut query).await?, &query.params)
+            .await?;
+
+        Ok(row.map(E::from))
+    }
+
+    pub async fn execute2<'a, E: From<Row>>(&self, mut query: Query<'a, E>) -> Result<u64, Error> {
+        self.execute(&self.prepare_cached2(&mut query).await?, &query.params)
+            .await
+    }
+}
+
+impl Transaction<'_> {
+    pub async fn prepare_cached2<'a, E: From<Row>>(&self, query: &mut Query<'a, E>) -> Result<Statement, Error> {
+        log::debug!("Preparing query: \"{}\"", query.q);
+
+        let stmt = self.t.prepare_typed(&query.q, &query.param_tys).await?;
+
+        self.stmt_cache.insert2(std::mem::take(&mut query.q).into(), &stmt);
+
+        Ok(stmt)
+    }
+
+    pub async fn query_stream2<'a, E: From<Row>>(
+        &self,
+        mut query: Query<'a, E>,
+    ) -> Result<impl Stream<Item = Result<E, Error>>, Error> {
+        fn slice_iter<'a>(s: &'a [&'a (dyn ToSql + Sync)]) -> impl ExactSizeIterator<Item = &'a dyn ToSql> + 'a {
+            s.iter().map(|s| *s as _)
+        }
+
+        let stream = self
+            .query_raw(&self.prepare_cached2(&mut query).await?, slice_iter(&query.params))
+            .await?;
+
+        Ok(stream.map(|r| match r {
+            Ok(row) => Ok(E::from(row)),
+            Err(e) => Err(e.into()),
+        }))
+    }
+
+    pub async fn query2<'a, E: From<Row>>(&self, query: Query<'a, E>) -> Result<Vec<E>, Error> {
+        let mut stream = std::pin::pin!(self.query_stream2(query).await?);
+
+        let mut rows = Vec::new();
+        while let Some(row) = stream.next().await {
+            rows.push(row?);
+        }
+        Ok(rows)
+    }
+
+    pub async fn query_one2<'a, E: From<Row>>(&self, mut query: Query<'a, E>) -> Result<E, Error> {
+        let row = self
+            .query_one(&self.prepare_cached2(&mut query).await?, &query.params)
+            .await?;
+
+        Ok(E::from(row))
+    }
+
+    pub async fn query_opt2<'a, E: From<Row>>(&self, mut query: Query<'a, E>) -> Result<Option<E>, Error> {
+        let row = self
+            .query_opt(&self.prepare_cached2(&mut query).await?, &query.params)
+            .await?;
+
+        Ok(row.map(E::from))
+    }
+
+    pub async fn execute2<'a, E: From<Row>>(&self, mut query: Query<'a, E>) -> Result<u64, Error> {
+        self.execute(&self.prepare_cached2(&mut query).await?, &query.params)
+            .await
     }
 }

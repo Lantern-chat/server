@@ -13,60 +13,41 @@ use crate::{
 
 use sdk::models::*;
 
-fn base_query() -> thorn::query::SelectQuery {
-    use schema::*;
-    use thorn::*;
-
-    Query::select().from_table::<Emotes>().cols(&[
-        Emotes::Id,
-        Emotes::PartyId,
-        Emotes::AssetId,
-        Emotes::Name,
-        Emotes::Flags,
-        Emotes::AspectRatio,
-    ])
-}
-
 pub async fn get_custom_emotes_raw<'a>(
     db: &Client,
     party_id: SearchMode<'a>,
 ) -> Result<impl Stream<Item = Result<CustomEmote, Error>> + 'static, Error> {
-    let stream = match party_id {
-        SearchMode::Single(id) => db
-            .query_stream_cached_typed(
-                || {
-                    use schema::*;
-                    use thorn::*;
+    let stream = db
+        .query_stream2({
+            use schema::*;
+            use thorn::*;
 
-                    base_query().and_where(Emotes::PartyId.equals(Var::of(Party::Id)))
-                },
-                &[&id],
-            )
-            .await?
-            .boxed(),
-        SearchMode::Many(ids) => db
-            .query_stream_cached_typed(
-                || {
-                    use schema::*;
-                    use thorn::*;
-
-                    base_query().and_where(Emotes::PartyId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))
-                },
-                &[&ids],
-            )
-            .await?
-            .boxed(),
-    };
+            sql! {
+                SELECT
+                    Emotes.Id           AS @_,
+                    Emotes.PartyId      AS @_,
+                    Emotes.AssetId      AS @_,
+                    Emotes.Name         AS @_,
+                    Emotes.Flags        AS @_,
+                    Emotes.AspectRatio  AS @_
+                FROM Emotes WHERE
+                match party_id {
+                    SearchMode::Single(ref id) => { Emotes.PartyId = #{id => SNOWFLAKE} },
+                    SearchMode::Many(ref ids)  => { Emotes.PartyId = ANY(#{ids => SNOWFLAKE_ARRAY}) },
+                }
+            }?
+        })
+        .await?;
 
     Ok(stream.map(|row| match row {
         Err(e) => Err(Error::from(e)),
         Ok(row) => Ok(CustomEmote {
-            id: row.try_get(0)?,
-            party_id: row.try_get(1)?,
-            asset: row.try_get(2)?,
-            name: row.try_get(3)?,
-            flags: row.try_get(4)?,
-            aspect_ratio: row.try_get(5)?,
+            id: row.emotes_id()?,
+            party_id: row.emotes_party_id()?,
+            asset: row.emotes_asset_id()?,
+            name: row.emotes_name()?,
+            flags: row.emotes_flags()?,
+            aspect_ratio: row.emotes_aspect_ratio()?,
         }),
     }))
 }

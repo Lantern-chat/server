@@ -10,8 +10,7 @@ pub async fn patch(
     let form = body::any(&mut route).await?;
 
     let msg =
-        crate::backend::api::room::messages::edit::edit_message(route.state, auth, room_id, msg_id, form)
-            .await?;
+        crate::backend::api::room::messages::edit::edit_message(route.state, auth, room_id, msg_id, form).await?;
 
     Ok(match msg {
         Some(msg) => WebResponse::new(msg),

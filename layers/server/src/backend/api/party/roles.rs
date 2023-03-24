@@ -10,75 +10,47 @@ use crate::{
 
 use sdk::models::*;
 
-mod role_query {
-    pub use schema::*;
-    pub use thorn::*;
-
-    indexed_columns! {
-        pub enum RoleColumns {
-            Roles::Id,
-            Roles::PartyId,
-            Roles::Name,
-            Roles::Permissions1,
-            Roles::Permissions2,
-            Roles::Color,
-            Roles::Position,
-            Roles::Flags,
-            Roles::AvatarId,
-        }
-    }
-}
-
-fn base_query() -> thorn::query::SelectQuery {
-    use role_query::*;
-
-    Query::select().from_table::<Roles>().cols(RoleColumns::default())
-}
-
 pub async fn get_roles_raw<'a, 'b>(
     db: &Client,
     state: &'b ServerState,
     party_id: SearchMode<'a>,
 ) -> Result<impl Stream<Item = Result<Role, Error>> + 'b, Error> {
-    let stream = match party_id {
-        SearchMode::Single(id) => db
-            .query_stream_cached_typed(
-                || {
-                    use role_query::*;
-                    base_query().and_where(Roles::PartyId.equals(Var::of(Party::Id)))
-                },
-                &[&id],
-            )
-            .await?
-            .boxed(),
-        SearchMode::Many(ids) => db
-            .query_stream_cached_typed(
-                || {
-                    use role_query::*;
-                    base_query().and_where(Roles::PartyId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))
-                },
-                &[&ids],
-            )
-            .await?
-            .boxed(),
-    };
+    let stream = db
+        .query_stream2({
+            use schema::*;
+            use thorn::*;
 
-    use role_query::RoleColumns;
+            sql! {
+                SELECT
+                    Roles.Id            AS @_,
+                    Roles.PartyId       AS @_,
+                    Roles.Name          AS @_,
+                    Roles.Permissions1  AS @_,
+                    Roles.Permissions2  AS @_,
+                    Roles.Color         AS @_,
+                    Roles.Position      AS @_,
+                    Roles.Flags         AS @_,
+                    Roles.AvatarId      AS @_
+                FROM Roles WHERE
+                match party_id {
+                    SearchMode::Single(ref id) => { Roles.PartyId = #{id => SNOWFLAKE} },
+                    SearchMode::Many(ref ids)  => { Roles.PartyId = ANY(#{ids => SNOWFLAKE_ARRAY}) },
+                }
+            }?
+        })
+        .await?;
 
     Ok(stream.map(move |row| match row {
         Err(e) => Err(Error::from(e)),
         Ok(row) => Ok(Role {
-            id: row.try_get(RoleColumns::id())?,
-            party_id: row.try_get(RoleColumns::party_id())?,
-            name: row.try_get(RoleColumns::name())?,
-            permissions: Permissions::from_i64(
-                row.try_get(RoleColumns::permissions1())?,
-                row.try_get(RoleColumns::permissions2())?,
-            ),
-            color: row.try_get::<_, Option<i32>>(RoleColumns::color())?.map(|c| c as u32),
-            position: row.try_get(RoleColumns::position())?,
-            flags: row.try_get(RoleColumns::flags())?,
-            avatar: encrypt_snowflake_opt(state, row.try_get(RoleColumns::avatar_id())?),
+            id: row.roles_id()?,
+            party_id: row.roles_party_id()?,
+            name: row.roles_name()?,
+            permissions: Permissions::from_i64(row.roles_permissions1()?, row.roles_permissions2()?),
+            color: row.roles_color::<Option<i32>>()?.map(|c| c as u32),
+            position: row.roles_position()?,
+            flags: row.roles_flags()?,
+            avatar: encrypt_snowflake_opt(state, row.roles_avatar_id()?),
         }),
     }))
 }

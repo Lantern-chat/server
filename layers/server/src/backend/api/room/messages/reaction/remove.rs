@@ -15,8 +15,7 @@ pub async fn remove_reaction(
     emote: EmoteOrEmojiId,
 ) -> Result<(), Error> {
     // TODO: Merge permission check into below CTEs?
-    let perms =
-        crate::backend::api::perm::get_cached_room_permissions(&state, auth.user_id, room_id).await?;
+    let perms = crate::backend::api::perm::get_cached_room_permissions(&state, auth.user_id, room_id).await?;
 
     if !perms.contains(Permissions::READ_MESSAGE_HISTORY) {
         return Err(Error::Unauthorized);

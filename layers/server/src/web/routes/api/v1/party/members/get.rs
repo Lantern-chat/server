@@ -15,6 +15,13 @@ pub async fn get_member(
     member_id: Snowflake,
 ) -> WebResult {
     Ok(WebResponse::new(
-        crate::backend::api::party::members::get_one(route.state, auth, party_id, member_id, true).await?,
+        crate::backend::api::party::members::get_one(
+            route.state,
+            auth.user_id,
+            party_id,
+            member_id,
+            crate::backend::api::party::members::MemberMode::Full,
+        )
+        .await?,
     ))
 }

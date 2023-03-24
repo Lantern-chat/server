@@ -37,10 +37,7 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
                 .await?;
 
             if let Some(row) = row {
-                state
-                    .gateway
-                    .last_event()
-                    .store(row.try_get(0)?, Ordering::SeqCst);
+                state.gateway.last_event().store(row.try_get(0)?, Ordering::SeqCst);
             }
         }
 
@@ -160,11 +157,7 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
             }
 
             // user events can be processed in any order
-            async fn process_user_events(
-                events: &mut Vec<RawEvent>,
-                state: &ServerState,
-                db: &db::pool::Client,
-            ) {
+            async fn process_user_events(events: &mut Vec<RawEvent>, state: &ServerState, db: &db::pool::Client) {
                 futures::stream::iter(events.drain(..))
                     .for_each_concurrent(None, |event| async move {
                         if let Err(e) = super::event_processors::process(state, db, event, None).await {

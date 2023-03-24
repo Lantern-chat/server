@@ -19,6 +19,5 @@ pub fn encrypt_user_message(key: &[u8], user_id: Snowflake, plaintext: &[u8]) ->
 
 pub fn decrypt_user_message(key: &[u8], user_id: Snowflake, ciphertext: &[u8]) -> Result<Vec<u8>, ()> {
     let gcm = Aes256GcmSiv::new_from_slice(key).unwrap();
-    gcm.decrypt(&nonce_from_user_id(user_id), ciphertext)
-        .map_err(|_| ()) // can error from invalid signatures, so allow it through.
+    gcm.decrypt(&nonce_from_user_id(user_id), ciphertext).map_err(|_| ()) // can error from invalid signatures, so allow it through.
 }

@@ -1,11 +1,7 @@
 use super::*;
 
 #[async_recursion]
-pub async fn get_many(
-    route: Route<crate::ServerState>,
-    auth: Authorization,
-    room_id: Snowflake,
-) -> WebResult {
+pub async fn get_many(route: Route<crate::ServerState>, auth: Authorization, room_id: Snowflake) -> WebResult {
     let form = match route.query() {
         None => Default::default(),
         Some(form) => form?,

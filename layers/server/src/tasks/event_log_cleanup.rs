@@ -31,10 +31,8 @@ pub fn add_event_log_cleanup_task(state: &ServerState, runner: &TaskRunner) {
                 .await?;
 
                 // take most recent event and put it into the second element
-                state.gateway.last_events[1].store(
-                    state.gateway.last_events[0].load(Ordering::SeqCst),
-                    Ordering::SeqCst,
-                );
+                state.gateway.last_events[1]
+                    .store(state.gateway.last_events[0].load(Ordering::SeqCst), Ordering::SeqCst);
 
                 Ok::<(), Error>(())
             };

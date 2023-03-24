@@ -94,8 +94,14 @@ pub async fn member_event(
             }))
         }),
         EventCode::MemberJoined | EventCode::MemberUpdated => Either::Right(
-            crate::backend::api::party::members::get_one_anonymouse(state, db, party_id, user_id, false)
-                .map_ok(Some),
+            crate::backend::api::party::members::get_one_anonymous(
+                state,
+                db,
+                party_id,
+                user_id,
+                crate::backend::api::party::members::MemberMode::Simple,
+            )
+            .map_ok(Some),
         ),
         _ => unreachable!(),
     };
