@@ -36,11 +36,9 @@ pub async fn get_members_inner(
     mode: MemberMode,
 ) -> Result<impl Stream<Item = Result<PartyMember, Error>>, Error> {
     let stream = db
-        .query_stream2({
+        .query_stream2(thorn::sql! {
             use schema::{flags::MemberFlags, *};
-            use thorn::*;
 
-            sql! {
             SELECT
                 AggMembersFull.UserId               AS @UserId,
                 AggMembersFull.Discriminator        AS @Discriminator,
@@ -99,8 +97,7 @@ pub async fn get_members_inner(
                 LIMIT 1
             }
 
-            }?
-        })
+        }?)
         .await?;
 
     Ok(stream.map(move |row| match row {

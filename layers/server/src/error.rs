@@ -18,6 +18,8 @@ pub enum Error {
 
     #[error("Database Error {0}")]
     DbError(DbError),
+    #[error("DB Format Error: {0}")]
+    DbFormattingError(#[from] thorn::macros::SqlFormatError),
     #[error("Join Error {0}")]
     JoinError(#[from] tokio::task::JoinError),
     #[error("Semaphore Error: {0}")]
@@ -204,6 +206,7 @@ impl Error {
             | Error::InternalErrorSmol(_)
             | Error::InternalErrorStatic(_)
             | Error::DbError(_)
+            | Error::DbFormattingError(_)
             | Error::JoinError(_)
             | Error::SemaphoreError(_)
             | Error::HashError(_)
@@ -285,7 +288,8 @@ impl Error {
             | Error::InternalErrorStatic(_)
             | Error::InternalErrorSmol(_)   => ApiErrorCode::InternalError,
 
-            Error::DbError(_)               => ApiErrorCode::DbError,
+            | Error::DbError(_)
+            | Error::DbFormattingError(_)   => ApiErrorCode::DbError,
             Error::JoinError(_)             => ApiErrorCode::JoinError,
             Error::SemaphoreError(_)        => ApiErrorCode::SemaphoreError,
             Error::HashError(_)             => ApiErrorCode::HashError,

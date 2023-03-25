@@ -16,28 +16,24 @@ pub async fn get_roles_raw<'a, 'b>(
     party_id: SearchMode<'a>,
 ) -> Result<impl Stream<Item = Result<Role, Error>> + 'b, Error> {
     let stream = db
-        .query_stream2({
+        .query_stream2(thorn::sql! {
             use schema::*;
-            use thorn::*;
 
-            sql! {
-                SELECT
-                    Roles.Id            AS @_,
-                    Roles.PartyId       AS @_,
-                    Roles.Name          AS @_,
-                    Roles.Permissions1  AS @_,
-                    Roles.Permissions2  AS @_,
-                    Roles.Color         AS @_,
-                    Roles.Position      AS @_,
-                    Roles.Flags         AS @_,
-                    Roles.AvatarId      AS @_
-                FROM Roles WHERE
-                match party_id {
-                    SearchMode::Single(ref id) => { Roles.PartyId = #{id => SNOWFLAKE} },
-                    SearchMode::Many(ref ids)  => { Roles.PartyId = ANY(#{ids => SNOWFLAKE_ARRAY}) },
-                }
-            }?
-        })
+            SELECT
+                Roles.Id            AS @_,
+                Roles.PartyId       AS @_,
+                Roles.Name          AS @_,
+                Roles.Permissions1  AS @_,
+                Roles.Permissions2  AS @_,
+                Roles.Color         AS @_,
+                Roles.Position      AS @_,
+                Roles.Flags         AS @_,
+                Roles.AvatarId      AS @_
+            FROM Roles WHERE match party_id {
+                SearchMode::Single(ref id) => { Roles.PartyId = #{id => SNOWFLAKE} },
+                SearchMode::Many(ref ids)  => { Roles.PartyId = ANY(#{ids => SNOWFLAKE_ARRAY}) },
+            }
+        }?)
         .await?;
 
     Ok(stream.map(move |row| match row {

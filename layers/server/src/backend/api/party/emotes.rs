@@ -18,25 +18,21 @@ pub async fn get_custom_emotes_raw<'a>(
     party_id: SearchMode<'a>,
 ) -> Result<impl Stream<Item = Result<CustomEmote, Error>> + 'static, Error> {
     let stream = db
-        .query_stream2({
+        .query_stream2(thorn::sql! {
             use schema::*;
-            use thorn::*;
 
-            sql! {
-                SELECT
-                    Emotes.Id           AS @_,
-                    Emotes.PartyId      AS @_,
-                    Emotes.AssetId      AS @_,
-                    Emotes.Name         AS @_,
-                    Emotes.Flags        AS @_,
-                    Emotes.AspectRatio  AS @_
-                FROM Emotes WHERE
-                match party_id {
-                    SearchMode::Single(ref id) => { Emotes.PartyId = #{id => SNOWFLAKE} },
-                    SearchMode::Many(ref ids)  => { Emotes.PartyId = ANY(#{ids => SNOWFLAKE_ARRAY}) },
-                }
-            }?
-        })
+            SELECT
+                Emotes.Id           AS @_,
+                Emotes.PartyId      AS @_,
+                Emotes.AssetId      AS @_,
+                Emotes.Name         AS @_,
+                Emotes.Flags        AS @_,
+                Emotes.AspectRatio  AS @_
+            FROM Emotes WHERE match party_id {
+                SearchMode::Single(ref id) => { Emotes.PartyId = #{id => SNOWFLAKE} },
+                SearchMode::Many(ref ids)  => { Emotes.PartyId = ANY(#{ids => SNOWFLAKE_ARRAY}) },
+            }
+        }?)
         .await?;
 
     Ok(stream.map(|row| match row {
