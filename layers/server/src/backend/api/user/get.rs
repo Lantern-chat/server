@@ -168,11 +168,9 @@ mod q {
 
         // ProfileColumns, must follow order as listed above
         q = match member {
-            false => q
-                .cols(ProfileColumns::default())
-                .and_where(Params::party_id().is_null()),
+            false => q.cols(ProfileColumns::default()).and_where(Params::party_id().is_null()),
             true => q
-                .expr(schema::combine_profile_bits(
+                .expr(schema::combine_profile_bits::call(
                     BaseProfile::col(Profiles::Bits),
                     PartyProfile::col(Profiles::Bits),
                     PartyProfile::col(Profiles::AvatarId),

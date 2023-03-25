@@ -117,8 +117,7 @@ pub async fn get_one_transactional(
 
     parse_first(
         state,
-        t.query_stream_cached_typed(p::exact_no_perm, &params.as_params())
-            .await?,
+        t.query_stream_cached_typed(p::exact_no_perm, &params.as_params()).await?,
     )
     .await
 }
@@ -142,8 +141,7 @@ pub async fn get_one_from_client(
 
     parse_first(
         state,
-        db.query_stream_cached_typed(p::exact_no_perm_no_room, &params.as_params())
-            .await?,
+        db.query_stream_cached_typed(p::exact_no_perm_no_room, &params.as_params()).await?,
     )
     .await
 }
@@ -308,11 +306,7 @@ mod q {
             .expr(SelectStarred::Starred.alias_to(SelectedMessages::Starred))
             // test if message is deleted
             .and_where(Messages::Flags.has_no_bits(MessageFlags::DELETED.bits().lit()))
-            .and_where(
-                Params::thread_id()
-                    .is_null()
-                    .or(Messages::ThreadId.equals(Params::thread_id())),
-            )
+            .and_where(Params::thread_id().is_null().or(Messages::ThreadId.equals(Params::thread_id())))
             .and_where(
                 Builtin::cardinality(Params::pinned())
                     .equals(0.lit())
@@ -322,9 +316,7 @@ mod q {
             .limit(Params::limit());
 
         selected = match with_user {
-            false => selected
-                .from_table::<Messages>()
-                .expr(false.lit().alias_to(SelectedMessages::Unavailable)),
+            false => selected.from_table::<Messages>().expr(false.lit().alias_to(SelectedMessages::Unavailable)),
             true => selected
                 .from(
                     Messages::left_join_table::<AggRelationships>().on(AggRelationships::UserId
@@ -357,13 +349,13 @@ mod q {
         }
 
         selected = match mode {
-            Cursor::After(_) => selected
-                .and_where(Messages::Id.greater_than(Params::msg_id()))
-                .order_by(Messages::Id.ascending()),
+            Cursor::After(_) => {
+                selected.and_where(Messages::Id.greater_than(Params::msg_id())).order_by(Messages::Id.ascending())
+            }
 
-            Cursor::Before(_) => selected
-                .and_where(Messages::Id.less_than(Params::msg_id()))
-                .order_by(Messages::Id.descending()),
+            Cursor::Before(_) => {
+                selected.and_where(Messages::Id.less_than(Params::msg_id())).order_by(Messages::Id.descending())
+            }
 
             Cursor::Exact(_) => selected.and_where(Messages::Id.equals(Params::msg_id())),
         };
@@ -392,7 +384,7 @@ mod q {
             .cols(MemberColumns::default())
             .cols(UserColumns::default())
             // ProfileColumns, must follow order as listed above
-            .expr(schema::combine_profile_bits(
+            .expr(schema::combine_profile_bits::call(
                 BaseProfile::col(Profiles::Bits),
                 PartyProfile::col(Profiles::Bits),
                 PartyProfile::col(Profiles::AvatarId),
@@ -483,11 +475,7 @@ mod q {
                         .expr(AggRoomPerms::Permissions2.alias_to(AggPerm::Permissions2))
                         .from_table::<AggRoomPerms>()
                         .and_where(AggRoomPerms::UserId.equals(Params::user_id()))
-                        .and_where(
-                            AggRoomPerms::RoomId
-                                .equals(Params::room_id())
-                                .or(Params::room_id().is_null()),
-                        ),
+                        .and_where(AggRoomPerms::RoomId.equals(Params::room_id()).or(Params::room_id().is_null())),
                 ))
                 .and_where(schema::has_all_permission_bits(
                     Permissions::READ_MESSAGE_HISTORY,
@@ -685,9 +673,8 @@ where
                 attachments
             };
 
-            msg.pins = row
-                .try_get::<_, Option<Vec<Snowflake>>>(DynamicMsgColumns::pin_tags())?
-                .unwrap_or_default();
+            msg.pins =
+                row.try_get::<_, Option<Vec<Snowflake>>>(DynamicMsgColumns::pin_tags())?.unwrap_or_default();
 
             msg.starred = row.try_get(SelectedColumns::starred())?;
 

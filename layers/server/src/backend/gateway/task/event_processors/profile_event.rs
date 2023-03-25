@@ -128,7 +128,7 @@ mod q {
             .cols(UserColumns::default())
             .cols(PartyColumns::default())
             // ProfileColumns, must follow order as listed above
-            .expr(schema::combine_profile_bits(
+            .expr(schema::combine_profile_bits::call(
                 BaseProfile::col(Profiles::Bits),
                 PartyProfile::col(Profiles::Bits),
                 PartyProfile::col(Profiles::AvatarId),
@@ -146,11 +146,7 @@ mod q {
                 BaseProfile::col(Profiles::CustomStatus),
             )))
             .and_where(PartyMembers::UserId.equals(Params::user_id()))
-            .and_where(
-                PartyMembers::PartyId
-                    .equals(Params::party_id())
-                    .or(Params::party_id().is_null()),
-            )
+            .and_where(PartyMembers::PartyId.equals(Params::party_id()).or(Params::party_id().is_null()))
             .from(
                 PartyMembers::inner_join_table::<Users>()
                     .on(Users::Id.equals(PartyMembers::UserId))

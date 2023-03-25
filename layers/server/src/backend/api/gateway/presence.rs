@@ -25,7 +25,7 @@ pub async fn set_presence(
             use schema::*;
             use thorn::*;
 
-            Query::call(schema::set_presence(
+            Query::call(schema::set_presence::call(
                 Params::user_id(),
                 Params::conn_id(),
                 Params::flags(),

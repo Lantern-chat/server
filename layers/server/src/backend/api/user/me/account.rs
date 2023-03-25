@@ -180,7 +180,7 @@ pub async fn modify_account(
             use schema::*;
             use thorn::*;
 
-            Query::call(schema::update_user(
+            Query::call(schema::update_user::call(
                 Var::of(Users::Id),
                 Var::of(Users::Username),
                 Var::of(Users::Email),

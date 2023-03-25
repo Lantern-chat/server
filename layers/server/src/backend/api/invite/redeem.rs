@@ -34,7 +34,7 @@ pub async fn redeem_invite(
                 use schema::*;
                 use thorn::*;
 
-                Query::call(schema::redeem_invite(
+                Query::call(schema::redeem_invite::call(
                     Var::of(Users::Id),
                     Var::of(Invite::Id),
                     Var::of(Invite::Vanity),

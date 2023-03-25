@@ -98,10 +98,7 @@ pub async fn add_reaction(
 
         match party_id {
             Some(party_id) => {
-                state
-                    .gateway
-                    .broadcast_event(Event::new(event, Some(room_id))?, party_id)
-                    .await;
+                state.gateway.broadcast_event(Event::new(event, Some(room_id))?, party_id).await;
             }
             None => unimplemented!(),
         }
@@ -287,7 +284,7 @@ mod q {
                 .alias_to(ReactionEvent::AvatarId),
             )
             .expr(
-                schema::combine_profile_bits(
+                schema::combine_profile_bits::call(
                     BaseProfile::col(Profiles::Bits),
                     PartyProfile::col(Profiles::Bits),
                     PartyProfile::col(Profiles::AvatarId),
@@ -300,9 +297,7 @@ mod q {
                     .inner_join_table::<Users>()
                     .on(Users::Id.equals(Params::user_id()))
                     .left_join_table::<AggMembers>()
-                    .on(AggMembers::UserId
-                        .equals(Users::Id)
-                        .and(AggMembers::PartyId.equals(Values::PartyId)))
+                    .on(AggMembers::UserId.equals(Users::Id).and(AggMembers::PartyId.equals(Values::PartyId)))
                     .left_join_table::<BaseProfile>()
                     .on(BaseProfile::col(Profiles::UserId)
                         .equals(Params::user_id())

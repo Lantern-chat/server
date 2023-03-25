@@ -91,7 +91,7 @@ pub async fn register_user(
                 use schema::*;
                 use thorn::*;
 
-                Query::call(schema::register_user(
+                Query::call(schema::register_user::call(
                     Var::of(Users::Id),
                     Var::of(Users::Username),
                     Var::of(Users::Email),

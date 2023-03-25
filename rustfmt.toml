@@ -1,2 +1,5 @@
 max_width = 115
 single_line_if_else_max_width = 100
+chain_width = 100
+# use_small_heuristics = "Max"
+# overflow_delimited_expr = true
