@@ -22,35 +22,29 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) ->
 
     let db = state.db.read.get().await?;
 
-    let user = db
-        .query_opt_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
+    #[rustfmt::skip]
+    let user = db.query_opt2(thorn::sql! {
+        use schema::*;
 
-                Query::select()
-                    .from_table::<Users>()
-                    .cols(&[
-                        Users::Id,
-                        Users::Flags,
-                        Users::Passhash,
-                        Users::MfaSecret,
-                        Users::MfaBackup,
-                    ])
-                    .and_where(Users::Email.equals(Var::of(Users::Email)))
-                    .and_where(Users::DeletedAt.is_null())
-            },
-            &[&form.email],
-        )
-        .await?;
+        SELECT
+            Users.Id        AS @Id,
+            Users.Flags     AS @Flags,
+            Users.Passhash  AS @Passhash,
+            Users.MfaSecret AS @MfaSecret,
+            Users.MfaBackup AS @MfaBackup
+        FROM Users
+        WHERE
+            Users.Email = #{&form.email => Type::TEXT} AND Users.DeletedAt IS NULL
+
+    }?).await?;
 
     let Some(user) = user else { return Err(Error::InvalidCredentials); };
 
-    let user_id: Snowflake = user.try_get(0)?;
-    let flags = UserFlags::from_bits_truncate(user.try_get(1)?);
-    let passhash: &str = user.try_get(2)?;
-    let secret: Option<&[u8]> = user.try_get(3)?;
-    let backup: Option<&[u8]> = user.try_get(4)?;
+    let user_id: Snowflake = user.id()?;
+    let flags = UserFlags::from_bits_truncate(user.flags()?);
+    let passhash: &str = user.passhash()?;
+    let secret: Option<&[u8]> = user.mfa_secret()?;
+    let backup: Option<&[u8]> = user.mfa_backup()?;
 
     let elevation = flags.elevation();
 
@@ -75,10 +69,8 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) ->
     }
 
     let verified = {
-        let _permit = state
-            .mem_semaphore
-            .acquire_many(crate::backend::api::user::register::hash_memory_cost())
-            .await?;
+        let _permit =
+            state.mem_semaphore.acquire_many(crate::backend::api::user::register::hash_memory_cost()).await?;
 
         // SAFETY: This is only used within the following spawn_blocking block,
         // but will remain alive until `drop(user)` below.
@@ -126,26 +118,22 @@ pub async fn do_login(
     };
 
     let expires = now + state.config().account.session_duration;
+    let ip = addr.ip();
 
     let db = state.db.write.get().await?;
 
-    db.execute_cached_typed(
-        || {
-            use schema::*;
-            use thorn::*;
+    db.execute2(thorn::sql! {
+        use schema::*;
 
-            Query::insert()
-                .into::<Sessions>()
-                .cols(&[Sessions::Token, Sessions::UserId, Sessions::Expires, Sessions::Addr])
-                .values([
-                    Var::of(Sessions::Token),
-                    Var::of(Sessions::UserId),
-                    Var::of(Sessions::Expires),
-                    Var::of(Sessions::Addr),
-                ])
-        },
-        &[&bytes, &user_id, &expires, &addr.ip()],
-    )
+        INSERT INTO Sessions (
+            Token, UserId, Expires, Addr
+        ) VALUES (
+            #{&bytes    => Sessions::Token   },
+            #{&user_id  => Sessions::UserId  },
+            #{&expires  => Sessions::Expires },
+            #{&ip       => Sessions::Addr    }
+        )
+    }?)
     .await?;
 
     Ok(Session {
@@ -161,10 +149,7 @@ pub async fn process_2fa(
     backup: &[u8],
     token: &str,
 ) -> Result<bool, Error> {
-    let now = SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
 
     let mfa_key = state.config().keys.mfa_key;
 
@@ -214,21 +199,12 @@ pub async fn process_2fa(
                 let backup = encrypt_user_message(&mfa_key, user_id, &backup);
 
                 log::debug!("MFA Backup token used, saving new backup array to database");
-                db.execute_cached_typed(
-                    || {
-                        use schema::*;
-                        use thorn::*;
+                db.execute2(thorn::sql! {
+                    use schema::*;
 
-                        let user_id = Var::at(Users::Id, 1);
-                        let backup = Var::at(Users::MfaBackup, 2);
-
-                        Query::update()
-                            .table::<Users>()
-                            .set(Users::MfaBackup, backup)
-                            .and_where(Users::Id.equals(user_id))
-                    },
-                    &[&user_id, &backup],
-                )
+                    UPDATE Users SET (MfaBackup) = (#{&backup => Users::MfaBackup})
+                    WHERE Users.Id = #{&user_id => Users::Id}
+                }?)
                 .await?;
             } else {
                 return Err(Error::InvalidCredentials);

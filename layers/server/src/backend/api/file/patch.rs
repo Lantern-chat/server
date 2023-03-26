@@ -30,31 +30,28 @@ pub async fn patch_file(
 ) -> Result<FilePatch, Error> {
     let db = state.db.read.get().await?;
 
-    let row = db
-        .query_opt_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
+    #[rustfmt::skip]
+    let row = state.db.read.get().await?.query_opt2(thorn::sql! {
+        use schema::*;
 
-                Query::select()
-                    .from_table::<Files>()
-                    .cols(&[Files::Size, Files::Flags, Files::Nonce])
-                    .expr(Files::Mime.is_null())
-                    .and_where(Files::Id.equals(Var::of(Files::Id)))
-                    .and_where(Files::UserId.equals(Var::of(Files::UserId)))
-            },
-            &[&file_id, &auth.user_id],
-        )
-        .await?;
+        SELECT
+            Files.Size  AS @Size,
+            Files.Flags AS @Flags,
+            Files.Nonce AS @Nonce,
+
+            Files.Mime IS NOT NULL AS @NoMime
+        FROM Files
+        WHERE
+            Files.Id     = #{&file_id => Files::Id}
+        AND Files.UserId = #{&auth.user_id => Files::UserId}
+    }?).await?;
 
     let Some(row) = row else { return Err(Error::NotFound) };
 
-    let size = row.try_get::<_, i32>(0)? as u64;
-    let mut flags: FileFlags = FileFlags::from_bits_truncate(row.try_get(1)?);
-    let nonce: i64 = row.try_get(2)?;
-    let no_mime: bool = row.try_get(3)?;
-
-    drop(db); // free connection
+    let size = row.size::<i32>()? as u64;
+    let mut flags: FileFlags = FileFlags::from_bits_truncate(row.flags()?);
+    let nonce: i64 = row.nonce()?;
+    let no_mime: bool = row.no_mime()?;
 
     // a completed file cannot be modified
     if flags.contains(FileFlags::COMPLETE) {
@@ -193,44 +190,28 @@ pub async fn patch_file(
 
         // try to deduce mime type from initial bytes
         if let Some((mstr, _)) = mime_db::from_prefix(first_chunk) {
-            let db = state.db.write.get().await?;
-
-            db.execute_cached_typed(
-                || {
-                    use schema::*;
-                    use thorn::*;
-
-                    Query::update()
-                        .table::<Files>()
-                        .set(Files::Mime, Var::of(Files::Mime))
-                        .and_where(Files::Id.equals(Var::of(Files::Id)))
-                },
-                &[&mstr, &file_id],
-            )
-            .await?;
+            #[rustfmt::skip]
+            state.db.write.get().await?.execute2(thorn::sql! {
+                use schema::*;
+                UPDATE Files SET (Mime) = (#{&mstr => Files::Mime})
+                WHERE Files.Id = #{&file_id => Files::Id}
+            }?).await?;
         }
     }
 
     // the file has finished uploading, so mark it as complete
     if end_pos == size {
-        let db = state.db.write.get().await?;
-
         flags.remove(FileFlags::PARTIAL);
         flags.insert(FileFlags::COMPLETE);
 
-        db.execute_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
+        let bits = flags.bits();
 
-                Query::update()
-                    .table::<Files>()
-                    .set(Files::Flags, Var::of(Files::Flags))
-                    .and_where(Files::Id.equals(Var::of(Files::Id)))
-            },
-            &[&flags.bits(), &file_id],
-        )
-        .await?;
+        #[rustfmt::skip]
+        state.db.write.get().await?.execute2(thorn::sql! {
+            use schema::*;
+            UPDATE Files SET (Flags) = (#{&bits => Files::Flags})
+            WHERE Files.Id = #{&file_id => Files::Id}
+        }?).await?;
 
         file_patch.complete = true;
     }

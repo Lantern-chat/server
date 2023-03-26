@@ -8,58 +8,28 @@ pub async fn set_presence(
     conn_id: Snowflake,
     presence: UserPresence,
 ) -> Result<(), Error> {
-    let db = state.db.write.get().await?;
+    let flags = presence.flags.bits();
 
-    use thorn::Parameters;
-    thorn::params! {
-        pub struct Params {
-            user_id: Snowflake = schema::UserPresence::UserId,
-            conn_id: Snowflake = schema::UserPresence::ConnId,
-            flags: i16 = schema::UserPresence::Flags,
-            activity: Option<serde_json::Value> = schema::UserPresence::Activity,
-        }
-    }
-
-    db.execute_cached_typed(
-        || {
-            use schema::*;
-            use thorn::*;
-
-            Query::call(schema::set_presence::call(
-                Params::user_id(),
-                Params::conn_id(),
-                Params::flags(),
-                Params::activity(),
-            ))
-        },
-        &Params {
-            user_id,
-            conn_id,
-            flags: presence.flags.bits(),
-            activity: None,
-        }
-        .as_params(),
-    )
-    .await?;
+    #[rustfmt::skip]
+    let db = state.db.write.get().await?.execute2(thorn::sql! {
+        use schema::*;
+        CALL .set_presence(
+            #{&user_id => UserPresence::UserId},
+            #{&conn_id => UserPresence::ConnId},
+            #{&flags   => UserPresence::Flags},
+            NULL // #{&activity => UserPresence::Activity}
+        )
+    }?).await?;
 
     Ok(())
 }
 
 pub async fn clear_presence(state: ServerState, conn_id: Snowflake) -> Result<(), Error> {
-    let db = state.db.write.get().await?;
-
-    db.execute_cached_typed(
-        || {
-            use schema::*;
-            use thorn::*;
-
-            Query::delete()
-                .from::<UserPresence>()
-                .and_where(UserPresence::ConnId.equals(Var::of(UserPresence::ConnId)))
-        },
-        &[&conn_id],
-    )
-    .await?;
+    #[rustfmt::skip]
+    state.db.write.get().await?.execute2(thorn::sql! {
+        use schema::*;
+        DELETE FROM UserPresence WHERE UserPresence.ConnId = #{&conn_id => UserPresence::ConnId}
+    }?).await?;
 
     Ok(())
 }

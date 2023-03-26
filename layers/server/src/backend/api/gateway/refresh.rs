@@ -11,37 +11,26 @@ pub async fn refresh_room_perms(
     db: &db::pool::Object,
     user_id: Snowflake,
 ) -> Result<(), Error> {
-    let stream = db
-        .query_stream_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
-
-                Query::select()
-                    .from_table::<AggRoomPerms>()
-                    .cols(&[
-                        AggRoomPerms::RoomId,
-                        AggRoomPerms::Permissions1,
-                        AggRoomPerms::Permissions2,
-                    ])
-                    .and_where(AggRoomPerms::UserId.equals(Var::of(Users::Id)))
-            },
-            &[&user_id],
-        )
-        .await?;
+    #[rustfmt::skip]
+    let stream = db.query_stream2(thorn::sql! {
+        use schema::*;
+        SELECT
+            AggRoomPerms.RoomId         AS @RoomId,
+            AggRoomPerms.Permissions1   AS @Permissions1,
+            AggRoomPerms.Permissions2   AS @Permissions2
+        FROM AggRoomPerms
+        WHERE AggRoomPerms.UserId = #{&user_id => AggRoomPerms::UserId}
+    }?).await?;
 
     let mut cache = Vec::new();
     let mut stream = std::pin::pin!(stream);
 
     while let Some(row) = stream.next().await {
         let row = row?;
-
-        let room_id: Snowflake = row.try_get(0)?;
-
         cache.push((
-            room_id,
+            row.room_id()?,
             PermMute {
-                perms: Permissions::from_i64(row.try_get(1)?, row.try_get(2)?),
+                perms: Permissions::from_i64(row.permissions1()?, row.permissions2()?),
                 flags: RoomMemberFlags::empty(),
             },
         ));

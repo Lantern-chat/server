@@ -43,19 +43,11 @@ pub async fn register_user(
 
     let read_db = state.db.read.get().await?;
 
-    let existing = read_db
-        .query_opt_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
-
-                Query::select()
-                    .from_table::<Users>()
-                    .and_where(Users::Email.equals(Var::of(Users::Email)))
-            },
-            &[&form.email],
-        )
-        .await?;
+    #[rustfmt::skip]
+    let existing = read_db.query_opt2(thorn::sql! {
+        use schema::*;
+        SELECT 1 FROM Users WHERE Users.Email = #{&form.email => Users::Email}
+    }?).await?;
 
     if existing.is_some() {
         return Err(Error::AlreadyExists);
@@ -79,29 +71,21 @@ pub async fn register_user(
     let id = Snowflake::at(now);
     let username = USERNAME_SANITIZE_REGEX.replace_all(&form.username, " ");
 
-    let password_hash = password_hash_task.await??;
+    let passhash = password_hash_task.await??;
 
     drop(_permit);
 
-    let write_db = state.db.write.get().await?;
-
-    write_db
-        .execute_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
-
-                Query::call(schema::register_user::call(
-                    Var::of(Users::Id),
-                    Var::of(Users::Username),
-                    Var::of(Users::Email),
-                    Var::of(Users::Passhash),
-                    Var::of(Users::Dob),
-                ))
-            },
-            &[&id, &username, &form.email, &password_hash, &dob],
+    #[rustfmt::skip]
+    state.db.write.get().await?.execute2(thorn::sql! {
+        use schema::*;
+        CALL .register_user(
+            #{&id           => Users::Id},
+            #{&username     => Users::Username},
+            #{&form.email   => Users::Email},
+            #{&passhash     => Users::Passhash},
+            #{&dob          => Users::Dob}
         )
-        .await?;
+    }?).await?;
 
     super::me::login::do_login(state, addr, id, now).await
 }

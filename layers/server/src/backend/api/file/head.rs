@@ -16,33 +16,29 @@ pub struct UploadHead {
 
 pub async fn head(state: ServerState, auth: Authorization, file_id: Snowflake) -> Result<UploadHead, Error> {
     let fetch_record = async {
-        let db = state.db.read.get().await?;
+        #[rustfmt::skip]
+        let row = state.db.read.get().await?.query_opt2(thorn::sql! {
+            use schema::*;
 
-        let row = db
-            .query_opt_cached_typed(
-                || {
-                    use schema::*;
-                    use thorn::*;
-
-                    Query::select()
-                        .from_table::<Files>()
-                        .cols(&[Files::Size, Files::Flags, Files::Name, Files::Mime, Files::Preview])
-                        .and_where(Files::Id.equals(Var::of(Files::Id)))
-                        .and_where(Files::UserId.equals(Var::of(Files::UserId)))
-                        .limit_n(1)
-                },
-                &[&file_id, &auth.user_id],
-            )
-            .await?;
+            SELECT
+                Files.Size    AS @Size,
+                Files.Flags   AS @Flags,
+                Files.Name    AS @Name,
+                Files.Mime    AS @Mime,
+                Files.Preview AS @Preview
+            FROM  Files
+            WHERE Files.Id = #{&file_id => Files::Id}
+              AND Files.UserId = #{&auth.user_id => Files::UserId}
+        }?).await?;
 
         match row {
             None => Err(Error::NotFound),
             Some(row) => Ok(UploadHead {
-                size: row.try_get(0)?,
-                flags: row.try_get(1)?,
-                name: row.try_get(2)?,
-                mime: row.try_get(3)?,
-                preview: row.try_get(4)?,
+                size: row.size()?,
+                flags: row.flags()?,
+                name: row.name()?,
+                mime: row.mime()?,
+                preview: row.preview()?,
                 offset: 0,
             }),
         }

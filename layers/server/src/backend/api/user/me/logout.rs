@@ -8,20 +8,13 @@ pub async fn logout_user(state: &ServerState, auth: Authorization) -> Result<(),
     };
 
     let db = state.db.write.get().await?;
+    let bytes = bytes.as_slice();
 
-    let res = db
-        .execute_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
-
-                Query::delete()
-                    .from::<Sessions>()
-                    .and_where(Sessions::Token.equals(Var::of(Sessions::Token)))
-            },
-            &[&&bytes[..]],
-        )
-        .await?;
+    #[rustfmt::skip]
+    let res = db.execute2(thorn::sql! {
+        use schema::*;
+        DELETE FROM Sessions WHERE Sessions.Token = #{&bytes => Sessions::Token}
+    }?).await?;
 
     if res == 0 {
         log::warn!(

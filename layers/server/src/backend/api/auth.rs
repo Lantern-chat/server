@@ -65,30 +65,27 @@ pub async fn do_user_auth(
 ) -> Result<Option<Authorization>, Error> {
     let db = state.db.read.get().await?;
 
-    let row = db
-        .query_opt_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
+    #[rustfmt::skip]
+    let row = db.query_opt2(thorn::sql! {
+        use schema::*;
 
-                // NOTE: User-deletion process will delete session tokens, too.
-                Query::select()
-                    .cols(&[Sessions::UserId, Sessions::Expires])
-                    .col(Users::Flags)
-                    .from(Sessions::inner_join_table::<Users>().on(Users::Id.equals(Sessions::UserId)))
-                    .and_where(Sessions::Token.equals(Var::of(Sessions::Token)))
-            },
-            &[&bytes],
-        )
-        .await?;
+        SELECT
+            Sessions.UserId  AS @UserId,
+            Sessions.Expires AS @Expires,
+            Users.Flags      AS @UserFlags
+        FROM
+            Sessions INNER JOIN Users ON Users.Id = Sessions.UserId
+        WHERE
+            Sessions.Token = #{&bytes => Sessions::Token}
+    }?).await?;
 
     Ok(match row {
         Some(row) => Some({
             let auth = Authorization {
                 token,
-                user_id: row.try_get(0)?,
-                expires: row.try_get(1)?,
-                flags: UserFlags::from_bits_truncate(row.try_get(2)?),
+                user_id: row.user_id()?,
+                expires: row.expires()?,
+                flags: UserFlags::from_bits_truncate(row.user_flags()?),
             };
 
             state.session_cache.set(auth).await;

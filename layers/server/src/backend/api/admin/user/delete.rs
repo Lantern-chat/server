@@ -15,7 +15,10 @@ pub async fn delete_user(state: ServerState, user_id: Snowflake) -> Result<(), E
     db.execute2(thorn::sql! {
         use schema::*;
 
-        CALL .soft_delete_user(#{&user_id}, #{&new_username})
+        CALL .soft_delete_user(
+            #{&user_id => Users::Id},
+            #{&new_username => Users::Username}
+        )
     }?)
     .await?;
 

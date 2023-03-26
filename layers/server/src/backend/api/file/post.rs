@@ -83,80 +83,26 @@ pub async fn do_post_file(
 ) -> Result<(Snowflake, i64), Error> {
     let file_id = Snowflake::now();
     let nonce: i64 = util::rng::crypto_thread_rng().gen();
+    let flags = FileFlags::PARTIAL.bits();
 
-    let db = state.db.write.get().await?;
+    #[rustfmt::skip]
+    state.db.write.get().await?.execute2(thorn::sql! {
+        use schema::*;
 
-    mod post_file_query {
-        pub use schema::*;
-        pub use thorn::*;
-
-        use smol_str::SmolStr;
-
-        thorn::params! {
-            pub struct Params {
-                pub file_id: Snowflake = Files::Id,
-                pub user_id: Snowflake = Files::UserId,
-                pub nonce: i64 = Files::Nonce,
-                pub size: i32 = Files::Size,
-                pub width: Option<i32> = Files::Width,
-                pub height: Option<i32> = Files::Height,
-                pub flags: i16 = Files::Flags,
-                pub filename: SmolStr = Files::Name,
-                pub mime: Option<SmolStr> = Files::Mime,
-                pub preview: Option<Vec<u8>> = Files::Preview,
-            }
-        }
-    }
-
-    use post_file_query::{Parameters, Params};
-
-    // TODO: Add flags
-    db.execute_cached_typed(
-        || {
-            use post_file_query::*;
-
-            Query::insert()
-                .into::<Files>()
-                .cols(&[
-                    Files::Id,
-                    Files::UserId,
-                    Files::Nonce,
-                    Files::Size,
-                    Files::Width,
-                    Files::Height,
-                    Files::Flags,
-                    Files::Name,
-                    Files::Mime,
-                    Files::Preview,
-                ])
-                .values([
-                    Params::file_id(),
-                    Params::user_id(),
-                    Params::nonce(),
-                    Params::size(),
-                    Params::width(),
-                    Params::height(),
-                    Params::flags(),
-                    Params::filename(),
-                    Params::mime(),
-                    Params::preview(),
-                ])
-        },
-        &Params {
-            file_id,
-            user_id,
-            nonce,
-            size: upload_size,
-            width,
-            height,
-            flags: FileFlags::PARTIAL.bits(),
-            filename,
-            mime,
-            preview,
-        }
-        .as_params(),
-    )
-    .await?;
+        INSERT INTO Files (Id, UserId, Nonce, Size, Width, Height, Flags, Name, Mime, Preview)
+        VALUES (
+            #{&file_id      => Files::Id},
+            #{&user_id      => Files::UserId},
+            #{&nonce        => Files::Nonce},
+            #{&upload_size  => Files::Size},
+            #{&width        => Files::Width},
+            #{&height       => Files::Height},
+            #{&flags        => Files::Flags},
+            #{&filename     => Files::Name},
+            #{&mime         => Files::Mime},
+            #{&preview      => Files::Preview}
+        )
+    }?).await?;
 
     Ok((file_id, nonce))
 }

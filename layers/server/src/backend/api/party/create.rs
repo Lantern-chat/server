@@ -60,24 +60,31 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
     let t = db.transaction().await?;
 
     // insert party first to avoid foreign key issues
-    t.execute_cached_typed(
-        || insert_party(),
-        &[
-            &party.id,
-            &party.name,
-            &party.description,
-            &party.owner,
-            &party.default_room,
-        ],
-    )
+    t.execute2(thorn::sql! {
+        use schema::*;
+
+        INSERT INTO Party (
+            Id, Name, Description, OwnerId, DefaultRoom
+        ) VALUES (
+            #{&party.id           => Party::Id          },
+            #{&party.name         => Party::Name        },
+            #{&party.description  => Party::Description },
+            #{&party.owner        => Party::OwnerId     },
+            #{&party.default_room => Party::DefaultRoom }
+        )
+    }?)
     .await?;
 
     let position = {
-        let row = t
-            .query_one_cached_typed(|| query_max_position(), &[&auth.user_id])
-            .await?;
+        #[rustfmt::skip]
+        let row = t.query_one2(thorn::sql! {
+            use schema::*;
 
-        match row.try_get::<_, Option<i16>>(0)? {
+            SELECT MAX(PartyMembers.Position) AS @MaxPosition
+            FROM PartyMembers WHERE PartyMembers.UserId = #{&auth.user_id}
+        }?).await?;
+
+        match row.max_position::<Option<i16>>()? {
             Some(max_position) => max_position + 1,
             None => 0,
         }
@@ -85,23 +92,47 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
 
     party.position = Some(position);
 
+    let [perm1, perm2] = default_role.permissions.to_i64();
+
     // NOTE: This is used to avoid lifetime issues
     futures::future::try_join3(
-        t.execute_cached_typed(|| insert_member(), &[&party.id, &auth.user_id, &position]),
-        t.execute_cached_typed(
-            || insert_role(),
-            &[
-                &default_role.name,
-                &default_role.id,
-                &party.id,
-                &default_role.permissions.to_i64()[0],
-                &default_role.permissions.to_i64()[1],
-            ],
-        ),
-        t.execute_cached_typed(
-            || insert_room(),
-            &[&room_id, &party.id, &"general", &0i16, &RoomFlags::DEFAULT],
-        ),
+        t.execute2(thorn::sql! {
+            use schema::*;
+
+            INSERT INTO PartyMembers (
+                PartyId, UserId, Position
+            ) VALUES (
+                #{&party.id     => PartyMembers::PartyId  },
+                #{&auth.user_id => PartyMembers::UserId   },
+                #{&position     => PartyMembers::Position }
+            )
+        }?),
+        t.execute2(thorn::sql! {
+            use schema::*;
+
+            INSERT INTO Roles (
+                Id, Name, PartyId, Permissions1, Permissions2
+            ) VALUES (
+                #{&default_role.id   => Roles::Id           },
+                #{&default_role.name => Roles::Name         },
+                #{&party.id          => Roles::PartyId      },
+                #{&perm1             => Roles::Permissions1 },
+                #{&perm2             => Roles::Permissions2 }
+            )
+        }?),
+        t.execute2(thorn::sql! {
+            use schema::*;
+
+            INSERT INTO Rooms (
+                Id, PartyId, Name, Position, Flags
+            ) VALUES (
+                #{&room_id              => Rooms::Id       },
+                #{&party.id             => Rooms::PartyId  },
+                #{&"general"            => Rooms::Name     },
+                #{&0i16                 => Rooms::Position },
+                #{&RoomFlags::DEFAULT   => Rooms::Flags    }
+            )
+        }?),
     )
     .await?;
 
@@ -110,82 +141,4 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
     party.roles.push(default_role);
 
     Ok(party)
-}
-
-use thorn::*;
-
-fn insert_party() -> impl AnyQuery {
-    use schema::*;
-
-    Query::insert()
-        .into::<Party>()
-        .cols(&[
-            Party::Id,
-            Party::Name,
-            Party::Description,
-            Party::OwnerId,
-            Party::DefaultRoom,
-        ])
-        .values([
-            Var::of(Party::Id),
-            Var::of(Party::Name),
-            Var::of(Party::Description),
-            Var::of(Party::OwnerId),
-            Var::of(Party::DefaultRoom),
-        ])
-}
-
-fn query_max_position() -> impl AnyQuery {
-    use schema::*;
-
-    Query::select()
-        .expr(Builtin::max(PartyMembers::Position))
-        .from_table::<PartyMembers>()
-        .and_where(PartyMembers::UserId.equals(Var::of(Users::Id)))
-}
-
-fn insert_member() -> impl AnyQuery {
-    use schema::*;
-
-    Query::insert()
-        .into::<PartyMembers>()
-        .cols(&[PartyMembers::PartyId, PartyMembers::UserId, PartyMembers::Position])
-        .values([Var::of(Party::Id), Var::of(Users::Id), Var::of(PartyMembers::Position)])
-}
-
-// NOTE: Does not set sort order manually, defaults to 0
-fn insert_role() -> impl AnyQuery {
-    use schema::*;
-
-    Query::insert()
-        .into::<Roles>()
-        .cols(&[
-            Roles::Name,
-            Roles::Id,
-            Roles::PartyId,
-            Roles::Permissions1,
-            Roles::Permissions2,
-        ])
-        .values([
-            Var::of(Roles::Name),
-            Var::of(Roles::Id),
-            Var::of(Roles::PartyId),
-            Var::of(Roles::Permissions1),
-            Var::of(Roles::Permissions2),
-        ])
-}
-
-fn insert_room() -> impl AnyQuery {
-    use schema::*;
-
-    Query::insert()
-        .into::<Rooms>()
-        .cols(&[Rooms::Id, Rooms::PartyId, Rooms::Name, Rooms::Position, Rooms::Flags])
-        .values([
-            Var::of(Rooms::Id),
-            Var::of(Party::Id),
-            Var::of(Rooms::Name),
-            Var::of(Rooms::Position),
-            Var::of(Rooms::Flags),
-        ])
 }

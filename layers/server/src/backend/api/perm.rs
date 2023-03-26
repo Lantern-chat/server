@@ -38,26 +38,22 @@ pub async fn get_room_permissions(
     user_id: Snowflake,
     room_id: Snowflake,
 ) -> Result<Permissions, Error> {
-    let row = db
-        .query_opt_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
+    #[rustfmt::skip]
+    let row = db.query_opt2(thorn::sql! {
+        use schema::*;
 
-                Query::select()
-                    .cols(&[AggRoomPerms::Permissions1, AggRoomPerms::Permissions2])
-                    .from_table::<AggRoomPerms>()
-                    .and_where(AggRoomPerms::UserId.equals(Var::of(Users::Id)))
-                    .and_where(AggRoomPerms::RoomId.equals(Var::of(Rooms::Id)))
-            },
-            &[&user_id, &room_id],
-        )
-        .await?;
+        SELECT
+            AggRoomPerms.Permissions1 AS @Permissions1,
+            AggRoomPerms.Permissions2 AS @Permissions2
+        FROM AggRoomPerms WHERE
+            AggRoomPerms.UserId = #{&user_id => AggRoomPerms::UserId}
+        AND AggRoomPerms.RoomId = #{&room_id => AggRoomPerms::RoomId}
+    }?).await?;
 
     let mut perm = Permissions::empty();
 
     if let Some(row) = row {
-        perm = Permissions::from_i64(row.try_get(0)?, row.try_get(1)?);
+        perm = Permissions::from_i64(row.permissions1()?, row.permissions2()?);
 
         if perm.contains(Permissions::ADMINISTRATOR) {
             perm = Permissions::all();

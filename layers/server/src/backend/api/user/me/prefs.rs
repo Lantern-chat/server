@@ -15,28 +15,19 @@ pub async fn update_prefs(
     prefs.nullify_defaults();
 
     let db = state.db.write.get().await?;
+    let prefs = Json(prefs);
 
-    db.execute_cached_typed(
-        || {
-            use schema::*;
-            use thorn::*;
+    db.execute2(thorn::sql! {
+        use schema::*;
 
-            Query::update()
-                .table::<Users>()
-                .set(
-                    Users::Preferences,
-                    // defaults are set to null, so strip them to save space
-                    Call::custom("jsonb_strip_nulls").arg(
-                        // Coalesce in case user never had prefs
-                        Builtin::coalesce((Users::Preferences, [(); 0].lit().cast(Type::JSONB)))
-                            // concat to overwrite old prefs
-                            .concat(Var::of(Users::Preferences)),
-                    ),
-                )
-                .and_where(Users::Id.equals(Var::of(Users::Id)))
-        },
-        &[&Json(prefs), &auth.user_id],
-    )
+        UPDATE Users SET (Preferences) = (
+            // defaults are set to null, so strip them to save space
+            jsonb_strip_nulls(
+                // Coalesce in case user never had prefs, then concat to overwrite old prefs
+                COALESCE(Users.Preferences, "{}"::jsonb) || #{&prefs => Users::Preferences}
+            )
+        ) WHERE Users.Id = #{&auth.user_id => Users::Id}
+    }?)
     .await?;
 
     Ok(())
