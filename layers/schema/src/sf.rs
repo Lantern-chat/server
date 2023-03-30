@@ -1,15 +1,18 @@
 use std::{
-    sync::atomic::{AtomicU16, Ordering},
+    sync::atomic::{AtomicU16, AtomicU64, Ordering},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use std::num::NonZeroU64;
 
 pub use sdk::models::sf::{Snowflake, LANTERN_EPOCH};
-use sdk::models::LANTERN_EPOCH_PDT;
+use sdk::models::{Timestamp, LANTERN_EPOCH_PDT};
 
 /// Incremenent counter to ensure unique snowflakes
 pub static INCR: AtomicU16 = AtomicU16::new(0);
+
+pub static TIME: AtomicU64 = AtomicU64::new(0);
+
 /// Global instance value
 pub static mut INST: u16 = 0;
 /// Global worker value
@@ -36,18 +39,35 @@ pub trait SnowflakeExt {
         Snowflake(unsafe { NonZeroU64::new_unchecked(ms << 22) })
     }
 
-    /// Create a snowflake at the given unix epoch (milliseconds)
-    fn at_ms(ms: u64) -> Snowflake {
+    /// **WARNING**: DO NOT USE FOR UNIQUE IDS
+    #[inline]
+    fn at_unix_ms(ms: u64) -> Snowflake {
         // offset by Lantern epoch
-        Self::at_ms_since_lantern_epoch(ms - LANTERN_EPOCH)
+        Self::from_parts(ms - LANTERN_EPOCH, 0)
     }
 
-    fn at_ms_since_lantern_epoch(ms: u64) -> Snowflake {
-        // update incremenent counter, making sure it wraps at 12 bits
-        let incr = INCR
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |incr| Some((incr + 1) & 0xFFF))
-            .unwrap() as u64;
+    /// **WARNING**: DO NOT USE FOR UNIQUE IDS
+    #[inline]
+    fn at_ts(ts: Timestamp) -> Snowflake {
+        Self::at_unix_ms(ts.duration_since(Timestamp::UNIX_EPOCH).whole_milliseconds().max(0) as u64)
+    }
 
+    /// **WARNING**: DO NOT USE FOR UNIQUE IDS
+    #[inline]
+    fn at(ts: SystemTime) -> Snowflake {
+        Self::at_unix_ms(ts.duration_since(UNIX_EPOCH).unwrap().as_millis() as u64)
+    }
+
+    /// **WARNING**: DO NOT USE FOR UNIQUE IDS
+    #[inline]
+    fn at_date(ts: time::Date) -> Snowflake {
+        let seconds = ts - LANTERN_EPOCH_PDT.date();
+
+        Self::from_parts(seconds.whole_seconds() as u64 * 1000, 0)
+    }
+
+    #[inline(always)]
+    fn from_parts(ms: u64, incr: u16) -> Snowflake {
         // get global IDs
         let inst = unsafe { INST as u64 };
         let worker = unsafe { WORK as u64 };
@@ -57,22 +77,27 @@ pub trait SnowflakeExt {
         debug_assert!(worker < (1 << 6));
 
         // Shift into position and bitwise-OR everything together
-        Snowflake(unsafe { NonZeroU64::new_unchecked((ms << 22) | (worker << 17) | (inst << 12) | incr) })
+        Snowflake(unsafe { NonZeroU64::new_unchecked((ms << 22) | (worker << 17) | (inst << 12) | (incr as u64)) })
     }
 
     /// Creates a new Snowflake at this moment
     fn now() -> Snowflake {
-        Self::at_ms(UNIX_EPOCH.elapsed().expect("Could not get time").as_millis() as u64)
-    }
+        let ms = UNIX_EPOCH.elapsed().expect("Could not get time").as_millis() as u64;
 
-    fn at(ts: SystemTime) -> Snowflake {
-        Self::at_ms(ts.duration_since(UNIX_EPOCH).unwrap().as_millis() as u64)
-    }
+        let incr =
+            INCR.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |incr| Some((incr + 1) & 0xFFF)).unwrap();
 
-    fn at_date(ts: time::Date) -> Snowflake {
-        let seconds = ts - LANTERN_EPOCH_PDT.date();
+        let max_ms = TIME.fetch_max(ms, Ordering::SeqCst);
 
-        Self::at_ms_since_lantern_epoch(seconds.whole_seconds() as u64 * 1000)
+        // clock went backwards and incr is/was at max
+        if incr == 0xFFF && max_ms > ms {
+            // forcibly increment the timestamp until clock flows normally again
+            let _ = TIME.compare_exchange(max_ms, max_ms + 1, Ordering::SeqCst, Ordering::Acquire);
+
+            // TODO: Maybe add a log entry for this
+        }
+
+        Snowflake::from_parts(max_ms - LANTERN_EPOCH, incr)
     }
 
     fn add(self, duration: time::Duration) -> Option<Snowflake>;

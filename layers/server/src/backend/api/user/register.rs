@@ -68,7 +68,7 @@ pub async fn register_user(
         res
     });
 
-    let id = Snowflake::at(now);
+    let id = Snowflake::now();
     let username = USERNAME_SANITIZE_REGEX.replace_all(&form.username, " ");
 
     let passhash = password_hash_task.await??;

@@ -23,10 +23,8 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
         return Err(Error::InvalidName);
     }
 
-    let now = SystemTime::now();
-
-    let party_id = Snowflake::at(now);
-    let room_id = Snowflake::at(now);
+    let party_id = Snowflake::now();
+    let room_id = Snowflake::now();
 
     let default_role = Role {
         id: party_id,
