@@ -145,22 +145,15 @@ async fn party_position_update(
     user_id: Snowflake,
     party_id: Snowflake,
 ) -> Result<(), Error> {
-    let row = db
-        .query_one_cached_typed(
-            || {
-                use schema::*;
+    #[rustfmt::skip]
+    let row = db.query_one2(schema::sql! {
+        SELECT PartyMembers.Position AS @Position
+          FROM PartyMembers
+         WHERE PartyMembers.PartyId = #{&party_id => Party::Id}
+           AND PartyMembers.UserId = #{&user_id => Users::Id}
+    }?).await?;
 
-                Query::select()
-                    .col(PartyMembers::Position)
-                    .from_table::<PartyMembers>()
-                    .and_where(PartyMembers::PartyId.equals(Var::of(Party::Id)))
-                    .and_where(PartyMembers::UserId.equals(Var::of(Users::Id)))
-            },
-            &[&party_id, &user_id],
-        )
-        .await?;
-
-    let position: i16 = row.try_get(0)?;
+    let position: i16 = row.position()?;
 
     state
         .gateway

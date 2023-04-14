@@ -25,59 +25,35 @@ pub async fn member_event(
 
     let member_future = match event {
         EventCode::MemberLeft | EventCode::MemberBan | EventCode::MemberUnban => Either::Left(async {
-            mod user_query {
-                pub use schema::*;
-                pub use thorn::*;
-
-                indexed_columns! {
-                    pub enum UserColumns {
-                        Users::Username,
-                        Users::Discriminator,
-                        Users::Flags,
-                    }
-
-                    pub enum ProfileColumns continue UserColumns {
-                        Profiles::Nickname,
-                        Profiles::AvatarId,
-                        Profiles::Bits,
-                    }
-                }
-            }
-
-            let row = db
-                .query_one_cached_typed(
-                    || {
-                        use user_query::*;
-
-                        Query::select()
-                            .cols(UserColumns::default())
-                            .cols(ProfileColumns::default())
-                            .from(
-                                Users::left_join_table::<Profiles>()
-                                    .on(Profiles::UserId.equals(Users::Id).and(Profiles::PartyId.is_null())),
-                            )
-                            .and_where(Users::Id.equals(Var::of(Users::Id)))
-                    },
-                    &[&user_id],
-                )
-                .await?;
-
-            use user_query::{ProfileColumns, UserColumns};
+            #[rustfmt::skip]
+            let row = db.query_one2(schema::sql! {
+                SELECT
+                    Users.Username      AS @Username,
+                    Users.Discriminator AS @Discriminator,
+                    Users.Flags         AS @Flags,
+                    Profiles.Nickname   AS @Nickname,
+                    Profiles.AvatarId   AS @AvatarId,
+                    Profiles.Bits       AS @ProfileBits
+                FROM
+                    Users LEFT JOIN Profiles ON Users.Id = Profiles.UserId AND Profiles.PartyId IS NULL
+                WHERE
+                    Users.Id = #{&user_id => Users::Id}
+            }?).await?;
 
             Ok::<Option<_>, Error>(Some(PartyMember {
                 user: User {
                     id: user_id,
-                    username: row.try_get(UserColumns::username())?,
-                    discriminator: row.try_get(UserColumns::discriminator())?,
-                    flags: UserFlags::from_bits_truncate_public(row.try_get(UserColumns::flags())?),
+                    username: row.username()?,
+                    discriminator: row.discriminator()?,
+                    flags: UserFlags::from_bits_truncate_public(row.flags()?),
                     presence: None,
-                    profile: match row.try_get(ProfileColumns::bits())? {
+                    profile: match row.profile_bits()? {
                         None => Nullable::Null,
                         Some(bits) => Nullable::Some(UserProfile {
                             bits,
                             extra: Default::default(),
-                            nick: row.try_get(ProfileColumns::nickname())?,
-                            avatar: encrypt_snowflake_opt(state, row.try_get(ProfileColumns::avatar_id())?).into(),
+                            nick: row.nickname()?,
+                            avatar: encrypt_snowflake_opt(state, row.avatar_id()?).into(),
                             banner: Nullable::Undefined,
                             bio: Nullable::Undefined,
                             status: Nullable::Undefined,

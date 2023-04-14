@@ -6,28 +6,14 @@ pub async fn message_delete(
     id: Snowflake,
     party_id: Option<Snowflake>,
 ) -> Result<(), Error> {
-    let row = db
-        .query_opt_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
+    #[rustfmt::skip]
+    let Some(row) = db.query_opt2(schema::sql! {
+        SELECT Messages.RoomId AS @RoomId, Messages.UserId AS @UserId
+        FROM Messages WHERE Messages.Id = #{&id => Messages::Id}
+    }?).await? else { return Ok(()); };
 
-                Query::select()
-                    .from_table::<Messages>()
-                    .col(Messages::RoomId)
-                    .col(Messages::UserId)
-                    .and_where(Messages::Id.equals(Var::of(Messages::Id)))
-            },
-            &[&id],
-        )
-        .await?;
-
-    let Some(row) = row else {
-        return Ok(());
-    };
-
-    let room_id = row.try_get(0)?;
-    let user_id = row.try_get(1)?;
+    let room_id = row.room_id()?;
+    let user_id = row.user_id()?;
 
     let event = ServerMsg::new_message_delete(MessageDeleteEvent {
         id,
@@ -37,10 +23,7 @@ pub async fn message_delete(
     });
 
     if let Some(party_id) = party_id {
-        state
-            .gateway
-            .broadcast_event(Event::new(event, Some(room_id))?, party_id)
-            .await;
+        state.gateway.broadcast_event(Event::new(event, Some(room_id))?, party_id).await;
     }
 
     Ok(())

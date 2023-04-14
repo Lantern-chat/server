@@ -35,54 +35,32 @@ pub async fn role_event(
         return Ok(());
     }
 
-    mod role_query {
-        pub use schema::*;
-        pub use thorn::*;
+    #[rustfmt::skip]
+    let row = db.query_one2(schema::sql! {
+        SELECT
+            Roles.PartyId       AS @PartyId,
+            Roles.AvatarId      AS @AvatarId,
+            Roles.Name          AS @Name,
+            Roles.Permissions1  AS @Permissions1,
+            Roles.Permissions2  AS @Permissions2,
+            Roles.Color         AS @Color,
+            Roles.Position      AS @Position,
+            Roles.Flags         AS @Flags
+        FROM Roles
+        WHERE Roles.Id = #{&role_id => Roles::Id}
+    }?).await?;
 
-        indexed_columns! {
-            pub enum RoleColumns {
-                Roles::PartyId,
-                Roles::AvatarId,
-                Roles::Name,
-                Roles::Permissions1,
-                Roles::Permissions2,
-                Roles::Color,
-                Roles::Position,
-                Roles::Flags,
-            }
-        }
-    }
-
-    let row = db
-        .query_one_cached_typed(
-            || {
-                use role_query::*;
-
-                Query::select()
-                    .cols(RoleColumns::default())
-                    .from_table::<Roles>()
-                    .and_where(Roles::Id.equals(Var::of(Roles::Id)))
-            },
-            &[&role_id],
-        )
-        .await?;
-
-    use role_query::RoleColumns;
-
-    let party_id = row.try_get(RoleColumns::party_id())?;
+    let party_id = row.party_id()?;
 
     let role = Role {
         id: role_id,
         party_id,
-        avatar: encrypt_snowflake_opt(state, row.try_get(RoleColumns::avatar_id())?),
-        name: row.try_get(RoleColumns::name())?,
-        permissions: Permissions::from_i64(
-            row.try_get(RoleColumns::permissions1())?,
-            row.try_get(RoleColumns::permissions2())?,
-        ),
-        color: { row.try_get::<_, Option<i32>>(RoleColumns::color())?.map(|c| c as u32) },
-        position: row.try_get(RoleColumns::position())?,
-        flags: row.try_get(RoleColumns::flags())?,
+        avatar: encrypt_snowflake_opt(state, row.avatar_id()?),
+        name: row.name()?,
+        permissions: Permissions::from_i64(row.permissions1()?, row.permissions2()?),
+        color: row.color::<Option<i32>>()?.map(|c| c as u32),
+        position: row.position()?,
+        flags: row.flags()?,
     };
 
     let event = match event {
