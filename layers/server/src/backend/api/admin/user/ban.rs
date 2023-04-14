@@ -7,14 +7,12 @@ pub async fn ban_user(state: ServerState, user_id: Snowflake) -> Result<(), Erro
 
     let t = db.transaction().await?;
 
-    let do_ban_user = t.execute2(thorn::sql! {
-        use schema::*;
+    let do_ban_user = t.execute2(schema::sql! {
         UPDATE Users SET (Flags) = (Users.Flags | {UserFlags::BANNED.bits()})
         WHERE Users.Id = #{&user_id => Users::Id}
     }?);
 
-    let clear_sessions = t.execute2(thorn::sql! {
-        use schema::*;
+    let clear_sessions = t.execute2(schema::sql! {
         DELETE FROM Sessions WHERE Sessions.UserId = #{&user_id => Users::Id}
     }?);
 

@@ -16,9 +16,7 @@ pub async fn get_roles_raw<'a, 'b>(
     party_id: SearchMode<'a>,
 ) -> Result<impl Stream<Item = Result<Role, Error>> + 'b, Error> {
     let stream = db
-        .query_stream2(thorn::sql! {
-            use schema::*;
-
+        .query_stream2(schema::sql! {
             SELECT
                 Roles.Id            AS @_,
                 Roles.PartyId       AS @_,

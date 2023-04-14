@@ -29,9 +29,7 @@ pub async fn patch_file(
     mut body: hyper::Body,
 ) -> Result<FilePatch, Error> {
     #[rustfmt::skip]
-    let row = state.db.read.get().await?.query_opt2(thorn::sql! {
-        use schema::*;
-
+    let row = state.db.read.get().await?.query_opt2(schema::sql! {
         SELECT
             Files.Size  AS @Size,
             Files.Flags AS @Flags,
@@ -189,8 +187,7 @@ pub async fn patch_file(
         // try to deduce mime type from initial bytes
         if let Some((mstr, _)) = mime_db::from_prefix(first_chunk) {
             #[rustfmt::skip]
-            state.db.write.get().await?.execute2(thorn::sql! {
-                use schema::*;
+            state.db.write.get().await?.execute2(schema::sql! {
                 UPDATE Files SET (Mime) = (#{&mstr => Files::Mime})
                 WHERE Files.Id = #{&file_id => Files::Id}
             }?).await?;
@@ -205,8 +202,7 @@ pub async fn patch_file(
         let bits = flags.bits();
 
         #[rustfmt::skip]
-        state.db.write.get().await?.execute2(thorn::sql! {
-            use schema::*;
+        state.db.write.get().await?.execute2(schema::sql! {
             UPDATE Files SET (Flags) = (#{&bits => Files::Flags})
             WHERE Files.Id = #{&file_id => Files::Id}
         }?).await?;

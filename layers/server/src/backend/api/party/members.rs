@@ -36,8 +36,8 @@ pub async fn get_members_inner(
     mode: MemberMode,
 ) -> Result<impl Stream<Item = Result<PartyMember, Error>>, Error> {
     let stream = db
-        .query_stream2(thorn::sql! {
-            use schema::{flags::MemberFlags, *};
+        .query_stream2(schema::sql! {
+            use schema::flags::MemberFlags;
 
             SELECT
                 AggMembersFull.UserId               AS @UserId,

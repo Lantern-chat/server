@@ -23,9 +23,7 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) ->
     let db = state.db.read.get().await?;
 
     #[rustfmt::skip]
-    let user = db.query_opt2(thorn::sql! {
-        use schema::*;
-
+    let user = db.query_opt2(schema::sql! {
         SELECT
             Users.Id        AS @Id,
             Users.Flags     AS @Flags,
@@ -34,7 +32,7 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) ->
             Users.MfaBackup AS @MfaBackup
         FROM Users
         WHERE
-            Users.Email = #{&form.email => Type::TEXT} AND Users.DeletedAt IS NULL
+            Users.Email = #{&form.email => Users::Email} AND Users.DeletedAt IS NULL
 
     }?).await?;
 
@@ -122,9 +120,7 @@ pub async fn do_login(
 
     let db = state.db.write.get().await?;
 
-    db.execute2(thorn::sql! {
-        use schema::*;
-
+    db.execute2(schema::sql! {
         INSERT INTO Sessions (
             Token, UserId, Expires, Addr
         ) VALUES (
@@ -199,9 +195,7 @@ pub async fn process_2fa(
                 let backup = encrypt_user_message(&mfa_key, user_id, &backup);
 
                 log::debug!("MFA Backup token used, saving new backup array to database");
-                db.execute2(thorn::sql! {
-                    use schema::*;
-
+                db.execute2(schema::sql! {
                     UPDATE Users SET (MfaBackup) = (#{&backup => Users::MfaBackup})
                     WHERE Users.Id = #{&user_id => Users::Id}
                 }?)

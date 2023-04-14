@@ -39,9 +39,7 @@ pub async fn get_room_permissions(
     room_id: Snowflake,
 ) -> Result<Permissions, Error> {
     #[rustfmt::skip]
-    let row = db.query_opt2(thorn::sql! {
-        use schema::*;
-
+    let row = db.query_opt2(schema::sql! {
         SELECT
             AggRoomPerms.Permissions1 AS @Permissions1,
             AggRoomPerms.Permissions2 AS @Permissions2

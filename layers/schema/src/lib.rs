@@ -27,7 +27,11 @@ pub fn has_all_permission_bits(
     use thorn::*;
 
     let perms = perms.to_i64();
-    cols.0
-        .has_all_bits(perms[0].lit())
-        .and(cols.1.has_all_bits(perms[1].lit()))
+    cols.0.has_all_bits(perms[0].lit()).and(cols.1.has_all_bits(perms[1].lit()))
+}
+
+/// Wrapper around [`thorn::sql!`] which injects `use schema::*` ahead of the declaration
+#[macro_export]
+macro_rules! sql {
+    ($($tt:tt)*) => { thorn::sql! { use $crate::*; $($tt)* } };
 }

@@ -18,9 +18,7 @@ pub async fn get_custom_emotes_raw<'a>(
     party_id: SearchMode<'a>,
 ) -> Result<impl Stream<Item = Result<CustomEmote, Error>> + 'static, Error> {
     let stream = db
-        .query_stream2(thorn::sql! {
-            use schema::*;
-
+        .query_stream2(schema::sql! {
             SELECT
                 Emotes.Id           AS @_,
                 Emotes.PartyId      AS @_,

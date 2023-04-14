@@ -36,9 +36,7 @@ pub async fn ready(
 
     let parties_future = async {
         #[rustfmt::skip]
-        let rows = db.query2(thorn::sql! {
-            use schema::*;
-
+        let rows = db.query2(schema::sql! {
             SELECT
                 Party.Id                AS @Id,
                 Party.OwnerId           AS @OwnerId,

@@ -58,9 +58,7 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
     let t = db.transaction().await?;
 
     // insert party first to avoid foreign key issues
-    t.execute2(thorn::sql! {
-        use schema::*;
-
+    t.execute2(schema::sql! {
         INSERT INTO Party (
             Id, Name, Description, OwnerId, DefaultRoom
         ) VALUES (
@@ -75,9 +73,7 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
 
     let position = {
         #[rustfmt::skip]
-        let row = t.query_one2(thorn::sql! {
-            use schema::*;
-
+        let row = t.query_one2(schema::sql! {
             SELECT MAX(PartyMembers.Position) AS @MaxPosition
             FROM PartyMembers WHERE PartyMembers.UserId = #{&auth.user_id => PartyMembers::UserId}
         }?).await?;
@@ -94,9 +90,7 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
 
     // NOTE: This is used to avoid lifetime issues
     futures::future::try_join3(
-        t.execute2(thorn::sql! {
-            use schema::*;
-
+        t.execute2(schema::sql! {
             INSERT INTO PartyMembers (
                 PartyId, UserId, Position
             ) VALUES (
@@ -105,9 +99,7 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
                 #{&position     => PartyMembers::Position }
             )
         }?),
-        t.execute2(thorn::sql! {
-            use schema::*;
-
+        t.execute2(schema::sql! {
             INSERT INTO Roles (
                 Id, Name, PartyId, Permissions1, Permissions2
             ) VALUES (
@@ -118,9 +110,7 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
                 #{&perm2             => Roles::Permissions2 }
             )
         }?),
-        t.execute2(thorn::sql! {
-            use schema::*;
-
+        t.execute2(schema::sql! {
             INSERT INTO Rooms (
                 Id, PartyId, Name, Position, Flags
             ) VALUES (

@@ -17,9 +17,7 @@ pub struct UploadHead {
 pub async fn head(state: ServerState, auth: Authorization, file_id: Snowflake) -> Result<UploadHead, Error> {
     let fetch_record = async {
         #[rustfmt::skip]
-        let row = state.db.read.get().await?.query_opt2(thorn::sql! {
-            use schema::*;
-
+        let row = state.db.read.get().await?.query_opt2(schema::sql! {
             SELECT
                 Files.Size    AS @Size,
                 Files.Flags   AS @Flags,

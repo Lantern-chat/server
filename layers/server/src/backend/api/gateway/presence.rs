@@ -11,8 +11,7 @@ pub async fn set_presence(
     let flags = presence.flags.bits();
 
     #[rustfmt::skip]
-    state.db.write.get().await?.execute2(thorn::sql! {
-        use schema::*;
+    state.db.write.get().await?.execute2(schema::sql! {
         CALL .set_presence(
             #{&user_id => UserPresence::UserId},
             #{&conn_id => UserPresence::ConnId},
@@ -26,8 +25,7 @@ pub async fn set_presence(
 
 pub async fn clear_presence(state: ServerState, conn_id: Snowflake) -> Result<(), Error> {
     #[rustfmt::skip]
-    state.db.write.get().await?.execute2(thorn::sql! {
-        use schema::*;
+    state.db.write.get().await?.execute2(schema::sql! {
         DELETE FROM UserPresence WHERE UserPresence.ConnId = #{&conn_id => UserPresence::ConnId}
     }?).await?;
 

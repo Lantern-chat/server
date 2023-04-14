@@ -17,9 +17,7 @@ pub async fn update_prefs(
     let db = state.db.write.get().await?;
     let prefs = Json(prefs);
 
-    db.execute2(thorn::sql! {
-        use schema::*;
-
+    db.execute2(schema::sql! {
         UPDATE Users SET (Preferences) = (
             // defaults are set to null, so strip them to save space
             jsonb_strip_nulls(

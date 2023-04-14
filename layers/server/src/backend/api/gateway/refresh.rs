@@ -12,8 +12,7 @@ pub async fn refresh_room_perms(
     user_id: Snowflake,
 ) -> Result<(), Error> {
     #[rustfmt::skip]
-    let stream = db.query_stream2(thorn::sql! {
-        use schema::*;
+    let stream = db.query_stream2(schema::sql! {
         SELECT
             AggRoomPerms.RoomId         AS @RoomId,
             AggRoomPerms.Permissions1   AS @Permissions1,

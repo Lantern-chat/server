@@ -86,9 +86,7 @@ pub async fn do_post_file(
     let flags = FileFlags::PARTIAL.bits();
 
     #[rustfmt::skip]
-    state.db.write.get().await?.execute2(thorn::sql! {
-        use schema::*;
-
+    state.db.write.get().await?.execute2(schema::sql! {
         INSERT INTO Files (Id, UserId, Nonce, Size, Width, Height, Flags, Name, Mime, Preview)
         VALUES (
             #{&file_id      => Files::Id},

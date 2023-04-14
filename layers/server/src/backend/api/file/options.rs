@@ -13,9 +13,7 @@ pub async fn file_options(state: &ServerState, auth: Authorization) -> Result<Fi
     };
 
     #[rustfmt::skip]
-    let row = state.db.read.get().await?.query_one2(thorn::sql! {
-        use schema::*;
-
+    let row = state.db.read.get().await?.query_one2(schema::sql! {
         SELECT
             SUM(Files.Size) AS @QuotaUsed
         FROM Files WHERE

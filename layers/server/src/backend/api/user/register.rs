@@ -44,8 +44,7 @@ pub async fn register_user(
     let read_db = state.db.read.get().await?;
 
     #[rustfmt::skip]
-    let existing = read_db.query_opt2(thorn::sql! {
-        use schema::*;
+    let existing = read_db.query_opt2(schema::sql! {
         SELECT 1 FROM Users WHERE Users.Email = #{&form.email => Users::Email}
     }?).await?;
 
@@ -76,8 +75,7 @@ pub async fn register_user(
     drop(_permit);
 
     #[rustfmt::skip]
-    state.db.write.get().await?.execute2(thorn::sql! {
-        use schema::*;
+    state.db.write.get().await?.execute2(schema::sql! {
         CALL .register_user(
             #{&id           => Users::Id},
             #{&username     => Users::Username},

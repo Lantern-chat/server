@@ -17,9 +17,7 @@ pub async fn trigger_typing(state: ServerState, auth: Authorization, room_id: Sn
     let db = state.db.read.get().await?;
 
     #[rustfmt::skip]
-    let row = db.query_opt2(thorn::sql! {
-        use schema::*;
-
+    let row = db.query_opt2(schema::sql! {
         tables! {
             pub struct AggRoom {
                 PartyId: Rooms::PartyId,

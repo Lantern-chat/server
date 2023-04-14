@@ -11,8 +11,7 @@ pub async fn logout_user(state: &ServerState, auth: Authorization) -> Result<(),
     let bytes = bytes.as_slice();
 
     #[rustfmt::skip]
-    let res = db.execute2(thorn::sql! {
-        use schema::*;
+    let res = db.execute2(schema::sql! {
         DELETE FROM Sessions WHERE Sessions.Token = #{&bytes => Sessions::Token}
     }?).await?;
 

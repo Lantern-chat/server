@@ -55,9 +55,7 @@ pub async fn get_asset(
     let Route { start, state, .. } = route;
 
     #[rustfmt::skip]
-    let row = state.db.read.get().await?.query_opt2(thorn::sql! {
-        use schema::*;
-
+    let row = state.db.read.get().await?.query_opt2(schema::sql! {
         SELECT
             Files.Id    AS @Id,
             Files.Size  AS @Size,
@@ -155,9 +153,7 @@ pub async fn get_attachment(
     let Route { start, state, .. } = route;
 
     #[rustfmt::skip]
-    let row = state.db.read.get().await?.query_opt2(thorn::sql! {
-        use schema::*;
-
+    let row = state.db.read.get().await?.query_opt2(schema::sql! {
         SELECT
             Files.Id    AS @Id,
             Files.Size  AS @Size,

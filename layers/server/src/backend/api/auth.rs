@@ -66,9 +66,7 @@ pub async fn do_user_auth(
     let db = state.db.read.get().await?;
 
     #[rustfmt::skip]
-    let row = db.query_opt2(thorn::sql! {
-        use schema::*;
-
+    let row = db.query_opt2(schema::sql! {
         SELECT
             Sessions.UserId  AS @UserId,
             Sessions.Expires AS @Expires,
