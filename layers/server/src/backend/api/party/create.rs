@@ -79,7 +79,7 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
             use schema::*;
 
             SELECT MAX(PartyMembers.Position) AS @MaxPosition
-            FROM PartyMembers WHERE PartyMembers.UserId = #{&auth.user_id}
+            FROM PartyMembers WHERE PartyMembers.UserId = #{&auth.user_id => PartyMembers::UserId}
         }?).await?;
 
         match row.max_position::<Option<i16>>()? {

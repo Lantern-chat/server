@@ -5,19 +5,12 @@ use crate::{Authorization, Error, ServerState};
 pub async fn unban_user(state: ServerState, user_id: Snowflake) -> Result<(), Error> {
     let db = state.db.write.get().await?;
 
-    db.execute_cached_typed(
-        || {
-            use schema::*;
-            use thorn::*;
-            let not_banned_flags = (UserFlags::all() - UserFlags::BANNED).bits();
+    db.execute2(thorn::sql! {
+        use schema::*;
 
-            Query::update()
-                .table::<Users>()
-                .and_where(Users::Id.equals(Var::of(Users::Id)))
-                .set(Users::Flags, Users::Flags.bitand(not_banned_flags.lit()))
-        },
-        &[&user_id],
-    )
+        UPDATE Users SET (Flags) = (Users.Flags & ~{UserFlags::BANNED.bits()})
+        WHERE Users.Id = #{&user_id => Users::Id}
+    }?)
     .await?;
 
     Ok(())

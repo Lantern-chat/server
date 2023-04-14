@@ -35,52 +35,31 @@ pub async fn ready(
     let user_future = crate::backend::api::user::me::get::get_full_self(&state, auth.user_id);
 
     let parties_future = async {
-        mod party_query {
-            pub use schema::*;
-            pub use thorn::*;
+        #[rustfmt::skip]
+        let rows = db.query2(thorn::sql! {
+            use schema::*;
 
-            indexed_columns! {
-                pub enum PartyColumns {
-                    Party::Id,
-                    Party::OwnerId,
-                    Party::Name,
-                    Party::AvatarId,
-                    Party::BannerId,
-                    Party::Description,
-                    Party::DefaultRoom,
-                }
-
-                pub enum MemberColumns continue PartyColumns {
-                    PartyMembers::Position
-                }
-            }
-        }
-
-        let rows = db
-            .query_cached_typed(
-                || {
-                    use party_query::*;
-
-                    Query::select()
-                        .cols(PartyColumns::default())
-                        .cols(MemberColumns::default())
-                        .from(
-                            Party::inner_join_table::<PartyMembers>().on(PartyMembers::PartyId.equals(Party::Id)),
-                        )
-                        .and_where(PartyMembers::UserId.equals(Var::of(Users::Id)))
-                        .and_where(Party::DeletedAt.is_null())
-                },
-                &[&auth.user_id],
-            )
-            .await?;
-
-        use party_query::{MemberColumns, PartyColumns};
+            SELECT
+                Party.Id                AS @Id,
+                Party.OwnerId           AS @OwnerId,
+                Party.Name              AS @Name,
+                Party.AvatarId          AS @AvatarId,
+                Party.BannerId          AS @BannerId,
+                Party.Description       AS @Description,
+                Party.DefaultRoom       AS @DefaultRoom,
+                PartyMembers.Position   AS @Position
+            FROM
+                Party INNER JOIN PartyMembers ON PartyMembers.PartyId = Party.Id
+            WHERE
+                Party.DeletedAt IS NULL
+                AND PartyMembers.UserId = #{&auth.user_id => Users::Id}
+        }?).await?;
 
         let mut parties = HashMap::with_capacity(rows.len());
         let mut ids = Vec::with_capacity(rows.len());
 
         for row in rows {
-            let id = row.try_get(PartyColumns::id())?;
+            let id = row.id()?;
 
             ids.push(id);
             parties.insert(
@@ -88,17 +67,15 @@ pub async fn ready(
                 Party {
                     partial: PartialParty {
                         id,
-                        name: row.try_get(PartyColumns::name())?,
-                        description: row.try_get(PartyColumns::description())?,
+                        name: row.name()?,
+                        description: row.description()?,
                     },
-                    avatar: encrypt_snowflake_opt(&state, row.try_get(PartyColumns::avatar_id())?),
-                    banner: row
-                        .try_get::<_, Nullable<_>>(PartyColumns::banner_id())?
-                        .map(|id| encrypt_snowflake(&state, id)),
-                    default_room: row.try_get(PartyColumns::default_room())?,
-                    position: row.try_get(MemberColumns::position())?,
+                    avatar: encrypt_snowflake_opt(&state, row.avatar_id()?),
+                    banner: row.banner_id::<Nullable<_>>()?.map(|id| encrypt_snowflake(&state, id)),
+                    default_room: row.default_room()?,
+                    position: row.position()?,
                     security: SecurityFlags::empty(),
-                    owner: row.try_get(PartyColumns::owner_id())?,
+                    owner: row.owner_id()?,
                     roles: Vec::new(),
                     emotes: Vec::new(),
                     pin_folders: Vec::new(),

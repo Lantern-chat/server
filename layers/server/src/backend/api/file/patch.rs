@@ -28,8 +28,6 @@ pub async fn patch_file(
     params: FilePatchParams,
     mut body: hyper::Body,
 ) -> Result<FilePatch, Error> {
-    let db = state.db.read.get().await?;
-
     #[rustfmt::skip]
     let row = state.db.read.get().await?.query_opt2(thorn::sql! {
         use schema::*;

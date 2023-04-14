@@ -11,7 +11,7 @@ pub async fn set_presence(
     let flags = presence.flags.bits();
 
     #[rustfmt::skip]
-    let db = state.db.write.get().await?.execute2(thorn::sql! {
+    state.db.write.get().await?.execute2(thorn::sql! {
         use schema::*;
         CALL .set_presence(
             #{&user_id => UserPresence::UserId},
