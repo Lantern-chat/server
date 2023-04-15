@@ -4,8 +4,8 @@ Allow: /api/v*/applications
 Allow: /api/v*/invite
 Allow: /invite
 Allow: /invite/
-Disallow: /channels
-Disallow: /channels/
+Disallow: /rooms
+Disallow: /rooms/
 Disallow: /verify
 Disallow: /verify/
 Disallow: /reset
@@ -21,8 +21,8 @@ Disallow: /widget/
 Disallow: /settings/
 
 User-agent: Twitterbot
-Disallow: /channels
-Disallow: /channels/
+Disallow: /rooms
+Disallow: /rooms/
 Disallow: /verify
 Disallow: /verify/
 Disallow: /reset

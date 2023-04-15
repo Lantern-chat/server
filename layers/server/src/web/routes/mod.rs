@@ -65,7 +65,7 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
         (&Method::GET | &Method::HEAD, segment) => {
             #[rustfmt::skip]
             let allowed = matches!(segment, Segment::End | Segment::Exact(
-                "channels" | "login" | "register" | "invite" | "verify" | "settings" | "reset"
+                "rooms" | "login" | "register" | "invite" | "verify" | "settings" | "reset"
             ));
 
             // NOTE: Whitelisting paths deters a bunch of false requests from bots
