@@ -67,28 +67,15 @@ pub async fn add_asset(
         }
     }
 
-    let db = state.db.read.get().await?;
+    #[rustfmt::skip]
+    let row = state.db.read.get().await?.query_one2(schema::sql! {
+        SELECT Files.Size AS @Size, Files.Nonce AS @Nonce, Files.Mime AS @Mime
+        FROM Files WHERE Files.Id = #{&file_id => Files::Id}
+    }?).await?;
 
-    let row = db
-        .query_one_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
-
-                Query::select()
-                    .from_table::<Files>()
-                    .cols(&[Files::Mime, Files::Nonce, Files::Size])
-                    .and_where(Files::Id.equals(Var::of(Files::Id)))
-            },
-            &[&file_id],
-        )
-        .await?;
-
-    drop(db);
-
-    let mime: Option<&str> = row.try_get(0)?;
-    let nonce: i64 = row.try_get(1)?;
-    let size: i32 = row.try_get(2)?;
+    let size: i32 = row.size()?;
+    let nonce: i64 = row.nonce()?;
+    let mime: Option<&str> = row.mime()?;
 
     if let Some(mime) = mime {
         if !mime.starts_with("image") {
@@ -110,17 +97,11 @@ pub async fn add_asset(
         .spawn()?;
 
     let mut input = AsyncFramedWriter::new(
-        child
-            .stdin
-            .take()
-            .ok_or(Error::InternalErrorStatic("Could not acquire child process stream"))?,
+        child.stdin.take().ok_or(Error::InternalErrorStatic("Could not acquire child process stream"))?,
     );
 
     let mut output = AsyncFramedReader::new(
-        child
-            .stdout
-            .take()
-            .ok_or(Error::InternalErrorStatic("Could not acquire child process stream"))?,
+        child.stdout.take().ok_or(Error::InternalErrorStatic("Could not acquire child process stream"))?,
     );
 
     let mut formats = gen_formats(state, mode);
@@ -151,9 +132,7 @@ pub async fn add_asset(
                     )
                     .await?;
 
-                input
-                    .write_buffered_object(&Command::ReadAndProcess { length: size as u64 })
-                    .await?;
+                input.write_buffered_object(&Command::ReadAndProcess { length: size as u64 }).await?;
 
                 let mut msg = input.new_message();
                 tokio::io::copy(&mut file, &mut msg).await?;
@@ -165,9 +144,7 @@ pub async fn add_asset(
                 processed_response = Some(p);
 
                 if let Some((format, quality)) = current {
-                    input
-                        .write_buffered_object(&Command::Encode { format, quality })
-                        .await?;
+                    input.write_buffered_object(&Command::Encode { format, quality }).await?;
                 }
             }
             Response::Error(e) => {
@@ -220,49 +197,27 @@ pub async fn add_asset(
                             EncodingFormat::Avif => "avif",
                         };
 
-                        db.execute_cached_typed(
-                            || {
-                                use schema::*;
-                                use thorn::*;
+                        let width = width as i32;
+                        let height = height as i32;
+                        let mime = format!("image/{ext}");
+                        let flags = FileFlags::COMPLETE.bits();
+                        let name = format!("{user_id}_asset.{ext}");
 
-                                Query::insert()
-                                    .into::<Files>()
-                                    .cols(&[
-                                        Files::Id,
-                                        Files::UserId,
-                                        Files::Nonce,
-                                        Files::Size,
-                                        Files::Width,
-                                        Files::Height,
-                                        Files::Mime,
-                                        Files::Flags,
-                                        Files::Name,
-                                    ])
-                                    .values([
-                                        Var::of(Files::Id),
-                                        Var::of(Files::UserId),
-                                        Var::of(Files::Nonce),
-                                        Var::of(Files::Size),
-                                        Var::of(Files::Width),
-                                        Var::of(Files::Height),
-                                        Var::of(Files::Mime),
-                                        Var::of(Files::Flags),
-                                        Var::of(Files::Name),
-                                    ])
-                            },
-                            &[
-                                &id,
-                                &user_id,
-                                &nonce,
-                                &len,
-                                &(width as i32),
-                                &(height as i32),
-                                &format!("image/{ext}"),
-                                &FileFlags::COMPLETE.bits(),
-                                &format!("{user_id}_asset.{ext}"),
-                            ],
-                        )
-                        .await?;
+                        #[rustfmt::skip]
+                        db.execute2(schema::sql! {
+                            INSERT INTO Files (Id, UserId, Nonce, Size, Width, Height, Mime, Flags, Name)
+                            VALUES (
+                                #{&id => Files::Id},
+                                #{&user_id => Files::UserId},
+                                #{&nonce => Files::Nonce},
+                                #{&len => Files::Size},
+                                #{&width => Files::Width},
+                                #{&height => Files::Height},
+                                #{&mime => Files::Mime},
+                                #{&flags => Files::Flags},
+                                #{&name => Files::Name}
+                            )
+                        }?).await?;
 
                         assets.push((id, format, quality));
 
@@ -281,9 +236,7 @@ pub async fn add_asset(
                     current = formats.pop();
 
                     if let Some((format, quality)) = current {
-                        input
-                            .write_buffered_object(&Command::Encode { format, quality })
-                            .await?;
+                        input.write_buffered_object(&Command::Encode { format, quality }).await?;
 
                         continue;
                     } else {
@@ -308,22 +261,14 @@ pub async fn add_asset(
     let mut db = state.db.write.get().await?;
     let t = db.transaction().await?;
 
-    t.execute_cached_typed(
-        || {
-            use schema::*;
-            use thorn::*;
-
-            Query::insert()
-                .into::<UserAssets>()
-                .cols(&[UserAssets::Id, UserAssets::FileId, UserAssets::Preview])
-                .values([
-                    Var::of(UserAssets::Id),
-                    Var::of(UserAssets::FileId),
-                    Var::of(UserAssets::Preview),
-                ])
-        },
-        &[&asset_id, &file_id, &processed.preview],
-    )
+    t.execute2(schema::sql! {
+        INSERT INTO UserAssets (Id, FileId, Preview)
+        VALUES (
+            #{&asset_id => UserAssets::Id },
+            #{&file_id => UserAssets::FileId },
+            #{&processed.preview => UserAssets::Preview }
+        )
+    }?)
     .await?;
 
     for (file_id, format, quality) in assets {
@@ -335,9 +280,7 @@ pub async fn add_asset(
             EncodingFormat::Avif => AssetFlags::FORMAT_AVIF,
         };
 
-        asset_flags = asset_flags
-            .with_quality(quality)
-            .with_alpha(processed.flags & process::HAS_ALPHA != 0);
+        asset_flags = asset_flags.with_quality(quality).with_alpha(processed.flags & process::HAS_ALPHA != 0);
 
         asset_flags = match format {
             // JPEGs cannot have alpha channels
@@ -347,22 +290,16 @@ pub async fn add_asset(
             EncodingFormat::Avif => asset_flags,
         };
 
-        t.execute_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
+        let asset_flags = asset_flags.bits();
 
-                Query::insert()
-                    .into::<UserAssetFiles>()
-                    .cols(&[UserAssetFiles::FileId, UserAssetFiles::AssetId, UserAssetFiles::Flags])
-                    .values([
-                        Var::of(UserAssetFiles::FileId),
-                        Var::of(UserAssetFiles::AssetId),
-                        Var::of(UserAssetFiles::Flags),
-                    ])
-            },
-            &[&file_id, &asset_id, &asset_flags.bits()],
-        )
+        t.execute2(schema::sql! {
+            INSERT INTO UserAssetFiles (FileId, AssetId, Flags)
+            VALUES (
+                #{&file_id => UserAssetFiles::FileId},
+                #{&asset_id => UserAssetFiles::AssetId},
+                #{&asset_flags => UserAssetFiles::Flags}
+            )
+        }?)
         .await?;
     }
 
