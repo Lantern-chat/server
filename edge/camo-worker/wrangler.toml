@@ -6,10 +6,10 @@ send_metrics = false
 route = { pattern = "cdn.lanternchat.net/camo/*", zone_name = "lanternchat.net" }
 
 [vars]
-WORKERS_RS_VERSION = "0.0.13"
+WORKERS_RS_VERSION = "0.0.16"
 
 [build]
-command = "cargo install -q worker-build && worker-build --release -- --no-default-features --features cf --config profile.release.opt-level='s'"
+command = "cargo install -q worker-build && worker-build --release -- --no-default-features --features cf --config profile.release.opt-level='z' --config profile.release.lto=true --config profile.release.codegen-units=1"
 
 [env]
 CAMO_SIGNING_KEY = "your_hexadecimal_signing_key"
