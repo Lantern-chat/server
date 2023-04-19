@@ -403,10 +403,10 @@ thorn::tables! {
         Id: Type::INT8,
         OwnerId: Type::INT8,
         DefaultRoom: Type::INT8,
-        Flags: Type::INT8,
         AvatarId: Nullable(Type::INT8),
         BannerId: Nullable(Type::INT8),
         DeletedAt: Nullable(Type::TIMESTAMPTZ),
+        Flags: Type::INT4,
         Name: Type::TEXT,
         Description: Nullable(Type::TEXT),
     }

@@ -236,13 +236,12 @@ CREATE TABLE lantern.party (
     id              bigint      NOT NULL,
     owner_id        bigint      NOT NULL,
     default_room    bigint      NOT NULL,
-    -- packed party flags
-    flags           bigint      NOT NULL DEFAULT 0,
     avatar_id       bigint,
     banner_id       bigint,
     deleted_at      timestamptz,
+    flags           integer     NOT NULL DEFAULT 0,
     name            text        NOT NULL,
-    description     text,
+    description     text
 
     CONSTRAINT party_pk PRIMARY KEY (id)
 );
