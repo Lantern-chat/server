@@ -52,9 +52,7 @@ pub async fn get_rooms(state: ServerState, auth: Authorization, party_id: Snowfl
                         .and_where(Party::Id.equals(Var::of(Party::Id)))
                         .and_where(
                             // @user and @everyone roles
-                            RoleMembers::UserId
-                                .equals(Var::of(Users::Id))
-                                .or(Roles::Id.equals(Party::Id)),
+                            RoleMembers::UserId.equals(Var::of(Users::Id)).or(Roles::Id.equals(Party::Id)),
                         )
                         .group_by(Party::OwnerId)
                 },
@@ -116,7 +114,7 @@ pub async fn get_rooms(state: ServerState, auth: Authorization, party_id: Snowfl
                 position: row.try_get(5)?,
                 rate_limit_per_user: None,
                 parent_id: row.try_get(6)?,
-                overwrites: Vec::new(),
+                overwrites: ThinVec::new(),
             };
 
             rooms.insert(room.id, room);

@@ -148,7 +148,7 @@ pub async fn get_members_inner(
                     preferences: None,
                     profile: match row.profile_bits()? {
                         None => Nullable::Null,
-                        Some(bits) => Nullable::Some(UserProfile {
+                        Some(bits) => Nullable::Some(Box::new(UserProfile {
                             bits,
                             extra: Default::default(),
                             nick: match is_friendly {
@@ -168,7 +168,7 @@ pub async fn get_members_inner(
                                 true => row.biography()?,
                                 false => Nullable::Undefined,
                             },
-                        }),
+                        })),
                     },
                 },
                 partial: PartialPartyMember {

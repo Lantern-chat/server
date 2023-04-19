@@ -61,7 +61,7 @@ pub async fn profile_updated(
                 presence: None,
                 profile: match row.profile_bits()? {
                     None => Nullable::Null,
-                    Some(bits) => Nullable::Some(UserProfile {
+                    Some(bits) => Nullable::Some(Box::new(UserProfile {
                         bits,
                         extra: Default::default(),
                         nick: row.nickname()?,
@@ -83,7 +83,7 @@ pub async fn profile_updated(
                         banner: Nullable::Undefined,
                         status: row.custom_status()?,
                         bio: Nullable::Undefined,
-                    }),
+                    })),
                 },
             };
 

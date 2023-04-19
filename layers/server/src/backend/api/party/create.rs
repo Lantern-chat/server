@@ -15,7 +15,7 @@ pub struct PartyCreateForm {
     description: Option<SmolStr>,
 
     #[serde(default)]
-    security: SecurityFlags,
+    flags: PartyFlags,
 }
 
 pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCreateForm) -> Result<Party, Error> {
@@ -43,15 +43,15 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
             name: form.name,
             description: form.description,
         },
+        flags: form.flags,
         avatar: None,
         banner: Nullable::Null,
         default_room: room_id,
         position: None,
-        security: form.security,
         owner: auth.user_id,
-        roles: Vec::new(),
-        emotes: Vec::new(),
-        pin_folders: Vec::new(),
+        roles: ThinVec::new(),
+        emotes: ThinVec::new(),
+        pin_folders: ThinVec::new(),
     };
 
     let mut db = state.db.write.get().await?;

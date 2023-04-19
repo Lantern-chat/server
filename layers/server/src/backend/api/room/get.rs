@@ -71,7 +71,7 @@ async fn get_room_simple(state: ServerState, db: db::pool::Object, room_id: Snow
             flags: row.try_get(5)?,
             rate_limit_per_user: None,
             parent_id: row.try_get(6)?,
-            overwrites: Vec::new(),
+            overwrites: ThinVec::new(),
         }),
     }
 }

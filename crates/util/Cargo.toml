@@ -10,7 +10,7 @@ publish = false
 [dependencies]
 timestamp = { package = "iso8601-timestamp", version = "0.2" }
 
-smol_str = "0.1"
+smol_str = "0.2"
 rand = "0.8"
 rand_chacha = "0.3.0"
 tokio = { version = "1.4", features = ["sync"] }

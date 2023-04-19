@@ -3,7 +3,11 @@ use std::{borrow::Cow, string::FromUtf8Error};
 use db::pool::Error as DbError;
 use ftl::{body::BodyDeserializeError, *};
 use http::header::InvalidHeaderValue;
-use sdk::{api::error::ApiErrorCode, driver::Encoding, models::UserPreferenceError};
+use sdk::{
+    api::error::ApiErrorCode,
+    driver::Encoding,
+    models::{PartyPreferenceError, UserPreferenceError},
+};
 use smol_str::SmolStr;
 
 #[derive(Debug, thiserror::Error)]
@@ -124,7 +128,9 @@ pub enum Error {
     InvalidImageFormat,
 
     #[error(transparent)]
-    InvalidPreferences(#[from] UserPreferenceError),
+    InvalidUserPreferences(#[from] UserPreferenceError),
+    #[error(transparent)]
+    InvalidPartyPreferences(#[from] PartyPreferenceError),
 
     #[error("No Session")]
     NoSession,
@@ -334,7 +340,8 @@ impl Error {
             Error::MimeParseError(_)        => ApiErrorCode::MimeParseError,
             Error::InvalidImageFormat       => ApiErrorCode::InvalidImageFormat,
             Error::TOTPRequired             => ApiErrorCode::TOTPRequired,
-            Error::InvalidPreferences(_)    => ApiErrorCode::InvalidPreferences,
+            | Error::InvalidUserPreferences(_)
+            | Error::InvalidPartyPreferences(_) => ApiErrorCode::InvalidPreferences,
             Error::TemporarilyDisabled      => ApiErrorCode::TemporarilyDisabled,
             Error::CaptchaError(_)          => ApiErrorCode::InvalidCaptcha,
             Error::Base85DecodeError(_)     => ApiErrorCode::Base85DecodeError,

@@ -91,8 +91,8 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
     for header in headers {
         match header {
             Header::Meta(meta) => {
-                let raw_content = || SmolStr::from(&meta.content);
-                let content = || Some(SmolStr::from(&meta.content));
+                let raw_content = || SmolStr::from(meta.content.as_ref());
+                let content = || Some(SmolStr::from(meta.content.as_ref()));
                 let content_int = || meta.content.parse().ok();
 
                 match &*meta.property {
@@ -224,7 +224,7 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                 let media = get!(provider.icon);
 
                 media.url = link.href.as_ref().into();
-                media.mime = link.mime.as_ref().map(From::from);
+                media.mime = link.mime.as_ref().map(|m| From::from(m.as_ref()));
             }
             Header::Link(link) if link.rel == LinkType::Canonical => {
                 embed.canonical = Some(link.href.as_ref().into());

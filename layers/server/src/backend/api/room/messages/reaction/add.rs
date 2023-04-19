@@ -77,7 +77,7 @@ pub async fn add_reaction(
                     preferences: None,
                     profile: match row.try_get(Columns::profile_bits())? {
                         None => Nullable::Null,
-                        Some(bits) => Nullable::Some(UserProfile {
+                        Some(bits) => Nullable::Some(Box::new(UserProfile {
                             bits,
                             extra: Default::default(),
                             nick: row.try_get(Columns::nickname())?,
@@ -85,7 +85,7 @@ pub async fn add_reaction(
                             banner: Nullable::Undefined,
                             status: Nullable::Undefined,
                             bio: Nullable::Undefined,
-                        }),
+                        })),
                     },
                 },
                 partial: PartialPartyMember {

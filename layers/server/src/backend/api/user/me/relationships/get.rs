@@ -71,7 +71,7 @@ pub async fn get_relationships(
                     preferences: None,
                     profile: match row.try_get(ProfileColumns::bits())? {
                         None => Nullable::Null,
-                        Some(bits) => Nullable::Some(UserProfile {
+                        Some(bits) => Nullable::Some(Box::new(UserProfile {
                             bits,
                             extra: Default::default(),
                             nick: match associated {
@@ -86,7 +86,7 @@ pub async fn get_relationships(
                                 .into(),
                             banner: Nullable::Undefined,
                             bio: Nullable::Undefined,
-                        }),
+                        })),
                     },
                 },
             }
@@ -155,9 +155,7 @@ mod q {
                 AggRelationships::inner_join_table::<AggUsers>()
                     .on(AggUsers::Id.equals(AggRelationships::FriendId))
                     .left_join_table::<Profiles>()
-                    .on(Profiles::UserId
-                        .equals(AggRelationships::FriendId)
-                        .and(Profiles::PartyId.is_null())),
+                    .on(Profiles::UserId.equals(AggRelationships::FriendId).and(Profiles::PartyId.is_null())),
             )
             .and_where(AggRelationships::UserId.equals(Var::of(AggUsers::Id)))
             // where the other user has not blocked this one

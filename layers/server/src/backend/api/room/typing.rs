@@ -82,7 +82,7 @@ pub async fn trigger_typing(state: ServerState, auth: Authorization, room_id: Sn
         preferences: None,
         profile: match row.profile_bits()? {
             None => Nullable::Null,
-            Some(bits) => Nullable::Some(UserProfile {
+            Some(bits) => Nullable::Some(Box::new(UserProfile {
                 bits,
                 extra: Default::default(),
                 nick: row.nickname()?,
@@ -90,7 +90,7 @@ pub async fn trigger_typing(state: ServerState, auth: Authorization, room_id: Sn
                 banner: Nullable::Undefined,
                 status: Nullable::Undefined,
                 bio: Nullable::Undefined,
-            }),
+            })),
         },
     };
 

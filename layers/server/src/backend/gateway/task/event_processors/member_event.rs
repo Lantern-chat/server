@@ -49,7 +49,7 @@ pub async fn member_event(
                     presence: None,
                     profile: match row.profile_bits()? {
                         None => Nullable::Null,
-                        Some(bits) => Nullable::Some(UserProfile {
+                        Some(bits) => Nullable::Some(Box::new(UserProfile {
                             bits,
                             extra: Default::default(),
                             nick: row.nickname()?,
@@ -57,7 +57,7 @@ pub async fn member_event(
                             banner: Nullable::Undefined,
                             bio: Nullable::Undefined,
                             status: Nullable::Undefined,
-                        }),
+                        })),
                     },
                     email: None,
                     preferences: None,

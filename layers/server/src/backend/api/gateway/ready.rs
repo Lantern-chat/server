@@ -40,6 +40,7 @@ pub async fn ready(
             SELECT
                 Party.Id                AS @Id,
                 Party.OwnerId           AS @OwnerId,
+                Party.Flags             AS @Flags,
                 Party.Name              AS @Name,
                 Party.AvatarId          AS @AvatarId,
                 Party.BannerId          AS @BannerId,
@@ -68,15 +69,15 @@ pub async fn ready(
                         name: row.name()?,
                         description: row.description()?,
                     },
+                    flags: row.flags()?,
                     avatar: encrypt_snowflake_opt(&state, row.avatar_id()?),
                     banner: row.banner_id::<Nullable<_>>()?.map(|id| encrypt_snowflake(&state, id)),
                     default_room: row.default_room()?,
                     position: row.position()?,
-                    security: SecurityFlags::empty(),
                     owner: row.owner_id()?,
-                    roles: Vec::new(),
-                    emotes: Vec::new(),
-                    pin_folders: Vec::new(),
+                    roles: ThinVec::new(),
+                    emotes: ThinVec::new(),
+                    pin_folders: ThinVec::new(),
                 },
             );
         }

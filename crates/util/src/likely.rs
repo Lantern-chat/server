@@ -1,4 +1,3 @@
-
 #[inline]
 #[cold]
 fn cold() {}

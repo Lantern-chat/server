@@ -106,11 +106,7 @@ impl<W: AsyncWrite + Unpin> AsyncWrite for AsyncMessageWriter<'_, W> {
         self.inner().poll_close(cx)
     }
 
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<Result<usize, io::Error>> {
+    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
         if buf.is_empty() {
             return Poll::Ready(Ok(0));
         }

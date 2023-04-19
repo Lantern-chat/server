@@ -39,13 +39,10 @@ pub async fn get_full_self(state: &ServerState, user_id: Snowflake) -> Result<Us
                 },
             }
         }),
-        preferences: {
-            row.try_get::<_, Option<_>>(UserColumns::preferences())?
-                .map(|v: Json<_>| v.0)
-        },
+        preferences: { row.try_get::<_, Option<_>>(UserColumns::preferences())?.map(|v: Json<_>| v.0) },
         profile: match row.try_get(ProfileColumns::bits())? {
             None => Nullable::Null,
-            Some(bits) => Nullable::Some(UserProfile {
+            Some(bits) => Nullable::Some(Box::new(UserProfile {
                 bits,
                 extra: Default::default(),
                 nick: row.try_get(ProfileColumns::nickname())?,
@@ -53,7 +50,7 @@ pub async fn get_full_self(state: &ServerState, user_id: Snowflake) -> Result<Us
                 banner: encrypt_snowflake_opt(&state, row.try_get(ProfileColumns::banner_id())?).into(),
                 status: row.try_get(ProfileColumns::custom_status())?,
                 bio: row.try_get(ProfileColumns::biography())?,
-            }),
+            })),
         },
     })
 }

@@ -32,6 +32,7 @@ pub async fn get_party_inner(
         indexed_columns! {
             pub enum PartyColumns {
                 Party::Name,
+                Party::Flags,
                 Party::OwnerId,
                 Party::AvatarId,
                 Party::BannerId,
@@ -74,15 +75,15 @@ pub async fn get_party_inner(
             name: row.try_get(PartyColumns::name())?,
             description: row.try_get(PartyColumns::description())?,
         },
+        flags: row.try_get(PartyColumns::flags())?,
         avatar: encrypt_snowflake_opt(&state, row.try_get(PartyColumns::avatar_id())?),
         banner: Nullable::Undefined,
         default_room: row.try_get(PartyColumns::default_room())?,
         position: row.try_get(PartyMemberColumns::position())?,
-        security: SecurityFlags::empty(),
         owner: row.try_get(PartyColumns::owner_id())?,
-        roles: Vec::new(),
-        emotes: Vec::new(),
-        pin_folders: Vec::new(),
+        roles: ThinVec::new(),
+        emotes: ThinVec::new(),
+        pin_folders: ThinVec::new(),
     };
 
     // these fields are only provided to joined members
@@ -93,14 +94,14 @@ pub async fn get_party_inner(
             async {
                 super::roles::get_roles_raw(db, &state, SearchMode::Single(party_id))
                     .await?
-                    .try_collect::<Vec<_>>()
+                    .try_collect::<ThinVec<_>>()
                     .await
             },
             async {
                 super::emotes::get_custom_emotes_raw(db, SearchMode::Single(party_id))
                     .await?
                     .map_ok(Emote::Custom)
-                    .try_collect::<Vec<_>>()
+                    .try_collect::<ThinVec<_>>()
                     .await
             }
         )?;

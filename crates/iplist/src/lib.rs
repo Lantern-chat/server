@@ -146,10 +146,7 @@ impl IpList {
     }
 
     pub fn insert(&mut self, ip: IpAddr) {
-        if let Err(idx) = self
-            .sorted
-            .binary_search_by(|idx| self.values.compare_ip(*idx, ip))
-        {
+        if let Err(idx) = self.sorted.binary_search_by(|idx| self.values.compare_ip(*idx, ip)) {
             self.sorted.insert(idx, self.values.insert(ip));
         }
     }

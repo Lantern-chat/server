@@ -9,7 +9,7 @@ pub async fn update_prefs(
     mut prefs: UserPreferences,
 ) -> Result<(), Error> {
     if let Err(e) = prefs.validate() {
-        return Err(Error::InvalidPreferences(e));
+        return Err(Error::InvalidUserPreferences(e));
     }
 
     prefs.nullify_defaults();

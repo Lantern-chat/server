@@ -27,7 +27,7 @@ pub async fn get_one(
             query: Some(Cursor::Exact(msg_id)),
             limit: Some(1),
             thread: None,
-            pinned: Vec::new(),
+            pinned: ThinVec::new(),
             starred: false,
         },
     )
@@ -111,7 +111,7 @@ pub async fn get_one_transactional(
         limit: 1,
         user_id: None,
         thread_id: None,
-        pinned: Vec::new(),
+        pinned: ThinVec::new(),
         starred: false,
     };
 
@@ -135,7 +135,7 @@ pub async fn get_one_from_client(
         limit: 1,
         user_id: None,
         thread_id: None,
-        pinned: Vec::new(),
+        pinned: ThinVec::new(),
         starred: false,
     };
 
@@ -168,7 +168,7 @@ mod p {
 mod q {
     use super::{Cursor, MessageFlags, Permissions};
     use db::Row;
-    use sdk::models::UserRelationship;
+    use sdk::models::{ThinVec, UserRelationship};
 
     pub use schema::*;
     pub use thorn::*;
@@ -290,7 +290,7 @@ mod q {
             pub room_id: Option<Snowflake> = Rooms::Id,
             pub user_id: Option<Snowflake> = Users::Id,
             pub thread_id: Option<Snowflake> = Threads::Id,
-            pub pinned: Vec<Snowflake> = SNOWFLAKE_ARRAY,
+            pub pinned: ThinVec<Snowflake> = SNOWFLAKE_ARRAY,
             pub starred: bool = Type::BOOL,
         }
     }
@@ -519,7 +519,6 @@ where
             let mut msg = Message {
                 id: msg_id,
                 party_id,
-                created_at: msg_id.timestamp(),
                 room_id: row.try_get(MessageColumns::room_id())?,
                 flags: MessageFlags::empty(),
                 kind: MessageKind::Normal,
@@ -527,15 +526,15 @@ where
                 content: None,
                 author: make_system_user(),
                 member: None,
-                thread_id: row.try_get(MessageColumns::thread_id())?,
-                user_mentions: Vec::new(),
-                role_mentions: Vec::new(),
-                room_mentions: Vec::new(),
-                attachments: Vec::new(),
-                reactions: Vec::new(),
-                embeds: Vec::new(),
-                pins: Vec::new(),
-                starred: false,
+                parent: row.try_get(MessageColumns::thread_id())?,
+                user_mentions: ThinVec::new(),
+                role_mentions: ThinVec::new(),
+                room_mentions: ThinVec::new(),
+                attachments: ThinVec::new(),
+                reactions: ThinVec::new(),
+                embeds: ThinVec::new(),
+                pins: ThinVec::new(),
+                score: 0,
             };
 
             // before we continue, if the message was marked unavailable, then we can skip everything else
@@ -561,7 +560,7 @@ where
                             preferences: None,
                             profile: match row.try_get(ProfileColumns::bits())? {
                                 None => Nullable::Null,
-                                Some(bits) => Nullable::Some(UserProfile {
+                                Some(bits) => Nullable::Some(Box::new(UserProfile {
                                     bits,
                                     extra: Default::default(),
                                     nick: row.try_get(ProfileColumns::nickname())?,
@@ -573,7 +572,7 @@ where
                                     banner: Nullable::Undefined,
                                     status: Nullable::Undefined,
                                     bio: Nullable::Undefined,
-                                }),
+                                })),
                             },
                         };
 
@@ -630,7 +629,7 @@ where
             }
 
             msg.attachments = {
-                let mut attachments = Vec::new();
+                let mut attachments = ThinVec::new();
 
                 let meta: Option<Json<Vec<schema::AggAttachmentsMeta>>> = row.try_get(AttachmentColumns::meta())?;
 
@@ -674,13 +673,15 @@ where
             };
 
             msg.pins =
-                row.try_get::<_, Option<Vec<Snowflake>>>(DynamicMsgColumns::pin_tags())?.unwrap_or_default();
+                row.try_get::<_, Option<ThinVec<Snowflake>>>(DynamicMsgColumns::pin_tags())?.unwrap_or_default();
 
-            msg.starred = row.try_get(SelectedColumns::starred())?;
+            if row.try_get(SelectedColumns::starred())? {
+                msg.flags |= MessageFlags::STARRED;
+            }
 
-            msg.reactions = match row.try_get(ReactionColumns::reactions())? {
+            match row.try_get(ReactionColumns::reactions())? {
                 Some(Json::<Vec<RawReaction>>(raw)) if !raw.is_empty() => {
-                    let mut reactions = Vec::with_capacity(raw.len());
+                    let mut reactions = ThinVec::with_capacity(raw.len());
 
                     for r in raw {
                         if r.c == 0 {
@@ -709,10 +710,10 @@ where
                         }));
                     }
 
-                    reactions
+                    msg.reactions = reactions;
                 }
-                _ => Vec::new(),
-            };
+                _ => {}
+            }
 
             let mention_kinds: Option<Vec<i32>> = row.try_get(MentionColumns::kinds())?;
             if let Some(mention_kinds) = mention_kinds {

@@ -142,11 +142,7 @@ impl<W: AsyncWrite + Unpin> AsyncWrite for AsyncMessageWriter<'_, W> {
         self.inner().poll_shutdown(cx)
     }
 
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<Result<usize, io::Error>> {
+    fn poll_write(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize, io::Error>> {
         if buf.is_empty() {
             return Poll::Ready(Ok(0));
         }
@@ -228,11 +224,7 @@ impl<R: AsyncRead + Unpin> AsyncFramedReader<R> {
 }
 
 impl<R: AsyncRead + Unpin> AsyncRead for AsyncFramedReader<R> {
-    fn poll_read(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<io::Result<()>> {
+    fn poll_read(mut self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
         if self.len == 0 {
             // reset header position if it was previously fully read
             if self.pos == self.header.len() {
