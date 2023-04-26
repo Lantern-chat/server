@@ -47,7 +47,7 @@ bincode = "1"
 tokio = { version = "1.4", features = ["full", "parking_lot"] }
 tokio-util = { version = "0.7", features = ["io"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
-tokio-rustls = "0.23.0"
+tokio-rustls = "0.24.0"
 # tls-listener = { version = "0.2.1", features = ["hyper-h1", "hyper-h2", "tokio-net"] }
 async-stream = "0.3"
 async-trait = "0.1.50"
@@ -80,7 +80,7 @@ either = "1.6.0"
 failsafe = "1.0.0"
 parking_lot = "0.12"
 num_cpus = "1.13"
-aho-corasick = "0.7"
+aho-corasick = "1"
 arc-swap = "1.2.0"
 cache-padded = "1.1.1"
 bitflags = "1.2"

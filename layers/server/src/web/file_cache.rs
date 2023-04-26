@@ -388,12 +388,12 @@ impl FileCache<ServerState> for MainFileCache {
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 
 lazy_static::lazy_static! {
-    static ref VARIABLE_PATTERNS: AhoCorasick = AhoCorasickBuilder::new().dfa(true).build([
+    static ref VARIABLE_PATTERNS: AhoCorasick = AhoCorasickBuilder::new().build([
         /*0*/ "__CONFIG__",
         /*1*/ "__BASE_URL__",
         /*2*/ "__SERVER_NAME__",
         /*3*/ "__CDN_DOMAIN__",
-    ]);
+    ]).unwrap();
 }
 
 impl MainFileCache {
@@ -422,7 +422,7 @@ impl MainFileCache {
 
             last_index = m.end();
 
-            match m.pattern() {
+            match m.pattern().as_u32() {
                 0 => {
                     serde_json::to_writer(
                         &mut new_file,

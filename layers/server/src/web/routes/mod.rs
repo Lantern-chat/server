@@ -34,9 +34,9 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
             .await
         }
 
-        (&Method::GET, Exact("robots.txt")) => include_str!("robots.txt")
-            .with_header(ContentType::text())
-            .into_response(),
+        (&Method::GET, Exact("robots.txt")) => {
+            include_str!("robots.txt").with_header(ContentType::text()).into_response()
+        }
 
         (&Method::GET | &Method::HEAD, Exact("favicon.ico")) => fs::file(
             &route,
@@ -104,11 +104,11 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 
 lazy_static::lazy_static! {
-    static ref BAD_PATTERNS: AhoCorasick = AhoCorasickBuilder::new().dfa(true).build([
+    static ref BAD_PATTERNS: AhoCorasick = AhoCorasickBuilder::new().build([
         "wp-includes", "wp-admin", "wp-login", "wp-content", "wordpress",
         "wlwmanifest", ".git", ".env", "drupal", "ajax", "claro", "wp-json", "tinymce", "kcfinder",
         "filemanager", "alfa", "eval"
-    ]);
+    ]).unwrap();
 }
 
 fn gen_oembed_header_value(route: &Route<ServerState>) -> Option<HeaderValue> {

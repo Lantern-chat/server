@@ -1,14 +1,16 @@
 use std::borrow::Cow;
 
-use aho_corasick::AhoCorasick;
+use aho_corasick::{AhoCorasick, MatchKind, StartKind};
 
 use crate::Error;
 
 lazy_static::lazy_static! {
     static ref SLASH_PATTERNS: AhoCorasick = aho_corasick::AhoCorasickBuilder::new()
-    .dfa(true).anchored(true).match_kind(aho_corasick::MatchKind::LeftmostFirst)
-    // include a space at the end of the name
-    .build(Pattern::NAMES);
+        .start_kind(StartKind::Anchored)
+        .match_kind(MatchKind::LeftmostFirst)
+        // include a space at the end of the name
+        .build(Pattern::NAMES)
+        .unwrap();
 }
 
 #[allow(unused)]
@@ -52,7 +54,7 @@ pub fn process_slash(content: &str, _active: bool) -> Result<Option<Cow<str>>, E
 
     let bytes = &content.as_bytes()[1..];
 
-    if let Some(m) = SLASH_PATTERNS.earliest_find(bytes) {
+    if let Some(m) = SLASH_PATTERNS.find(bytes) {
         let mut end_idx = m.end();
         let mut do_command = false;
 
@@ -70,7 +72,7 @@ pub fn process_slash(content: &str, _active: bool) -> Result<Option<Cow<str>>, E
         // skip past the leading slash + match + any extra whitespace
         let content = content[1 + end_idx..].trim_start();
 
-        let (align, value) = match Pattern::from_index(m.pattern()) {
+        let (align, value) = match Pattern::from_index(m.pattern().as_usize()) {
             Pattern::Gimme => (Align::Left, "༼ つ ◕_◕ ༽つ"),
             Pattern::Lenny => (Align::Right, "( ͡° ͜ʖ ͡°)"),
             Pattern::Shrug => (Align::Right, "¯\\\\_(ツ)_/¯"),
