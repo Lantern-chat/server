@@ -5,6 +5,8 @@ use std::{
 
 use std::num::NonZeroU64;
 
+use aes::{cipher::Key, Aes128};
+
 pub use sdk::models::sf::{Snowflake, LANTERN_EPOCH};
 use sdk::models::{Timestamp, LANTERN_EPOCH_PDT};
 
@@ -102,15 +104,15 @@ pub trait SnowflakeExt {
 
     fn add(self, duration: time::Duration) -> Option<Snowflake>;
 
-    fn encrypt(self, key: aes::cipher::Key<aes::Aes128>) -> u128;
+    fn encrypt(self, key: Key<Aes128>) -> u128;
 
     #[inline]
-    fn decrypt(block: u128, key: aes::cipher::Key<aes::Aes128>) -> Option<Snowflake> {
+    fn decrypt(block: u128, key: Key<Aes128>) -> Option<Snowflake> {
         use aes::cipher::{BlockDecrypt, KeyInit};
 
         let mut block = unsafe { std::mem::transmute(block) };
 
-        let cipher = aes::Aes128::new(&key);
+        let cipher = Aes128::new(&key);
 
         cipher.decrypt_block(&mut block);
 
@@ -141,12 +143,12 @@ impl SnowflakeExt for Snowflake {
     }
 
     #[inline]
-    fn encrypt(self, key: aes::cipher::Key<aes::Aes128>) -> u128 {
+    fn encrypt(self, key: Key<Aes128>) -> u128 {
         use aes::cipher::{BlockEncrypt, KeyInit};
 
         let mut block = unsafe { std::mem::transmute([self, self]) };
 
-        let cipher = aes::Aes128::new(&key);
+        let cipher = Aes128::new(&key);
 
         cipher.encrypt_block(&mut block);
 
@@ -154,7 +156,7 @@ impl SnowflakeExt for Snowflake {
     }
 
     fn low_complexity(self) -> u64 {
-        const ID_MASK: u64 = 0b11111_11111;
+        const ID_MASK: u64 = 0b11_1111_1111; // 10 bits
         let raw = self.to_u64();
 
         // shift high bits of timestamp down, since the timestamp occupies the top 42 bits,
