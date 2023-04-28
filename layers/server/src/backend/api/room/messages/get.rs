@@ -90,8 +90,6 @@ pub async fn get_many(
         limit,
         user_id: Some(auth.user_id),
         thread_id: form.thread,
-        pinned: form.pinned,
-        starred: form.starred,
     };
 
     Ok(parse_stream(state, db.query_stream(&query, &params.as_params()).await?))
@@ -111,8 +109,6 @@ pub async fn get_one_transactional(
         limit: 1,
         user_id: None,
         thread_id: None,
-        pinned: ThinVec::new(),
-        starred: false,
     };
 
     parse_first(
@@ -135,8 +131,6 @@ pub async fn get_one_from_client(
         limit: 1,
         user_id: None,
         thread_id: None,
-        pinned: ThinVec::new(),
-        starred: false,
     };
 
     parse_first(
@@ -177,10 +171,6 @@ mod q {
         pub struct SelectedMessages {
             Id: Messages::Id,
             Unavailable: Type::BOOL,
-            Starred: Type::BOOL,
-        }
-
-        pub struct SelectStarred {
             Starred: Type::BOOL,
         }
 
@@ -258,7 +248,6 @@ mod q {
             }
 
             pub enum DynamicMsgColumns continue MentionColumns {
-                Messages::PinTags,
                 Messages::Content,
             }
 
@@ -290,8 +279,6 @@ mod q {
             pub room_id: Option<Snowflake> = Rooms::Id,
             pub user_id: Option<Snowflake> = Users::Id,
             pub thread_id: Option<Snowflake> = Threads::Id,
-            pub pinned: ThinVec<Snowflake> = SNOWFLAKE_ARRAY,
-            pub starred: bool = Type::BOOL,
         }
     }
 
@@ -303,16 +290,9 @@ mod q {
     ) -> impl thorn::AnyQuery {
         let mut selected = Query::select()
             .expr(Messages::Id.alias_to(SelectedMessages::Id))
-            .expr(SelectStarred::Starred.alias_to(SelectedMessages::Starred))
             // test if message is deleted
             .and_where(Messages::Flags.has_no_bits(MessageFlags::DELETED.bits().lit()))
             .and_where(Params::thread_id().is_null().or(Messages::ThreadId.equals(Params::thread_id())))
-            .and_where(
-                Builtin::cardinality(Params::pinned())
-                    .equals(0.lit())
-                    .or(Messages::PinTags.overlaps(Params::pinned())),
-            )
-            .and_where(Params::starred().is_false().or(SelectStarred::Starred))
             .limit(Params::limit());
 
         selected = match with_user {
@@ -332,14 +312,16 @@ mod q {
                 ),
         };
 
-        // Need to shove this logic into a lateral subquery so it can be used in WHERE
-        selected = selected.from(Lateral(SelectStarred::as_query(
-            Query::select().expr(
-                Builtin::coalesce((Params::user_id().equals(Builtin::any(Messages::StarredBy)), false.lit()))
-                    .alias_to(SelectStarred::Starred),
-            ),
-        )));
+        selected = selected.expr(
+            Query::select()
+                .from_table::<MessageStars>()
+                .and_where(MessageStars::MsgId.equals(Messages::Id))
+                .and_where(MessageStars::UserId.equals(Params::user_id()))
+                .exists()
+                .alias_to(SelectedMessages::Starred),
+        );
 
+        // Need to shove this logic into a lateral subquery so it can be used in WHERE
         if with_room {
             selected = selected.and_where(Messages::RoomId.equals(Params::room_id()));
         } else {
@@ -431,14 +413,16 @@ mod q {
                     Call::custom("jsonb_build_object").args((
                         "e".lit(), AggReactions::EmoteId,
                         "j".lit(), AggReactions::EmojiId,
-                        "m".lit(), Params::user_id().equals(Builtin::any(AggReactions::UserIds)),
-                        "c".lit(), Builtin::coalesce((
-                            Builtin::array_length((AggReactions::UserIds, 1.lit())), 0.lit()
-                        ))
+                        "m".lit(), ReactionUsers::UserId.equals(Params::user_id()).is_not_false(),
+                        "c".lit(), AggReactions::Count,
                     ))),
                 )
-                .from_table::<AggReactions>()
+                .from(AggReactions::left_join_table::<ReactionUsers>().on(
+                    ReactionUsers::ReactionId.equals(AggReactions::Id)
+                        .and(ReactionUsers::UserId.equals(Params::user_id()))
+                ))
                 .and_where(AggReactions::MsgId.equals(Messages::Id))
+
                 .as_value())
             .from(
                 Messages::inner_join_table::<SelectedMessages>()
@@ -672,8 +656,8 @@ where
                 attachments
             };
 
-            msg.pins =
-                row.try_get::<_, Option<ThinVec<Snowflake>>>(DynamicMsgColumns::pin_tags())?.unwrap_or_default();
+            // msg.pins =
+            //     row.try_get::<_, Option<ThinVec<Snowflake>>>(DynamicMsgColumns::pin_tags())?.unwrap_or_default();
 
             if row.try_get(SelectedColumns::starred())? {
                 msg.flags |= MessageFlags::STARRED;

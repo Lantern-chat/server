@@ -57,7 +57,7 @@ async fn delete_reaction(
     msg_id: Snowflake,
     emote: EmoteOrEmojiId,
 ) -> WebResult {
-    crate::backend::api::room::messages::reaction::remove::remove_reaction(
+    crate::backend::api::room::messages::reaction::remove::remove_own_reaction(
         route.state,
         auth,
         room_id,

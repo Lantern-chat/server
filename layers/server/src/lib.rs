@@ -1,4 +1,4 @@
-#![recursion_limit = "256"]
+#![recursion_limit = "512"]
 #![allow(unused_imports, clippy::redundant_pattern_matching)]
 #![deny(deprecated)]
 

@@ -111,7 +111,7 @@ CREATE TYPE lantern.event_code AS ENUM (
     'rel_updated'
 );
 
-CREATE SEQUENCE lantern.event_id;
+CREATE SEQUENCE lantern.event_id AS bigint;
 
 ----------------------------------------
 -------------- TABLES ------------------
@@ -225,7 +225,7 @@ CREATE TABLE lantern.user_freelist (
 CREATE TABLE lantern.user_tokens (
     id          bigint      NOT NULL,
     user_id     bigint      NOT NULL,
-    expires     timestamptz   NOT NULL,
+    expires     timestamptz NOT NULL,
     kind        smallint    NOT NULL,
     token       bytea       NOT NULL,
 
@@ -241,7 +241,7 @@ CREATE TABLE lantern.party (
     deleted_at      timestamptz,
     flags           integer     NOT NULL DEFAULT 0,
     name            text        NOT NULL,
-    description     text
+    description     text,
 
     CONSTRAINT party_pk PRIMARY KEY (id)
 );

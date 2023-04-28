@@ -7,42 +7,73 @@ use crate::{
 };
 use sdk::models::{events::UserReactionEvent, gateway::message::ServerMsg, *};
 
-pub async fn remove_reaction(
+pub async fn remove_own_reaction(
     state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,
     emote: EmoteOrEmojiId,
 ) -> Result<(), Error> {
-    // TODO: Merge permission check into below CTEs?
-    let perms = crate::backend::api::perm::get_cached_room_permissions(&state, auth.user_id, room_id).await?;
+    let perms = state.perm_cache.get(auth.user_id, room_id).await;
 
-    if !perms.contains(Permissions::READ_MESSAGE_HISTORY) {
-        return Err(Error::Unauthorized);
+    match perms {
+        Some(perms) if !perms.contains(Permissions::READ_MESSAGE_HISTORY) => return Err(Error::Unauthorized),
+        _ => {}
     }
 
-    let db = state.db.write.get().await?;
+    #[rustfmt::skip]
+    let res = state.db.write.get().await?.query_opt2(schema::sql! {
+        tables! {
+            struct SelectedReaction {
+                ReactionId: Reactions::Id,
+                MsgId: Reactions::MsgId,
+            }
 
-    use q::{Parameters, Params};
+            struct DeletedReactionUser {
+                ReactionId: Reactions::Id,
+            }
+        };
 
-    let params = Params {
-        user_id: auth.user_id,
-        msg_id,
-        room_id,
-        emote_id: emote.emote(),
-        emoji_id: emote.emoji(),
-    };
+        WITH SelectedReaction AS (
+            SELECT
+                Reactions.Id AS SelectedReaction.ReactionId,
+                Reactions.MsgId AS SelectedReaction.MsgId
+            FROM Reactions
 
-    let params_p = &params.as_params();
+            if perms.is_none() {
+                INNER JOIN AggRoomPerms ON
+                    AggRoomPerms.UserId = #{&auth.user_id => Users::Id}
+                AND AggRoomPerms.RoomId = #{&room_id => Rooms::Id}
+            }
 
-    let res = match params.emoji_id.is_some() {
-        true => db.query_opt_cached_typed(|| q::query(true), params_p).boxed(),
-        false => db.query_opt_cached_typed(|| q::query(false), params_p).boxed(),
-    };
+            WHERE Reactions.MsgId = #{&msg_id => Messages::Id}
+            AND match emote {
+                EmoteOrEmojiId::Emote(ref emote_id) => { Reactions.EmoteId = #{emote_id => Reactions::EmoteId} }
+                EmoteOrEmojiId::Emoji(ref emoji_id) => { Reactions.EmojiId = #{emoji_id => Reactions::EmojiId} }
+            }
 
-    let Some(row) = res.await? else { return Ok(()); };
+            if perms.is_none() {
+                let read_messages = Permissions::READ_MESSAGE_HISTORY.to_i64();
 
-    let party_id = row.try_get(0)?;
+                AND AggRoomPerms.Permissions1 & {read_messages[0]} = {read_messages[0]}
+                AND AggRoomPerms.Permissions2 & {read_messages[1]} = {read_messages[1]}
+            }
+        ), DeletedReactionUser AS (
+            DELETE FROM ReactionUsers USING SelectedReaction
+            WHERE ReactionUsers.ReactionId = SelectedReaction.ReactionId
+            AND ReactionUsers.UserId = #{&auth.user_id => Users::Id}
+            RETURNING ReactionUsers.ReactionId AS DeletedReactionUser.ReactionId
+        )
+        SELECT
+            Rooms.PartyId AS @PartyId
+        FROM SelectedReaction
+            INNER JOIN DeletedReactionUser ON DeletedReactionUser.ReactionId = SelectedReaction.ReactionId
+            INNER JOIN Rooms ON Rooms.Id = #{&room_id => Rooms::Id}
+    }?).await?;
+
+    let Some(row) = res else { return Ok(()); };
+
+    let party_id = row.party_id()?;
 
     let emote = match state.emoji.lookup(emote) {
         Some(emote) => emote,
@@ -63,10 +94,7 @@ pub async fn remove_reaction(
 
     match party_id {
         Some(party_id) => {
-            state
-                .gateway
-                .broadcast_event(Event::new(event, Some(room_id))?, party_id)
-                .await;
+            state.gateway.broadcast_event(Event::new(event, Some(room_id))?, party_id).await;
         }
         None => unimplemented!(),
     }
@@ -74,51 +102,51 @@ pub async fn remove_reaction(
     Ok(())
 }
 
-mod q {
-    use sdk::Snowflake;
+// mod q {
+//     use sdk::Snowflake;
 
-    pub use schema::*;
-    pub use thorn::*;
+//     pub use schema::*;
+//     pub use thorn::*;
 
-    thorn::tables! {
-        pub struct Updated {
-            MsgId: Reactions::MsgId,
-        }
-    }
+//     thorn::tables! {
+//         pub struct Updated {
+//             MsgId: Reactions::MsgId,
+//         }
+//     }
 
-    thorn::params! {
-        pub struct Params {
-            pub user_id: Snowflake = Users::Id,
-            pub msg_id: Snowflake = Messages::Id,
-            pub emote_id: Option<Snowflake> = Emotes::Id,
-            pub emoji_id: Option<i32> = Emojis::Id,
-            pub room_id: Snowflake = Rooms::Id,
-        }
-    }
+//     thorn::params! {
+//         pub struct Params {
+//             pub user_id: Snowflake = Users::Id,
+//             pub msg_id: Snowflake = Messages::Id,
+//             pub emote_id: Option<Snowflake> = Emotes::Id,
+//             pub emoji_id: Option<i32> = Emojis::Id,
+//             pub room_id: Snowflake = Rooms::Id,
+//         }
+//     }
 
-    pub fn query(emoji: bool) -> impl AnyQuery {
-        let update = Query::update()
-            .table::<Reactions>()
-            .set(
-                Reactions::UserIds,
-                Builtin::array_remove((Reactions::UserIds, Params::user_id())),
-            )
-            .and_where(Reactions::MsgId.equals(Params::msg_id()))
-            .and_where(match emoji {
-                true => Reactions::EmojiId.equals(Params::emoji_id()),
-                false => Reactions::EmoteId.equals(Params::emote_id()),
-            })
-            .and_where(match !emoji {
-                true => Params::emoji_id().is_null(),
-                false => Params::emote_id().is_null(),
-            })
-            .and_where(Params::user_id().equals(Builtin::any(Reactions::UserIds)))
-            .returning(Reactions::MsgId.alias_to(Updated::MsgId));
+//     pub fn query(emoji: bool) -> impl AnyQuery {
+//         let update = Query::update()
+//             .table::<Reactions>()
+//             .set(
+//                 Reactions::UserIds,
+//                 Builtin::array_remove((Reactions::UserIds, Params::user_id())),
+//             )
+//             .and_where(Reactions::MsgId.equals(Params::msg_id()))
+//             .and_where(match emoji {
+//                 true => Reactions::EmojiId.equals(Params::emoji_id()),
+//                 false => Reactions::EmoteId.equals(Params::emote_id()),
+//             })
+//             .and_where(match !emoji {
+//                 true => Params::emoji_id().is_null(),
+//                 false => Params::emote_id().is_null(),
+//             })
+//             .and_where(Params::user_id().equals(Builtin::any(Reactions::UserIds)))
+//             .returning(Reactions::MsgId.alias_to(Updated::MsgId));
 
-        Query::select()
-            .with(Updated::as_query(update).exclude())
-            .col(Rooms::PartyId)
-            .from(Rooms::inner_join_table::<Updated>().on(true.lit()))
-            .and_where(Rooms::Id.equals(Params::room_id()))
-    }
-}
+//         Query::select()
+//             .with(Updated::as_query(update).exclude())
+//             .col(Rooms::PartyId)
+//             .from(Rooms::inner_join_table::<Updated>().on(true.lit()))
+//             .and_where(Rooms::Id.equals(Params::room_id()))
+//     }
+// }

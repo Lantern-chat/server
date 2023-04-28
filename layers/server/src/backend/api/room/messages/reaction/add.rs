@@ -4,6 +4,7 @@ use crate::{
     Authorization, Error, ServerState,
 };
 use futures::FutureExt;
+use schema::SnowflakeExt;
 use sdk::models::{events::UserReactionEvent, gateway::message::ServerMsg, *};
 
 pub async fn add_reaction(
@@ -13,43 +14,220 @@ pub async fn add_reaction(
     msg_id: Snowflake,
     emote: EmoteOrEmojiId,
 ) -> Result<(), Error> {
-    // TODO: Merge permission check into below CTEs
-    let perms = crate::backend::api::perm::get_cached_room_permissions(&state, auth.user_id, room_id).await?;
+    let perms = state.perm_cache.get(auth.user_id, room_id).await;
 
-    if !perms.contains(Permissions::ADD_REACTIONS) {
-        return Err(Error::Unauthorized);
+    match perms {
+        Some(perms) if !perms.contains(Permissions::ADD_REACTIONS) => return Err(Error::Unauthorized),
+        _ => {}
     }
 
-    let db = state.db.write.get().await?;
-
-    use q::{Parameters, Params};
-
-    let params = Params {
-        user_id: auth.user_id,
-        msg_id,
-        room_id,
-        emote_id: emote.emote(),
-        emoji_id: emote.emoji(),
-    };
-
-    let params_p = &params.as_params();
+    let reaction_id = Snowflake::now();
 
     #[rustfmt::skip]
-    let res = match (
-        perms.contains(Permissions::USE_EXTERNAL_EMOTES),
-        params.emoji_id.is_some(),
-    ) {
-        (false, false) => db.query_opt_cached_typed(|| q::query(false, false), params_p).boxed(),
-        (false, true) => db.query_opt_cached_typed(|| q::query(false, true), params_p).boxed(),
-        (true, false) => db.query_opt_cached_typed(|| q::query(true, false), params_p).boxed(),
-        (true, true) => db.query_opt_cached_typed(|| q::query(true, true), params_p).boxed(),
-    };
+    let row = state.db.write.get().await?.query_opt2(schema::sql! {
+        tables! {
+            pub struct Checked {
+                MsgId: Reactions::MsgId,
+                PartyId: Rooms::PartyId,
+            }
 
-    let Some(row) = res.await? else { return Err(Error::Unauthorized) };
+            pub struct SelectedReaction {
+                ReactionId: Reactions::Id,
+                Count: Reactions::Count,
+            }
 
-    use q::columns::Columns;
+            pub struct InsertedReaction {
+                ReactionId: Reactions::Id,
+            }
 
-    if let Some(msg_id) = row.try_get(Columns::msg_id())? {
+            pub struct InsertedReactionUser {
+                UserId: ReactionUsers::UserId,
+                ReactionId: ReactionUsers::ReactionId,
+            }
+
+            pub struct ReactionEvent {
+                MsgId: Checked::MsgId,
+                PartyId: Rooms::PartyId,
+                Nickname: Profiles::Nickname,
+                Username: Users::Username,
+                Discriminator: Users::Discriminator,
+                UserFlags: Users::Flags,
+                AvatarId: Profiles::AvatarId,
+                ProfileBits: Profiles::Bits,
+                RoleIds: AggMembers::RoleIds,
+                JoinedAt: AggMembers::JoinedAt,
+            }
+        };
+
+        // these CTEs rely on the previous ones to succeed, so msg id and
+        // reaction ids are passed through them, becoming NULL if not forwarded
+        //
+        // 1. verify emote/emoji is valid for this room
+        // 2. insert Reaction row and get ID
+        // 3. insert ReactionUser
+        // 4. fetch event data
+        //
+        // if step 1 fails, we should return Unauthorized
+        // Step 2 shouldn't fail unless 1 fails
+        // Step 3 will fail if the reaction already exists
+        //   in which case step 4 will also fail
+        //
+        // So if steps 3-4 fail, don't do anything.
+
+
+        WITH Checked AS (
+            SELECT
+                #{&msg_id => Messages::Id} AS Checked.MsgId,
+
+            // if we have cached permissions, things can be much simpler
+            if let Some(perms) = perms {
+                match emote {
+                    // verify the user sending this emote is a member of the party the emote belongs to
+                    EmoteOrEmojiId::Emote(ref emote_id) if perms.contains(Permissions::USE_EXTERNAL_EMOTES) => {
+                        PartyMembers.PartyId AS Checked.PartyId
+                        FROM  PartyMembers INNER JOIN Emotes ON Emotes.PartyId = PartyMembers.PartyId
+                        WHERE PartyMembers.UserId = #{&auth.user_id => Users::Id}
+                        AND   Emotes.Id = #{emote_id => Emotes::Id}
+                    }
+                    EmoteOrEmojiId::Emote(ref emote_id) => {
+                        Rooms.PartyId AS Checked.PartyId
+                        FROM  Rooms INNER JOIN Emotes ON Rooms.PartyId = Emotes.PartyId
+                        WHERE Rooms.Id = #{&room_id => Rooms::Id}
+                        AND   Emotes.Id = #{emote_id => Emotes::Id}
+                    }
+                    EmoteOrEmojiId::Emoji(ref emoji_id) => {
+                        Rooms.PartyId AS Checked.PartyId FROM Rooms WHERE Rooms.Id = #{&room_id => Rooms::Id}
+                    }
+                }
+            } else {
+                match emote {
+                    EmoteOrEmojiId::Emoji(ref emoji_id) => {
+                        Rooms.PartyId AS Checked.PartyId
+                        FROM Rooms INNER JOIN AggRoomPerms
+                            ON AggRoomPerms.RoomId = Rooms.Id
+                            AND AggRoomPerms.UserId = #{&auth.user_id => Users::Id}
+                        WHERE Rooms.Id = #{&room_id => Rooms::Id}
+                    }
+                    EmoteOrEmojiId::Emote(ref emote_id) => {
+                        PartyMembers.PartyId AS Checked.PartyId
+                        FROM PartyMembers
+                            // ensure user is a member of the party they're using the emote from
+                            INNER JOIN Emotes ON Emotes.PartyId = PartyMembers.PartyId
+                            // join with rooms to get target party id
+                            INNER JOIN Rooms ON Rooms.Id = #{&room_id => Rooms::Id}
+                            INNER JOIN AggRoomPerms
+                                ON  AggRoomPerms.RoomId = Rooms.Id
+                                AND AggRoomPerms.UserId = PartyMembers.UserId
+                        WHERE
+                            PartyMembers.UserId = #{&auth.user_id => Users::Id}
+                        AND Emotes.Id = #{emote_id => Emotes::Id}
+                        // emote is in same party as the room we're sending to,
+                        // or the user has the permissions to use external emotes
+                        AND (Emotes.PartyId = Rooms.PartyId OR (
+                            let use_external = Permissions::USE_EXTERNAL_EMOTES.to_i64();
+
+                                (AggRoomPerms.Permissions1 & {use_external[0]} = {use_external[0]})
+                            AND (AggRoomPerms.Permissions2 & {use_external[1]} = {use_external[1]})
+                        ))
+                    }
+                }
+
+                let add_reactions = Permissions::ADD_REACTIONS.to_i64();
+                AND (AggRoomPerms.Permissions1 & {add_reactions[0]} = {add_reactions[0]})
+                AND (AggRoomPerms.Permissions2 & {add_reactions[1]} = {add_reactions[1]})
+            }
+        ),
+
+        SelectedReaction AS (
+            SELECT
+                Reactions.Id AS SelectedReaction.ReactionId,
+                Reactions.Count AS SelectedReaction.Count
+            FROM Checked INNER JOIN Reactions ON Reactions.MsgId = Checked.MsgId
+            AND match emote {
+                EmoteOrEmojiId::Emoji(ref emoji_id) => { Reactions.EmojiId = #{emoji_id => Reactions::EmojiId} }
+                EmoteOrEmojiId::Emote(ref emote_id) => { Reactions.EmoteId = #{emote_id => Reactions::EmoteId} }
+            }
+        ),
+
+        InsertedReaction AS (
+            INSERT INTO Reactions (Id, MsgId, EmoteId, EmojiId) (
+                SELECT #{&reaction_id => Reactions::Id}, Checked.MsgId,
+                match emote {
+                    EmoteOrEmojiId::Emoji(ref emoji_id) => { NULL, #{emoji_id => Reactions::EmojiId} }
+                    EmoteOrEmojiId::Emote(ref emote_id) => { #{emote_id => Reactions::EmoteId}, NULL }
+                }
+                FROM Checked LEFT JOIN SelectedReaction ON TRUE
+                // prefer to not insert at all if we already have an ID
+                WHERE (SelectedReaction.ReactionId IS NULL OR SelectedReaction.Count = 0)
+            )
+            ON CONFLICT match emote {
+                // NOTE: Make sure to use ./ syntax to only print column names
+                EmoteOrEmojiId::Emoji(_) => { (Reactions./MsgId, Reactions./EmojiId) }
+                EmoteOrEmojiId::Emote(_) => { (Reactions./MsgId, Reactions./EmoteId) }
+            }
+            DO UPDATE Reactions SET (Id) = (
+                // if count is zero, then reset the ID to update the timestamp
+                // side-effect of this is allowing RETURNING to always work
+                CASE Reactions.Count WHEN 0 THEN #{&reaction_id => Reactions::Id} ELSE Reactions.Id END
+            )
+            RETURNING
+                Reactions.Id AS InsertedReaction.ReactionId
+        ),
+
+        InsertedReactionUser AS (
+            INSERT INTO ReactionUsers (ReactionId, UserId) (
+                SELECT
+                    COALESCE(SelectedReaction.ReactionId, InsertedReaction.ReactionId),
+                    #{&auth.user_id => Users::Id}
+                FROM SelectedReaction FULL OUTER JOIN InsertedReaction ON TRUE
+            )
+            ON CONFLICT DO NOTHING
+            RETURNING
+                ReactionUsers.UserId AS InsertedReactionUser.UserId,
+                ReactionUsers.ReactionId AS InsertedReactionUser.ReactionId
+        ),
+
+        ReactionEvent AS (
+            SELECT
+                Checked.MsgId       AS ReactionEvent.MsgId,
+                Checked.PartyId     AS ReactionEvent.PartyId,
+                AggMembers.RoleIds  AS ReactionEvent.RoleIds,
+                AggMembers.JoinedAt AS ReactionEvent.JoinedAt,
+                Users.Username      AS ReactionEvent.Username,
+                Users.Discriminator AS ReactionEvent.Discriminator,
+                Users.Flags         AS ReactionEvent.UserFlags,
+                COALESCE(PartyProfile.Nickname, BaseProfile.Nickname) AS ReactionEvent.Nickname,
+                COALESCE(PartyProfile.AvatarId, BaseProfile.AvatarId) AS ReactionEvent.AvatarId,
+                .combine_profile_bits(BaseProfile.Bits, PartyProfile.Bits, PartyProfile.AvatarId) AS ReactionEvent.ProfileBits
+            FROM Checked
+                INNER JOIN Users ON Users.Id = #{&auth.user_id => Users::Id}
+                INNER JOIN InsertedReactionUser ON InsertedReactionUser.UserId = Users.Id
+                LEFT JOIN AggMembers ON AggMembers.UserId = Users.Id AND AggMembers.PartyId = Checked.PartyId
+                LEFT JOIN Profiles AS BaseProfile ON BaseProfile.UserId = Users.Id AND BaseProfile.PartyId IS NULL
+                LEFT JOIN Profiles AS PartyProfile ON PartyProfile.UserId = Users.Id AND PartyProfile.PartyId = Checked.PartyId
+        )
+
+        SELECT
+            ReactionEvent.MsgId         AS @MsgId,
+            ReactionEvent.PartyId       AS @PartyId,
+            ReactionEvent.Nickname      AS @Nickname,
+            ReactionEvent.Username      AS @Username,
+            ReactionEvent.Discriminator AS @Discriminator,
+            ReactionEvent.UserFlags     AS @UserFlags,
+            ReactionEvent.AvatarId      AS @AvatarId,
+            ReactionEvent.ProfileBits   AS @ProfileBits,
+            ReactionEvent.RoleIds       AS @RoleIds,
+            ReactionEvent.JoinedAt      AS @JoinedAt
+
+        // If Checked is valid, but ReactionEvent is not,
+        // then all columns will be NULL
+        FROM Checked LEFT JOIN ReactionEvent ON TRUE
+
+    }?).await?;
+
+    let Some(row) = row else { return Err(Error::Unauthorized) };
+
+    if let Some(msg_id) = row.msg_id()? {
         let emote = match state.emoji.lookup(emote) {
             Some(emote) => emote,
             None => {
@@ -58,7 +236,7 @@ pub async fn add_reaction(
             }
         };
 
-        let party_id = row.try_get(Columns::party_id())?;
+        let party_id = row.party_id()?;
 
         let event = ServerMsg::new_message_reaction_add(UserReactionEvent {
             emote,
@@ -69,19 +247,19 @@ pub async fn add_reaction(
             member: Some(Box::new(PartyMember {
                 user: User {
                     id: auth.user_id,
-                    username: row.try_get(Columns::username())?,
-                    discriminator: row.try_get(Columns::discriminator())?,
-                    flags: UserFlags::from_bits_truncate_public(row.try_get(Columns::user_flags())?),
+                    username: row.username()?,
+                    discriminator: row.discriminator()?,
+                    flags: UserFlags::from_bits_truncate_public(row.user_flags()?),
                     presence: None,
                     email: None,
                     preferences: None,
-                    profile: match row.try_get(Columns::profile_bits())? {
+                    profile: match row.profile_bits()? {
                         None => Nullable::Null,
                         Some(bits) => Nullable::Some(Box::new(UserProfile {
                             bits,
                             extra: Default::default(),
-                            nick: row.try_get(Columns::nickname())?,
-                            avatar: encrypt_snowflake_opt(&state, row.try_get(Columns::avatar_id())?).into(),
+                            nick: row.nickname()?,
+                            avatar: encrypt_snowflake_opt(&state, row.avatar_id()?).into(),
                             banner: Nullable::Undefined,
                             status: Nullable::Undefined,
                             bio: Nullable::Undefined,
@@ -89,8 +267,8 @@ pub async fn add_reaction(
                     },
                 },
                 partial: PartialPartyMember {
-                    roles: row.try_get(Columns::role_ids())?,
-                    joined_at: row.try_get(Columns::joined_at())?,
+                    roles: row.role_ids()?,
+                    joined_at: row.joined_at()?,
                     flags: None,
                 },
             })),
@@ -105,215 +283,4 @@ pub async fn add_reaction(
     }
 
     Ok(())
-}
-
-mod q {
-    use sdk::Snowflake;
-
-    pub use schema::*;
-    pub use thorn::*;
-
-    thorn::params! {
-        pub struct Params {
-            pub user_id: Snowflake = Users::Id,
-            pub msg_id: Snowflake = Messages::Id,
-            pub emote_id: Option<Snowflake> = Emotes::Id,
-            pub emoji_id: Option<i32> = Emojis::Id,
-            pub room_id: Snowflake = Rooms::Id,
-        }
-    }
-
-    thorn::tables! {
-        pub struct Values {
-            MsgId: Reactions::MsgId,
-            EmoteId: Reactions::EmoteId,
-            EmojiId: Reactions::EmojiId,
-            UserIds: Reactions::UserIds,
-            PartyId: Rooms::PartyId,
-        }
-
-        pub struct Inserted {
-            MsgId: Values::MsgId,
-        }
-
-        pub struct ReactionEvent {
-            MsgId: Inserted::MsgId,
-            PartyId: Rooms::PartyId,
-            Nickname: Profiles::Nickname,
-            Username: Users::Username,
-            Discriminator: Users::Discriminator,
-            UserFlags: Users::Flags,
-            AvatarId: Profiles::AvatarId,
-            ProfileBits: Profiles::Bits,
-            RoleIds: AggMembers::RoleIds,
-            JoinedAt: AggMembers::JoinedAt,
-        }
-    }
-
-    thorn::decl_alias! {
-        pub BaseProfile = Profiles,
-        pub PartyProfile = Profiles
-    }
-
-    pub mod columns {
-        use super::*;
-
-        thorn::indexed_columns! {
-            pub enum ValuesColumns {
-                Values::MsgId,
-            }
-
-            pub enum Columns continue ValuesColumns {
-                ReactionEvent::MsgId,
-                ReactionEvent::PartyId,
-                ReactionEvent::Username,
-                ReactionEvent::Discriminator,
-                ReactionEvent::UserFlags,
-                ReactionEvent::Nickname,
-                ReactionEvent::AvatarId,
-                ReactionEvent::ProfileBits,
-                ReactionEvent::RoleIds,
-                ReactionEvent::JoinedAt,
-            }
-        }
-    }
-
-    use columns::*;
-
-    pub fn query(allow_external: bool, emoji: bool) -> impl AnyQuery {
-        // first CTE, verified emote data and aggregates the values
-        let mut values = Query::select()
-            .exprs([
-                Params::msg_id().alias_to(Values::MsgId),
-                Params::emote_id().alias_to(Values::EmoteId),
-                Params::emoji_id().alias_to(Values::EmojiId),
-            ])
-            .expr(Builtin::array(Params::user_id()).alias_to(Values::UserIds))
-            // room_id may be unused, so just toss it here, will always be true
-            .and_where(Params::room_id().is_not_null());
-
-        // find emote and party_id
-        values = if !emoji {
-            values = match allow_external {
-                true => values
-                    .expr(PartyMembers::PartyId.alias_to(Values::PartyId))
-                    .from(
-                        PartyMembers::inner_join_table::<Emotes>()
-                            .on(Emotes::PartyId.equals(PartyMembers::PartyId)),
-                    )
-                    .and_where(PartyMembers::UserId.equals(Params::user_id())),
-                false => values
-                    .expr(Rooms::PartyId.alias_to(Values::PartyId))
-                    .from(Rooms::inner_join_table::<Emotes>().on(Emotes::PartyId.equals(Rooms::PartyId)))
-                    .and_where(Rooms::Id.equals(Params::room_id())),
-            };
-
-            values.and_where(Emotes::Id.equals(Params::emote_id()))
-        } else {
-            values
-                .expr(Rooms::PartyId.alias_to(Values::PartyId))
-                .from_table::<Rooms>()
-                .and_where(Rooms::Id.equals(Params::room_id()))
-        };
-
-        // second CTE, actually does the insertion
-        let insert = Query::insert()
-            .into::<Reactions>()
-            .cols(&[
-                Reactions::MsgId,
-                Reactions::EmoteId,
-                Reactions::EmojiId,
-                Reactions::UserIds,
-            ])
-            .query(
-                Query::select()
-                    .cols(&[Values::MsgId, Values::EmoteId, Values::EmojiId, Values::UserIds])
-                    .from_table::<Values>()
-                    .as_value(),
-            )
-            .on_conflict(
-                match emoji {
-                    true => [Reactions::MsgId, Reactions::EmojiId],
-                    false => [Reactions::MsgId, Reactions::EmoteId],
-                },
-                DoUpdate
-                    .set(
-                        // If user_ids is empty, treat this as a fresh reaction and reset the timestamp
-                        Reactions::Reacted,
-                        Case::default()
-                            .when_condition(
-                                Builtin::cardinality(Reactions::UserIds).equals(0.lit()),
-                                Builtin::now(()),
-                            )
-                            .otherwise(Reactions::Reacted),
-                    )
-                    .set(
-                        Reactions::UserIds,
-                        Builtin::array_append((Reactions::UserIds, Params::user_id())),
-                    )
-                    .and_where(Params::user_id().not_equals(Builtin::all(Reactions::UserIds))),
-            )
-            .returning(Reactions::MsgId.alias_to(Inserted::MsgId));
-
-        // third CTE, based on if the insertion succeeds, fetch react object
-        let fetch = Query::select()
-            .expr(Inserted::MsgId.alias_to(ReactionEvent::MsgId))
-            .expr(Values::PartyId.alias_to(ReactionEvent::PartyId))
-            .exprs([
-                AggMembers::RoleIds.alias_to(ReactionEvent::RoleIds),
-                AggMembers::JoinedAt.alias_to(ReactionEvent::JoinedAt),
-            ])
-            .exprs([
-                Users::Username.alias_to(ReactionEvent::Username),
-                Users::Discriminator.alias_to(ReactionEvent::Discriminator),
-                Users::Flags.alias_to(ReactionEvent::UserFlags),
-            ])
-            // ProfileColumns
-            .expr(
-                Builtin::coalesce((
-                    PartyProfile::col(Profiles::Nickname),
-                    BaseProfile::col(Profiles::Nickname),
-                ))
-                .alias_to(ReactionEvent::Nickname),
-            )
-            .expr(
-                Builtin::coalesce((
-                    PartyProfile::col(Profiles::AvatarId),
-                    BaseProfile::col(Profiles::AvatarId),
-                ))
-                .alias_to(ReactionEvent::AvatarId),
-            )
-            .expr(
-                schema::combine_profile_bits::call(
-                    BaseProfile::col(Profiles::Bits),
-                    PartyProfile::col(Profiles::Bits),
-                    PartyProfile::col(Profiles::AvatarId),
-                )
-                .alias_to(ReactionEvent::ProfileBits),
-            )
-            .from(
-                Values::inner_join_table::<Inserted>()
-                    .on(Inserted::MsgId.equals(Values::MsgId))
-                    .inner_join_table::<Users>()
-                    .on(Users::Id.equals(Params::user_id()))
-                    .left_join_table::<AggMembers>()
-                    .on(AggMembers::UserId.equals(Users::Id).and(AggMembers::PartyId.equals(Values::PartyId)))
-                    .left_join_table::<BaseProfile>()
-                    .on(BaseProfile::col(Profiles::UserId)
-                        .equals(Params::user_id())
-                        .and(BaseProfile::col(Profiles::PartyId).is_null()))
-                    .left_join_table::<PartyProfile>()
-                    .on(PartyProfile::col(Profiles::UserId)
-                        .equals(Params::user_id())
-                        .and(PartyProfile::col(Profiles::PartyId).equals(Values::PartyId))),
-            );
-
-        Query::select()
-            .with(Values::as_query(values).exclude())
-            .with(Inserted::as_query(insert).exclude())
-            .with(ReactionEvent::as_query(fetch).exclude())
-            .cols(ValuesColumns::default())
-            .cols(Columns::default())
-            .from(Values::left_join_table::<ReactionEvent>().on(true.lit()))
-    }
 }
