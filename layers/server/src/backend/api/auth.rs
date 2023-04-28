@@ -41,7 +41,7 @@ impl Authorization {
 use crate::Error;
 
 pub async fn do_auth(state: &ServerState, token: RawAuthToken) -> Result<Authorization, Error> {
-    let auth = match state.session_cache.get(&token).await {
+    let auth = match state.session_cache.get(&token) {
         Some(auth) => Some(auth),
         None => match token {
             RawAuthToken::Bearer(bytes) => do_user_auth(state, &bytes, token).boxed().await?,

@@ -1,7 +1,6 @@
 use std::time::SystemTime;
 
 use sdk::models::UserFlags;
-use util::cmap::CHashMap;
 
 use schema::{auth::RawAuthToken, Snowflake};
 
@@ -14,44 +13,45 @@ struct PartialAuthorization {
     flags: UserFlags,
 }
 
-#[derive(Default)]
 pub struct SessionCache {
-    map: CHashMap<RawAuthToken, PartialAuthorization>,
+    map: scc::HashIndex<RawAuthToken, PartialAuthorization, ahash::RandomState>,
+}
+
+impl Default for SessionCache {
+    fn default() -> Self {
+        SessionCache {
+            map: scc::HashIndex::with_hasher(ahash::RandomState::new()),
+        }
+    }
 }
 
 impl SessionCache {
-    pub async fn get(&self, token: &RawAuthToken) -> Option<Authorization> {
-        match self.map.get(token).await {
-            None => None,
-            Some(part) => Some(Authorization {
-                token: *token,
-                user_id: part.user_id,
-                expires: part.expires,
-                flags: part.flags,
-            }),
-        }
+    pub fn get(&self, token: &RawAuthToken) -> Option<Authorization> {
+        self.map.read(token, |_, part| Authorization {
+            token: *token,
+            user_id: part.user_id,
+            expires: part.expires,
+            flags: part.flags,
+        })
     }
 
     pub async fn set(&self, auth: Authorization) {
-        self.map
-            .insert(
-                auth.token,
-                PartialAuthorization {
-                    user_id: auth.user_id,
-                    expires: auth.expires,
-                    flags: auth.flags,
-                },
-            )
-            .await;
+        let part = PartialAuthorization {
+            user_id: auth.user_id,
+            expires: auth.expires,
+            flags: auth.flags,
+        };
 
-        log::trace!("Cached auth {}: {}", auth.user_id, auth.token);
+        if let Ok(_) = self.map.insert_async(auth.token, part).await {
+            log::trace!("Cached auth {}: {}", auth.user_id, auth.token);
+        }
     }
 
     pub async fn cleanup(&self, now: SystemTime) {
-        self.map.retain(|_, part| part.expires < now).await;
+        self.map.retain_async(|_, part| part.expires < now).await;
     }
 
     pub async fn clear_user(&self, user_id: Snowflake) {
-        self.map.retain(|_, part| part.user_id != user_id).await;
+        self.map.retain_async(|_, part| part.user_id != user_id).await;
     }
 }
