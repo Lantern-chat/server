@@ -62,11 +62,11 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
         INSERT INTO Party (
             Id, Name, Description, OwnerId, DefaultRoom
         ) VALUES (
-            #{&party.id           => Party::Id          },
-            #{&party.name         => Party::Name        },
-            #{&party.description  => Party::Description },
-            #{&party.owner        => Party::OwnerId     },
-            #{&party.default_room => Party::DefaultRoom }
+            #{&party.id           as Party::Id          },
+            #{&party.name         as Party::Name        },
+            #{&party.description  as Party::Description },
+            #{&party.owner        as Party::OwnerId     },
+            #{&party.default_room as Party::DefaultRoom }
         )
     }?)
     .await?;
@@ -75,7 +75,7 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
         #[rustfmt::skip]
         let row = t.query_one2(schema::sql! {
             SELECT MAX(PartyMembers.Position) AS @MaxPosition
-            FROM PartyMembers WHERE PartyMembers.UserId = #{&auth.user_id => PartyMembers::UserId}
+            FROM PartyMembers WHERE PartyMembers.UserId = #{&auth.user_id as PartyMembers::UserId}
         }?).await?;
 
         match row.max_position::<Option<i16>>()? {
@@ -94,31 +94,31 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
             INSERT INTO PartyMembers (
                 PartyId, UserId, Position
             ) VALUES (
-                #{&party.id     => PartyMembers::PartyId  },
-                #{&auth.user_id => PartyMembers::UserId   },
-                #{&position     => PartyMembers::Position }
+                #{&party.id     as PartyMembers::PartyId  },
+                #{&auth.user_id as PartyMembers::UserId   },
+                #{&position     as PartyMembers::Position }
             )
         }?),
         t.execute2(schema::sql! {
             INSERT INTO Roles (
                 Id, Name, PartyId, Permissions1, Permissions2
             ) VALUES (
-                #{&default_role.id   => Roles::Id           },
-                #{&default_role.name => Roles::Name         },
-                #{&party.id          => Roles::PartyId      },
-                #{&perm1             => Roles::Permissions1 },
-                #{&perm2             => Roles::Permissions2 }
+                #{&default_role.id   as Roles::Id           },
+                #{&default_role.name as Roles::Name         },
+                #{&party.id          as Roles::PartyId      },
+                #{&perm1             as Roles::Permissions1 },
+                #{&perm2             as Roles::Permissions2 }
             )
         }?),
         t.execute2(schema::sql! {
             INSERT INTO Rooms (
                 Id, PartyId, Name, Position, Flags
             ) VALUES (
-                #{&room_id              => Rooms::Id       },
-                #{&party.id             => Rooms::PartyId  },
-                #{&"general"            => Rooms::Name     },
-                #{&0i16                 => Rooms::Position },
-                #{&RoomFlags::DEFAULT   => Rooms::Flags    }
+                #{&room_id              as Rooms::Id       },
+                #{&party.id             as Rooms::PartyId  },
+                #{&"general"            as Rooms::Name     },
+                #{&0i16                 as Rooms::Position },
+                #{&RoomFlags::DEFAULT   as Rooms::Flags    }
             )
         }?),
     )

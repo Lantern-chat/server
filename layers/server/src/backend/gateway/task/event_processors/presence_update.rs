@@ -25,10 +25,10 @@ pub async fn presence_updated(
                 INNER JOIN PartyMembers ON PartyMembers.UserId = Users.Id
                 LEFT JOIN AggPresence ON AggPresence.UserId = Users.Id
             WHERE
-                Users.Id = #{&user_id => Users::Id}
+                Users.Id = #{&user_id as Users::Id}
             AND (
-                PartyMembers.PartyId = #{&party_id => Party::Id}
-                OR #{&party_id => Party::Id} IS NULL
+                PartyMembers.PartyId = #{&party_id as Party::Id}
+                OR #{&party_id as Party::Id} IS NULL
             )
         }?).await?);
 

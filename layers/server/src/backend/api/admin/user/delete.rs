@@ -14,8 +14,8 @@ pub async fn delete_user(state: ServerState, user_id: Snowflake) -> Result<(), E
     // TODO: Typecheck this procedure
     db.execute2(schema::sql! {
         CALL .soft_delete_user(
-            #{&user_id => Users::Id},
-            #{&new_username => Users::Username}
+            #{&user_id as Users::Id},
+            #{&new_username as Users::Username}
         )
     }?)
     .await?;

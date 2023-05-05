@@ -74,7 +74,7 @@ pub async fn do_user_auth(
         FROM
             Sessions INNER JOIN Users ON Users.Id = Sessions.UserId
         WHERE
-            Sessions.Token = #{&bytes => Sessions::Token}
+            Sessions.Token = #{&bytes as Sessions::Token}
     }?).await?;
 
     Ok(match row {

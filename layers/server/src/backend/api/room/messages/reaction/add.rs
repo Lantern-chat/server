@@ -77,7 +77,7 @@ pub async fn add_reaction(
 
         WITH Checked AS (
             SELECT
-                #{&msg_id => Messages::Id} AS Checked.MsgId,
+                #{&msg_id as Messages::Id} AS Checked.MsgId,
 
             // if we have cached permissions, things can be much simpler
             if let Some(perms) = perms {
@@ -86,27 +86,27 @@ pub async fn add_reaction(
                     EmoteOrEmojiId::Emote(ref emote_id) if perms.contains(Permissions::USE_EXTERNAL_EMOTES) => {
                         PartyMembers.PartyId AS Checked.PartyId
                         FROM  PartyMembers INNER JOIN Emotes ON Emotes.PartyId = PartyMembers.PartyId
-                        WHERE PartyMembers.UserId = #{&auth.user_id => Users::Id}
-                        AND   Emotes.Id = #{emote_id => Emotes::Id}
+                        WHERE PartyMembers.UserId = #{&auth.user_id as Users::Id}
+                        AND   Emotes.Id = #{emote_id as Emotes::Id}
                     }
                     EmoteOrEmojiId::Emote(ref emote_id) => {
                         Rooms.PartyId AS Checked.PartyId
                         FROM  Rooms INNER JOIN Emotes ON Rooms.PartyId = Emotes.PartyId
-                        WHERE Rooms.Id = #{&room_id => Rooms::Id}
-                        AND   Emotes.Id = #{emote_id => Emotes::Id}
+                        WHERE Rooms.Id = #{&room_id as Rooms::Id}
+                        AND   Emotes.Id = #{emote_id as Emotes::Id}
                     }
-                    EmoteOrEmojiId::Emoji(ref emoji_id) => {
-                        Rooms.PartyId AS Checked.PartyId FROM Rooms WHERE Rooms.Id = #{&room_id => Rooms::Id}
+                    EmoteOrEmojiId::Emoji(_) => {
+                        Rooms.PartyId AS Checked.PartyId FROM Rooms WHERE Rooms.Id = #{&room_id as Rooms::Id}
                     }
                 }
             } else {
                 match emote {
-                    EmoteOrEmojiId::Emoji(ref emoji_id) => {
+                    EmoteOrEmojiId::Emoji(_) => {
                         Rooms.PartyId AS Checked.PartyId
                         FROM Rooms INNER JOIN AggRoomPerms
                             ON AggRoomPerms.RoomId = Rooms.Id
-                            AND AggRoomPerms.UserId = #{&auth.user_id => Users::Id}
-                        WHERE Rooms.Id = #{&room_id => Rooms::Id}
+                            AND AggRoomPerms.UserId = #{&auth.user_id as Users::Id}
+                        WHERE Rooms.Id = #{&room_id as Rooms::Id}
                     }
                     EmoteOrEmojiId::Emote(ref emote_id) => {
                         PartyMembers.PartyId AS Checked.PartyId
@@ -114,13 +114,13 @@ pub async fn add_reaction(
                             // ensure user is a member of the party they're using the emote from
                             INNER JOIN Emotes ON Emotes.PartyId = PartyMembers.PartyId
                             // join with rooms to get target party id
-                            INNER JOIN Rooms ON Rooms.Id = #{&room_id => Rooms::Id}
+                            INNER JOIN Rooms ON Rooms.Id = #{&room_id as Rooms::Id}
                             INNER JOIN AggRoomPerms
                                 ON  AggRoomPerms.RoomId = Rooms.Id
                                 AND AggRoomPerms.UserId = PartyMembers.UserId
                         WHERE
-                            PartyMembers.UserId = #{&auth.user_id => Users::Id}
-                        AND Emotes.Id = #{emote_id => Emotes::Id}
+                            PartyMembers.UserId = #{&auth.user_id as Users::Id}
+                        AND Emotes.Id = #{emote_id as Emotes::Id}
                         // emote is in same party as the room we're sending to,
                         // or the user has the permissions to use external emotes
                         AND (Emotes.PartyId = Rooms.PartyId OR (
@@ -144,17 +144,17 @@ pub async fn add_reaction(
                 Reactions.Count AS SelectedReaction.Count
             FROM Checked INNER JOIN Reactions ON Reactions.MsgId = Checked.MsgId
             AND match emote {
-                EmoteOrEmojiId::Emoji(ref emoji_id) => { Reactions.EmojiId = #{emoji_id => Reactions::EmojiId} }
-                EmoteOrEmojiId::Emote(ref emote_id) => { Reactions.EmoteId = #{emote_id => Reactions::EmoteId} }
+                EmoteOrEmojiId::Emoji(ref emoji_id) => { Reactions.EmojiId = #{emoji_id as Reactions::EmojiId} }
+                EmoteOrEmojiId::Emote(ref emote_id) => { Reactions.EmoteId = #{emote_id as Reactions::EmoteId} }
             }
         ),
 
         InsertedReaction AS (
             INSERT INTO Reactions (Id, MsgId, EmoteId, EmojiId) (
-                SELECT #{&reaction_id => Reactions::Id}, Checked.MsgId,
+                SELECT #{&reaction_id as Reactions::Id}, Checked.MsgId,
                 match emote {
-                    EmoteOrEmojiId::Emoji(ref emoji_id) => { NULL, #{emoji_id => Reactions::EmojiId} }
-                    EmoteOrEmojiId::Emote(ref emote_id) => { #{emote_id => Reactions::EmoteId}, NULL }
+                    EmoteOrEmojiId::Emoji(ref emoji_id) => { NULL, #{emoji_id as Reactions::EmojiId} }
+                    EmoteOrEmojiId::Emote(ref emote_id) => { #{emote_id as Reactions::EmoteId}, NULL }
                 }
                 FROM Checked LEFT JOIN SelectedReaction ON TRUE
                 // prefer to not insert at all if we already have an ID
@@ -168,7 +168,7 @@ pub async fn add_reaction(
             DO UPDATE Reactions SET (Id) = (
                 // if count is zero, then reset the ID to update the timestamp
                 // side-effect of this is allowing RETURNING to always work
-                CASE Reactions.Count WHEN 0 THEN #{&reaction_id => Reactions::Id} ELSE Reactions.Id END
+                CASE Reactions.Count WHEN 0 THEN #{&reaction_id as Reactions::Id} ELSE Reactions.Id END
             )
             RETURNING
                 Reactions.Id AS InsertedReaction.ReactionId
@@ -178,7 +178,7 @@ pub async fn add_reaction(
             INSERT INTO ReactionUsers (ReactionId, UserId) (
                 SELECT
                     COALESCE(SelectedReaction.ReactionId, InsertedReaction.ReactionId),
-                    #{&auth.user_id => Users::Id}
+                    #{&auth.user_id as Users::Id}
                 FROM SelectedReaction FULL OUTER JOIN InsertedReaction ON TRUE
             )
             ON CONFLICT DO NOTHING
@@ -200,7 +200,7 @@ pub async fn add_reaction(
                 COALESCE(PartyProfile.AvatarId, BaseProfile.AvatarId) AS ReactionEvent.AvatarId,
                 .combine_profile_bits(BaseProfile.Bits, PartyProfile.Bits, PartyProfile.AvatarId) AS ReactionEvent.ProfileBits
             FROM Checked
-                INNER JOIN Users ON Users.Id = #{&auth.user_id => Users::Id}
+                INNER JOIN Users ON Users.Id = #{&auth.user_id as Users::Id}
                 INNER JOIN InsertedReactionUser ON InsertedReactionUser.UserId = Users.Id
                 LEFT JOIN AggMembers ON AggMembers.UserId = Users.Id AND AggMembers.PartyId = Checked.PartyId
                 LEFT JOIN Profiles AS BaseProfile ON BaseProfile.UserId = Users.Id AND BaseProfile.PartyId IS NULL
@@ -222,7 +222,6 @@ pub async fn add_reaction(
         // If Checked is valid, but ReactionEvent is not,
         // then all columns will be NULL
         FROM Checked LEFT JOIN ReactionEvent ON TRUE
-
     }?).await?;
 
     let Some(row) = row else { return Err(Error::Unauthorized) };

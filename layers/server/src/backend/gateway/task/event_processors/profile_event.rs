@@ -40,8 +40,8 @@ pub async fn profile_updated(
                     ON PartyProfile.UserId = Users.Id
                     AND PartyProfile.PartyId = PartyMembers.PartyId
             WHERE
-                PartyMembers.UserId = #{&user_id => Users::Id}
-            AND PartyMembers.PartyId = #{&party_id => Party::Id}
+                PartyMembers.UserId  = #{&user_id  as Users::Id}
+            AND PartyMembers.PartyId = #{&party_id as Party::Id}
         }?).await?);
 
         let mut last_avatar: Option<(Snowflake, SmolStr)> = None;

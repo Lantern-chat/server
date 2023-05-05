@@ -12,7 +12,7 @@ pub async fn logout_user(state: &ServerState, auth: Authorization) -> Result<(),
 
     #[rustfmt::skip]
     let res = db.execute2(schema::sql! {
-        DELETE FROM Sessions WHERE Sessions.Token = #{&bytes => Sessions::Token}
+        DELETE FROM Sessions WHERE Sessions.Token = #{&bytes as Sessions::Token}
     }?).await?;
 
     if res == 0 {

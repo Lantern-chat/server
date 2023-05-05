@@ -89,16 +89,16 @@ pub async fn do_post_file(
     state.db.write.get().await?.execute2(schema::sql! {
         INSERT INTO Files (Id, UserId, Nonce, Size, Width, Height, Flags, Name, Mime, Preview)
         VALUES (
-            #{&file_id      => Files::Id},
-            #{&user_id      => Files::UserId},
-            #{&nonce        => Files::Nonce},
-            #{&upload_size  => Files::Size},
-            #{&width        => Files::Width},
-            #{&height       => Files::Height},
-            #{&flags        => Files::Flags},
-            #{&filename     => Files::Name},
-            #{&mime         => Files::Mime},
-            #{&preview      => Files::Preview}
+            #{&file_id      as Files::Id},
+            #{&user_id      as Files::UserId},
+            #{&nonce        as Files::Nonce},
+            #{&upload_size  as Files::Size},
+            #{&width        as Files::Width},
+            #{&height       as Files::Height},
+            #{&flags        as Files::Flags},
+            #{&filename     as Files::Name},
+            #{&mime         as Files::Mime},
+            #{&preview      as Files::Preview}
         )
     }?).await?;
 

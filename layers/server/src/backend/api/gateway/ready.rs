@@ -51,7 +51,7 @@ pub async fn ready(
                 Party INNER JOIN PartyMembers ON PartyMembers.PartyId = Party.Id
             WHERE
                 Party.DeletedAt IS NULL
-                AND PartyMembers.UserId = #{&auth.user_id => Users::Id}
+                AND PartyMembers.UserId = #{&auth.user_id as Users::Id}
         }?).await?;
 
         let mut parties = HashMap::with_capacity(rows.len());

@@ -37,7 +37,7 @@ pub async fn member_event(
                 FROM
                     Users LEFT JOIN Profiles ON Users.Id = Profiles.UserId AND Profiles.PartyId IS NULL
                 WHERE
-                    Users.Id = #{&user_id => Users::Id}
+                    Users.Id = #{&user_id as Users::Id}
             }?).await?;
 
             Ok::<Option<_>, Error>(Some(PartyMember {

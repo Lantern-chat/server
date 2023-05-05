@@ -28,8 +28,8 @@ pub async fn get_roles_raw<'a, 'b>(
                 Roles.Flags         AS @_,
                 Roles.AvatarId      AS @_
             FROM Roles WHERE match party_id {
-                SearchMode::Single(ref id) => { Roles.PartyId = #{id => SNOWFLAKE} },
-                SearchMode::Many(ref ids)  => { Roles.PartyId = ANY(#{ids => SNOWFLAKE_ARRAY}) },
+                SearchMode::Single(ref id) => { Roles.PartyId =     #{id  as SNOWFLAKE} },
+                SearchMode::Many(ref ids)  => { Roles.PartyId = ANY(#{ids as SNOWFLAKE_ARRAY}) },
             }
         }?)
         .await?;

@@ -26,7 +26,7 @@ pub async fn trigger_typing(state: ServerState, auth: Authorization, room_id: Sn
 
         WITH AggRoom AS (
             SELECT Rooms.PartyId AS AggRoom.PartyId
-            FROM Rooms WHERE Rooms.Id = #{&room_id => SNOWFLAKE}
+            FROM Rooms WHERE Rooms.Id = #{&room_id as SNOWFLAKE}
         )
 
         SELECT
@@ -65,7 +65,7 @@ pub async fn trigger_typing(state: ServerState, auth: Authorization, room_id: Sn
                     ON PartyProfile.UserId = Users.Id
                     AND PartyProfile.PartyId = PartyMembers.PartyId
 
-            WHERE Users.Id = #{&auth.user_id => SNOWFLAKE}
+            WHERE Users.Id = #{&auth.user_id as SNOWFLAKE}
     }?).await?;
 
     let Some(row) = row else { return Ok(()) };

@@ -75,24 +75,24 @@ pub async fn get_members_inner(
             // if not anonymous (from gateway), join with relationships
             if let Some(ref user_id) = user_id {
                 LEFT JOIN AggRelationships
-                 ON AggRelationships.UserId   = #{user_id => SNOWFLAKE}
+                 ON AggRelationships.UserId   = #{user_id as SNOWFLAKE}
                 AND AggRelationships.FriendId = AggMembersFull.UserId
             }
 
-            WHERE AggMembersFull.PartyId     = #{&party_id => SNOWFLAKE}
+            WHERE AggMembersFull.PartyId     = #{&party_id as SNOWFLAKE}
               AND AggMembersFull.MemberFlags & {MemberFlags::BANNED.bits()} = 0
 
             // if not anonymous, double-check this user is actually a party member
             if let Some(ref user_id) = user_id {
                 AND EXISTS(
                     SELECT 1 FROM PartyMembers
-                    WHERE PartyMembers.UserId  = #{user_id => SNOWFLAKE}
-                      AND PartyMembers.PartyId = #{&party_id => SNOWFLAKE}
+                    WHERE PartyMembers.UserId  = #{user_id as SNOWFLAKE}
+                      AND PartyMembers.PartyId = #{&party_id as SNOWFLAKE}
                 )
             }
 
             if let Some(ref member_id) = member_id {
-                AND AggMembersFull.UserId = #{member_id => SNOWFLAKE}
+                AND AggMembersFull.UserId = #{member_id as SNOWFLAKE}
 
                 LIMIT 1
             }

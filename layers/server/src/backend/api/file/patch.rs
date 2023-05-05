@@ -38,8 +38,8 @@ pub async fn patch_file(
             Files.Mime IS NOT NULL AS @NoMime
         FROM Files
         WHERE
-            Files.Id     = #{&file_id => Files::Id}
-        AND Files.UserId = #{&auth.user_id => Files::UserId}
+            Files.Id     = #{&file_id      as Files::Id}
+        AND Files.UserId = #{&auth.user_id as Files::UserId}
     }?).await?;
 
     let Some(row) = row else { return Err(Error::NotFound) };
@@ -188,8 +188,8 @@ pub async fn patch_file(
         if let Some((mstr, _)) = mime_db::from_prefix(first_chunk) {
             #[rustfmt::skip]
             state.db.write.get().await?.execute2(schema::sql! {
-                UPDATE Files SET (Mime) = (#{&mstr => Files::Mime})
-                WHERE Files.Id = #{&file_id => Files::Id}
+                UPDATE Files SET (Mime) = (#{&mstr as Files::Mime})
+                WHERE Files.Id = #{&file_id as Files::Id}
             }?).await?;
         }
     }
@@ -203,8 +203,8 @@ pub async fn patch_file(
 
         #[rustfmt::skip]
         state.db.write.get().await?.execute2(schema::sql! {
-            UPDATE Files SET (Flags) = (#{&bits => Files::Flags})
-            WHERE Files.Id = #{&file_id => Files::Id}
+            UPDATE Files SET (Flags) = (#{&bits as Files::Flags})
+            WHERE Files.Id = #{&file_id as Files::Id}
         }?).await?;
 
         file_patch.complete = true;

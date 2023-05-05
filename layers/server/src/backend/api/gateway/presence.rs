@@ -13,10 +13,10 @@ pub async fn set_presence(
     #[rustfmt::skip]
     state.db.write.get().await?.execute2(schema::sql! {
         CALL .set_presence(
-            #{&user_id => UserPresence::UserId},
-            #{&conn_id => UserPresence::ConnId},
-            #{&flags   => UserPresence::Flags},
-            NULL // #{&activity => UserPresence::Activity}
+            #{&user_id as UserPresence::UserId},
+            #{&conn_id as UserPresence::ConnId},
+            #{&flags   as UserPresence::Flags},
+            NULL // #{&activity as UserPresence::Activity}
         )
     }?).await?;
 
@@ -26,7 +26,7 @@ pub async fn set_presence(
 pub async fn clear_presence(state: ServerState, conn_id: Snowflake) -> Result<(), Error> {
     #[rustfmt::skip]
     state.db.write.get().await?.execute2(schema::sql! {
-        DELETE FROM UserPresence WHERE UserPresence.ConnId = #{&conn_id => UserPresence::ConnId}
+        DELETE FROM UserPresence WHERE UserPresence.ConnId = #{&conn_id as UserPresence::ConnId}
     }?).await?;
 
     Ok(())

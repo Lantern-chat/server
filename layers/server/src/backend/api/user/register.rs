@@ -45,7 +45,7 @@ pub async fn register_user(
 
     #[rustfmt::skip]
     let existing = read_db.query_opt2(schema::sql! {
-        SELECT 1 FROM Users WHERE Users.Email = #{&form.email => Users::Email}
+        SELECT 1 FROM Users WHERE Users.Email = #{&form.email as Users::Email}
     }?).await?;
 
     if existing.is_some() {
@@ -77,11 +77,11 @@ pub async fn register_user(
     #[rustfmt::skip]
     state.db.write.get().await?.execute2(schema::sql! {
         CALL .register_user(
-            #{&id           => Users::Id},
-            #{&username     => Users::Username},
-            #{&form.email   => Users::Email},
-            #{&passhash     => Users::Passhash},
-            #{&dob          => Users::Dob}
+            #{&id           as Users::Id},
+            #{&username     as Users::Username},
+            #{&form.email   as Users::Email},
+            #{&passhash     as Users::Passhash},
+            #{&dob          as Users::Dob}
         )
     }?).await?;
 

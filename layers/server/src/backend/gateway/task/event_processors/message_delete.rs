@@ -9,7 +9,7 @@ pub async fn message_delete(
     #[rustfmt::skip]
     let Some(row) = db.query_opt2(schema::sql! {
         SELECT Messages.RoomId AS @RoomId, Messages.UserId AS @UserId
-        FROM Messages WHERE Messages.Id = #{&id => Messages::Id}
+        FROM Messages WHERE Messages.Id = #{&id as Messages::Id}
     }?).await? else { return Ok(()); };
 
     let room_id = row.room_id()?;

@@ -18,7 +18,7 @@ pub async fn refresh_room_perms(
             AggRoomPerms.Permissions1   AS @Permissions1,
             AggRoomPerms.Permissions2   AS @Permissions2
         FROM AggRoomPerms
-        WHERE AggRoomPerms.UserId = #{&user_id => AggRoomPerms::UserId}
+        WHERE AggRoomPerms.UserId = #{&user_id as AggRoomPerms::UserId}
     }?).await?;
 
     let mut cache = Vec::new();

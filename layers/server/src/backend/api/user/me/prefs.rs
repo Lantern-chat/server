@@ -22,9 +22,9 @@ pub async fn update_prefs(
             // defaults are set to null, so strip them to save space
             jsonb_strip_nulls(
                 // Coalesce in case user never had prefs, then concat to overwrite old prefs
-                COALESCE(Users.Preferences, "{}"::jsonb) || #{&prefs => Users::Preferences}
+                COALESCE(Users.Preferences, "{}"::jsonb) || #{&prefs as Users::Preferences}
             )
-        ) WHERE Users.Id = #{&auth.user_id => Users::Id}
+        ) WHERE Users.Id = #{&auth.user_id as Users::Id}
     }?)
     .await?;
 

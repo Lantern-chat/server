@@ -27,8 +27,8 @@ pub async fn get_custom_emotes_raw<'a>(
                 Emotes.Flags        AS @_,
                 Emotes.AspectRatio  AS @_
             FROM Emotes WHERE match party_id {
-                SearchMode::Single(ref id) => { Emotes.PartyId = #{id => SNOWFLAKE} },
-                SearchMode::Many(ref ids)  => { Emotes.PartyId = ANY(#{ids => SNOWFLAKE_ARRAY}) },
+                SearchMode::Single(ref id) => { Emotes.PartyId =     #{id  as SNOWFLAKE} },
+                SearchMode::Many(ref ids)  => { Emotes.PartyId = ANY(#{ids as SNOWFLAKE_ARRAY}) },
             }
         }?)
         .await?;

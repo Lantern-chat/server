@@ -70,44 +70,44 @@ pub async fn get_asset(
         match kind {
             AssetKind::UserAvatar => {
                 INNER JOIN Profiles ON Profiles.AvatarId = UserAssetFiles.AssetId
-                WHERE Profiles.UserId = #{&kind_id => Profiles::UserId}
+                WHERE Profiles.UserId = #{&kind_id as Profiles::UserId}
             }
             AssetKind::UserBanner => {
                 INNER JOIN Profiles ON Profiles.BannerId = UserAssetFiles.AssetId
-                WHERE Profiles.UserId = #{&kind_id => Profiles::UserId}
+                WHERE Profiles.UserId = #{&kind_id as Profiles::UserId}
             }
             AssetKind::RoleAvatar => {
                 INNER JOIN Roles ON Roles.AvatarId = UserAssetFiles.AssetId
-                WHERE Roles.Id = #{&kind_id => Roles::Id}
+                WHERE Roles.Id = #{&kind_id as Roles::Id}
             }
             AssetKind::RoomAvatar => {
                 INNER JOIN Rooms ON Rooms.AvatarId = UserAssetFiles.AssetId
-                WHERE Rooms.Id = #{&kind_id => Rooms::Id}
+                WHERE Rooms.Id = #{&kind_id as Rooms::Id}
             }
             AssetKind::PartyAvatar => {
                 INNER JOIN Party ON Party.AvatarId = UserAssetFiles.AssetId
-                WHERE Party.Id = #{&kind_id => Party::Id}
+                WHERE Party.Id = #{&kind_id as Party::Id}
             }
             AssetKind::PartyBanner => {
                 INNER JOIN Party ON Party.BannerId = UserAssetFiles.AssetId
-                WHERE Party.Id = #{&kind_id => Party::Id}
+                WHERE Party.Id = #{&kind_id as Party::Id}
             }
             AssetKind::Emote | AssetKind::Sticker => {
                 INNER JOIN Emotes ON Emotes.AssetId = UserAssetFiles.AssetId
-                WHERE Emotes.Id = #{&kind_id => Emotes::Id}
+                WHERE Emotes.Id = #{&kind_id as Emotes::Id}
             }
         }
 
         if !matches!(kind, AssetKind::Emote | AssetKind::Sticker) {
-            AND UserAssetFiles.AssetId = #{&asset_id => UserAssetFiles::AssetId}
+            AND UserAssetFiles.AssetId = #{&asset_id as UserAssetFiles::AssetId}
         }
 
         AND (UserAssetFiles.Flags & {AssetFlags::QUALITY.bits()}) >= LEAST(
-            100, {AssetFlags::QUALITY.bits()} & #{&flags => UserAssetFiles::Flags}
+            100, {AssetFlags::QUALITY.bits()} & #{&flags as UserAssetFiles::Flags}
         )
         AND (
             // if it has the requested format flags
-            (UserAssetFiles.Flags & #{&flags => UserAssetFiles::Flags} & {AssetFlags::FORMATS.bits()}) != 0
+            (UserAssetFiles.Flags & #{&flags as UserAssetFiles::Flags} & {AssetFlags::FORMATS.bits()}) != 0
             // or if it has no flags at all
             OR UserAssetFiles.Flags & {AssetFlags::FLAGS.bits()} = 0
         )
@@ -165,13 +165,13 @@ pub async fn get_attachment(
             INNER JOIN Messages ON Attachments.MessageId = Messages.Id
             INNER JOIN Files ON Files.Id = Attachments.FileId
         WHERE
-            Files.Id = #{&file_id => Files::Id}
-        AND Messages.RoomId = #{&room_id => Rooms::Id}
+            Files.Id        = #{&file_id as Files::Id}
+        AND Messages.RoomId = #{&room_id as Rooms::Id}
     }?).await?;
 
     let Some(row) = row else { return Err(Error::NotFound); };
 
-    let meta = ParsedFile {
+    let m = ParsedFile {
         id: row.id()?,
         size: row.size()?,
         flags: schema::flags::FileFlags::from_bits_truncate(row.flags()?),
@@ -181,13 +181,13 @@ pub async fn get_attachment(
     };
 
     if let Some(provided_name) = provided_name {
-        if meta.name != provided_name {
-            log::debug!("{:?} != {:?}", meta.name, provided_name);
+        if m.name != provided_name {
+            log::debug!("{:?} != {:?}", m.name, provided_name);
             return Err(Error::NotFound);
         }
     }
 
-    sendfile::send_file(state, meta, is_head, download, range, last_modified, Some(start)).await
+    sendfile::send_file(state, m, is_head, download, range, last_modified, Some(start)).await
 }
 
 pub struct ParsedFile<'a> {

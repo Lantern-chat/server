@@ -42,14 +42,14 @@ pub async fn remove_own_reaction(
 
             if perms.is_none() {
                 INNER JOIN AggRoomPerms ON
-                    AggRoomPerms.UserId = #{&auth.user_id => Users::Id}
-                AND AggRoomPerms.RoomId = #{&room_id => Rooms::Id}
+                    AggRoomPerms.UserId = #{&auth.user_id as Users::Id}
+                AND AggRoomPerms.RoomId = #{&room_id as Rooms::Id}
             }
 
-            WHERE Reactions.MsgId = #{&msg_id => Messages::Id}
+            WHERE Reactions.MsgId = #{&msg_id as Messages::Id}
             AND match emote {
-                EmoteOrEmojiId::Emote(ref emote_id) => { Reactions.EmoteId = #{emote_id => Reactions::EmoteId} }
-                EmoteOrEmojiId::Emoji(ref emoji_id) => { Reactions.EmojiId = #{emoji_id => Reactions::EmojiId} }
+                EmoteOrEmojiId::Emote(ref emote_id) => { Reactions.EmoteId = #{emote_id as Reactions::EmoteId} }
+                EmoteOrEmojiId::Emoji(ref emoji_id) => { Reactions.EmojiId = #{emoji_id as Reactions::EmojiId} }
             }
 
             if perms.is_none() {
@@ -61,14 +61,14 @@ pub async fn remove_own_reaction(
         ), DeletedReactionUser AS (
             DELETE FROM ReactionUsers USING SelectedReaction
             WHERE ReactionUsers.ReactionId = SelectedReaction.ReactionId
-            AND ReactionUsers.UserId = #{&auth.user_id => Users::Id}
+            AND ReactionUsers.UserId = #{&auth.user_id as Users::Id}
             RETURNING ReactionUsers.ReactionId AS DeletedReactionUser.ReactionId
         )
         SELECT
             Rooms.PartyId AS @PartyId
         FROM SelectedReaction
             INNER JOIN DeletedReactionUser ON DeletedReactionUser.ReactionId = SelectedReaction.ReactionId
-            INNER JOIN Rooms ON Rooms.Id = #{&room_id => Rooms::Id}
+            INNER JOIN Rooms ON Rooms.Id = #{&room_id as Rooms::Id}
     }?).await?;
 
     let Some(row) = res else { return Ok(()); };

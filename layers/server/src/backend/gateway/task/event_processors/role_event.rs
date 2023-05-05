@@ -47,7 +47,7 @@ pub async fn role_event(
             Roles.Position      AS @Position,
             Roles.Flags         AS @Flags
         FROM Roles
-        WHERE Roles.Id = #{&role_id => Roles::Id}
+        WHERE Roles.Id = #{&role_id as Roles::Id}
     }?).await?;
 
     let party_id = row.party_id()?;

@@ -9,11 +9,11 @@ pub async fn ban_user(state: ServerState, user_id: Snowflake) -> Result<(), Erro
 
     let do_ban_user = t.execute2(schema::sql! {
         UPDATE Users SET (Flags) = (Users.Flags | {UserFlags::BANNED.bits()})
-        WHERE Users.Id = #{&user_id => Users::Id}
+        WHERE Users.Id = #{&user_id as Users::Id}
     }?);
 
     let clear_sessions = t.execute2(schema::sql! {
-        DELETE FROM Sessions WHERE Sessions.UserId = #{&user_id => Users::Id}
+        DELETE FROM Sessions WHERE Sessions.UserId = #{&user_id as Users::Id}
     }?);
 
     // TODO: Setup task to soft-delete user after 30 days or so.

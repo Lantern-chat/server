@@ -25,8 +25,8 @@ pub async fn head(state: ServerState, auth: Authorization, file_id: Snowflake) -
                 Files.Mime    AS @Mime,
                 Files.Preview AS @Preview
             FROM  Files
-            WHERE Files.Id = #{&file_id => Files::Id}
-              AND Files.UserId = #{&auth.user_id => Files::UserId}
+            WHERE Files.Id = #{&file_id as Files::Id}
+              AND Files.UserId = #{&auth.user_id as Files::UserId}
         }?).await?;
 
         match row {

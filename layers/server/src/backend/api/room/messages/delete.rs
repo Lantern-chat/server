@@ -36,8 +36,8 @@ pub async fn delete_msg(
                     AggRoomPerms.Permissions2 AS TempPerms.Permissions2
                 FROM AggRoomPerms
                 WHERE
-                    AggRoomPerms.RoomId = #{&room_id => Rooms::Id}
-                AND AggRoomPerms.UserId = #{&auth.user_id => Users::Id}
+                    AggRoomPerms.RoomId = #{&room_id as Rooms::Id}
+                AND AggRoomPerms.UserId = #{&auth.user_id as Users::Id}
             )
         }
 
@@ -47,13 +47,13 @@ pub async fn delete_msg(
         if perms.is_none() { FROM TempPerms } // include CTE if needed
 
         WHERE
-            Messages.Id = #{&msg_id => Messages::Id}
+            Messages.Id = #{&msg_id as Messages::Id}
         AND Messages.Flags & {MessageFlags::DELETED.bits()} = 0 // prevent double updates
 
         match perms {
             Some(perm) if !perm.contains(Permissions::MANAGE_MESSAGES) => {
                 // if they are a known party member and without manage perm
-                AND Messages.UserId = #{&auth.user_id => Users::Id}
+                AND Messages.UserId = #{&auth.user_id as Users::Id}
             }
             None => {
                 let m = Permissions::MANAGE_MESSAGES.to_i64();
@@ -64,7 +64,7 @@ pub async fn delete_msg(
                     ({m[1]} & TempPerms.Permissions2 = {m[1]})
                 ) OR (
                     // or they are a valid party member and it's their own message
-                    Messages.UserId = #{&auth.user_id => Users::Id} AND
+                    Messages.UserId = #{&auth.user_id as Users::Id} AND
                     TempPerms.Permissions1 IS NOT NULL
                 ))
             }

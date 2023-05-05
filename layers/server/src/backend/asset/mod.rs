@@ -70,7 +70,7 @@ pub async fn add_asset(
     #[rustfmt::skip]
     let row = state.db.read.get().await?.query_one2(schema::sql! {
         SELECT Files.Size AS @Size, Files.Nonce AS @Nonce, Files.Mime AS @Mime
-        FROM Files WHERE Files.Id = #{&file_id => Files::Id}
+        FROM Files WHERE Files.Id = #{&file_id as Files::Id}
     }?).await?;
 
     let size: i32 = row.size()?;
@@ -207,15 +207,15 @@ pub async fn add_asset(
                         db.execute2(schema::sql! {
                             INSERT INTO Files (Id, UserId, Nonce, Size, Width, Height, Mime, Flags, Name)
                             VALUES (
-                                #{&id => Files::Id},
-                                #{&user_id => Files::UserId},
-                                #{&nonce => Files::Nonce},
-                                #{&len => Files::Size},
-                                #{&width => Files::Width},
-                                #{&height => Files::Height},
-                                #{&mime => Files::Mime},
-                                #{&flags => Files::Flags},
-                                #{&name => Files::Name}
+                                #{&id       as Files::Id},
+                                #{&user_id  as Files::UserId},
+                                #{&nonce    as Files::Nonce},
+                                #{&len      as Files::Size},
+                                #{&width    as Files::Width},
+                                #{&height   as Files::Height},
+                                #{&mime     as Files::Mime},
+                                #{&flags    as Files::Flags},
+                                #{&name     as Files::Name}
                             )
                         }?).await?;
 
@@ -264,9 +264,9 @@ pub async fn add_asset(
     t.execute2(schema::sql! {
         INSERT INTO UserAssets (Id, FileId, Preview)
         VALUES (
-            #{&asset_id => UserAssets::Id },
-            #{&file_id => UserAssets::FileId },
-            #{&processed.preview => UserAssets::Preview }
+            #{&asset_id as UserAssets::Id },
+            #{&file_id as UserAssets::FileId },
+            #{&processed.preview as UserAssets::Preview }
         )
     }?)
     .await?;
@@ -295,9 +295,9 @@ pub async fn add_asset(
         t.execute2(schema::sql! {
             INSERT INTO UserAssetFiles (FileId, AssetId, Flags)
             VALUES (
-                #{&file_id => UserAssetFiles::FileId},
-                #{&asset_id => UserAssetFiles::AssetId},
-                #{&asset_flags => UserAssetFiles::Flags}
+                #{&file_id as UserAssetFiles::FileId},
+                #{&asset_id as UserAssetFiles::AssetId},
+                #{&asset_flags as UserAssetFiles::Flags}
             )
         }?)
         .await?;

@@ -149,8 +149,8 @@ async fn party_position_update(
     let row = db.query_one2(schema::sql! {
         SELECT PartyMembers.Position AS @Position
           FROM PartyMembers
-         WHERE PartyMembers.PartyId = #{&party_id => Party::Id}
-           AND PartyMembers.UserId = #{&user_id => Users::Id}
+         WHERE PartyMembers.PartyId = #{&party_id as Party::Id}
+           AND PartyMembers.UserId  = #{&user_id  as Users::Id}
     }?).await?;
 
     let position: i16 = row.position()?;

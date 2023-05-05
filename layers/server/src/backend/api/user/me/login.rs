@@ -32,7 +32,7 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) ->
             Users.MfaBackup AS @MfaBackup
         FROM Users
         WHERE
-            Users.Email = #{&form.email => Users::Email} AND Users.DeletedAt IS NULL
+            Users.Email = #{&form.email as Users::Email} AND Users.DeletedAt IS NULL
 
     }?).await?;
 
@@ -124,10 +124,10 @@ pub async fn do_login(
         INSERT INTO Sessions (
             Token, UserId, Expires, Addr
         ) VALUES (
-            #{&bytes    => Sessions::Token   },
-            #{&user_id  => Sessions::UserId  },
-            #{&expires  => Sessions::Expires },
-            #{&ip       => Sessions::Addr    }
+            #{&bytes    as Sessions::Token   },
+            #{&user_id  as Sessions::UserId  },
+            #{&expires  as Sessions::Expires },
+            #{&ip       as Sessions::Addr    }
         )
     }?)
     .await?;
@@ -196,8 +196,8 @@ pub async fn process_2fa(
 
                 log::debug!("MFA Backup token used, saving new backup array to database");
                 db.execute2(schema::sql! {
-                    UPDATE Users SET (MfaBackup) = (#{&backup => Users::MfaBackup})
-                    WHERE Users.Id = #{&user_id => Users::Id}
+                    UPDATE Users SET (MfaBackup) = (#{&backup as Users::MfaBackup})
+                    WHERE Users.Id = #{&user_id as Users::Id}
                 }?)
                 .await?;
             } else {
