@@ -12,7 +12,6 @@ use filesystem::store::FileStore;
 use futures::{Stream, StreamExt};
 use schema::Snowflake;
 use tokio::sync::{watch, Mutex, Notify, OwnedMutexGuard, Semaphore};
-use util::cmap::CHashMap;
 
 use crate::{
     backend::{

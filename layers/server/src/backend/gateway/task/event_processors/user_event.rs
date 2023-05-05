@@ -110,7 +110,7 @@ pub async fn user_update(state: &ServerState, db: &db::pool::Client, user_id: Sn
     }
 
     for party_id in party_ids {
-        state.gateway.broadcast_event(event.clone(), party_id).await;
+        state.gateway.broadcast_event(event.clone(), party_id);
     }
 
     // TODO: Also include open DMs

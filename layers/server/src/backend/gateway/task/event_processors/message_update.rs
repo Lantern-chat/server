@@ -8,10 +8,7 @@ pub async fn message_update(state: &ServerState, db: &db::pool::Client, id: Snow
 
         let event = ServerMsg::new_message_update(msg);
 
-        state
-            .gateway
-            .broadcast_event(Event::new(event, Some(room_id))?, party_id)
-            .await;
+        state.gateway.broadcast_event(Event::new(event, Some(room_id))?, party_id);
     }
 
     Ok(())

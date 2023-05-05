@@ -128,8 +128,7 @@ pub async fn member_event(
             if event == EventCode::MemberBan {
                 state
                     .gateway
-                    .broadcast_event(Event::new(ServerMsg::new_member_ban(inner.clone()), None)?, party_id)
-                    .await;
+                    .broadcast_event(Event::new(ServerMsg::new_member_ban(inner.clone()), None)?, party_id);
             }
 
             ServerMsg::new_member_remove(inner)
@@ -138,7 +137,7 @@ pub async fn member_event(
         _ => unreachable!(),
     };
 
-    state.gateway.broadcast_event(Event::new(msg, None)?, party_id).await;
+    state.gateway.broadcast_event(Event::new(msg, None)?, party_id);
 
     Ok(())
 }

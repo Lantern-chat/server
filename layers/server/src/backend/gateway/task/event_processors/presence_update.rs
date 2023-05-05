@@ -67,9 +67,7 @@ pub async fn presence_updated(
             };
 
             if let Some(party_id) = party_id {
-                let event = Event::new(ServerMsg::new_presence_update(inner), None)?;
-
-                state.gateway.broadcast_event(event, party_id).await;
+                state.gateway.broadcast_event(Event::new(ServerMsg::new_presence_update(inner), None)?, party_id);
             }
         }
 

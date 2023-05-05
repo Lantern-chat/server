@@ -112,7 +112,7 @@ pub async fn trigger_typing(state: ServerState, auth: Authorization, room_id: Sn
                 member: Some(member),
             });
 
-            state.gateway.broadcast_event(Event::new(event, Some(room_id))?, party_id).await;
+            state.gateway.broadcast_event(Event::new(event, Some(room_id))?, party_id);
         }
         None => todo!("Typing in non-party rooms"),
     }

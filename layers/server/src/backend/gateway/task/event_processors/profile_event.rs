@@ -93,7 +93,7 @@ pub async fn profile_updated(
             )?;
 
             match party_id {
-                Some(party_id) => state.gateway.broadcast_event(event, party_id).await,
+                Some(party_id) => state.gateway.broadcast_event(event, party_id),
                 None => log::error!("Unimplemented profile event"),
             }
         }

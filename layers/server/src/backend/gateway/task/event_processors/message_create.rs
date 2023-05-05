@@ -16,10 +16,7 @@ pub async fn message_create(state: &ServerState, db: &db::pool::Client, id: Snow
 
         let event = ServerMsg::new_message_create(msg);
 
-        state
-            .gateway
-            .broadcast_event(Event::new(event, Some(room_id))?, party_id)
-            .await;
+        state.gateway.broadcast_event(Event::new(event, Some(room_id))?, party_id);
     }
 
     Ok(())

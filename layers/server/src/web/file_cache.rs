@@ -6,7 +6,6 @@ use std::time::{Duration, SystemTime};
 use std::{pin::Pin, sync::Arc};
 
 use tokio::io::{AsyncRead, AsyncSeek, ReadBuf};
-use util::cmap::CHashMap;
 
 use ftl::fs::{EncodedFile, FileCache, FileMetadata, GenericFile};
 use ftl::*;
@@ -114,7 +113,7 @@ pub struct CacheEntry {
 
 #[derive(Default)]
 pub struct MainFileCache {
-    map: CHashMap<PathBuf, CacheEntry>,
+    map: scc::HashMap<PathBuf, CacheEntry, ahash::RandomState>,
 }
 
 impl MainFileCache {
@@ -122,12 +121,12 @@ impl MainFileCache {
         let now = SystemTime::now();
 
         self.map
-            .retain(|_, file| match now.duration_since(file.last_checked) {
+            .retain_async(|_, file| match now.duration_since(file.last_checked) {
                 Ok(dur) => dur < max_age,
                 // if checked since `now`, then don't retain (or time travel, but whatever)
                 Err(_) => false,
             })
-            .await
+            .await;
     }
 }
 
@@ -142,7 +141,7 @@ impl FileCache<ServerState> for MainFileCache {
     type Meta = Metadata;
 
     async fn clear(&self, _state: &ServerState) {
-        self.map.retain(|_, _| false).await
+        self.map.retain_async(|_, _| false).await;
     }
 
     async fn open(
@@ -153,7 +152,7 @@ impl FileCache<ServerState> for MainFileCache {
     ) -> io::Result<Self::File> {
         let mut last_modified = None;
 
-        if let Some(file) = self.map.get_cloned(path).await {
+        if let Some(file) = self.map.read_async(path, |_, file| file.clone()).await {
             let dur = SystemTime::now().duration_since(file.last_checked);
 
             match dur {
@@ -204,9 +203,7 @@ impl FileCache<ServerState> for MainFileCache {
 
         use tokio::io::AsyncReadExt;
 
-        // WARNING: This will lock an entire shard while the file is processed,
-        // avoiding duplicate processing.
-        let EntryValue { lock, mut entry } = self.map.entry(path).await;
+        let mut entry = self.map.entry_async(path.to_owned()).await;
 
         let mut file = tokio::fs::File::open(path).await?;
 
@@ -223,9 +220,9 @@ impl FileCache<ServerState> for MainFileCache {
 
         if let Some(last_modified) = last_modified {
             if last_modified == meta.modified()? {
-                use hashbrown::hash_map::RawEntryMut;
+                use scc::hash_map::Entry;
 
-                if let RawEntryMut::Occupied(ref mut entry) = entry {
+                if let Entry::Occupied(ref mut entry) = entry {
                     entry.get_mut().last_checked = SystemTime::now();
                     do_read = false;
                 }
@@ -334,35 +331,37 @@ impl FileCache<ServerState> for MainFileCache {
                 path.display(),
             );
 
-            entry.insert(
-                path.to_path_buf(),
-                CacheEntry {
-                    last_modified: meta.modified()?,
-                    last_checked: now,
+            // NOTE: consumes entry
+            entry.insert_entry(CacheEntry {
+                last_modified: meta.modified()?,
+                last_checked: now,
 
-                    // NOTE: Arc::from(vec) does not overallocate, so shrink_to_fit() is not needed
-                    identity: Arc::from(content),
-                    brotli: Arc::from(compressed.brotli),
-                    deflate: Arc::from(compressed.deflate),
-                    gzip: Arc::from(compressed.gzip),
-                    best: compressed.best,
-                },
-            );
+                // NOTE: Arc::from(vec) does not overallocate, so shrink_to_fit() is not needed
+                identity: Arc::from(content),
+                brotli: Arc::from(compressed.brotli),
+                deflate: Arc::from(compressed.deflate),
+                gzip: Arc::from(compressed.gzip),
+                best: compressed.best,
+            });
+        } else {
+            // must be dropped before recursion, otherwise deadlock
+            drop(entry);
         }
-
-        // release lock
-        drop(lock);
 
         self.open(path, accepts, state).await
     }
 
     async fn metadata(&self, path: &Path, _state: &ServerState) -> io::Result<Self::Meta> {
-        match self.map.get(path).await {
-            Some(file) => Ok(Metadata {
+        match self
+            .map
+            .read_async(path, |_, file| Metadata {
                 len: file.identity.len() as u64,
                 last_modified: file.last_modified,
                 is_dir: false,
-            }),
+            })
+            .await
+        {
+            Some(file) => Ok(file),
             None => {
                 let meta = tokio::fs::metadata(path).await?;
 

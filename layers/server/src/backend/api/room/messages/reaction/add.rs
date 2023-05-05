@@ -275,7 +275,7 @@ pub async fn add_reaction(
 
         match party_id {
             Some(party_id) => {
-                state.gateway.broadcast_event(Event::new(event, Some(room_id))?, party_id).await;
+                state.gateway.broadcast_event(Event::new(event, Some(room_id))?, party_id);
             }
             None => unimplemented!(),
         }

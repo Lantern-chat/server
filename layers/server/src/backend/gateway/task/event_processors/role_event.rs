@@ -21,16 +21,13 @@ pub async fn role_event(
             }
         };
 
-        state
-            .gateway
-            .broadcast_event(
-                Event::new(
-                    ServerMsg::new_role_delete(RoleDeleteEvent { id: role_id, party_id }),
-                    None,
-                )?,
-                party_id,
-            )
-            .await;
+        state.gateway.broadcast_event(
+            Event::new(
+                ServerMsg::new_role_delete(RoleDeleteEvent { id: role_id, party_id }),
+                None,
+            )?,
+            party_id,
+        );
 
         return Ok(());
     }
@@ -69,7 +66,7 @@ pub async fn role_event(
         _ => unreachable!(),
     };
 
-    state.gateway.broadcast_event(Event::new(event, None)?, party_id).await;
+    state.gateway.broadcast_event(Event::new(event, None)?, party_id);
 
     Ok(())
 }

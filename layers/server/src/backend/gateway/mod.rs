@@ -2,7 +2,7 @@ pub mod conn;
 pub mod event;
 pub mod task;
 
-use std::sync::atomic::AtomicI64;
+use std::sync::{atomic::AtomicI64, Arc};
 use std::{borrow::Cow, error::Error, pin::Pin, time::Duration};
 
 use futures::{future, Future, FutureExt, SinkExt, StreamExt, TryStreamExt};
@@ -12,7 +12,6 @@ use tokio::sync::{broadcast, mpsc, Notify, RwLock};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 use schema::Snowflake;
-use util::cmap::{CHashMap, EntryValue};
 
 pub type PartyId = Snowflake;
 pub type UserId = Snowflake;
@@ -39,6 +38,7 @@ pub struct PartySubscription {
 }
 
 /// Stored in the gateway, provides a channel to party subscribers
+#[derive(Clone)]
 pub struct PartyEmitter {
     pub id: PartyId,
     pub tx: mpsc::UnboundedSender<Event>,
@@ -88,13 +88,13 @@ use crate::backend::gateway::event::EventInner;
 #[derive(Default)]
 pub struct Gateway {
     /// per-party emitters that can be subscribed to
-    pub parties: CHashMap<PartyId, PartyEmitter>,
+    pub parties: scc::HashIndex<PartyId, PartyEmitter>,
 
     /// All gateway connections, even unidentified
-    pub conns: CHashMap<ConnectionId, GatewayConnection>,
+    pub conns: scc::HashIndex<ConnectionId, GatewayConnection>,
 
     /// Identified gateway connections that can targetted by UserId
-    pub users: CHashMap<UserId, HashMap<ConnectionId, GatewayConnection>>,
+    pub users: scc::HashMap<UserId, HashMap<ConnectionId, GatewayConnection>>,
 
     /// First element stores the actual last event, updated frequently
     ///
@@ -106,31 +106,34 @@ pub struct Gateway {
 }
 
 impl Gateway {
+    #[inline]
     pub fn last_event(&self) -> &AtomicI64 {
         &self.last_events[0]
     }
 
     pub async fn broadcast_user_event(&self, event: Event, user_id: Snowflake) {
-        if let Some(users) = self.users.get(&user_id).await {
-            for conn in users.values() {
-                if let Err(e) = conn.tx.try_send(event.clone()) {
-                    log::warn!("Could not send message to user connection: {}", e);
+        self.users
+            .read_async(&user_id, |_, users| {
+                for conn in users.values() {
+                    if let Err(e) = conn.tx.try_send(event.clone()) {
+                        log::warn!("Could not send message to user connection: {}", e);
 
-                    conn.is_active.store(false, std::sync::atomic::Ordering::Relaxed);
-                    conn.kill.notify_waiters();
+                        conn.is_active.store(false, std::sync::atomic::Ordering::Relaxed);
+                        conn.kill.notify_waiters();
 
-                    crate::metrics::API_METRICS.load().errs.add(1);
+                        crate::metrics::API_METRICS.load().errs.add(1);
 
-                    // TODO: Better handling of this
+                        // TODO: Better handling of this
+                    }
                 }
-            }
-        }
+            })
+            .await;
 
-        crate::metrics::API_METRICS.load().events.add(1);
+        crate::metrics::API_METRICS.load().add_event();
     }
 
-    pub async fn broadcast_event(&self, event: Event, party_id: Snowflake) {
-        if let Some(party) = self.parties.get(&party_id).await {
+    pub fn broadcast_event(&self, event: Event, party_id: Snowflake) {
+        let sent = self.parties.read(&party_id, |_, party| {
             match *event {
                 EventInner::External(ref event) => {
                     log::debug!("Sending event {:?} to party tx: {party_id}", event.msg.opcode());
@@ -141,13 +144,15 @@ impl Gateway {
             if let Err(e) = party.tx.send(event) {
                 crate::metrics::API_METRICS.load().errs.add(1);
 
-                return log::error!("Could not broadcast to party: {e}");
+                log::error!("Could not broadcast to party: {e}");
             }
-        } else {
+        });
+
+        if sent.is_none() {
             log::warn!("Could not find party {party_id}!");
         }
 
-        crate::metrics::API_METRICS.load().events.add(1);
+        crate::metrics::API_METRICS.load().add_event();
     }
 
     /// After identifying, a connection can be added to active subscriptions
@@ -158,60 +163,66 @@ impl Gateway {
         conn: GatewayConnection,
         party_ids: impl IntoIterator<Item = &PartyId>,
     ) -> Vec<PartySubscription> {
-        let (_, subs) = futures::future::join(
+        let (_, subs) = tokio::join!(
             self.activate_connection(user_id, conn),
-            self.subscribe(party_ids)).await;
+            self.subscribe(party_ids),
+        );
 
         subs
     }
 
     pub async fn add_connection(&self, conn: GatewayConnection) {
-        self.conns.insert(conn.id, conn).await;
+        _ = self.conns.insert_async(conn.id, conn).await;
     }
 
     pub async fn remove_connection(&self, conn_id: Snowflake, user_id: Option<Snowflake>) {
-        self.conns.remove(&conn_id).await;
-
-        if let Some(user_id) = user_id {
-            use hashbrown::hash_map::RawEntryMut;
-
-            let EntryValue { lock, entry } = self.users.entry(&user_id).await;
-
-            if let RawEntryMut::Occupied(mut occupied) = entry {
-                let user = occupied.get_mut();
-                user.remove(&conn_id);
-                if user.is_empty() {
-                    occupied.remove();
+        tokio::join!(self.conns.remove_async(&conn_id), async {
+            if let Some(user_id) = user_id {
+                if let scc::hash_map::Entry::Occupied(mut occupied) = self.users.entry_async(user_id).await {
+                    let user = occupied.get_mut();
+                    user.remove(&conn_id);
+                    if user.is_empty() {
+                        _ = occupied.remove();
+                    }
                 }
             }
-
-            drop(lock);
-        }
+        });
     }
 
     async fn activate_connection(&self, user_id: UserId, conn: GatewayConnection) {
-        self.users.get_mut_or_default(&user_id).await.insert(conn.id, conn);
+        self.users.entry_async(user_id).await.or_default().get_mut().insert(conn.id, conn);
     }
 
     async fn subscribe(&self, party_ids: impl IntoIterator<Item = &PartyId>) -> Vec<PartySubscription> {
         let mut subs = Vec::new();
         let mut missing = Vec::new();
-        let mut cache = Vec::new();
 
-        self.parties
-            .batch_read(party_ids.into_iter(), Some(&mut cache), |key, value| match value {
-                Some((_, p)) => subs.push(p.subscribe()),
-                None => missing.push(key),
-            })
-            .await;
+        {
+            let barrier = scc::ebr::Barrier::new();
 
-        if !missing.is_empty() {
-            self.parties
-                .batch_write(missing, Some(&mut cache), |key, value| {
-                    log::debug!("Added gateway entry for missing party: {}", key);
-                    subs.push(value.or_insert_with(|| (*key, PartyEmitter::new(*key))).1.subscribe())
-                })
-                .await;
+            for &party_id in party_ids {
+                if self.parties.read_with(&party_id, |_, party| subs.push(party.subscribe()), &barrier).is_none() {
+                    missing.push(party_id);
+                }
+            }
+        }
+
+        // this is really only invoked on startup
+        for party_id in missing {
+            let party = PartyEmitter::new(party_id);
+            let mut sub = party.subscribe();
+
+            // if this errors, then a race-condition occurred and we should just retry reading the party emitter
+            if self.parties.insert_async(party_id, party).await.is_err() {
+                if let Some(new_sub) = self.parties.read(&party_id, |_, party| party.subscribe()) {
+                    // forget the old sub and party
+                    sub = new_sub;
+                } else {
+                    panic!("Inconsistent state of gateway party emitters");
+                }
+            }
+
+            subs.push(sub);
         }
 
         subs

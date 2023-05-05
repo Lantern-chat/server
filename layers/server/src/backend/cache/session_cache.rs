@@ -13,16 +13,9 @@ struct PartialAuthorization {
     flags: UserFlags,
 }
 
+#[derive(Default)]
 pub struct SessionCache {
     map: scc::HashIndex<RawAuthToken, PartialAuthorization, ahash::RandomState>,
-}
-
-impl Default for SessionCache {
-    fn default() -> Self {
-        SessionCache {
-            map: scc::HashIndex::with_hasher(ahash::RandomState::new()),
-        }
-    }
 }
 
 impl SessionCache {
