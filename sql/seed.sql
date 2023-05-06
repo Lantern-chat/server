@@ -11,6 +11,7 @@ ALTER SCHEMA lantern OWNER TO postgres;
 
 SET search_path TO pg_catalog, public, lantern;
 
+-- Make sure to run these every time PostgreSQL is updated
 ALTER SYSTEM SET enable_seqscan = 1;
 ALTER SYSTEM SET jit = 0; -- honestly buggy, and we never create insane queries that need it anyway
 ALTER SYSTEM SET random_page_cost = 1; -- Database on SSD
@@ -2380,16 +2381,17 @@ $$
 DECLARE
    _discriminator lantern.uint2;
 BEGIN
-    SELECT discriminator INTO _discriminator FROM lantern.user_freelist WHERE username = _username;
+    DELETE FROM lantern.user_freelist WHERE ctid IN (
+        SELECT ctid FROM lantern.user_freelist
+        WHERE username = _username LIMIT 1
+    ) RETURNING discriminator INTO _discriminator;
 
-    IF FOUND THEN
-        DELETE FROM lantern.user_freelist WHERE username = _username AND discriminator = _discriminator;
-    ELSE
-        SELECT discriminator INTO _discriminator FROM lantern.users WHERE username = _username ORDER BY discriminator DESC LIMIT 1;
+    IF _discriminator IS NULL THEN
+        SELECT MAX(discriminator) INTO _discriminator FROM lantern.users WHERE username = _username;
 
         IF NOT FOUND THEN
             _discriminator := 0;
-        ELSIF _discriminator = 65535 THEN
+        ELSIF _discriminator >= x'FFFF' THEN
             RAISE EXCEPTION 'Username % exhausted', _username;
         ELSE
             _discriminator := _discriminator + 1;
@@ -2414,16 +2416,17 @@ DECLARE
     _discriminator lantern.uint2;
 BEGIN
     IF _username IS NOT NULL THEN
-        SELECT discriminator INTO _discriminator FROM lantern.user_freelist WHERE username = _username;
+        DELETE FROM lantern.user_freelist WHERE ctid IN (
+            SELECT ctid FROM lantern.user_freelist
+            WHERE username = _username LIMIT 1
+        ) RETURNING discriminator INTO _discriminator;
 
-        IF FOUND THEN
-            DELETE FROM lantern.user_freelist WHERE username = _username AND discriminator = _discriminator;
-        ELSE
-            SELECT discriminator INTO _discriminator FROM lantern.users WHERE username = _username ORDER BY discriminator DESC LIMIT 1;
+        IF _discriminator IS NULL THEN
+            SELECT MAX(discriminator) INTO _discriminator FROM lantern.users WHERE username = _username;
 
             IF NOT FOUND THEN
                 _discriminator := 0;
-            ELSIF _discriminator = 65535 THEN
+            ELSIF _discriminator >= x'FFFF' THEN
                 RAISE EXCEPTION 'Username % exhausted', _username;
             ELSE
                 _discriminator := _discriminator + 1;

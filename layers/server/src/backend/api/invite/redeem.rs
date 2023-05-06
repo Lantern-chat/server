@@ -28,35 +28,27 @@ pub async fn redeem_invite(
     let t = db.transaction().await?;
 
     // redeem the invite and add user to party_member
-    let row = t
-        .query_one_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
-
-                Query::call(schema::redeem_invite::call(
-                    Var::of(Users::Id),
-                    Var::of(Invite::Id),
-                    Var::of(Invite::Vanity),
-                ))
-            },
-            &[&auth.user_id, &maybe_id, &code],
+    let row = t.query_one2(schema::sql! {
+        CALL .redeem_invite(
+            #{&auth.user_id as Users::Id},
+            #{&maybe_id as Invite::Id},
+            #{&code as Invite::Vanity}
         )
-        .await;
+    }?);
 
-    let row = match row {
+    let row = match row.await {
         Ok(row) => row,
         Err(err) => {
             if let Some(db) = err.as_db_error() {
                 match *db.code() {
                     SqlState::RAISE_EXCEPTION => match db.message() {
-                        "user_banned" => return Err(Error::BadRequest),
+                        "user_banned" => return Err(Error::Unauthorized),
                         "invalid_invite" => return Err(Error::NotFound),
                         _ => {}
                     },
                     SqlState::UNIQUE_VIOLATION => match db.constraint() {
-                        Some("party_member_pk") => return Err(Error::Conflict),
-                        _ => {}
+                        Some("party_members_pk") => return Err(Error::Conflict),
+                        _ => todo!("Other constraints"),
                     },
                     _ => {}
                 }
@@ -69,60 +61,38 @@ pub async fn redeem_invite(
     let invite_id: Snowflake = row.try_get(0)?;
     let party_id: Snowflake = row.try_get(1)?;
 
-    let mut update_member = Either::Left(futures::future::ok::<_, Error>(()));
-
-    if let Some(nickname) = body.nickname {
-        use sdk::api::commands::user::UpdateUserProfileBody;
-
-        update_member = Either::Right(
+    let update_member = async {
+        if let Some(nickname) = body.nickname {
             crate::backend::api::user::me::profile::patch_profile(
                 state.clone(),
                 auth,
-                UpdateUserProfileBody {
+                sdk::api::commands::user::UpdateUserProfileBody {
                     nick: Nullable::Some(nickname),
-                    ..UpdateUserProfileBody::default()
+                    ..Default::default()
                 },
                 Some(party_id),
             )
-            .map_ok(|_| ())
-            .boxed(),
-        );
-    }
+            .boxed()
+            .await?; // avoid inlining this future
+        }
+
+        Ok::<_, Error>(())
+    };
 
     let welcome_message = async {
         let msg_id = Snowflake::now();
 
-        t.execute_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
-
-                let msg_id = Var::at(Messages::Id, 1);
-                let user_id = Var::at(Messages::UserId, 2);
-                let msg_kind = Var::at(Messages::Kind, 3);
-                let invite_id = Var::at(Invite::Id, 4);
-
-                Query::insert()
-                    .into::<Messages>()
-                    .cols(&[
-                        Messages::Id,
-                        Messages::UserId,
-                        Messages::Kind,
-                        Messages::Content,
-                        Messages::RoomId,
-                    ])
-                    .query(
-                        Query::select()
-                            .exprs([msg_id, user_id, msg_kind])
-                            .expr("".lit())
-                            .col(Party::DefaultRoom)
-                            .from(Invite::inner_join_table::<Party>().on(Party::Id.equals(Invite::PartyId)))
-                            .and_where(Invite::Id.equals(invite_id))
-                            .as_value(),
-                    )
-            },
-            &[&msg_id, &auth.user_id, &(MessageKind::Welcome as i16), &invite_id],
-        )
+        t.execute2(schema::sql! {
+            INSERT INTO Messages (Id, UserId, RoomId, Kind) (
+                SELECT
+                    #{&msg_id as Messages::Id},
+                    #{&auth.user_id as Messages::UserId},
+                    Party.DefaultRoom,
+                    {MessageKind::Welcome as i16}
+                FROM Invite INNER JOIN Party ON Party.Id = Invite.PartyId
+                WHERE Invite.Id = #{&invite_id as Invite::Id}
+            )
+        }?)
         .await?;
 
         Ok(())
