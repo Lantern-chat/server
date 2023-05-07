@@ -17,8 +17,6 @@ use crate::{Error, ServerState};
 
 use md_utils::{Span, SpanList, SpanType};
 
-use self::query::get_embed;
-
 pub fn process_embeds(state: ServerState, msg_id: Snowflake, msg: &str, spans: &[Span]) {
     let mut position = 0;
     let max_embeds = state.config().message.max_embeds as i16;
@@ -35,6 +33,8 @@ pub fn process_embeds(state: ServerState, msg_id: Snowflake, msg: &str, spans: &
             if !urls.insert(url) {
                 continue;
             }
+
+            log::debug!("Starting task of fetching {url}");
 
             embed_tasks.push(state.queues.embed_processing.push(run_embed(
                 state.clone(),
@@ -94,7 +94,11 @@ pub fn process_embeds(state: ServerState, msg_id: Snowflake, msg: &str, spans: &
             }
         };
 
-        if let Err(e) = db.execute_cached_typed(|| query::update_message(), &[&msg_id]).await {
+        let update_message = db.execute2(schema::sql! {
+            UPDATE Messages SET (UpdatedAt) = DEFAULT WHERE Messages.Id = #{&msg_id as Messages::Id}
+        });
+
+        if let Err(e) = update_message.await {
             log::error!("Could not update message {msg_id} after embed processing: {e}");
         }
     });
@@ -141,16 +145,45 @@ pub async fn run_embed(
 
         let db = state.db.write.get().await?;
 
-        use thorn::pg::Json;
+        let embed = thorn::pg::Json(&embed);
 
         // NOTE: The original URL should be used, not embed.url(), do to potential odd duplicates
-        let row = db
-            .query_one_cached_typed(|| query::insert_embed(), &[&embed_id, &url, &Json(&embed), &expires])
-            .await?;
+        #[rustfmt::skip]
+        let row = db.query_one2(schema::sql! {
+            tables! {
+                pub struct TempEmbed {
+                    Id: Embeds::Id,
+                }
+                pub struct ExistingEmbed {
+                    Id: Embeds::Id,
+                }
+            };
+
+            WITH ExistingEmbed AS (
+                SELECT Embeds.Id AS ExistingEmbed.Id
+                FROM Embeds WHERE Embeds.Url = #{&url as Embeds::Url}
+            ),
+            TempEmbed AS (
+                SELECT #{&embed_id as Embeds::Id} AS TempEmbed.Id
+            )
+            INSERT INTO Embeds (Id, Url, Embed, Expires) (
+                SELECT
+                    COALESCE(ExistingEmbed.Id, TempEmbed.Id),
+                    #{&url      as Embeds::Url},
+                    #{&embed    as Embeds::Embed},
+                    #{&expires  as Embeds::Expires}
+                FROM TempEmbed LEFT JOIN ExistingEmbed ON TRUE
+            )
+            ON CONFLICT (Embeds./Id) DO UPDATE Embeds SET (Embed, Expires) = (
+                #{&embed    as Embeds::Embed},
+                #{&expires  as Embeds::Expires}
+            )
+            RETURNING Embeds.Id AS @EmbedId
+        }).await?;
 
         // if another embed of the exact same url was found during insertion,
         // we should reuse its ID returned here
-        embed_id = row.try_get(0)?;
+        embed_id = row.embed_id()?;
 
         maybe_db = Some(db);
     }
@@ -160,92 +193,15 @@ pub async fn run_embed(
         Some(db) => db,
     };
 
-    db.execute_cached_typed(
-        || query::insert_message_embed(),
-        &[&embed_id, &msg_id, &position, &flags],
-    )
+    db.execute2(schema::sql! {
+        INSERT INTO MessageEmbeds (EmbedId, MsgId, Position, Flags) VALUES (
+            #{&embed_id as MessageEmbeds::EmbedId},
+            #{&msg_id   as MessageEmbeds::MsgId},
+            #{&position as MessageEmbeds::Position},
+            #{&flags    as MessageEmbeds::Flags}
+        )
+    })
     .await?;
 
     Ok(())
-}
-
-mod query {
-    use schema::*;
-    use thorn::{conflict::ConflictAction, *};
-
-    pub fn insert_embed() -> impl AnyQuery {
-        let id = Var::at(Embeds::Id, 1);
-        let url = Var::at(Embeds::Url, 2);
-        let embed = Var::at(Embeds::Embed, 3);
-        let expires = Var::at(Embeds::Expires, 4);
-
-        tables! {
-            pub struct ExistingEmbed {
-                Id: Embeds::Id,
-            }
-
-            pub struct TempEmbed {
-                Id: Embeds::Id,
-                Url: Embeds::Url,
-                Embed: Embeds::Embed,
-                Expires: Embeds::Expires,
-            }
-        }
-
-        let new_embed = TempEmbed::as_query(Query::select().exprs([
-            id.alias_to(TempEmbed::Id),
-            url.clone().alias_to(TempEmbed::Url),
-            embed.clone().alias_to(TempEmbed::Embed),
-            expires.clone().alias_to(TempEmbed::Expires),
-        ]));
-
-        let existing = ExistingEmbed::as_query(
-            Query::select()
-                .expr(Embeds::Id.alias_to(ExistingEmbed::Id))
-                .from_table::<Embeds>()
-                .and_where(Embeds::Url.equals(url)),
-        );
-
-        Query::insert()
-            .with(new_embed)
-            .with(existing.exclude())
-            .into::<Embeds>()
-            .cols(&[Embeds::Id, Embeds::Url, Embeds::Embed, Embeds::Expires])
-            .query(
-                Query::select()
-                    .expr(Builtin::coalesce((ExistingEmbed::Id, TempEmbed::Id)))
-                    .cols(&[TempEmbed::Url, TempEmbed::Embed, TempEmbed::Expires])
-                    .from(TempEmbed::left_join_table::<ExistingEmbed>().on(true.lit()))
-                    .as_value(),
-            )
-            .on_conflict(
-                [Embeds::Id],
-                ConflictAction::DoUpdateSet(DoUpdate.set(Embeds::Embed, embed).set(Embeds::Expires, expires)),
-            )
-            .returning(Embeds::Id)
-    }
-
-    pub fn insert_message_embed() -> impl AnyQuery {
-        Query::insert()
-            .into::<MessageEmbeds>()
-            .cols(&[
-                MessageEmbeds::EmbedId,
-                MessageEmbeds::MsgId,
-                MessageEmbeds::Position,
-                MessageEmbeds::Flags,
-            ])
-            .values([
-                Var::at(MessageEmbeds::EmbedId, 1),
-                Var::at(MessageEmbeds::MsgId, 2),
-                Var::at(MessageEmbeds::Position, 3),
-                Var::at(MessageEmbeds::Flags, 4),
-            ])
-    }
-
-    pub fn update_message() -> impl AnyQuery {
-        Query::update()
-            .table::<Messages>()
-            .and_where(Messages::Id.equals(Var::of(Messages::Id)))
-            .set_default(Messages::UpdatedAt)
-    }
 }
