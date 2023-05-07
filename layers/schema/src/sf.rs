@@ -89,12 +89,17 @@ pub trait SnowflakeExt {
         let incr =
             INCR.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |incr| Some((incr + 1) & 0xFFF)).unwrap();
 
-        let max_ms = TIME.fetch_max(ms, Ordering::SeqCst);
+        let mut max_ms = TIME.fetch_max(ms, Ordering::SeqCst);
 
         // clock went backwards and incr is/was at max
         if incr == 0xFFF && max_ms > ms {
             // forcibly increment the timestamp until clock flows normally again
-            let _ = TIME.compare_exchange(max_ms, max_ms + 1, Ordering::SeqCst, Ordering::Acquire);
+            // so each new snowflake will be 1ms after the previous
+            while let Err(new_max) =
+                TIME.compare_exchange_weak(max_ms, max_ms + 1, Ordering::AcqRel, Ordering::Relaxed)
+            {
+                max_ms = new_max;
+            }
 
             // TODO: Maybe add a log entry for this
         }
