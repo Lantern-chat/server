@@ -177,7 +177,8 @@ pub async fn add_reaction(
         InsertedReactionUser AS (
             INSERT INTO ReactionUsers (ReactionId, UserId) (
                 SELECT
-                    COALESCE(SelectedReaction.ReactionId, InsertedReaction.ReactionId),
+                    // Must choose the inserted reaction first, as that likely means the ID was updated
+                    COALESCE(InsertedReaction.ReactionId, SelectedReaction.ReactionId),
                     #{&auth.user_id as Users::Id}
                 FROM SelectedReaction FULL OUTER JOIN InsertedReaction ON TRUE
             )
