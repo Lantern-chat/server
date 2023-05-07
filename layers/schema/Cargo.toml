@@ -8,11 +8,11 @@ edition = "2021"
 [dependencies]
 util = { path = "../../crates/util" }
 
-sdk = { git = "https://github.com/Lantern-chat/client-sdk-rs", default-features = false, features = ["pg", "api"], package = "client-sdk" }
+sdk = { git = "https://github.com/Lantern-chat/client-sdk-rs", default-features = false, features = ["pg", "api", "framework_utils"], package = "client-sdk" }
 
 thorn = { git = "https://github.com/Lantern-chat/thorn" }
 
-smol_str = "0.1"
+smol_str = "0.2"
 serde = { version = "1", features = ["derive"] }
 postgres-types = "0.2.1"
 # enum_primitive = "0.1.1"
