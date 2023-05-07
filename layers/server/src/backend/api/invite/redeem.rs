@@ -72,8 +72,9 @@ pub async fn redeem_invite(
                 },
                 Some(party_id),
             )
+            // avoid inlining this future
             .boxed()
-            .await?; // avoid inlining this future
+            .await?;
         }
 
         Ok::<_, Error>(())
