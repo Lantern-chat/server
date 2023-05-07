@@ -40,7 +40,7 @@ pub async fn patch_file(
         WHERE
             Files.Id     = #{&file_id      as Files::Id}
         AND Files.UserId = #{&auth.user_id as Files::UserId}
-    }?).await?;
+    }).await?;
 
     let Some(row) = row else { return Err(Error::NotFound) };
 
@@ -190,7 +190,7 @@ pub async fn patch_file(
             state.db.write.get().await?.execute2(schema::sql! {
                 UPDATE Files SET (Mime) = (#{&mstr as Files::Mime})
                 WHERE Files.Id = #{&file_id as Files::Id}
-            }?).await?;
+            }).await?;
         }
     }
 
@@ -205,7 +205,7 @@ pub async fn patch_file(
         state.db.write.get().await?.execute2(schema::sql! {
             UPDATE Files SET (Flags) = (#{&bits as Files::Flags})
             WHERE Files.Id = #{&file_id as Files::Id}
-        }?).await?;
+        }).await?;
 
         file_patch.complete = true;
     }

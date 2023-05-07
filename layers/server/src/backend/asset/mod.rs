@@ -71,7 +71,7 @@ pub async fn add_asset(
     let row = state.db.read.get().await?.query_one2(schema::sql! {
         SELECT Files.Size AS @Size, Files.Nonce AS @Nonce, Files.Mime AS @Mime
         FROM Files WHERE Files.Id = #{&file_id as Files::Id}
-    }?).await?;
+    }).await?;
 
     let size: i32 = row.size()?;
     let nonce: i64 = row.nonce()?;
@@ -217,7 +217,7 @@ pub async fn add_asset(
                                 #{&flags    as Files::Flags},
                                 #{&name     as Files::Name}
                             )
-                        }?).await?;
+                        }).await?;
 
                         assets.push((id, format, quality));
 
@@ -268,7 +268,7 @@ pub async fn add_asset(
             #{&file_id as UserAssets::FileId },
             #{&processed.preview as UserAssets::Preview }
         )
-    }?)
+    })
     .await?;
 
     for (file_id, format, quality) in assets {
@@ -299,7 +299,7 @@ pub async fn add_asset(
                 #{&asset_id as UserAssetFiles::AssetId},
                 #{&asset_flags as UserAssetFiles::Flags}
             )
-        }?)
+        })
         .await?;
     }
 

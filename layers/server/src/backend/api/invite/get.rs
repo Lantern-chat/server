@@ -27,7 +27,7 @@ pub async fn get_invite(state: &ServerState, auth: Authorization, code: SmolStr)
         FROM Invite INNER JOIN Party ON Party.Id = Invite.PartyId
         LEFT JOIN PartyMembers ON PartyMembers.UserId = #{&auth.user_id as Users::Id}
         WHERE Invite.Id = #{&id as Invite::Id} OR Invite.Vanity = #{&code as Invite::Vanity}
-    }?).await? else {
+    }).await? else {
         return Err(Error::NotFound);
     };
 

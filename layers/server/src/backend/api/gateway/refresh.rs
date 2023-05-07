@@ -19,7 +19,7 @@ pub async fn refresh_room_perms(
             AggRoomPerms.Permissions2   AS @Permissions2
         FROM AggRoomPerms
         WHERE AggRoomPerms.UserId = #{&user_id as AggRoomPerms::UserId}
-    }?).await?;
+    }).await?;
 
     let mut cache = Vec::new();
     let mut stream = std::pin::pin!(stream);

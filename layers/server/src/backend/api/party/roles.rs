@@ -31,7 +31,7 @@ pub async fn get_roles_raw<'a, 'b>(
                 SearchMode::Single(ref id) => { Roles.PartyId =     #{id  as SNOWFLAKE} },
                 SearchMode::Many(ref ids)  => { Roles.PartyId = ANY(#{ids as SNOWFLAKE_ARRAY}) },
             }
-        }?)
+        })
         .await?;
 
     Ok(stream.map(move |row| match row {

@@ -151,7 +151,7 @@ async fn party_position_update(
           FROM PartyMembers
          WHERE PartyMembers.PartyId = #{&party_id as Party::Id}
            AND PartyMembers.UserId  = #{&user_id  as Users::Id}
-    }?).await?;
+    }).await?;
 
     let position: i16 = row.position()?;
 

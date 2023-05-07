@@ -69,7 +69,7 @@ pub async fn remove_own_reaction(
         FROM SelectedReaction
             INNER JOIN DeletedReactionUser ON DeletedReactionUser.ReactionId = SelectedReaction.ReactionId
             INNER JOIN Rooms ON Rooms.Id = #{&room_id as Rooms::Id}
-    }?).await?;
+    }).await?;
 
     let Some(row) = res else { return Ok(()); };
 

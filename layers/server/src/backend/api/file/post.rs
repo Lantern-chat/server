@@ -100,7 +100,7 @@ pub async fn do_post_file(
             #{&mime         as Files::Mime},
             #{&preview      as Files::Preview}
         )
-    }?).await?;
+    }).await?;
 
     Ok((file_id, nonce))
 }

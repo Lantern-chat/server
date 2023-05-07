@@ -52,7 +52,7 @@ pub async fn ready(
             WHERE
                 Party.DeletedAt IS NULL
                 AND PartyMembers.UserId = #{&auth.user_id as Users::Id}
-        }?).await?;
+        }).await?;
 
         let mut parties = HashMap::with_capacity(rows.len());
         let mut ids = Vec::with_capacity(rows.len());

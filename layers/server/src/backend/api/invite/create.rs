@@ -75,7 +75,7 @@ pub async fn create_invite(
             Inserted.InviteId AS @InviteId
         FROM
             Checked LEFT JOIN Inserted ON TRUE
-    }?).await?;
+    }).await?;
 
     if row.invite_id::<Option<Snowflake>>()?.is_none() {
         return Err(Error::Unauthorized);

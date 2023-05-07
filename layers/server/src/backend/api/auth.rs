@@ -75,7 +75,7 @@ pub async fn do_user_auth(
             Sessions INNER JOIN Users ON Users.Id = Sessions.UserId
         WHERE
             Sessions.Token = #{&bytes as Sessions::Token}
-    }?).await?;
+    }).await?;
 
     Ok(match row {
         Some(row) => Some({

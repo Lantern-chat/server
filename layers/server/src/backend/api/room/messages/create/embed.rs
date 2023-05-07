@@ -112,9 +112,15 @@ pub async fn run_embed(
     let mut embed_id = None;
     let mut refresh = true;
 
-    if let Some(row) = db.query_opt_cached_typed(|| get_embed(), &[&url]).await? {
-        let existing_id: Snowflake = row.try_get(0)?;
-        let expires: Timestamp = row.try_get(1)?;
+    #[rustfmt::skip]
+    let existing = db.query_opt2(schema::sql! {
+        SELECT Embeds.Id AS @EmbedId, Embeds.Expires AS @Expires
+        FROM Embeds WHERE Embeds.Url = #{&url as Embeds::Url} LIMIT 1
+    });
+
+    if let Some(row) = existing.await? {
+        let existing_id: Snowflake = row.embed_id()?;
+        let expires: Timestamp = row.expires()?;
 
         embed_id = Some(existing_id);
         refresh = expires <= Timestamp::now_utc();
@@ -166,14 +172,6 @@ pub async fn run_embed(
 mod query {
     use schema::*;
     use thorn::{conflict::ConflictAction, *};
-
-    pub fn get_embed() -> impl AnyQuery {
-        Query::select()
-            .cols(&[Embeds::Id, Embeds::Expires])
-            .from_table::<Embeds>()
-            .and_where(Embeds::Url.equals(Var::of(Embeds::Url)))
-            .limit_n(1)
-    }
 
     pub fn insert_embed() -> impl AnyQuery {
         let id = Var::at(Embeds::Id, 1);

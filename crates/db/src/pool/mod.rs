@@ -648,10 +648,7 @@ impl Client {
             s.iter().map(|s| *s as _)
         }
 
-        Ok(self
-            .query_raw(statement, slice_iter(params))
-            .await?
-            .map_err(Error::from))
+        Ok(self.query_raw(statement, slice_iter(params)).await?.map_err(Error::from))
     }
 
     pub async fn query_stream_cached<F>(
@@ -676,10 +673,7 @@ impl Client {
     where
         F: Any + FnOnce() -> &'static str,
     {
-        self.client
-            .execute(&self.prepare_cached(query).await?, params)
-            .await
-            .map_err(Error::from)
+        self.client.execute(&self.prepare_cached(query).await?, params).await.map_err(Error::from)
     }
 
     pub async fn query<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<Vec<Row>, Error>
@@ -746,11 +740,7 @@ impl Client {
 
         // this future is boxed to avoid extra growth on the stack of async functions calling this
         // and since it's rare for this to be reached (only on startup), the allocation cost is trivial
-        let stmt = self
-            .client
-            .prepare_typed(self.debug_check_readonly(&query), &types)
-            .boxed()
-            .await?;
+        let stmt = self.client.prepare_typed(self.debug_check_readonly(&query), &types).boxed().await?;
 
         self.stmt_cache.insert(id, &stmt);
 
@@ -766,8 +756,7 @@ impl Client {
         F: Any + FnOnce() -> Q,
         Q: AnyQuery,
     {
-        self.query_stream(&self.prepare_cached_typed(query).await?, params)
-            .await
+        self.query_stream(&self.prepare_cached_typed(query).await?, params).await
     }
 
     pub async fn execute_cached_typed<F, Q>(&self, query: F, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
@@ -911,10 +900,7 @@ impl Transaction<'_> {
             s.iter().map(|s| *s as _)
         }
 
-        Ok(self
-            .query_raw(statement, slice_iter(params))
-            .await?
-            .map_err(Error::from))
+        Ok(self.query_raw(statement, slice_iter(params)).await?.map_err(Error::from))
     }
 
     pub async fn query_stream_cached<F>(
@@ -939,10 +925,7 @@ impl Transaction<'_> {
     where
         F: Any + FnOnce() -> &'static str,
     {
-        self.t
-            .execute(&self.prepare_cached(query).await?, params)
-            .await
-            .map_err(Error::from)
+        self.t.execute(&self.prepare_cached(query).await?, params).await.map_err(Error::from)
     }
 
     pub async fn query<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<Vec<Row>, Error>
@@ -1023,8 +1006,7 @@ impl Transaction<'_> {
         F: Any + FnOnce() -> Q,
         Q: AnyQuery,
     {
-        self.query_stream(&self.prepare_cached_typed(query).await?, params)
-            .await
+        self.query_stream(&self.prepare_cached_typed(query).await?, params).await
     }
 
     pub async fn execute_cached_typed<F, Q>(&self, query: F, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
@@ -1072,7 +1054,7 @@ impl Transaction<'_> {
     }
 }
 
-use thorn::macros::Query;
+use thorn::macros::{Query, SqlFormatError};
 
 impl Client {
     pub async fn prepare_cached2<'a, E: From<Row>>(&self, query: &mut Query<'a, E>) -> Result<Statement, Error> {
@@ -1091,15 +1073,15 @@ impl Client {
 
     pub async fn query_stream2<'a, E: From<Row>>(
         &self,
-        mut query: Query<'a, E>,
+        query: Result<Query<'a, E>, SqlFormatError>,
     ) -> Result<impl Stream<Item = Result<E, Error>>, Error> {
         fn slice_iter<'a>(s: &'a [&'a (dyn ToSql + Sync)]) -> impl ExactSizeIterator<Item = &'a dyn ToSql> + 'a {
             s.iter().map(|s| *s as _)
         }
 
-        let stream = self
-            .query_raw(&self.prepare_cached2(&mut query).await?, slice_iter(&query.params))
-            .await?;
+        let mut query = query?;
+
+        let stream = self.query_raw(&self.prepare_cached2(&mut query).await?, slice_iter(&query.params)).await?;
 
         Ok(stream.map(|r| match r {
             Ok(row) => Ok(E::from(row)),
@@ -1107,7 +1089,10 @@ impl Client {
         }))
     }
 
-    pub async fn query2<'a, E: From<Row>>(&self, query: Query<'a, E>) -> Result<Vec<E>, Error> {
+    pub async fn query2<'a, E: From<Row>>(
+        &self,
+        query: Result<Query<'a, E>, SqlFormatError>,
+    ) -> Result<Vec<E>, Error> {
         let mut stream = std::pin::pin!(self.query_stream2(query).await?);
 
         let mut rows = Vec::new();
@@ -1117,25 +1102,32 @@ impl Client {
         Ok(rows)
     }
 
-    pub async fn query_one2<'a, E: From<Row>>(&self, mut query: Query<'a, E>) -> Result<E, Error> {
-        let row = self
-            .query_one(&self.prepare_cached2(&mut query).await?, &query.params)
-            .await?;
+    pub async fn query_one2<'a, E: From<Row>>(
+        &self,
+        query: Result<Query<'a, E>, SqlFormatError>,
+    ) -> Result<E, Error> {
+        let mut query = query?;
+        let row = self.query_one(&self.prepare_cached2(&mut query).await?, &query.params).await?;
 
         Ok(E::from(row))
     }
 
-    pub async fn query_opt2<'a, E: From<Row>>(&self, mut query: Query<'a, E>) -> Result<Option<E>, Error> {
-        let row = self
-            .query_opt(&self.prepare_cached2(&mut query).await?, &query.params)
-            .await?;
+    pub async fn query_opt2<'a, E: From<Row>>(
+        &self,
+        query: Result<Query<'a, E>, SqlFormatError>,
+    ) -> Result<Option<E>, Error> {
+        let mut query = query?;
+        let row = self.query_opt(&self.prepare_cached2(&mut query).await?, &query.params).await?;
 
         Ok(row.map(E::from))
     }
 
-    pub async fn execute2<'a, E: From<Row>>(&self, mut query: Query<'a, E>) -> Result<u64, Error> {
-        self.execute(&self.prepare_cached2(&mut query).await?, &query.params)
-            .await
+    pub async fn execute2<'a, E: From<Row>>(
+        &self,
+        query: Result<Query<'a, E>, SqlFormatError>,
+    ) -> Result<u64, Error> {
+        let mut query = query?;
+        self.execute(&self.prepare_cached2(&mut query).await?, &query.params).await
     }
 }
 
@@ -1152,15 +1144,14 @@ impl Transaction<'_> {
 
     pub async fn query_stream2<'a, E: From<Row>>(
         &self,
-        mut query: Query<'a, E>,
+        query: Result<Query<'a, E>, SqlFormatError>,
     ) -> Result<impl Stream<Item = Result<E, Error>>, Error> {
         fn slice_iter<'a>(s: &'a [&'a (dyn ToSql + Sync)]) -> impl ExactSizeIterator<Item = &'a dyn ToSql> + 'a {
             s.iter().map(|s| *s as _)
         }
 
-        let stream = self
-            .query_raw(&self.prepare_cached2(&mut query).await?, slice_iter(&query.params))
-            .await?;
+        let mut query = query?;
+        let stream = self.query_raw(&self.prepare_cached2(&mut query).await?, slice_iter(&query.params)).await?;
 
         Ok(stream.map(|r| match r {
             Ok(row) => Ok(E::from(row)),
@@ -1168,7 +1159,10 @@ impl Transaction<'_> {
         }))
     }
 
-    pub async fn query2<'a, E: From<Row>>(&self, query: Query<'a, E>) -> Result<Vec<E>, Error> {
+    pub async fn query2<'a, E: From<Row>>(
+        &self,
+        query: Result<Query<'a, E>, SqlFormatError>,
+    ) -> Result<Vec<E>, Error> {
         let mut stream = std::pin::pin!(self.query_stream2(query).await?);
 
         let mut rows = Vec::new();
@@ -1178,24 +1172,31 @@ impl Transaction<'_> {
         Ok(rows)
     }
 
-    pub async fn query_one2<'a, E: From<Row>>(&self, mut query: Query<'a, E>) -> Result<E, Error> {
-        let row = self
-            .query_one(&self.prepare_cached2(&mut query).await?, &query.params)
-            .await?;
+    pub async fn query_one2<'a, E: From<Row>>(
+        &self,
+        query: Result<Query<'a, E>, SqlFormatError>,
+    ) -> Result<E, Error> {
+        let mut query = query?;
+        let row = self.query_one(&self.prepare_cached2(&mut query).await?, &query.params).await?;
 
         Ok(E::from(row))
     }
 
-    pub async fn query_opt2<'a, E: From<Row>>(&self, mut query: Query<'a, E>) -> Result<Option<E>, Error> {
-        let row = self
-            .query_opt(&self.prepare_cached2(&mut query).await?, &query.params)
-            .await?;
+    pub async fn query_opt2<'a, E: From<Row>>(
+        &self,
+        query: Result<Query<'a, E>, SqlFormatError>,
+    ) -> Result<Option<E>, Error> {
+        let mut query = query?;
+        let row = self.query_opt(&self.prepare_cached2(&mut query).await?, &query.params).await?;
 
         Ok(row.map(E::from))
     }
 
-    pub async fn execute2<'a, E: From<Row>>(&self, mut query: Query<'a, E>) -> Result<u64, Error> {
-        self.execute(&self.prepare_cached2(&mut query).await?, &query.params)
-            .await
+    pub async fn execute2<'a, E: From<Row>>(
+        &self,
+        query: Result<Query<'a, E>, SqlFormatError>,
+    ) -> Result<u64, Error> {
+        let mut query = query?;
+        self.execute(&self.prepare_cached2(&mut query).await?, &query.params).await
     }
 }

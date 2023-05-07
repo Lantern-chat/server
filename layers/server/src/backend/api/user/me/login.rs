@@ -34,7 +34,7 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) ->
         WHERE
             Users.Email = #{&form.email as Users::Email} AND Users.DeletedAt IS NULL
 
-    }?).await?;
+    }).await?;
 
     let Some(user) = user else { return Err(Error::InvalidCredentials); };
 
@@ -129,7 +129,7 @@ pub async fn do_login(
             #{&expires  as Sessions::Expires },
             #{&ip       as Sessions::Addr    }
         )
-    }?)
+    })
     .await?;
 
     Ok(Session {
@@ -198,7 +198,7 @@ pub async fn process_2fa(
                 db.execute2(schema::sql! {
                     UPDATE Users SET (MfaBackup) = (#{&backup as Users::MfaBackup})
                     WHERE Users.Id = #{&user_id as Users::Id}
-                }?)
+                })
                 .await?;
             } else {
                 return Err(Error::InvalidCredentials);

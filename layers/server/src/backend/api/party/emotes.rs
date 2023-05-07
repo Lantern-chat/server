@@ -30,7 +30,7 @@ pub async fn get_custom_emotes_raw<'a>(
                 SearchMode::Single(ref id) => { Emotes.PartyId =     #{id  as SNOWFLAKE} },
                 SearchMode::Many(ref ids)  => { Emotes.PartyId = ANY(#{ids as SNOWFLAKE_ARRAY}) },
             }
-        }?)
+        })
         .await?;
 
     Ok(stream.map(|row| match row {

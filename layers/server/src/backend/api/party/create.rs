@@ -68,7 +68,7 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
             #{&party.owner        as Party::OwnerId     },
             #{&party.default_room as Party::DefaultRoom }
         )
-    }?)
+    })
     .await?;
 
     let position = {
@@ -76,7 +76,7 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
         let row = t.query_one2(schema::sql! {
             SELECT MAX(PartyMembers.Position) AS @MaxPosition
             FROM PartyMembers WHERE PartyMembers.UserId = #{&auth.user_id as PartyMembers::UserId}
-        }?).await?;
+        }).await?;
 
         match row.max_position::<Option<i16>>()? {
             Some(max_position) => max_position + 1,
@@ -98,7 +98,7 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
                 #{&auth.user_id as PartyMembers::UserId   },
                 #{&position     as PartyMembers::Position }
             )
-        }?),
+        }),
         t.execute2(schema::sql! {
             INSERT INTO Roles (
                 Id, Name, PartyId, Permissions1, Permissions2
@@ -109,7 +109,7 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
                 #{&perm1             as Roles::Permissions1 },
                 #{&perm2             as Roles::Permissions2 }
             )
-        }?),
+        }),
         t.execute2(schema::sql! {
             INSERT INTO Rooms (
                 Id, PartyId, Name, Position, Flags
@@ -120,7 +120,7 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
                 #{&0i16                 as Rooms::Position },
                 #{&RoomFlags::DEFAULT   as Rooms::Flags    }
             )
-        }?),
+        }),
     )
     .await?;
 

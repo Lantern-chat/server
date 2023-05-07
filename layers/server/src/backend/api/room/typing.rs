@@ -66,7 +66,7 @@ pub async fn trigger_typing(state: ServerState, auth: Authorization, room_id: Sn
                     AND PartyProfile.PartyId = PartyMembers.PartyId
 
             WHERE Users.Id = #{&auth.user_id as SNOWFLAKE}
-    }?).await?;
+    }).await?;
 
     let Some(row) = row else { return Ok(()) };
 

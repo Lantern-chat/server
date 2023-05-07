@@ -30,7 +30,7 @@ pub async fn presence_updated(
                 PartyMembers.PartyId = #{&party_id as Party::Id}
                 OR #{&party_id as Party::Id} IS NULL
             )
-        }?).await?);
+        }).await?);
 
         // TODO: Accumulate events then shotgun them or do one broadcast per iteration?
         while let Some(row_res) = stream.next().await {

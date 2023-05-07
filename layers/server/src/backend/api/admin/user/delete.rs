@@ -17,7 +17,7 @@ pub async fn delete_user(state: ServerState, user_id: Snowflake) -> Result<(), E
             #{&user_id as Users::Id},
             #{&new_username as Users::Username}
         )
-    }?)
+    })
     .await?;
 
     Ok(())

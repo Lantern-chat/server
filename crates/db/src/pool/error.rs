@@ -17,6 +17,9 @@ pub enum Error {
 
     #[error("Could not connect to database")]
     ConnectionFailure,
+
+    #[error("Thorn Format Error: {0}")]
+    FormatError(#[from] thorn::macros::SqlFormatError),
 }
 
 impl Error {

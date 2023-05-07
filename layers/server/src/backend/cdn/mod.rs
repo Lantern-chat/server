@@ -114,7 +114,7 @@ pub async fn get_asset(
         // prioritize images by flags (animation, alpha), then by file size to pick the smallest
         ORDER BY UserAssetFiles.Flags & {AssetFlags::FLAGS.bits()} DESC, Files.Size ASC
         LIMIT 1
-    }?).await;
+    }).await;
 
     let row = match row {
         Ok(None) => return Err(Error::NotFound),
@@ -167,7 +167,7 @@ pub async fn get_attachment(
         WHERE
             Files.Id        = #{&file_id as Files::Id}
         AND Messages.RoomId = #{&room_id as Rooms::Id}
-    }?).await?;
+    }).await?;
 
     let Some(row) = row else { return Err(Error::NotFound); };
 

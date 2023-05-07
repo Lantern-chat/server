@@ -97,7 +97,7 @@ pub async fn get_members_inner(
                 LIMIT 1
             }
 
-        }?)
+        })
         .await?;
 
     Ok(stream.map(move |row| match row {

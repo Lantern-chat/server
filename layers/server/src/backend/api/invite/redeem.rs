@@ -34,7 +34,7 @@ pub async fn redeem_invite(
             #{&maybe_id as Invite::Id},
             #{&code as Invite::Vanity}
         )
-    }?);
+    });
 
     let row = match row.await {
         Ok(row) => row,
@@ -93,7 +93,7 @@ pub async fn redeem_invite(
                 FROM Invite INNER JOIN Party ON Party.Id = Invite.PartyId
                 WHERE Invite.Id = #{&invite_id as Invite::Id}
             )
-        }?)
+        })
         .await?;
 
         Ok(())

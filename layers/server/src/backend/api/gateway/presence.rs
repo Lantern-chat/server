@@ -18,7 +18,7 @@ pub async fn set_presence(
             #{&flags   as UserPresence::Flags},
             NULL // #{&activity as UserPresence::Activity}
         )
-    }?).await?;
+    }).await?;
 
     Ok(())
 }
@@ -27,7 +27,7 @@ pub async fn clear_presence(state: ServerState, conn_id: Snowflake) -> Result<()
     #[rustfmt::skip]
     state.db.write.get().await?.execute2(schema::sql! {
         DELETE FROM UserPresence WHERE UserPresence.ConnId = #{&conn_id as UserPresence::ConnId}
-    }?).await?;
+    }).await?;
 
     Ok(())
 }

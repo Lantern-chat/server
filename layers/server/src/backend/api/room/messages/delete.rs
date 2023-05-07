@@ -70,7 +70,7 @@ pub async fn delete_msg(
             }
             _ => {} // no additional constraints
         }
-    }?).await;
+    }).await;
 
     match res {
         Ok(1) => Ok(()),

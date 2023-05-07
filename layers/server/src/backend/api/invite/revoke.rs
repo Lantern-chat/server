@@ -35,7 +35,7 @@ pub async fn revoke_invite(state: ServerState, auth: Authorization, code: SmolSt
         )
         UPDATE Invite SET (Uses, Expires) = (0, NOW())
         FROM Perms WHERE Invite.Id = Perms.InviteId AND Perms.Allowed IS TRUE
-    }?).await?;
+    }).await?;
 
     Ok(())
 }

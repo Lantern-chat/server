@@ -223,7 +223,7 @@ pub async fn add_reaction(
         // If Checked is valid, but ReactionEvent is not,
         // then all columns will be NULL
         FROM Checked LEFT JOIN ReactionEvent ON TRUE
-    }?).await?;
+    }).await?;
 
     let Some(row) = row else { return Err(Error::Unauthorized) };
 

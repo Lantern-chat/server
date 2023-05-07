@@ -46,7 +46,7 @@ pub async fn get_room_permissions(
         FROM AggRoomPerms WHERE
             AggRoomPerms.UserId = #{&user_id as AggRoomPerms::UserId}
         AND AggRoomPerms.RoomId = #{&room_id as AggRoomPerms::RoomId}
-    }?).await?;
+    }).await?;
 
     let mut perm = Permissions::empty();
 

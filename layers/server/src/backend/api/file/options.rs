@@ -19,7 +19,7 @@ pub async fn file_options(state: &ServerState, auth: Authorization) -> Result<Fi
         FROM Files WHERE
             Files.UserId = #{&auth.user_id as Files::UserId}
         AND Files.Id    >= #{&month_start  as Files::Id}
-    }?).await?;
+    }).await?;
 
     let quota_used: Option<i64> = row.quota_used()?;
 

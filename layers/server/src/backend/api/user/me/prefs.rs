@@ -25,7 +25,7 @@ pub async fn update_prefs(
                 COALESCE(Users.Preferences, "{}"::jsonb) || #{&prefs as Users::Preferences}
             )
         ) WHERE Users.Id = #{&auth.user_id as Users::Id}
-    }?)
+    })
     .await?;
 
     Ok(())

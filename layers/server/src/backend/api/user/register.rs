@@ -46,7 +46,7 @@ pub async fn register_user(
     #[rustfmt::skip]
     let existing = read_db.query_opt2(schema::sql! {
         SELECT 1 FROM Users WHERE Users.Email = #{&form.email as Users::Email}
-    }?).await?;
+    }).await?;
 
     if existing.is_some() {
         return Err(Error::AlreadyExists);
@@ -83,7 +83,7 @@ pub async fn register_user(
             #{&passhash     as Users::Passhash},
             #{&dob          as Users::Dob}
         )
-    }?).await?;
+    }).await?;
 
     super::me::login::do_login(state, addr, id, now).await
 }
