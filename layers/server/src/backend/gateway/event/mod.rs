@@ -1,5 +1,5 @@
 use std::ops::Deref;
-use std::sync::Arc;
+use triomphe::Arc;
 
 use schema::Snowflake;
 

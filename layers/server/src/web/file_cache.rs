@@ -1,9 +1,10 @@
 use std::borrow::Cow;
 use std::io::{self, SeekFrom};
 use std::path::{Path, PathBuf};
+use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::{Duration, SystemTime};
-use std::{pin::Pin, sync::Arc};
+use triomphe::Arc;
 
 use tokio::io::{AsyncRead, AsyncSeek, ReadBuf};
 

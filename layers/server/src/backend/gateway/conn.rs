@@ -1,11 +1,10 @@
 use std::{
     ops::Deref,
-    sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
     time::Instant,
 };
+
+use triomphe::Arc;
 
 use schema::{Snowflake, SnowflakeExt};
 
@@ -29,6 +28,7 @@ impl Drop for GatewayConnectionInner {
 }
 
 #[derive(Clone)]
+#[repr(transparent)]
 pub struct GatewayConnection(Arc<GatewayConnectionInner>);
 
 impl Deref for GatewayConnection {

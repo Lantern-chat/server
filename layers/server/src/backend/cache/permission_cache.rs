@@ -1,15 +1,15 @@
 use std::{
     hash::BuildHasher,
-    sync::{
-        atomic::{AtomicIsize, AtomicU64, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicIsize, AtomicU64, Ordering},
 };
+
+use triomphe::Arc;
 
 use hashbrown::HashMap;
 
 /// Because the permission cache is a nested hashmap, we may as well share hashers.
 #[derive(Default, Clone)]
+#[repr(transparent)]
 struct SharedBuildHasher<S: BuildHasher>(Arc<S>);
 
 impl<S: BuildHasher> BuildHasher for SharedBuildHasher<S> {
@@ -101,10 +101,7 @@ impl PermissionCache {
     }
 
     pub async fn batch_set(&self, user_id: Snowflake, iter: impl IntoIterator<Item = (Snowflake, PermMute)>) {
-        self.with_cache_mut(user_id, |cache| {
-            cache.room.extend(iter);
-        })
-        .await;
+        self.with_cache_mut(user_id, |cache| cache.room.extend(iter)).await;
     }
 
     /// Increments the reference count if exists,

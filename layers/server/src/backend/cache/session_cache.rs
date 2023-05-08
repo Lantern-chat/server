@@ -44,7 +44,7 @@ impl SessionCache {
         self.map.retain_async(|_, part| part.expires < now).await;
     }
 
-    pub async fn clear_user(&self, user_id: Snowflake) {
-        self.map.retain_async(|_, part| part.user_id != user_id).await;
-    }
+    // pub async fn clear_user(&self, user_id: Snowflake) {
+    //     self.map.retain_async(|_, part| part.user_id != user_id).await;
+    // }
 }
