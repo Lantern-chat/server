@@ -131,6 +131,7 @@ thorn::tables! {
         PresenceUpdatedAt: Nullable(Type::TIMESTAMPTZ),
         MemberFlags: Nullable(Type::INT2),
         JoinedAt: Nullable(Type::TIMESTAMPTZ),
+        Position: Nullable(Type::INT2),
         ProfileBits: Nullable(Type::INT4),
         AvatarId: Nullable(Type::INT8),
         BannerId: Nullable(Type::INT8),

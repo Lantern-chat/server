@@ -6,6 +6,14 @@ use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Authorization
 pub async fn get_full_self(state: &ServerState, user_id: Snowflake) -> Result<User, Error> {
     let db = state.db.read.get().await?;
 
+    get_full_self_inner(state, user_id, &db).await
+}
+
+pub async fn get_full_self_inner(
+    state: &ServerState,
+    user_id: Snowflake,
+    db: &db::pool::Object,
+) -> Result<User, Error> {
     let row = db.query_one_cached_typed(|| q::query(), &[&user_id]).await?;
 
     use q::{PresenceColumns, ProfileColumns, UserColumns};

@@ -43,7 +43,6 @@ impl std::ops::Deref for PermMute {
     }
 }
 
-// TODO: Maybe add per-party caching as well?
 struct UserCache {
     room: HashMap<RoomId, PermMute, SHB>,
     rc: AtomicIsize,
@@ -101,7 +100,21 @@ impl PermissionCache {
     }
 
     pub async fn batch_set(&self, user_id: Snowflake, iter: impl IntoIterator<Item = (Snowflake, PermMute)>) {
-        self.with_cache_mut(user_id, |cache| cache.room.extend(iter)).await;
+        self.with_cache_mut(user_id, |cache| {
+            cache.room.extend(iter);
+            if cache.room.capacity() > (cache.room.len() * 3 / 2) {
+                cache.room.shrink_to_fit();
+            }
+        })
+        .await;
+    }
+
+    pub async fn remove(&self, user_id: Snowflake, room_id: Snowflake) -> bool {
+        self.map.update_async(&user_id, |_, cache| cache.room.remove(&room_id)).await.flatten().is_some()
+    }
+
+    pub async fn clear_user(&self, user_id: Snowflake) -> bool {
+        self.map.update_async(&user_id, |_, cache| cache.room.clear()).await.is_some()
     }
 
     /// Increments the reference count if exists,
