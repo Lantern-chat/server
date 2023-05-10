@@ -16,9 +16,8 @@ pub async fn add_reaction(
 ) -> Result<(), Error> {
     let perms = state.perm_cache.get(auth.user_id, room_id).await;
 
-    match perms {
-        Some(perms) if !perms.contains(Permissions::ADD_REACTIONS) => return Err(Error::Unauthorized),
-        _ => {}
+    if matches!(perms, Some(perms) if !perms.contains(Permissions::ADD_REACTIONS)) {
+        return Err(Error::Unauthorized);
     }
 
     let reaction_id = Snowflake::now();
@@ -255,7 +254,7 @@ pub async fn add_reaction(
                     preferences: None,
                     profile: match row.profile_bits()? {
                         None => Nullable::Null,
-                        Some(bits) => Nullable::Some(Box::new(UserProfile {
+                        Some(bits) => Nullable::Some(Arc::new(UserProfile {
                             bits,
                             extra: Default::default(),
                             nick: row.nickname()?,

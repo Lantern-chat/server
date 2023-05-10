@@ -56,7 +56,7 @@ pub struct InnerServerState {
 
 #[derive(Clone)]
 #[repr(transparent)]
-pub struct ServerState(Arc<InnerServerState>);
+pub struct ServerState(triomphe::Arc<InnerServerState>);
 
 impl Deref for ServerState {
     type Target = InnerServerState;
@@ -69,7 +69,7 @@ impl Deref for ServerState {
 
 impl ServerState {
     pub fn new(config: Config, db: db::DatabasePools) -> Self {
-        ServerState(Arc::new(InnerServerState {
+        ServerState(triomphe::Arc::new(InnerServerState {
             db,
             id_lock: Default::default(),
             mem_semaphore: Semaphore::new(config.general.memory_limit as usize),

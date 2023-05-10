@@ -148,7 +148,7 @@ pub async fn get_members_inner(
                     preferences: None,
                     profile: match row.profile_bits()? {
                         None => Nullable::Null,
-                        Some(bits) => Nullable::Some(Box::new(UserProfile {
+                        Some(bits) => Nullable::Some(Arc::new(UserProfile {
                             bits,
                             extra: Default::default(),
                             nick: match is_friendly {

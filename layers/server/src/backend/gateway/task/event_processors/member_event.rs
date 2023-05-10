@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use futures::{future::Either, TryFutureExt};
 use schema::EventCode;
 
@@ -49,7 +47,7 @@ pub async fn member_event(
                     presence: None,
                     profile: match row.profile_bits()? {
                         None => Nullable::Null,
-                        Some(bits) => Nullable::Some(Box::new(UserProfile {
+                        Some(bits) => Nullable::Some(Arc::new(UserProfile {
                             bits,
                             extra: Default::default(),
                             nick: row.nickname()?,

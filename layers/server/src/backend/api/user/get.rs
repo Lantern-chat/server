@@ -64,7 +64,7 @@ pub async fn get_full_user(state: ServerState, auth: Authorization, user_id: Sno
         }),
         profile: match row.try_get(ProfileColumns::bits())? {
             None => Nullable::Null,
-            Some(bits) => Nullable::Some(Box::new(UserProfile {
+            Some(bits) => Nullable::Some(Arc::new(UserProfile {
                 bits,
                 extra: Default::default(),
                 nick: row.try_get(ProfileColumns::nickname())?,
