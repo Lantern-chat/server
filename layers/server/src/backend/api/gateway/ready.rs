@@ -79,7 +79,7 @@ pub async fn ready(state: ServerState, conn_id: Snowflake, auth: Authorization) 
                     ON  Roles.Id = RoleMembers.RoleId
                     AND Roles.PartyId = PartyMembers.PartyId
                     AND RoleMembers.UserId = PartyMembers.UserId
-                ) AS AggRoles
+                ) AS AggRoles ON TRUE
             WHERE
                 Party.DeletedAt IS NULL AND PartyMembers.UserId = #{&auth.user_id as Users::Id}
         }).await?;
