@@ -8,6 +8,6 @@ pub async fn get_many(route: Route<crate::ServerState>, auth: Authorization, roo
     };
 
     Ok(WebResponse::stream(
-        crate::backend::api::room::messages::get::get_many(route.state, auth, room_id, form).await?,
+        crate::backend::api::room::messages::get2::get_many(route.state, auth, room_id, form).await?,
     ))
 }

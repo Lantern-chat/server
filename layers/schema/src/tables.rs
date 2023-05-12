@@ -196,6 +196,7 @@ thorn::tables! {
     }
 
     pub struct AggRoomPerms in Lantern {
+        PartyId: Nullable(Type::INT8),
         RoomId: Nullable(Type::INT8),
         UserId: Nullable(Type::INT8),
         Permissions1: Nullable(Type::INT8),

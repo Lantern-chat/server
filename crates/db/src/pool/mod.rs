@@ -9,8 +9,6 @@ use std::task::{Context, Poll};
 use std::{any::TypeId, collections::VecDeque};
 use std::{borrow::Cow, time::Duration};
 
-use async_trait::async_trait;
-
 use arc_swap::{ArcSwap, ArcSwapOption};
 use hashbrown::HashMap;
 
@@ -148,14 +146,14 @@ impl Connection {
     }
 }
 
-#[async_trait]
+#[async_trait::async_trait]
 pub trait Connector {
     async fn connect(&self, config: &PoolConfig) -> Result<(PgClient, Connection, Receiver<Notification>), Error>;
 }
 
 static ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 
-#[async_trait]
+#[async_trait::async_trait]
 impl<T> Connector for T
 where
     T: MakeTlsConnect<Socket> + Clone + Sync + Send + 'static,
@@ -1198,5 +1196,37 @@ impl Transaction<'_> {
     ) -> Result<u64, Error> {
         let mut query = query?;
         self.execute(&self.prepare_cached2(&mut query).await?, &query.params).await
+    }
+}
+
+#[async_trait::async_trait]
+pub trait AnyClient {
+    async fn query_stream2<'a, E: From<Row> + Send + 'static>(
+        &self,
+        query: Result<Query<'a, E>, SqlFormatError>,
+    ) -> Result<BoxStream<'static, Result<E, Error>>, Error>;
+}
+
+#[async_trait::async_trait]
+impl AnyClient for Transaction<'_> {
+    async fn query_stream2<'a, E: From<Row> + Send + 'static>(
+        &self,
+        query: Result<Query<'a, E>, SqlFormatError>,
+    ) -> Result<BoxStream<'static, Result<E, Error>>, Error> {
+        let stream = self.query_stream2(query).await?;
+
+        Ok(stream.boxed())
+    }
+}
+
+#[async_trait::async_trait]
+impl AnyClient for Client {
+    async fn query_stream2<'a, E: From<Row> + Send + 'static>(
+        &self,
+        query: Result<Query<'a, E>, SqlFormatError>,
+    ) -> Result<BoxStream<'static, Result<E, Error>>, Error> {
+        let stream = self.query_stream2(query).await?;
+
+        Ok(stream.boxed())
     }
 }

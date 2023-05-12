@@ -57,6 +57,7 @@ pub mod room {
         pub mod delete;
         pub mod edit;
         pub mod get;
+        pub mod get2;
 
         pub mod reaction {
             pub mod add;
