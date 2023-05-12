@@ -45,7 +45,7 @@ pub async fn get_many(
 
     let db = state.db.read.get().await?;
 
-    let res = do_search(
+    let SearchResult { stream, .. } = do_search(
         state,
         &*db,
         limit,
@@ -58,7 +58,22 @@ pub async fn get_many(
     )
     .await?;
 
-    Ok(res.stream)
+    Ok(stream)
+}
+
+pub async fn get_one<DB>(state: ServerState, db: &DB, msg_id: Snowflake) -> Result<Message, Error>
+where
+    DB: db::pool::AnyClient,
+{
+    let SearchResult { stream, .. } = do_search(state, db, 1, SearchRequest::Single { msg_id }).await?;
+
+    let mut stream = std::pin::pin!(stream);
+
+    match stream.next().await {
+        Some(Ok(msg)) => Ok(msg),
+        Some(Err(e)) => Err(e),
+        None => Err(Error::NotFound),
+    }
 }
 
 pub enum SearchRequest {
@@ -177,9 +192,9 @@ where
 
                     // this must go last, as it includes ORDER BY
                     AND match cursor {
-                        Cursor::After(ref msg_id)  => { Messages.Id >= #{msg_id as Messages::Id} ORDER BY Messages.Id ASC },
-                        Cursor::Before(ref msg_id) => { Messages.Id <  #{msg_id as Messages::Id} ORDER BY Messages.Id DESC },
-                        Cursor::Exact(ref msg_id)  => { Messages.Id  = #{msg_id as Messages::Id} }
+                        Cursor::After(ref msg_id)  => { Messages.Id > #{msg_id as Messages::Id} ORDER BY Messages.Id ASC },
+                        Cursor::Before(ref msg_id) => { Messages.Id < #{msg_id as Messages::Id} ORDER BY Messages.Id DESC },
+                        Cursor::Exact(ref msg_id)  => { Messages.Id = #{msg_id as Messages::Id} }
                     }
 
                     LIMIT {limit}
@@ -195,7 +210,6 @@ where
             Messages.ThreadId   AS @ThreadId,
             Messages.EditedAt   AS @EditedAt,
             Messages.Flags      AS @Flags,
-            Messages.Content    AS @Content,
             SelectedMessages.Unavailable    AS @Unavailable,
             SelectedMessages.Starred        AS @Starred,
             SelectedMessages.PartyId        AS @PartyId,
@@ -206,6 +220,7 @@ where
             .combine_profile_bits(BaseProfile.Bits, PartyProfile.Bits, PartyProfile.AvatarId) AS @ProfileBits,
             COALESCE(PartyProfile.AvatarId, BaseProfile.AvatarId) AS @AvatarId,
             COALESCE(PartyProfile.Nickname, BaseProfile.Nickname) AS @Nickname,
+            Messages.Content        AS @Content,
             AggMentions.Kinds       AS @MentionKinds,
             AggMentions.Ids         AS @MentionIds,
             AggMembers.RoleIds      AS @RoleIds,

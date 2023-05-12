@@ -54,9 +54,7 @@ pub async fn edit_message(
     };
 
     // first read-only query is not within the transaction because without repeatable-read it doesn't matter anyway
-    let prev = db
-        .query_opt_cached_typed(|| query_existing_message(), &[&msg_id, &room_id])
-        .await?;
+    let prev = db.query_opt_cached_typed(|| query_existing_message(), &[&msg_id, &room_id]).await?;
 
     let Some(row) = prev else { return Err(Error::NotFound); };
 
@@ -120,8 +118,7 @@ pub async fn edit_message(
 
             if !added.is_empty() {
                 add_attachments = Either::Right(async move {
-                    t.execute_cached_typed(|| add_attachments_query(), &[&msg_id, &added])
-                        .await?;
+                    t.execute_cached_typed(|| add_attachments_query(), &[&msg_id, &added]).await?;
 
                     Ok(())
                 });
@@ -129,8 +126,7 @@ pub async fn edit_message(
 
             if !removed.is_empty() {
                 orphan_attachments = Either::Right(async move {
-                    t.execute_cached_typed(|| orphan_attachments_query(), &[&removed])
-                        .await?;
+                    t.execute_cached_typed(|| orphan_attachments_query(), &[&removed]).await?;
 
                     Ok(())
                 });
@@ -147,8 +143,7 @@ pub async fn edit_message(
             let t = &t;
 
             update_message = Either::Right(async move {
-                t.execute_cached_typed(|| update_message_query(), &[&msg_id, &content])
-                    .await?;
+                t.execute_cached_typed(|| update_message_query(), &[&msg_id, &content]).await?;
 
                 Ok(())
             })
@@ -157,7 +152,7 @@ pub async fn edit_message(
 
     tokio::try_join!(add_attachments, orphan_attachments, update_message)?;
 
-    let msg = super::get::get_one_transactional(state, msg_id, room_id, &t).await?;
+    let msg = super::get2::get_one(state, &t, msg_id).await?;
 
     t.commit().await?;
 
@@ -213,13 +208,7 @@ fn add_attachments_query() -> impl thorn::AnyQuery {
         .insert()
         .into::<Attachments>()
         .cols(&[Attachments::FileId, Attachments::MessageId])
-        .query(
-            Query::select()
-                .col(AggIds::Id)
-                .expr(msg_id_var)
-                .from_table::<AggIds>()
-                .as_value(),
-        )
+        .query(Query::select().col(AggIds::Id).expr(msg_id_var).from_table::<AggIds>().as_value())
 }
 
 fn orphan_attachments_query() -> impl thorn::AnyQuery {

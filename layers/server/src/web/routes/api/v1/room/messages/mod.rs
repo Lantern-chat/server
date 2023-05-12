@@ -2,7 +2,6 @@ use super::*;
 
 pub mod delete;
 pub mod get_many;
-pub mod get_one;
 pub mod patch;
 pub mod pin;
 pub mod post;
@@ -19,9 +18,6 @@ pub fn messages(mut route: Route<ServerState>, auth: Authorization, room_id: Sno
         // ANY /api/v1/room/1234/messages/5678
         (_, Exact(_)) => match route.param::<Snowflake>() {
             Some(Ok(msg_id)) => match route.next().method_segment() {
-                // GET /api/v1/room/1234/messages/5678
-                (&Method::GET, End) => Ok(get_one::get_one(route, auth, room_id, msg_id)),
-
                 // PATCH /api/v1/room/1234/messages/5678
                 (&Method::PATCH, End) => Ok(patch::patch(route, auth, room_id, msg_id)),
 
