@@ -127,8 +127,13 @@ impl PermissionCache {
         Some(false) != self.map.read_async(&user_id, |_, cache| 0 < cache.rc.fetch_add(1, Ordering::AcqRel)).await
     }
 
+    #[rustfmt::skip]
     pub async fn remove_reference(&self, user_id: Snowflake) {
-        self.map.read_async(&user_id, |_, cache| cache.rc.fetch_sub(1, Ordering::AcqRel)).await;
+        self.map.update_async(&user_id, |_, cache| {
+            if 1 == cache.rc.fetch_sub(1, Ordering::AcqRel) {
+                cache.room.clear();
+            }
+        }).await;
     }
 
     /// Cleanup any cache entries with no active users
