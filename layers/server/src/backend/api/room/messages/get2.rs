@@ -426,75 +426,89 @@ where
                         )
                     }
 
-                    match data.has_embed {
-                        Some(false) => {
-                            AND NOT EXISTS(
-                                SELECT FROM Embeds INNER JOIN MessageEmbeds ON
-                                MessageEmbeds.MsgId = Messages.Id AND Embeds.Id = MessageEmbeds.EmbedId
-                            )
-                        }
-                        Some(true) if !has_media_query => {
+                    if (Some(false), Some(false)) == (data.has_embed, data.has_file) {
+                        AND NOT EXISTS(
+                            SELECT FROM Embeds INNER JOIN MessageEmbeds ON
+                            MessageEmbeds.MsgId = Messages.Id AND Embeds.Id = MessageEmbeds.EmbedId
+                            UNION ALL
+                            SELECT FROM Files INNER JOIN Attachments ON
+                            Attachments.MessageId = Messages.Id AND Files.Id = Attachments.FileId
+                        )
+                    } else if !has_media_query {
+                        if data.has_embed == Some(true) {
                             AND EXISTS(
                                 SELECT FROM Embeds INNER JOIN MessageEmbeds ON
                                 MessageEmbeds.MsgId = Messages.Id AND Embeds.Id = MessageEmbeds.EmbedId
                             )
                         }
-                        _ => {
-                            if !data.has_media.is_empty() {
-                                AND EXISTS(
+
+                        if data.has_file == Some(true) {
+                            AND EXISTS(
+                                SELECT FROM Files INNER JOIN Attachments ON
+                                Attachments.MessageId = Messages.Id AND Files.Id = Attachments.FileId
+                            )
+                        }
+                    } else {
+                        if data.has_embed == Some(false) {
+                            AND NOT EXISTS(
+                                SELECT FROM Embeds INNER JOIN MessageEmbeds ON
+                                MessageEmbeds.MsgId = Messages.Id AND Embeds.Id = MessageEmbeds.EmbedId
+                            )
+                        }
+
+                        if data.has_file == Some(false) {
+                            AND NOT EXISTS(
+                                SELECT FROM Files INNER JOIN Attachments ON
+                                Attachments.MessageId = Messages.Id AND Files.Id = Attachments.FileId
+                            )
+                        }
+
+                        if !data.has_media.is_empty() {
+                            AND EXISTS(
+                                if data.has_embed != Some(false) {
                                     SELECT FROM Embeds INNER JOIN MessageEmbeds ON
                                     MessageEmbeds.MsgId = Messages.Id AND Embeds.Id = MessageEmbeds.EmbedId
                                     WHERE Embeds.Embed->>"ty" = ALL(ARRAY[
                                         join has in &data.has_media { {has.as_str()} }
                                     ])
-                                )
-                            }
 
-                            if !data.has_not_media.is_empty() {
-                                AND NOT EXISTS(
-                                    SELECT FROM Embeds INNER JOIN MessageEmbeds ON
-                                    MessageEmbeds.MsgId = Messages.Id AND Embeds.Id = MessageEmbeds.EmbedId
-                                    WHERE Embeds.Embed->>"ty" = ANY(ARRAY[
-                                        join has in &data.has_not_media { {has.as_str()} }
-                                    ])
-                                )
-                            }
-                        }
-                    }
+                                    if data.has_file != Some(false) {
+                                        UNION ALL
+                                    }
+                                }
 
-                    match data.has_file {
-                        Some(false) => {
-                            AND NOT EXISTS(
-                                SELECT FROM Files INNER JOIN Attachments ON
-                                Attachments.MessageId = Messages.Id AND Files.Id = Attachments.FileId
-                            )
-                        }
-                        Some(true) if !has_media_query => {
-                            AND EXISTS(
-                                SELECT FROM Files INNER JOIN Attachments ON
-                                Attachments.MessageId = Messages.Id AND Files.Id = Attachments.FileId
-                            )
-                        }
-                        _ => {
-                            if !data.has_media.is_empty() {
-                                AND EXISTS(
+                                if data.has_file != Some(false) {
                                     SELECT FROM Files INNER JOIN Attachments ON
                                     Attachments.MessageId = Messages.Id AND Files.Id = Attachments.FileId
                                     WHERE TRUE for has in &data.has_media {
                                         AND starts_with(Files.Mime, { has.as_mime() })
                                     }
-                                )
-                            }
+                                }
+                            )
+                        }
 
-                            if !data.has_not_media.is_empty() {
-                                AND NOT EXISTS(
+                        if !data.has_not_media.is_empty() {
+                            AND NOT EXISTS(
+                                if data.has_embed != Some(false) {
+                                    SELECT FROM Embeds INNER JOIN MessageEmbeds ON
+                                    MessageEmbeds.MsgId = Messages.Id AND Embeds.Id = MessageEmbeds.EmbedId
+                                    WHERE Embeds.Embed->>"ty" = ANY(ARRAY[
+                                        join has in &data.has_not_media { {has.as_str()} }
+                                    ])
+
+                                    if data.has_file != Some(false) {
+                                        UNION ALL
+                                    }
+                                }
+
+                                if data.has_file != Some(false) {
                                     SELECT FROM Files INNER JOIN Attachments ON
                                     Attachments.MessageId = Messages.Id AND Files.Id = Attachments.FileId
                                     WHERE FALSE for has in &data.has_not_media {
                                         OR starts_with(Files.Mime, { has.as_mime() })
                                     }
-                                )
-                            }
+                                }
+                            )
                         }
                     }
 
@@ -511,11 +525,11 @@ where
                     if !count || has_difficult_joins {
                         LIMIT {limit + 1}
                     }
+                ), MessageCount AS MATERIALIZED (
+                    SELECT COUNT(*)::int8 AS MessageCount.Count FROM SelectedMessages
                 )
             }
-        }, MessageCount AS MATERIALIZED (
-            SELECT COUNT(*)::int8 AS MessageCount.Count FROM SelectedMessages
-        )
+        }
         SELECT
             Messages.Id         AS @MsgId,
             Messages.UserId     AS @UserId,
@@ -536,7 +550,9 @@ where
             Users.Username      AS @Username,
             Users.Discriminator AS @Discriminator,
             Users.Flags         AS @UserFlags,
-            MessageCount.Count  AS @Count,
+            if let SearchRequest::Search { .. } = search {
+                (SELECT MessageCount.Count FROM MessageCount)
+            } else { 0::int8 } AS @Count,
             .combine_profile_bits(BaseProfile.Bits, PartyProfile.Bits, PartyProfile.AvatarId) AS @ProfileBits,
             COALESCE(PartyProfile.AvatarId, BaseProfile.AvatarId) AS @AvatarId,
             COALESCE(PartyProfile.Nickname, BaseProfile.Nickname) AS @Nickname,
