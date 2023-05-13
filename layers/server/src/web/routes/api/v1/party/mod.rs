@@ -8,6 +8,7 @@ pub mod post;
 pub mod invites;
 pub mod members;
 pub mod rooms;
+pub mod search;
 
 pub fn party(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
     let auth = auth.unwrap()?;
@@ -36,11 +37,12 @@ pub fn party(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
                 // ANY /api/v1/party/1234/members
                 (_, Exact("members")) => members::members(route, auth, party_id),
 
+                (&Method::POST, Exact("search")) => Ok(search::search(route, auth, party_id)),
+
                 _ => Err(Error::NotFound),
             },
             _ => Err(Error::BadRequest),
         },
-
         _ => Err(Error::NotFound),
     }
 }

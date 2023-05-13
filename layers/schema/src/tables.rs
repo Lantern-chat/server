@@ -63,7 +63,7 @@ thorn::enums! {
 
 lazy_static::lazy_static! {
     /// See [EventCode] for full documentation
-    pub static ref EVENT_CODE: Type = <EventCode as EnumType>::ty(36595);
+    pub static ref EVENT_CODE: Type = <EventCode as EnumType>::ty(37462);
 }
 
 thorn::tables! {
@@ -348,6 +348,11 @@ thorn::tables! {
         Position: Type::INT2,
         /// Additional flags for embeds that are specific to the message
         Flags: Nullable(Type::INT2),
+    }
+
+    pub struct MessagePins in Lantern {
+        MsgId: Type::INT8,
+        PinId: Type::INT8,
     }
 
     pub struct MessageStars in Lantern {

@@ -1,4 +1,4 @@
-use std::{borrow::Cow, string::FromUtf8Error};
+use std::{borrow::Cow, str::Utf8Error, string::FromUtf8Error};
 
 use db::pool::Error as DbError;
 use ftl::{body::BodyDeserializeError, *};
@@ -48,6 +48,8 @@ pub enum Error {
 
     #[error("UTF8 Parse Error: {0}")]
     Utf8ParseError(#[from] FromUtf8Error),
+    #[error("UTF8 Error: {0}")]
+    Utf8CheckError(#[from] Utf8Error),
 
     #[error("Unimplemented")]
     Unimplemented,
@@ -298,7 +300,8 @@ impl Error {
             Error::JsonError(_)             => ApiErrorCode::JsonError,
             Error::BincodeError(_)          => ApiErrorCode::BincodeError,
             Error::EventEncodingError(_)    => ApiErrorCode::EventEncodingError,
-            Error::Utf8ParseError(_)        => ApiErrorCode::Utf8ParseError,
+            | Error::Utf8ParseError(_)
+            | Error::Utf8CheckError(_)      => ApiErrorCode::Utf8ParseError,
             Error::IOError(_)               => ApiErrorCode::IOError,
             Error::InvalidHeaderValue(_)    => ApiErrorCode::InvalidHeaderValue,
             Error::XMLError(_)              => ApiErrorCode::XMLError,
@@ -434,6 +437,8 @@ impl From<DbError> for Error {
     fn from(e: DbError) -> Self {
         if let Some(e) = e.as_db_error() {
             use db::pg::error::SqlState;
+
+            log::warn!("DATABASE ERROR: {e}");
 
             // TODO: Improve this with names of specific constraints
             match *e.code() {

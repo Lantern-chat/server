@@ -4,7 +4,8 @@ use ftl::*;
 use futures::future::BoxFuture;
 use futures::Future;
 use headers::ContentType;
-use http::StatusCode;
+use http::header::IntoHeaderName;
+use http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
 use sdk::driver::Encoding;
 
 use crate::web::encoding::EncodingQuery;
@@ -13,10 +14,10 @@ use crate::{Error, ServerState};
 use ftl::reply::deferred::*;
 
 pub enum WebResponse {
-    Status(StatusCode),
-    Single(StatusCode, DeferredValue),
-    Stream(StatusCode, DeferredStream),
-    Raw(Response),
+    Status(StatusCode, Option<Box<HeaderMap>>),
+    Single(StatusCode, Option<Box<HeaderMap>>, DeferredValue),
+    Stream(StatusCode, Option<Box<HeaderMap>>, DeferredStream),
+    Raw(Box<Response>),
 }
 
 impl WebResponse {
@@ -25,7 +26,7 @@ impl WebResponse {
     where
         T: serde::Serialize + Send + 'static,
     {
-        WebResponse::Single(StatusCode::OK, DeferredValue::new(value))
+        WebResponse::Single(StatusCode::OK, None, DeferredValue::new(value))
     }
 
     #[inline]
@@ -33,17 +34,32 @@ impl WebResponse {
     where
         T: serde::Serialize + Send + Sync + 'static,
     {
-        WebResponse::Stream(StatusCode::OK, DeferredStream::new(stream))
+        WebResponse::Stream(StatusCode::OK, None, DeferredStream::new(stream))
     }
 
     #[inline]
     pub fn with_status(self, status: StatusCode) -> Self {
         match self {
-            WebResponse::Status(_) => WebResponse::Status(status),
-            WebResponse::Single(_, v) => WebResponse::Single(status, v),
-            WebResponse::Stream(_, v) => WebResponse::Stream(status, v),
-            WebResponse::Raw(r) => WebResponse::Raw(r.with_status(status).into_response()),
+            WebResponse::Status(_, h) => WebResponse::Status(status, h),
+            WebResponse::Single(_, h, v) => WebResponse::Single(status, h, v),
+            WebResponse::Stream(_, h, v) => WebResponse::Stream(status, h, v),
+            WebResponse::Raw(r) => WebResponse::Raw(Box::new(r.with_status(status).into_response())),
         }
+    }
+
+    pub fn with_header(mut self, k: impl IntoHeaderName, v: HeaderValue) -> Self {
+        match self {
+            WebResponse::Status(_, ref mut headers)
+            | WebResponse::Single(_, ref mut headers, _)
+            | WebResponse::Stream(_, ref mut headers, _) => {
+                headers.get_or_insert_with(|| Box::new(HeaderMap::new())).insert(k, v);
+            }
+            WebResponse::Raw(ref mut raw) => {
+                raw.headers_mut().insert(k, v);
+            }
+        }
+
+        self
     }
 }
 
@@ -54,11 +70,11 @@ where
     fn from(value: T) -> Self {
         // poor-mans specialization
         match TypeId::of::<T>() {
-            ty if ty == TypeId::of::<()>() => WebResponse::Status(StatusCode::OK),
+            ty if ty == TypeId::of::<()>() => WebResponse::Status(StatusCode::OK, None),
             ty if ty == TypeId::of::<StatusCode>() => {
-                WebResponse::Status(unsafe { std::mem::transmute_copy(&value) })
+                WebResponse::Status(unsafe { std::mem::transmute_copy(&value) }, None)
             }
-            _ => WebResponse::Raw(value.into_response()),
+            _ => WebResponse::Raw(Box::new(value.into_response())),
         }
     }
 }
@@ -71,25 +87,34 @@ pub type RouteResult = Result<BoxFuture<'static, WebResult>, Error>;
 #[inline(never)]
 pub fn web_response(encoding: Encoding, res: WebResult) -> Response {
     let res = res.and_then(|r| {
-        Ok(match r {
-            WebResponse::Status(s) => s.into_response(),
-            WebResponse::Single(status, value) => {
+        let (mut resp, headers) = match r {
+            WebResponse::Status(s, headers) => (s.into_response(), headers),
+            WebResponse::Single(status, headers, value) => {
                 let (buf, ct) = match encoding {
                     Encoding::JSON => (value.as_json()?.into_bytes(), ContentType::json()),
                     Encoding::CBOR => (value.as_cbor()?, ftl::APPLICATION_CBOR.clone()),
                 };
 
-                hyper::Body::from(buf)
-                    .with_header(ct)
-                    .with_status(status)
-                    .into_response()
+                (
+                    hyper::Body::from(buf).with_header(ct).with_status(status).into_response(),
+                    headers,
+                )
             }
-            WebResponse::Stream(status, stream) => match encoding {
-                Encoding::JSON => stream.as_json().with_status(status).into_response(),
-                Encoding::CBOR => stream.as_cbor().with_status(status).into_response(),
-            },
-            WebResponse::Raw(raw) => raw,
-        })
+            WebResponse::Stream(status, headers, stream) => (
+                match encoding {
+                    Encoding::JSON => stream.as_json().with_status(status).into_response(),
+                    Encoding::CBOR => stream.as_cbor().with_status(status).into_response(),
+                },
+                headers,
+            ),
+            WebResponse::Raw(raw) => (*raw, None),
+        };
+
+        if let Some(headers) = headers {
+            resp.headers_mut().extend(headers.into_iter());
+        }
+
+        Ok(resp)
     });
 
     match res {

@@ -43,8 +43,9 @@ pub enum SearchTermKind {
     IsPinned,
     IsStarred,
     InThread,
+    Ascending,
     Id(Snowflake),
-    Thread(Snowflake),
+    Parent(Snowflake),
     Pinned(Snowflake),
     Has(Has),
     Query(String),
@@ -165,14 +166,16 @@ pub fn parse_search_terms(q: &str) -> BTreeSet<SearchTerm> {
             ("in", "thread") => term.kind = SearchTermKind::InThread,
             ("is", "pinned") => term.kind = SearchTermKind::IsPinned,
             ("is", "starred") => term.kind = SearchTermKind::IsStarred,
+            ("sort", "asc" | "ascend" | "ascending") => term.kind = SearchTermKind::Ascending,
+            ("sort", "desc" | "descend" | "descending") => { /* ignore, this is the default */ }
             ("pinned", tag_id) => match Snowflake::from_str(tag_id) {
                 Ok(id) => term.kind = SearchTermKind::Pinned(id),
                 _ => {}
             },
-            ("thread", thread_id) if !existing.contains(Existing::THREAD) => {
+            ("thread" | "parent", thread_id) if !existing.contains(Existing::THREAD) => {
                 match Snowflake::from_str(thread_id) {
                     Ok(id) => {
-                        term.kind = SearchTermKind::Thread(id);
+                        term.kind = SearchTermKind::Parent(id);
                         existing |= Existing::THREAD;
                     }
                     _ => {}

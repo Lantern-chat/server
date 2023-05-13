@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, sync::atomic::AtomicUsize};
 
 use arrayvec::ArrayVec;
 use db::{
@@ -18,7 +18,93 @@ use thorn::pg::{Json, ToSql};
 
 use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Authorization, Error, ServerState};
 
+pub async fn get_search(
+    state: ServerState,
+    auth: Authorization,
+    party_id: Snowflake,
+    terms: SearchTerms,
+) -> Result<SearchResult<impl Stream<Item = Result<Message, Error>>>, Error> {
+    let db = state.db.read.get().await?;
+
+    // TODO: Maybe check for room perms in cache if the query is limited to a room?
+    let SearchResult { lower_bound, stream } = do_search(
+        state,
+        &*db,
+        100,
+        SearchRequest::Search {
+            user_id: auth.user_id,
+            scope: SearchScope::Party(party_id),
+            count: true,
+            terms,
+        },
+    )
+    .await?;
+
+    let mut stream = stream.peekable();
+
+    // force the first read so lower_bound is populated
+    let _ = std::pin::Pin::new(&mut stream).peek().await;
+
+    Ok(SearchResult { lower_bound, stream })
+}
+
 use sdk::api::commands::room::GetMessagesQuery;
+
+fn form_to_search(
+    user_id: Snowflake,
+    room_id: Snowflake,
+    form: GetMessagesQuery,
+    needs_perms: bool,
+) -> SearchRequest {
+    let cursor = form.query.unwrap_or_else(|| Cursor::Before(Snowflake::max_value()));
+
+    // we have to handle multiple pins as a search, so convert all the
+    // parameters to search terms
+    if form.pinned.len() > 1 {
+        let mut terms = SearchTerms::default();
+
+        for pin in form.pinned {
+            terms.insert(SearchTerm::new(SearchTermKind::Pinned(pin)));
+        }
+
+        terms.insert(SearchTerm::new(match cursor {
+            Cursor::After(id) => SearchTermKind::After(id),
+            Cursor::Before(id) => SearchTermKind::Before(id),
+            Cursor::Exact(id) => SearchTermKind::Id(id),
+        }));
+
+        if let Cursor::After(_) = cursor {
+            terms.insert(SearchTerm::new(SearchTermKind::Ascending));
+        }
+
+        if form.starred {
+            terms.insert(SearchTerm::new(SearchTermKind::IsStarred));
+        }
+
+        terms.insert(SearchTerm::new(SearchTermKind::Room(room_id)));
+
+        if let Some(parent) = form.parent {
+            terms.insert(SearchTerm::new(SearchTermKind::Parent(parent)));
+        }
+
+        return SearchRequest::Search {
+            user_id,
+            scope: SearchScope::Room(room_id),
+            count: false,
+            terms,
+        };
+    }
+
+    SearchRequest::Many {
+        cursor,
+        parent: form.parent,
+        user_id,
+        room_id,
+        needs_perms,
+        starred: form.starred,
+        pinned: form.pinned.first().copied(),
+    }
+}
 
 pub async fn get_many(
     state: ServerState,
@@ -37,26 +123,16 @@ pub async fn get_many(
         None => true,
     };
 
-    let cursor = form.query.unwrap_or_else(|| Cursor::Before(Snowflake::max_value()));
     let limit = match form.limit {
         Some(limit) => 100.min(limit as i16),
         None => 100,
     };
 
+    let search = form_to_search(auth.user_id, room_id, form, needs_perms);
+
     let db = state.db.read.get().await?;
 
-    let SearchResult { stream, .. } = do_search(
-        state,
-        &*db,
-        limit,
-        SearchRequest::Many {
-            cursor,
-            user_id: auth.user_id,
-            room_id,
-            needs_perms,
-        },
-    )
-    .await?;
+    let SearchResult { stream, .. } = do_search(state, &*db, limit, search).await?;
 
     Ok(stream)
 }
@@ -76,25 +152,46 @@ where
     }
 }
 
+#[derive(Clone, Copy)]
+pub enum SearchScope {
+    Party(Snowflake),
+    Room(Snowflake),
+}
+
+pub type SearchTerms = BTreeSet<SearchTerm>;
+
 pub enum SearchRequest {
     Single {
         msg_id: Snowflake,
     },
     Many {
         cursor: Cursor,
+        parent: Option<Snowflake>,
         user_id: Snowflake,
         room_id: Snowflake,
         needs_perms: bool,
+        starred: bool,
+        pinned: Option<Snowflake>,
     },
     Search {
         user_id: Snowflake,
-        party_id: Snowflake,
-        terms: BTreeSet<SearchTerm>,
+        scope: SearchScope,
+        count: bool,
+        terms: SearchTerms,
     },
 }
 
+impl SearchRequest {
+    fn user_id(&self) -> Option<&Snowflake> {
+        match self {
+            SearchRequest::Many { user_id, .. } | SearchRequest::Search { user_id, .. } => Some(user_id),
+            _ => None,
+        }
+    }
+}
+
 pub struct SearchResult<S> {
-    pub upper_bound: Option<usize>,
+    pub lower_bound: Arc<AtomicUsize>,
     pub stream: S,
 }
 
@@ -102,11 +199,20 @@ pub async fn do_search<DB>(
     state: ServerState,
     db: &DB,
     limit: i16,
-    search: SearchRequest,
+    mut search: SearchRequest,
 ) -> Result<SearchResult<impl Stream<Item = Result<Message, Error>>>, Error>
 where
     DB: db::pool::AnyClient,
 {
+    let data = match search {
+        SearchRequest::Search {
+            ref mut scope,
+            ref mut terms,
+            ..
+        } => Some(process_terms(terms, scope)),
+        _ => None,
+    };
+
     #[rustfmt::skip]
     let stream = db.query_stream2(schema::sql! {
         tables! {
@@ -118,11 +224,10 @@ where
                 Id: Messages::Id,
                 PartyId: Party::Id,
                 Starred: Type::BOOL,
-                Unavailable: Type::BOOL,
             }
 
-            struct Starred {
-                Starred: Type::BOOL,
+            struct MessageCount {
+                Count: Type::INT8,
             }
 
             pub struct SortedEmbeds {
@@ -144,14 +249,21 @@ where
                     SELECT
                         Messages.Id AS SelectedMessages.Id,
                         Rooms.PartyId AS SelectedMessages.PartyId,
-                        FALSE AS SelectedMessages.Starred,
-                        FALSE AS SelectedMessages.Unavailable
+                        FALSE AS SelectedMessages.Starred
                     FROM Messages INNER JOIN Rooms ON Rooms.Id = Messages.RoomId
                     WHERE Messages.Id = #{msg_id as Messages::Id}
                     AND Messages.Flags & {MessageFlags::DELETED.bits()} = 0
                 )
             }
-            SearchRequest::Many { ref cursor, ref user_id, ref room_id, needs_perms } => {
+            SearchRequest::Many {
+                ref cursor,
+                ref parent,
+                ref user_id,
+                ref room_id,
+                ref pinned,
+                starred,
+                needs_perms,
+            } => {
                 SelectedMessages AS MATERIALIZED (
                     SELECT
                         Messages.Id AS SelectedMessages.Id,
@@ -160,11 +272,7 @@ where
                             SELECT FROM MessageStars
                             WHERE MessageStars.MsgId = Messages.Id
                             AND MessageStars.UserId = #{user_id as Users::Id}
-                        ) AS SelectedMessages.Starred,
-
-                        // RelA could be NULL, so use IS TRUE
-                        (AggRelationships.RelA = {UserRelationship::BlockedDangerous as i8}) IS TRUE
-                            AS SelectedMessages.Unavailable
+                        ) AS SelectedMessages.Starred
 
                     FROM Messages INNER JOIN Rooms ON Rooms.Id = Messages.RoomId
 
@@ -174,13 +282,27 @@ where
                             AND AggRoomPerms.UserId = #{user_id as Users::Id}
                     }
 
-                    LEFT JOIN AggRelationships
-                        ON AggRelationships.UserId = Messages.UserId
-                        AND AggRelationships.FriendId = #{user_id as Users::Id}
-
                     WHERE
                         Messages.Flags & {MessageFlags::DELETED.bits()} = 0
                     AND Messages.RoomId = #{room_id as Rooms::Id}
+
+                    if let Some(ref parent) = parent {
+                        AND Messages.ThreadId = #{parent as Messages::ThreadId}
+                    }
+
+                    if starred {
+                        AND EXISTS (
+                            SELECT FROM MessageStars WHERE MessageStars.MsgId = Messages.Id
+                            AND MessageStars.UserId = #{user_id as Users::Id}
+                        )
+                    }
+
+                    if let Some(ref pin_id) = pinned {
+                        AND EXISTS (
+                            SELECT FROM MessagePins WHERE MessagePins.MsgId = Messages.Id
+                            AND MessagePins.PinId = #{pin_id as PinTags::Id}
+                        )
+                    }
 
                     if needs_perms {
                         // we know this perm is in the lower half, so only use that
@@ -200,8 +322,200 @@ where
                     LIMIT {limit}
                 )
             },
-            SearchRequest::Search {..} => {}
-        }
+            SearchRequest::Search { ref user_id, ref scope, ref terms, count } => {
+                AllowedRooms AS (
+                    SELECT AggRoomPerms.RoomId AS AllowedRooms.RoomId
+                    FROM   AggRoomPerms
+                    WHERE  AggRoomPerms.UserId = #{user_id as Users::Id}
+                    AND (
+                        // we know this perm is in the lower half, so only use that
+                        let perms = Permissions::READ_MESSAGE_HISTORY.to_i64();
+                        assert_eq!(perms[1], 0);
+
+                        AggRoomPerms.Permissions1 & {perms[0]} = {perms[0]}
+                    )
+
+                    AND match scope {
+                        SearchScope::Party(ref party_id) => { AggRoomPerms.PartyId = #{party_id as Party::Id} },
+                        SearchScope::Room(ref room_id) => { AggRoomPerms.RoomId = #{room_id as Rooms::Id} }
+                    }
+                ),
+                SelectedMessages AS (
+                    let data = data.as_ref().unwrap();
+
+                    let has_many_pins = data.pin_tags.len() > 1;
+                    let has_media_query = !data.has_media.is_empty() || !data.has_not_media.is_empty();
+                    let has_embed_query = data.has_embed.is_some() || has_media_query;
+                    let has_attachment_query = data.has_file.is_some() || has_media_query;
+
+                    let has_difficult_joins = has_embed_query || has_attachment_query || data.has_link;
+
+                    SELECT
+                        Messages.Id AS SelectedMessages.Id,
+                        Rooms.PartyId AS SelectedMessages.PartyId,
+                        // optimize either branch
+                        match data.starred {
+                            false => {
+                                EXISTS(
+                                    SELECT FROM MessageStars
+                                    WHERE MessageStars.MsgId = Messages.Id
+                                    AND MessageStars.UserId = #{user_id as Users::Id}
+                                )
+                            },
+                            // if one of the criteria is to be starred, this will always be true
+                            true => { TRUE }
+                        } AS SelectedMessages.Starred
+
+                    FROM Messages
+                        INNER JOIN Rooms ON Rooms.Id = Messages.RoomId
+                        INNER JOIN AllowedRooms ON AllowedRooms.RoomId = Messages.RoomId
+
+                    if has_many_pins {
+                        INNER JOIN MessagePins ON MessagePins.MsgId = Messages.Id
+                    }
+
+                    WHERE Messages.Flags & {MessageFlags::DELETED.bits()} = 0
+
+                    if has_many_pins {
+                        AND MessagePins.PinId = ANY(#{&data.pin_tags as SNOWFLAKE_ARRAY})
+                    }
+
+                    for term in terms {
+                        AND if term.negated { NOT }
+                        (match term.kind {
+                            SearchTermKind::Query(ref q)   => { Messages.Ts @@ websearch_to_tsquery(#{q as Type::TEXT}) },
+                            SearchTermKind::Id(ref id)     => { Messages.Id = #{id as Messages::Id} },
+                            SearchTermKind::Before(ref ts) => { Messages.Id < #{ts as Messages::Id} },
+                            SearchTermKind::After(ref ts)  => { Messages.Id > #{ts as Messages::Id} },
+                            SearchTermKind::User(ref id)   => { Messages.UserId = #{id as Messages::UserId} },
+                            SearchTermKind::Room(ref id)   => { Messages.RoomId = #{id as Messages::RoomId} },
+                            SearchTermKind::Parent(ref id) => { Messages.ThreadId = #{id as Messages::ThreadId} },
+                            SearchTermKind::InThread       => { Messages.ThreadId IS NOT NULL },
+                            SearchTermKind::Has(Has::Link) => { Messages.Flags & {MessageFlags::HAS_LINK.bits()} != 0 },
+                            SearchTermKind::IsPinned => {
+                                // redundant if selecting by specific tag
+                                if !data.pin_tags.is_empty() {
+                                    EXISTS ( SELECT FROM MessagePins WHERE MessagePins.MsgId = Messages.Id )
+                                } else { TRUE }
+                            }
+                            _ => { {unreachable!("Unaccounted for search term")} }
+                        })
+                    }
+
+                    if data.starred {
+                        AND EXISTS (
+                            SELECT FROM MessageStars
+                            WHERE MessageStars.MsgId = Messages.Id
+                            AND MessageStars.UserId = #{user_id as Users::Id}
+                        )
+                    }
+
+                    if data.pin_tags.len() == 1 {
+                        let pin_tag = data.pin_tags.first().unwrap();
+
+                        AND EXISTS (
+                            SELECT FROM MessagePins WHERE MessagePins.MsgId = Messages.Id
+                            AND MessagePins.PinId = #{pin_tag as PinTags::Id}
+                        )
+                    }
+
+                    if !data.pin_not_tags.is_empty() {
+                        AND NOT EXISTS (
+                            SELECT FROM MessagePins WHERE MessagePins.MsgId = Messages.Id
+                            AND MessagePins.PinId = ANY(#{&data.pin_not_tags as SNOWFLAKE_ARRAY})
+                        )
+                    }
+
+                    match data.has_embed {
+                        Some(false) => {
+                            AND NOT EXISTS(
+                                SELECT FROM Embeds INNER JOIN MessageEmbeds ON
+                                MessageEmbeds.MsgId = Messages.Id AND Embeds.Id = MessageEmbeds.EmbedId
+                            )
+                        }
+                        Some(true) if !has_media_query => {
+                            AND EXISTS(
+                                SELECT FROM Embeds INNER JOIN MessageEmbeds ON
+                                MessageEmbeds.MsgId = Messages.Id AND Embeds.Id = MessageEmbeds.EmbedId
+                            )
+                        }
+                        _ => {
+                            if !data.has_media.is_empty() {
+                                AND EXISTS(
+                                    SELECT FROM Embeds INNER JOIN MessageEmbeds ON
+                                    MessageEmbeds.MsgId = Messages.Id AND Embeds.Id = MessageEmbeds.EmbedId
+                                    WHERE Embeds.Embed->>"ty" = ALL(ARRAY[
+                                        join has in &data.has_media { {has.as_str()} }
+                                    ])
+                                )
+                            }
+
+                            if !data.has_not_media.is_empty() {
+                                AND NOT EXISTS(
+                                    SELECT FROM Embeds INNER JOIN MessageEmbeds ON
+                                    MessageEmbeds.MsgId = Messages.Id AND Embeds.Id = MessageEmbeds.EmbedId
+                                    WHERE Embeds.Embed->>"ty" = ANY(ARRAY[
+                                        join has in &data.has_not_media { {has.as_str()} }
+                                    ])
+                                )
+                            }
+                        }
+                    }
+
+                    match data.has_file {
+                        Some(false) => {
+                            AND NOT EXISTS(
+                                SELECT FROM Files INNER JOIN Attachments ON
+                                Attachments.MessageId = Messages.Id AND Files.Id = Attachments.FileId
+                            )
+                        }
+                        Some(true) if !has_media_query => {
+                            AND EXISTS(
+                                SELECT FROM Files INNER JOIN Attachments ON
+                                Attachments.MessageId = Messages.Id AND Files.Id = Attachments.FileId
+                            )
+                        }
+                        _ => {
+                            if !data.has_media.is_empty() {
+                                AND EXISTS(
+                                    SELECT FROM Files INNER JOIN Attachments ON
+                                    Attachments.MessageId = Messages.Id AND Files.Id = Attachments.FileId
+                                    WHERE TRUE for has in &data.has_media {
+                                        AND starts_with(Files.Mime, { has.as_mime() })
+                                    }
+                                )
+                            }
+
+                            if !data.has_not_media.is_empty() {
+                                AND NOT EXISTS(
+                                    SELECT FROM Files INNER JOIN Attachments ON
+                                    Attachments.MessageId = Messages.Id AND Files.Id = Attachments.FileId
+                                    WHERE FALSE for has in &data.has_not_media {
+                                        OR starts_with(Files.Mime, { has.as_mime() })
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    if has_many_pins {
+                        GROUP BY Messages.Id, Rooms.PartyId
+                        HAVING COUNT(DISTINCT MessagePins.PinId)::int8 = {data.pin_tags.len() as i64}
+                    }
+
+                    match data.ascending {
+                        true => { ORDER BY Messages.Id ASC },
+                        false => { ORDER BY Messages.Id DESC },
+                    }
+
+                    if !count || has_difficult_joins {
+                        LIMIT {limit + 1}
+                    }
+                )
+            }
+        }, MessageCount AS MATERIALIZED (
+            SELECT COUNT(*)::int8 AS MessageCount.Count FROM SelectedMessages
+        )
         SELECT
             Messages.Id         AS @MsgId,
             Messages.UserId     AS @UserId,
@@ -210,13 +524,19 @@ where
             Messages.ThreadId   AS @ThreadId,
             Messages.EditedAt   AS @EditedAt,
             Messages.Flags      AS @Flags,
-            SelectedMessages.Unavailable    AS @Unavailable,
+
+            if let SearchRequest::Single { .. } = search { FALSE } else {
+                // RelA could be NULL, so use IS TRUE
+                (AggRelationships.RelA = {UserRelationship::BlockedDangerous as i8}) IS TRUE
+            } AS @Unavailable,
+
             SelectedMessages.Starred        AS @Starred,
             SelectedMessages.PartyId        AS @PartyId,
             AggMembers.JoinedAt AS @JoinedAt,
             Users.Username      AS @Username,
             Users.Discriminator AS @Discriminator,
             Users.Flags         AS @UserFlags,
+            MessageCount.Count  AS @Count,
             .combine_profile_bits(BaseProfile.Bits, PartyProfile.Bits, PartyProfile.AvatarId) AS @ProfileBits,
             COALESCE(PartyProfile.AvatarId, BaseProfile.AvatarId) AS @AvatarId,
             COALESCE(PartyProfile.Nickname, BaseProfile.Nickname) AS @Nickname,
@@ -257,7 +577,7 @@ where
                 )) FROM AggReactions
 
                 // where a user_id is available, check for own reaction in ReactionUsers
-                if let SearchRequest::Many { ref user_id, .. } | SearchRequest::Search { ref user_id, .. } = search {
+                if let Some(user_id) = search.user_id() {
                     LEFT JOIN ReactionUsers ON
                         ReactionUsers.ReactionId = AggReactions.Id
                         AND ReactionUsers.UserId = #{user_id as Users::Id}
@@ -276,7 +596,13 @@ where
                     AggMembers.PartyId IS NULL AND SelectedMessages.PartyId IS NULL
                 ))
             LEFT JOIN AggMentions ON AggMentions.MsgId = Messages.Id
-            // use a lateral join to avoid GROUP BY
+
+            if let Some(user_id) = search.user_id() {
+                LEFT JOIN AggRelationships
+                    ON AggRelationships.UserId = Messages.UserId
+                    AND AggRelationships.FriendId = #{user_id as Users::Id}
+            }
+
             LEFT JOIN LATERAL (
                 SELECT
                     (jsonb_agg(jsonb_build_object(
@@ -292,12 +618,15 @@ where
                 FROM Attachments INNER JOIN Files ON Files.Id = Attachments.FileId
                 WHERE Attachments.MessageId = Messages.Id
             ) AS TempAttachments ON TRUE
+
+        LIMIT {limit}
     }).await?;
 
     let mut last_user: Option<User> = None;
+    let count = Arc::new(AtomicUsize::new(0));
 
     Ok(SearchResult {
-        upper_bound: None,
+        lower_bound: count.clone(),
         stream: stream.map(move |row| match row {
             Err(e) => Err(e.into()),
             Ok(row) => {
@@ -506,6 +835,8 @@ where
                         .collect();
                 }
 
+                count.store(row.count::<i64>()? as usize, std::sync::atomic::Ordering::Relaxed);
+
                 Ok(msg)
             }
         }),
@@ -546,4 +877,74 @@ struct RawEmbed {
 
     /// embed
     pub e: Embed,
+}
+
+#[derive(Default)]
+pub struct ProcessedSearch {
+    has_media: ArrayVec<Has, 3>,
+    has_not_media: ArrayVec<Has, 3>,
+    has_embed: Option<bool>,
+    has_file: Option<bool>,
+    pin_tags: Vec<Snowflake>,
+    pin_not_tags: Vec<Snowflake>,
+    has_link: bool,
+    starred: bool,
+    ascending: bool,
+}
+
+fn process_terms(terms: &mut SearchTerms, scope: &mut SearchScope) -> ProcessedSearch {
+    let mut data = ProcessedSearch::default();
+
+    #[allow(clippy::match_like_matches_macro)]
+    terms.retain(|term| match term.kind {
+        SearchTermKind::Query(_) => true,
+        SearchTermKind::Before(_) => true,
+        SearchTermKind::After(_) => true,
+        SearchTermKind::Ascending => {
+            data.ascending = true;
+            false
+        }
+        SearchTermKind::User(_) => true,
+        SearchTermKind::Room(id) => {
+            // since we limit to rooms anyway
+            *scope = SearchScope::Room(id);
+            false
+        }
+        SearchTermKind::InThread => true,
+        SearchTermKind::IsStarred => {
+            data.starred = true;
+            true
+        }
+        SearchTermKind::IsPinned => true,
+        SearchTermKind::Pinned(tag) => {
+            if term.negated {
+                data.pin_not_tags.push(tag);
+            } else {
+                data.pin_tags.push(tag);
+            }
+            false
+        }
+        SearchTermKind::Has(has) => {
+            match has {
+                Has::Image | Has::Video | Has::Audio => {
+                    if term.negated {
+                        data.has_not_media.push(has);
+                    } else {
+                        data.has_media.push(has);
+                    }
+                }
+                Has::Embed => data.has_embed = Some(!term.negated),
+                Has::File => data.has_file = Some(!term.negated),
+                Has::Link => {
+                    data.has_link = true;
+                    return true;
+                }
+            }
+
+            false
+        }
+        _ => false,
+    });
+
+    data
 }
