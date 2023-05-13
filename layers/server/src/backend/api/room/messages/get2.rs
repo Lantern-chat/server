@@ -514,7 +514,7 @@ where
 
                     if has_many_pins {
                         GROUP BY Messages.Id, Rooms.PartyId
-                        HAVING COUNT(DISTINCT MessagePins.PinId)::int8 = {data.pin_tags.len() as i64}
+                        HAVING COUNT(DISTINCT MessagePins.PinId)::int8 = array_length(#{&data.pin_tags as SNOWFLAKE_ARRAY}, 1)
                     }
 
                     match data.ascending {
