@@ -30,7 +30,7 @@ pub async fn get_search(
     let SearchResult { lower_bound, stream } = do_search(
         state,
         &*db,
-        100,
+        1000,
         SearchRequest::Search {
             user_id: auth.user_id,
             scope: SearchScope::Party(party_id),
@@ -544,15 +544,16 @@ where
                 (AggRelationships.RelA = {UserRelationship::BlockedDangerous as i8}) IS TRUE
             } AS @Unavailable,
 
+            if let SearchRequest::Search { .. } = search {
+                (SELECT MessageCount.Count FROM MessageCount)
+            } else { 0::int8 } AS @Count,
+
             SelectedMessages.Starred        AS @Starred,
             SelectedMessages.PartyId        AS @PartyId,
             AggMembers.JoinedAt AS @JoinedAt,
             Users.Username      AS @Username,
             Users.Discriminator AS @Discriminator,
             Users.Flags         AS @UserFlags,
-            if let SearchRequest::Search { .. } = search {
-                (SELECT MessageCount.Count FROM MessageCount)
-            } else { 0::int8 } AS @Count,
             .combine_profile_bits(BaseProfile.Bits, PartyProfile.Bits, PartyProfile.AvatarId) AS @ProfileBits,
             COALESCE(PartyProfile.AvatarId, BaseProfile.AvatarId) AS @AvatarId,
             COALESCE(PartyProfile.Nickname, BaseProfile.Nickname) AS @Nickname,
@@ -600,17 +601,19 @@ where
                 }
 
                 WHERE AggReactions.MsgId = Messages.Id
-            ) AS @Reactions
+            ) AS @Reactions,
+
+            (
+                SELECT ARRAY_AGG(MessagePins.PinId)
+                FROM MessagePins WHERE MessagePins.MsgId = Messages.Id
+            ) AS @Pins
 
         FROM Messages INNER JOIN SelectedMessages ON Messages.Id = SelectedMessages.Id
             INNER JOIN Users ON Users.Id = Messages.UserId
             LEFT JOIN Profiles AS BaseProfile  ON  BaseProfile.UserId = Messages.UserId AND BaseProfile.PartyId IS NULL
             LEFT JOIN Profiles AS PartyProfile ON PartyProfile.UserId = Messages.UserId AND PartyProfile.PartyId = SelectedMessages.PartyId
-            LEFT JOIN AggMembers ON AggMembers.UserId = Messages.UserId AND
-                (AggMembers.PartyId = SelectedMessages.PartyId OR (
-                    // not in a party
-                    AggMembers.PartyId IS NULL AND SelectedMessages.PartyId IS NULL
-                ))
+            // PartyId can be null for non-party room messages
+            LEFT JOIN AggMembers ON AggMembers.UserId = Messages.UserId AND AggMembers.PartyId IS NOT DISTINCT FROM SelectedMessages.PartyId
             LEFT JOIN AggMentions ON AggMentions.MsgId = Messages.Id
 
             if let Some(user_id) = search.user_id() {
@@ -635,7 +638,7 @@ where
                 WHERE Attachments.MessageId = Messages.Id
             ) AS TempAttachments ON TRUE
 
-        LIMIT {limit}
+        LIMIT {limit.min(100)}
     }).await?;
 
     let mut last_user: Option<User> = None;
@@ -774,8 +777,7 @@ where
                     attachments
                 };
 
-                // msg.pins =
-                //     row.try_get::<_, Option<ThinVec<Snowflake>>>(DynamicMsgColumns::pin_tags())?.unwrap_or_default();
+                msg.pins = row.pins::<Option<_>>()?.unwrap_or_default(); // will be NULL if empty
 
                 if row.starred()? {
                     msg.flags |= MessageFlags::STARRED;

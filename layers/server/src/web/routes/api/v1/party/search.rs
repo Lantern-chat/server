@@ -22,8 +22,8 @@ pub async fn search(mut route: Route<ServerState>, auth: Authorization, party_id
         HeaderName::from_static("count"),
         // save a few nanoseconds by not allocating for formatting in very common cases
         match count {
-            // 101 is the common limit when the full lower bound cannot be computed
-            101 => HeaderValue::from_static("101"),
+            // 1001 is the common limit when the full lower bound cannot be computed
+            1001 => HeaderValue::from_static("1001"),
             0 => HeaderValue::from_static("0"),
             _ => HeaderValue::try_from(format!("{count}")).unwrap(),
         },
