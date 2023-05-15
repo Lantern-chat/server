@@ -9,7 +9,7 @@ use futures::{FutureExt, Stream, StreamExt};
 
 use schema::{
     flags::AttachmentFlags,
-    search::{Has, SearchTerm, SearchTermKind},
+    search::{Has, SearchError, SearchTerm, SearchTermKind},
     Snowflake, SnowflakeExt,
 };
 use sdk::models::*;
@@ -214,7 +214,7 @@ where
             ref mut scope,
             ref mut terms,
             ..
-        } => Some(process_terms(auth, terms, scope)?),
+        } => Some(process_terms(&state, auth, terms, scope)?),
         _ => None,
     };
 
@@ -291,9 +291,9 @@ where
                             AND AggRoomPerms.UserId = #{user_id as Users::Id}
                     }
 
-                    WHERE
-                        Messages.Flags & {MessageFlags::DELETED.bits()} = 0
-                    AND Messages.RoomId = #{room_id as Rooms::Id}
+                    // always start off with selecting non-deleted messages
+                    WHERE Messages.Flags & {MessageFlags::DELETED.bits()} = 0
+                    AND   Messages.RoomId = #{room_id as Rooms::Id}
 
                     if let Some(ref parent) = parent {
                         AND Messages.ThreadId = #{parent as Messages::ThreadId}
@@ -400,6 +400,7 @@ where
                         INNER JOIN Precalculated ON TRUE
                     }
 
+                    // always start off with selecting non-deleted messages
                     WHERE Messages.Flags & {MessageFlags::DELETED.bits()} = 0
 
                     if has_many_pins {
@@ -409,9 +410,12 @@ where
                     for term in terms {
                         AND if term.negated { NOT }
                         (match term.kind {
+                            // These three MUST match the `msg_content_idx` value
+                            SearchTermKind::Prefix(ref q)  => { lower(Messages.Content) SIMILAR TO #{q as Type::TEXT} },
+                            SearchTermKind::Regex(ref re)  => { lower(Messages.Content) ~* #{re as Type::TEXT} },
+                            SearchTermKind::Has(Has::Text) => { lower(Messages.Content) != "" AND lower(Messages.Content) IS NOT NULL }
+
                             SearchTermKind::Query(_)       => { Messages.Ts @@ Precalculated.Query },
-                            SearchTermKind::Prefix(ref q)  => { LOWER(Messages.Content) SIMILAR TO #{q as Type::TEXT} },
-                            SearchTermKind::Regex(ref re)  => { LOWER(Messages.Content) ~* #{re as Type::TEXT} },
                             SearchTermKind::Id(ref id)     => { Messages.Id = #{id as Messages::Id} },
                             SearchTermKind::Before(ref ts) => { Messages.Id < #{ts as Messages::Id} },
                             SearchTermKind::After(ref ts)  => { Messages.Id > #{ts as Messages::Id} },
@@ -940,6 +944,7 @@ pub struct ProcessedSearch {
 }
 
 fn process_terms(
+    state: &ServerState,
     auth: &Authorization,
     terms: &mut SearchTerms,
     scope: &mut SearchScope,
@@ -955,9 +960,11 @@ fn process_terms(
             true
         }
         SearchTermKind::Prefix(_) => true,
-        SearchTermKind::Regex(_) => {
+        SearchTermKind::Regex(ref re) => {
             if !auth.flags.intersects(UserFlags::PREMIUM) {
                 err = Some(Error::Unauthorized);
+            } else if re.len() > state.config().message.max_regex_search_len as usize {
+                err = Some(Error::SearchError(SearchError::InvalidRegex));
             }
 
             true
@@ -1003,6 +1010,7 @@ fn process_terms(
                     data.has_link = true;
                     return true;
                 }
+                Has::Text => return true,
             }
 
             false

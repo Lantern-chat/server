@@ -13,5 +13,8 @@ section! {
 
         /// Maximum number of links to generate embeds for in a message
         pub max_embeds: u8                      = 8,
+
+        /// Maximum length of a string allowed to be used as a regex for premium message search
+        pub max_regex_search_len: u16           = 128,
     }
 }

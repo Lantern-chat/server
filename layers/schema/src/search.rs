@@ -22,6 +22,7 @@ pub enum SearchError {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Has {
+    Text,
     Image,
     Video,
     Audio,
@@ -33,6 +34,7 @@ pub enum Has {
 impl Has {
     pub fn as_str(self) -> &'static str {
         match self {
+            Has::Text => "text",
             Has::Image => "img",
             Has::Video => "vid",
             Has::Audio => "audio",
@@ -160,13 +162,9 @@ pub fn parse_search_terms(q: &str) -> Result<BTreeSet<SearchTerm>, SearchError> 
 
         let maybe_category_value = if arg.is_quoted() {
             if arg.is_quoted_with(('`', '`')) {
-                if let Some(re) = normalize_regex_syntax(inner) {
-                    term.kind = SearchTermKind::Regex(re.into());
-                    terms.insert(term);
-                    continue;
-                } else {
-                    return Err(SearchError::InvalidRegex);
-                }
+                term.kind = SearchTermKind::Regex(normalize_regex_syntax(inner)?.into());
+                terms.insert(term);
+                continue;
             }
 
             if negated {
@@ -207,6 +205,7 @@ pub fn parse_search_terms(q: &str) -> Result<BTreeSet<SearchTerm>, SearchError> 
             ("has", "link" | "url") => term.kind = SearchTermKind::Has(Has::Link),
             ("has", "embed") => term.kind = SearchTermKind::Has(Has::Embed),
             ("has", "file" | "attachment") => term.kind = SearchTermKind::Has(Has::File),
+            ("has", "text" | "txt" | "message" | "msg" | "content") => term.kind = SearchTermKind::Has(Has::Text),
             ("in", "thread") => term.kind = SearchTermKind::InThread,
             ("is", "pinned") => term.kind = SearchTermKind::IsPinned,
             ("is", "starred") => term.kind = SearchTermKind::IsStarred,
@@ -366,12 +365,28 @@ mod tests {
 
         println!("{:?}", parse_search_terms("-prefix:\"!echo \""));
 
-        println!("{:?}", normalize_regex_syntax("^test"));
+        println!("{:?}", normalize_regex_syntax("(tes[ts])"));
     }
 }
 
-fn normalize_regex_syntax(re: &str) -> Option<String> {
-    use regex_syntax::ParserBuilder;
+fn normalize_regex_syntax(re: &str) -> Result<String, SearchError> {
+    use regex_syntax::ast::{parse::ParserBuilder, visit, Ast, Visitor};
+
+    struct ReAstVisitor;
+
+    impl Visitor for ReAstVisitor {
+        type Output = ();
+        type Err = SearchError;
+
+        fn finish(self) -> Result<(), Self::Err> {
+            Ok(())
+        }
+
+        //fn visit_pre(&mut self, _ast: &Ast) -> Result<(), Self::Err> {
+        //    // TODO
+        //    Ok(())
+        //}
+    }
 
     //if re.starts_with('^') {
     //    if let Some(mut prefix) = normalize_similar(re) {
@@ -379,7 +394,11 @@ fn normalize_regex_syntax(re: &str) -> Option<String> {
     //    }
     //}
 
-    ParserBuilder::new().nest_limit(2).case_insensitive(false).build().parse(re).ok()?;
+    let Ok(ast) = ParserBuilder::new().nest_limit(6).build().parse(re) else {
+        return Err(SearchError::InvalidRegex);
+    };
 
-    Some(re.to_owned())
+    //visit(&ast, ReAstVisitor)?;
+
+    Ok(re.to_owned())
 }

@@ -1113,12 +1113,15 @@ CREATE INDEX msg_id_idx                     ON lantern.messages         USING bt
 CREATE INDEX msg_search_idx                 ON lantern.messages         USING btree(room_id, user_id);
 
 -- mutually exclusive indexes
-CREATE INDEX msg_dl_idx                     ON lantern.messages         USING btree(room_id, id) WHERE flags & MESSAGE_DELETED = 1;
+CREATE INDEX msg_dl_idx                     ON lantern.messages         USING btree(room_id, id) WHERE flags & MESSAGE_DELETED = MESSAGE_DELETED;
 CREATE INDEX msg_nd_idx                     ON lantern.messages         USING btree(room_id, id) WHERE flags & MESSAGE_DELETED = 0;
 
 
 CREATE INDEX msg_ts_idx                     ON lantern.messages         USING GIN (ts);
-CREATE INDEX message_pin_tag_idx            ON lantern.messages         USING GIN (pin_tags) WHERE pin_tags IS NOT NULL;
+
+-- Accelerates SIMILAR TO and regex searches, only index non-deleted messages
+-- searches MUST add the non-deleted condition as well
+CREATE INDEX msg_content_idx                ON lantern.messages         USING btree(lower(content) text_pattern_ops) WHERE flags & MESSAGE_DELETED = 0;
 
 -- Use HASH for this to save space
 CREATE INDEX embed_url_idx                  ON lantern.embeds           USING HASH(url);
