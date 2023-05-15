@@ -12,7 +12,8 @@ pub async fn search(mut route: Route<ServerState>, auth: Authorization, party_id
 
     let body = route.bytes().await.map_err(body::BodyDeserializeError::from)?;
 
-    let terms = schema::search::parse_search_terms(std::str::from_utf8(&body)?);
+    let terms = schema::search::parse_search_terms(std::str::from_utf8(&body)?)?;
+
 
     let res = crate::backend::api::room::messages::get2::get_search(route.state, auth, party_id, terms).await?;
 

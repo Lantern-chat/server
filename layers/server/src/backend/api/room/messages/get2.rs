@@ -32,8 +32,9 @@ pub async fn get_search(
         &*db,
         1000,
         SearchRequest::Search {
-            user_id: auth.user_id,
+            auth,
             scope: SearchScope::Party(party_id),
+            party_id: Some(party_id),
             count: true,
             terms,
         },
@@ -51,7 +52,7 @@ pub async fn get_search(
 use sdk::api::commands::room::GetMessagesQuery;
 
 fn form_to_search(
-    user_id: Snowflake,
+    auth: Authorization,
     room_id: Snowflake,
     form: GetMessagesQuery,
     needs_perms: bool,
@@ -88,8 +89,9 @@ fn form_to_search(
         }
 
         return SearchRequest::Search {
-            user_id,
+            auth,
             scope: SearchScope::Room(room_id),
+            party_id: None,
             count: false,
             terms,
         };
@@ -98,7 +100,7 @@ fn form_to_search(
     SearchRequest::Many {
         cursor,
         parent: form.parent,
-        user_id,
+        user_id: auth.user_id,
         room_id,
         needs_perms,
         starred: form.starred,
@@ -128,7 +130,7 @@ pub async fn get_many(
         None => 100,
     };
 
-    let search = form_to_search(auth.user_id, room_id, form, needs_perms);
+    let search = form_to_search(auth, room_id, form, needs_perms);
 
     let db = state.db.read.get().await?;
 
@@ -174,8 +176,9 @@ pub enum SearchRequest {
         pinned: Option<Snowflake>,
     },
     Search {
-        user_id: Snowflake,
+        auth: Authorization,
         scope: SearchScope,
+        party_id: Option<Snowflake>,
         count: bool,
         terms: SearchTerms,
     },
@@ -184,7 +187,8 @@ pub enum SearchRequest {
 impl SearchRequest {
     fn user_id(&self) -> Option<&Snowflake> {
         match self {
-            SearchRequest::Many { user_id, .. } | SearchRequest::Search { user_id, .. } => Some(user_id),
+            SearchRequest::Many { user_id, .. } => Some(user_id),
+            SearchRequest::Search { auth, .. } => Some(&auth.user_id),
             _ => None,
         }
     }
@@ -206,10 +210,11 @@ where
 {
     let data = match search {
         SearchRequest::Search {
+            ref auth,
             ref mut scope,
             ref mut terms,
             ..
-        } => Some(process_terms(terms, scope)),
+        } => Some(process_terms(auth, terms, scope)?),
         _ => None,
     };
 
@@ -238,6 +243,10 @@ where
             pub struct TempAttachments {
                 Meta: Type::JSONB,
                 Preview: Type::BYTEA_ARRAY,
+            }
+
+            pub struct Precalculated {
+                Query: Type::TSQUERY,
             }
         };
 
@@ -322,11 +331,13 @@ where
                     LIMIT {limit}
                 )
             },
-            SearchRequest::Search { ref user_id, ref scope, ref terms, count } => {
+            SearchRequest::Search { ref auth, ref scope, ref terms, ref party_id, count } => {
+                let data = data.as_ref().unwrap();
+
                 AllowedRooms AS (
                     SELECT AggRoomPerms.RoomId AS AllowedRooms.RoomId
                     FROM   AggRoomPerms
-                    WHERE  AggRoomPerms.UserId = #{user_id as Users::Id}
+                    WHERE  AggRoomPerms.UserId = #{&auth.user_id as Users::Id}
                     AND (
                         // we know this perm is in the lower half, so only use that
                         let perms = Permissions::READ_MESSAGE_HISTORY.to_i64();
@@ -340,9 +351,20 @@ where
                         SearchScope::Room(ref room_id) => { AggRoomPerms.RoomId = #{room_id as Rooms::Id} }
                     }
                 ),
-                SelectedMessages AS (
-                    let data = data.as_ref().unwrap();
+                if let Some(ref query) = data.query {
+                    // `WHERE ts @@ websearch_to_tsquery(...)` will recompute the tsquery every row, which is bad
+                    // so we will precalculate the tsquery here and reuse it
+                    Precalculated AS MATERIALIZED (
+                        let party_id = party_id.as_ref().unwrap();
 
+                        SELECT (websearch_to_tsquery(
+                            .to_language((Party.Flags >> 26)::int2),
+                            #{query as Type::TEXT}
+                        )) AS Precalculated.Query
+                        FROM Party WHERE Party.Id = #{party_id as Party::Id}
+                    ),
+                }
+                SelectedMessages AS (
                     let has_many_pins = data.pin_tags.len() > 1;
                     let has_media_query = !data.has_media.is_empty() || !data.has_not_media.is_empty();
                     let has_embed_query = data.has_embed.is_some() || has_media_query;
@@ -359,7 +381,7 @@ where
                                 EXISTS(
                                     SELECT FROM MessageStars
                                     WHERE MessageStars.MsgId = Messages.Id
-                                    AND MessageStars.UserId = #{user_id as Users::Id}
+                                    AND MessageStars.UserId = #{&auth.user_id as Users::Id}
                                 )
                             },
                             // if one of the criteria is to be starred, this will always be true
@@ -374,6 +396,10 @@ where
                         INNER JOIN MessagePins ON MessagePins.MsgId = Messages.Id
                     }
 
+                    if data.query.is_some() {
+                        INNER JOIN Precalculated ON TRUE
+                    }
+
                     WHERE Messages.Flags & {MessageFlags::DELETED.bits()} = 0
 
                     if has_many_pins {
@@ -383,7 +409,9 @@ where
                     for term in terms {
                         AND if term.negated { NOT }
                         (match term.kind {
-                            SearchTermKind::Query(ref q)   => { Messages.Ts @@ websearch_to_tsquery(#{q as Type::TEXT}) },
+                            SearchTermKind::Query(_)       => { Messages.Ts @@ Precalculated.Query },
+                            SearchTermKind::Prefix(ref q)  => { LOWER(Messages.Content) SIMILAR TO #{q as Type::TEXT} },
+                            SearchTermKind::Regex(ref re)  => { LOWER(Messages.Content) ~* #{re as Type::TEXT} },
                             SearchTermKind::Id(ref id)     => { Messages.Id = #{id as Messages::Id} },
                             SearchTermKind::Before(ref ts) => { Messages.Id < #{ts as Messages::Id} },
                             SearchTermKind::After(ref ts)  => { Messages.Id > #{ts as Messages::Id} },
@@ -406,7 +434,7 @@ where
                         AND EXISTS (
                             SELECT FROM MessageStars
                             WHERE MessageStars.MsgId = Messages.Id
-                            AND MessageStars.UserId = #{user_id as Users::Id}
+                            AND MessageStars.UserId = #{&auth.user_id as Users::Id}
                         )
                     }
 
@@ -526,7 +554,7 @@ where
                         LIMIT {limit + 1}
                     }
                 ), MessageCount AS MATERIALIZED (
-                    SELECT COUNT(*)::int8 AS MessageCount.Count FROM SelectedMessages
+                    SELECT COUNT(SelectedMessages.Id)::int8 AS MessageCount.Count FROM SelectedMessages
                 )
             }
         }
@@ -906,16 +934,34 @@ pub struct ProcessedSearch {
     pin_tags: Vec<Snowflake>,
     pin_not_tags: Vec<Snowflake>,
     has_link: bool,
+    query: Option<SmolStr>,
     starred: bool,
     ascending: bool,
 }
 
-fn process_terms(terms: &mut SearchTerms, scope: &mut SearchScope) -> ProcessedSearch {
+fn process_terms(
+    auth: &Authorization,
+    terms: &mut SearchTerms,
+    scope: &mut SearchScope,
+) -> Result<ProcessedSearch, Error> {
     let mut data = ProcessedSearch::default();
+
+    let mut err = None;
 
     #[allow(clippy::match_like_matches_macro)]
     terms.retain(|term| match term.kind {
-        SearchTermKind::Query(_) => true,
+        SearchTermKind::Query(ref tsquery) => {
+            data.query = Some(tsquery.clone());
+            true
+        }
+        SearchTermKind::Prefix(_) => true,
+        SearchTermKind::Regex(_) => {
+            if !auth.flags.intersects(UserFlags::PREMIUM) {
+                err = Some(Error::Unauthorized);
+            }
+
+            true
+        }
         SearchTermKind::Before(_) => true,
         SearchTermKind::After(_) => true,
         SearchTermKind::Ascending => {
@@ -964,5 +1010,8 @@ fn process_terms(terms: &mut SearchTerms, scope: &mut SearchScope) -> ProcessedS
         _ => false,
     });
 
-    data
+    match err {
+        Some(e) => Err(e),
+        None => Ok(data),
+    }
 }

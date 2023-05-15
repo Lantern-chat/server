@@ -5,6 +5,21 @@ use sdk::{framework_utils::args::ArgumentSplitter, models::*, Snowflake};
 
 use crate::SnowflakeExt;
 
+#[derive(Debug, thiserror::Error)]
+pub enum SearchError {
+    #[error("Empty Search")]
+    Empty,
+
+    #[error("Invalid Term")]
+    InvalidTerm,
+
+    #[error("Invalid Prefix")]
+    InvalidPrefix,
+
+    #[error("Invalid Regex")]
+    InvalidRegex,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Has {
     Image,
@@ -48,11 +63,13 @@ pub enum SearchTermKind {
     Parent(Snowflake),
     Pinned(Snowflake),
     Has(Has),
-    Query(String),
+    Query(SmolStr),
     Room(Snowflake),
     User(Snowflake),
     Before(Snowflake),
     After(Snowflake),
+    Prefix(SmolStr),
+    Regex(SmolStr),
 }
 
 impl SearchTermKind {
@@ -89,11 +106,12 @@ bitflags::bitflags! {
         const AFTER = 1 << 3;
         const THREAD = 1 << 4;
         const ID = 1 << 5;
+        const PREFIX = 1 << 6;
     }
 }
 
 /// A BTreeSet is used to ensure consistent ordering
-pub fn parse_search_terms(q: &str) -> BTreeSet<SearchTerm> {
+pub fn parse_search_terms(q: &str) -> Result<BTreeSet<SearchTerm>, SearchError> {
     let mut terms = BTreeSet::new();
     let args = ArgumentSplitter::split(q);
 
@@ -101,7 +119,9 @@ pub fn parse_search_terms(q: &str) -> BTreeSet<SearchTerm> {
 
     let mut existing = Existing::empty();
 
-    for arg in args.arguments() {
+    let mut args_iter = args.arguments().iter().peekable();
+
+    while let Some(arg) = args_iter.next() {
         let inner = arg.inner_str();
 
         if inner.is_empty() || inner == "-" {
@@ -136,7 +156,19 @@ pub fn parse_search_terms(q: &str) -> BTreeSet<SearchTerm> {
             kind: SearchTermKind::None,
         };
 
-        if arg.is_quoted() {
+        let mut matched_next = false;
+
+        let maybe_category_value = if arg.is_quoted() {
+            if arg.is_quoted_with(('`', '`')) {
+                if let Some(re) = normalize_regex_syntax(inner) {
+                    term.kind = SearchTermKind::Regex(re.into());
+                    terms.insert(term);
+                    continue;
+                } else {
+                    return Err(SearchError::InvalidRegex);
+                }
+            }
+
             if negated {
                 websearch.push_str("-");
             }
@@ -144,9 +176,21 @@ pub fn parse_search_terms(q: &str) -> BTreeSet<SearchTerm> {
             websearch.push_str(inner);
             websearch.push_str("\" ");
             continue;
-        }
+        } else {
+            let mut res = None;
+            if let Some(inner) = inner.strip_suffix(':') {
+                if let Some(next) = args_iter.peek() {
+                    if arg.outer().end == next.outer().start {
+                        res = Some((inner, next.inner_str()));
+                        matched_next = true;
+                    }
+                }
+            }
 
-        let Some((category, value)) = inner.split_once(':') else {
+            res.or_else(|| inner.split_once(':'))
+        };
+
+        let Some((category, value)) = maybe_category_value else {
             if negated {
                 websearch.push_str("-");
             }
@@ -228,6 +272,14 @@ pub fn parse_search_terms(q: &str) -> BTreeSet<SearchTerm> {
                 }
                 _ => {}
             },
+            ("starts_with" | "prefix", value) if !existing.contains(Existing::PREFIX) => {
+                let Some(mut value) = normalize_similar(value) else {
+                    return Err(SearchError::InvalidPrefix);
+                };
+                value.push('%');
+                term.kind = SearchTermKind::Prefix(value.into());
+                existing |= Existing::PREFIX;
+            }
             _ => {
                 if negated {
                     websearch.push_str("-");
@@ -238,18 +290,96 @@ pub fn parse_search_terms(q: &str) -> BTreeSet<SearchTerm> {
             }
         }
 
+        if matched_next {
+            args_iter.next();
+        }
+
         if term.kind != SearchTermKind::None {
             terms.insert(term);
         }
     }
 
     websearch.truncate(websearch.trim_end().len());
-    if !websearch.is_empty() {
+
+    // silently ignore non-text searches
+    if !websearch.is_empty() && websearch.contains(char::is_alphanumeric) {
         terms.insert(SearchTerm {
             negated: false,
-            kind: SearchTermKind::Query(websearch),
+            kind: SearchTermKind::Query(websearch.into()),
         });
     }
 
-    terms
+    if terms.is_empty() {
+        return Err(SearchError::Empty);
+    }
+
+    Ok(terms)
+}
+
+fn normalize_similar(mut s: &str) -> Option<String> {
+    s = s.trim_matches('^');
+
+    if !s.starts_with(|c: char| c.is_alphanumeric() || !matches!(c, '\\' | '[' | '(' | '{' | '.')) {
+        return None;
+    }
+
+    let s = s.to_lowercase();
+
+    let mut escaped = false;
+
+    let mut out = String::new();
+    let mut chars = s.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        if c == '\\' || escaped {
+            escaped ^= true;
+            out.push(c);
+            continue;
+        }
+
+        match c {
+            '.' => match chars.peek() {
+                Some('*') => {
+                    _ = chars.next(); // consume
+                    out.push('%');
+                }
+                _ => out.push('_'),
+            },
+            '_' | '%' => {
+                out.push('\\');
+                out.push(c);
+            }
+            _ => out.push(c),
+        }
+    }
+
+    Some(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{normalize_regex_syntax, normalize_similar, parse_search_terms};
+
+    #[test]
+    fn test_similar() {
+        println!("{:?}", normalize_similar("!echo"));
+
+        println!("{:?}", parse_search_terms("-prefix:\"!echo \""));
+
+        println!("{:?}", normalize_regex_syntax("^test"));
+    }
+}
+
+fn normalize_regex_syntax(re: &str) -> Option<String> {
+    use regex_syntax::ParserBuilder;
+
+    //if re.starts_with('^') {
+    //    if let Some(mut prefix) = normalize_similar(re) {
+    //        prefix.push('%');
+    //    }
+    //}
+
+    ParserBuilder::new().nest_limit(2).case_insensitive(false).build().parse(re).ok()?;
+
+    Some(re.to_owned())
 }

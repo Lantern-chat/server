@@ -60,10 +60,7 @@ impl SplitBotToken {
         let mut t = SplitBotToken {
             id,
             hmac: [0; 20],
-            ts: SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap()
-                .as_secs(),
+            ts: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs(),
         };
 
         t.hmac = t.token_mac(key).finalize_fixed().into();

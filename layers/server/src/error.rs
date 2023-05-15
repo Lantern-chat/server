@@ -188,6 +188,9 @@ pub enum Error {
 
     #[error("Websocket Error: {0}")]
     WsError(#[from] ftl::ws::WsError),
+
+    #[error("Search Error: {0}")]
+    SearchError(#[from] schema::search::SearchError),
 }
 
 impl From<db::pg::Error> for Error {
@@ -347,6 +350,7 @@ impl Error {
             Error::WsError(_)               => ApiErrorCode::WebsocketError,
             Error::Blocked                  => ApiErrorCode::Blocked,
             Error::Banned                   => ApiErrorCode::Banned,
+            Error::SearchError(_)           => ApiErrorCode::SearchError,
 
             // HTTP-like error codes
             Error::BadRequest               => ApiErrorCode::BadRequest,
