@@ -1541,8 +1541,8 @@ BEGIN
             NULLIF(COALESCE(bit_or(o.user_allow1), 0) | (COALESCE(bit_or(o.allow1), 0) & ~COALESCE(bit_or(o.user_deny1), 0)), 0) AS allow1,
             NULLIF(COALESCE(bit_or(o.user_allow2), 0) | (COALESCE(bit_or(o.allow2), 0) & ~COALESCE(bit_or(o.user_deny2), 0)), 0) AS allow2,
             -- deny | user_deny, NULL if 0
-            NULLIF(COALESCE(bit_or(o.deny1), 0) | COALESCE(bit_or(o.user_deny1)), 0) AS deny1,
-            NULLIF(COALESCE(bit_or(o.deny2), 0) | COALESCE(bit_or(o.user_deny2)), 0) AS deny2
+            NULLIF(COALESCE(bit_or(o.deny1), 0) | COALESCE(bit_or(o.user_deny1), 0), 0) AS deny1,
+            NULLIF(COALESCE(bit_or(o.deny2), 0) | COALESCE(bit_or(o.user_deny2), 0), 0) AS deny2
         FROM rm LEFT JOIN lantern.agg_overwrites o ON o.user_id = rm.user_id AND o.room_id = rm.room_id
         GROUP BY rm.user_id, rm.room_id
     )
@@ -1686,8 +1686,8 @@ BEGIN
                 NULLIF(COALESCE(bit_or(o.user_allow1), 0) | (COALESCE(bit_or(o.allow1), 0) & ~COALESCE(bit_or(o.user_deny1), 0)), 0) AS allow1,
                 NULLIF(COALESCE(bit_or(o.user_allow2), 0) | (COALESCE(bit_or(o.allow2), 0) & ~COALESCE(bit_or(o.user_deny2), 0)), 0) AS allow2,
                 -- deny | user_deny, NULL if 0
-                NULLIF(COALESCE(bit_or(o.deny1), 0) | COALESCE(bit_or(o.user_deny1)), 0) AS deny1,
-                NULLIF(COALESCE(bit_or(o.deny2), 0) | COALESCE(bit_or(o.user_deny2)), 0) AS deny2
+                NULLIF(COALESCE(bit_or(o.deny1), 0) | COALESCE(bit_or(o.user_deny1), 0), 0) AS deny1,
+                NULLIF(COALESCE(bit_or(o.deny2), 0) | COALESCE(bit_or(o.user_deny2), 0), 0) AS deny2
             FROM lantern.agg_overwrites o
             INNER JOIN members_to_update m ON o.user_id = m.user_id -- limit to users with this role
             WHERE o.room_id = _room_id -- limit by room, of course
@@ -1716,8 +1716,8 @@ BEGIN
                 NULLIF(COALESCE(bit_or(o.user_allow1), 0) | (COALESCE(bit_or(o.allow1), 0) & ~COALESCE(bit_or(o.user_deny1), 0)), 0) AS allow1,
                 NULLIF(COALESCE(bit_or(o.user_allow2), 0) | (COALESCE(bit_or(o.allow2), 0) & ~COALESCE(bit_or(o.user_deny2), 0)), 0) AS allow2,
                 -- deny | user_deny, NULL if 0
-                NULLIF(COALESCE(bit_or(o.deny1), 0) | COALESCE(bit_or(o.user_deny1)), 0) AS deny1,
-                NULLIF(COALESCE(bit_or(o.deny2), 0) | COALESCE(bit_or(o.user_deny2)), 0) AS deny2
+                NULLIF(COALESCE(bit_or(o.deny1), 0) | COALESCE(bit_or(o.user_deny1), 0), 0) AS deny1,
+                NULLIF(COALESCE(bit_or(o.deny2), 0) | COALESCE(bit_or(o.user_deny2), 0), 0) AS deny2
             FROM lantern.agg_overwrites o
             WHERE o.user_id = _user_id
               AND o.room_id = _room_id
@@ -1780,8 +1780,8 @@ BEGIN
         NULLIF(COALESCE(bit_or(o.user_allow1), 0) | (COALESCE(bit_or(o.allow1), 0) & ~COALESCE(bit_or(o.user_deny1), 0)), 0) AS allow1,
         NULLIF(COALESCE(bit_or(o.user_allow2), 0) | (COALESCE(bit_or(o.allow2), 0) & ~COALESCE(bit_or(o.user_deny2), 0)), 0) AS allow2,
         -- deny | user_deny, NULL if 0
-        NULLIF(COALESCE(bit_or(o.deny1), 0) | COALESCE(bit_or(o.user_deny1)), 0) AS deny1,
-        NULLIF(COALESCE(bit_or(o.deny2), 0) | COALESCE(bit_or(o.user_deny2)), 0) AS deny2
+        NULLIF(COALESCE(bit_or(o.deny1), 0) | COALESCE(bit_or(o.user_deny1), 0), 0) AS deny1,
+        NULLIF(COALESCE(bit_or(o.deny2), 0) | COALESCE(bit_or(o.user_deny2), 0), 0) AS deny2
         FROM lantern.agg_overwrites o INNER JOIN lantern.rooms ON rooms.id = o.room_id
         WHERE rooms.party_id = NEW.party_id
         GROUP BY o.room_id;
@@ -1845,8 +1845,8 @@ BEGIN
             NULLIF(COALESCE(bit_or(o.user_allow1), 0) | (COALESCE(bit_or(o.allow1), 0) & ~COALESCE(bit_or(o.user_deny1), 0)), 0) AS allow1,
             NULLIF(COALESCE(bit_or(o.user_allow2), 0) | (COALESCE(bit_or(o.allow2), 0) & ~COALESCE(bit_or(o.user_deny2), 0)), 0) AS allow2,
             -- deny | user_deny, NULL if 0
-            NULLIF(COALESCE(bit_or(o.deny1), 0) | COALESCE(bit_or(o.user_deny1)), 0) AS deny1,
-            NULLIF(COALESCE(bit_or(o.deny2), 0) | COALESCE(bit_or(o.user_deny2)), 0) AS deny2
+            NULLIF(COALESCE(bit_or(o.deny1), 0) | COALESCE(bit_or(o.user_deny1), 0), 0) AS deny1,
+            NULLIF(COALESCE(bit_or(o.deny2), 0) | COALESCE(bit_or(o.user_deny2), 0), 0) AS deny2
         FROM lantern.agg_overwrites o
         INNER JOIN r ON o.room_id = r.room_id AND o.user_id = _user_id
         GROUP BY o.room_id
