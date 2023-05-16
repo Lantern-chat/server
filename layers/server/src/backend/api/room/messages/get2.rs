@@ -9,7 +9,7 @@ use futures::{FutureExt, Stream, StreamExt};
 
 use schema::{
     flags::AttachmentFlags,
-    search::{Has, SearchError, SearchTerm, SearchTermKind},
+    search::{Has, SearchError, SearchTerm, SearchTermKind, Sort},
     Snowflake, SnowflakeExt,
 };
 use sdk::models::*;
@@ -75,7 +75,7 @@ fn form_to_search(
         }));
 
         if let Cursor::After(_) = cursor {
-            terms.insert(SearchTerm::new(SearchTermKind::Ascending));
+            terms.insert(SearchTerm::new(SearchTermKind::Sort(Sort::Ascending)));
         }
 
         if form.starred {
@@ -229,6 +229,7 @@ where
                 Id: Messages::Id,
                 PartyId: Party::Id,
                 Starred: Type::BOOL,
+                Rank: Type::FLOAT4,
             }
 
             struct MessageCount {
@@ -375,6 +376,13 @@ where
                     SELECT
                         Messages.Id AS SelectedMessages.Id,
                         Rooms.PartyId AS SelectedMessages.PartyId,
+
+                        if data.order == Sort::Relevant && data.query.is_some() {
+                            // TODO: Determine best normalization method
+                            // https://www.postgresql.org/docs/current/textsearch-controls.html
+                            (ts_rank_cd(Messages.Ts, Precalculated.Query, 4)) AS SelectedMessages.Rank,
+                        }
+
                         // optimize either branch
                         match data.starred {
                             false => {
@@ -549,9 +557,13 @@ where
                         HAVING COUNT(DISTINCT MessagePins.PinId)::int8 = array_length(#{&data.pin_tags as SNOWFLAKE_ARRAY}, 1)
                     }
 
-                    match data.ascending {
-                        true => { ORDER BY Messages.Id ASC },
-                        false => { ORDER BY Messages.Id DESC },
+                    ORDER BY match data.order {
+                        Sort::Relevant if data.query.is_some() => {
+                            // NOTE: Must use column-name syntax since we're _inside_ SelectedMessages
+                            SelectedMessages./Rank DESC, Messages.Id DESC
+                        },
+                        Sort::Ascending => { Messages.Id ASC },
+                        _ => { Messages.Id DESC }
                     }
 
                     if !count || has_difficult_joins {
@@ -940,7 +952,7 @@ pub struct ProcessedSearch {
     has_link: bool,
     query: Option<SmolStr>,
     starred: bool,
-    ascending: bool,
+    order: Sort,
 }
 
 fn process_terms(
@@ -971,8 +983,8 @@ fn process_terms(
         }
         SearchTermKind::Before(_) => true,
         SearchTermKind::After(_) => true,
-        SearchTermKind::Ascending => {
-            data.ascending = true;
+        SearchTermKind::Sort(order) => {
+            data.order = order;
             false
         }
         SearchTermKind::User(_) => true,

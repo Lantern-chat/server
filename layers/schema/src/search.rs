@@ -20,6 +20,14 @@ pub enum SearchError {
     InvalidRegex,
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Sort {
+    Relevant,
+    Ascending,
+    #[default]
+    Descending,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Has {
     Text,
@@ -60,7 +68,7 @@ pub enum SearchTermKind {
     IsPinned,
     IsStarred,
     InThread,
-    Ascending,
+    Sort(Sort),
     Id(Snowflake),
     Parent(Snowflake),
     Pinned(Snowflake),
@@ -109,6 +117,7 @@ bitflags::bitflags! {
         const THREAD = 1 << 4;
         const ID = 1 << 5;
         const PREFIX = 1 << 6;
+        const SORT = 1 << 7;
     }
 }
 
@@ -209,8 +218,17 @@ pub fn parse_search_terms(q: &str) -> Result<BTreeSet<SearchTerm>, SearchError> 
             ("in", "thread") => term.kind = SearchTermKind::InThread,
             ("is", "pinned") => term.kind = SearchTermKind::IsPinned,
             ("is", "starred") => term.kind = SearchTermKind::IsStarred,
-            ("sort", "asc" | "ascend" | "ascending") => term.kind = SearchTermKind::Ascending,
-            ("sort", "desc" | "descend" | "descending") => { /* ignore, this is the default */ }
+            ("sort" | "order", order) if !existing.contains(Existing::SORT) => {
+                let order = match order {
+                    "asc" | "ascend" | "ascending" | "reverse" | "old" | "oldest" => Sort::Ascending,
+                    "desc" | "descend" | "descending" | "new" | "newest" => Sort::Descending,
+                    "rel" | "relevance" | "relevant" | "rank" | "score" => Sort::Relevant,
+                    _ => continue,
+                };
+
+                term.kind = SearchTermKind::Sort(order);
+                existing |= Existing::SORT;
+            }
             ("pinned", tag_id) => match Snowflake::from_str(tag_id) {
                 Ok(id) => term.kind = SearchTermKind::Pinned(id),
                 _ => {}
