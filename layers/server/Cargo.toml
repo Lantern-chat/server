@@ -51,12 +51,12 @@ tokio-rustls = "0.24.0"
 # tls-listener = { version = "0.2.1", features = ["hyper-h1", "hyper-h2", "tokio-net"] }
 async-stream = "0.3"
 async-trait = "0.1.50"
-async-compression = { version = "0.3.8", features = ["deflate", "gzip", "tokio"] }
+async-compression = { version = "0.4", features = ["deflate", "gzip", "tokio"] }
 async-recursion = "1"
 hashbrown = { version = "0.13", features = ["inline-more", "ahash"] }
 futures = "0.3"
 hyper = { version = "0.14.4", features = ["http1", "http2", "server", "stream", "runtime"] }
-tokio-tungstenite = { version = "0.18", default-features = false, features = ["connect"] }
+tokio-tungstenite = { version = "0.19", default-features = false, features = ["connect"] }
 mime = "0.3.16"
 http = "0.2.3"
 reqwest = { version = "0.11", default-features = false, features = ["gzip", "deflate", "rustls-tls", "json"] }
@@ -82,7 +82,7 @@ parking_lot = "0.12"
 num_cpus = "1.13"
 aho-corasick = "1"
 arc-swap = "1.2.0"
-cache-padded = "1.1.1"
+crossbeam-utils = "0.8.15"
 bitflags = "1.2"
 pin-project-lite = "0.2.8"
 urlencoding = "2.1.0"

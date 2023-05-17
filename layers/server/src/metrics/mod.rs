@@ -22,7 +22,7 @@ impl Default for LatencyHistogram {
 }
 
 use arc_swap::ArcSwap;
-use cache_padded::CachePadded;
+use crossbeam_utils::CachePadded;
 
 pub static MEMORY_METRICS: MemoryMetrics = MemoryMetrics {
     // allocs: PaddedCounter::new(),
@@ -58,6 +58,10 @@ impl ApiMetrics {
         }
 
         self.histogram.add(duration.as_millis() as usize);
+    }
+
+    pub fn add_event(&self) {
+        self.events.add(1);
     }
 
     // compute percentiles and reset the histogram and req counter
