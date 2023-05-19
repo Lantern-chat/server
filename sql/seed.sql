@@ -50,29 +50,29 @@ RETURNS regconfig
 AS
 $$
     SELECT CASE WHEN $1 = 0 THEN 'english'::regconfig
-                WHEN $1 = 1 THEN 'arabic'::regconfig
-                WHEN $1 = 2 THEN 'armenian'::regconfig
-                WHEN $1 = 3 THEN 'basque'::regconfig
-                WHEN $1 = 4 THEN 'catalan'::regconfig
-                WHEN $1 = 5 THEN 'danish'::regconfig
-                WHEN $1 = 6 THEN 'dutch'::regconfig
-                WHEN $1 = 7 THEN 'finnish'::regconfig
-                WHEN $1 = 8 THEN 'french'::regconfig
-                WHEN $1 = 9 THEN 'german'::regconfig
-                WHEN $1 = 10 THEN 'greek'::regconfig
-                WHEN $1 = 11 THEN 'hindi'::regconfig
-                WHEN $1 = 12 THEN 'hungarian'::regconfig
-                WHEN $1 = 13 THEN 'indonesian'::regconfig
-                WHEN $1 = 14 THEN 'irish'::regconfig
-                WHEN $1 = 15 THEN 'italian'::regconfig
-                WHEN $1 = 16 THEN 'lithuanian'::regconfig
-                WHEN $1 = 17 THEN 'nepali'::regconfig
-                WHEN $1 = 18 THEN 'norwegian'::regconfig
-                WHEN $1 = 19 THEN 'portuguese'::regconfig
-                WHEN $1 = 20 THEN 'romanian'::regconfig
-                WHEN $1 = 21 THEN 'russian'::regconfig
-                WHEN $1 = 22 THEN 'serbian'::regconfig
-                WHEN $1 = 23 THEN 'simple'::regconfig
+                WHEN $1 = 1 THEN 'simple'::regconfig
+                WHEN $1 = 2 THEN 'arabic'::regconfig
+                WHEN $1 = 3 THEN 'armenian'::regconfig
+                WHEN $1 = 4 THEN 'basque'::regconfig
+                WHEN $1 = 5 THEN 'catalan'::regconfig
+                WHEN $1 = 6 THEN 'danish'::regconfig
+                WHEN $1 = 7 THEN 'dutch'::regconfig
+                WHEN $1 = 8 THEN 'finnish'::regconfig
+                WHEN $1 = 9 THEN 'french'::regconfig
+                WHEN $1 = 10 THEN 'german'::regconfig
+                WHEN $1 = 11 THEN 'greek'::regconfig
+                WHEN $1 = 12 THEN 'hindi'::regconfig
+                WHEN $1 = 13 THEN 'hungarian'::regconfig
+                WHEN $1 = 14 THEN 'indonesian'::regconfig
+                WHEN $1 = 15 THEN 'irish'::regconfig
+                WHEN $1 = 16 THEN 'italian'::regconfig
+                WHEN $1 = 17 THEN 'lithuanian'::regconfig
+                WHEN $1 = 18 THEN 'nepali'::regconfig
+                WHEN $1 = 19 THEN 'norwegian'::regconfig
+                WHEN $1 = 20 THEN 'portuguese'::regconfig
+                WHEN $1 = 21 THEN 'romanian'::regconfig
+                WHEN $1 = 22 THEN 'russian'::regconfig
+                WHEN $1 = 23 THEN 'serbian'::regconfig
                 WHEN $1 = 24 THEN 'spanish'::regconfig
                 WHEN $1 = 25 THEN 'swedish'::regconfig
                 WHEN $1 = 26 THEN 'tamil'::regconfig
@@ -244,7 +244,7 @@ CREATE TABLE lantern.party (
     name            text        NOT NULL,
     description     text,
 
-    CONSTRAINT party_pk PRIMARY KEY (id)
+    CONSTRAINT party_pk PRIMARY KEY (id) INCLUDE (flags)
 );
 
 -- Association map between parties and users
@@ -1003,10 +1003,6 @@ ALTER TABLE lantern.party_members ADD CONSTRAINT unique_party_position
 ALTER TABLE lantern.rooms ADD CONSTRAINT unique_room_position
     UNIQUE(party_id, position) DEFERRABLE INITIALLY DEFERRED;
 
--- Each attachment has a unique file
-ALTER TABLE lantern.attachments ADD CONSTRAINT attachment_uq
-    UNIQUE (file_id);
-
 ALTER TABLE lantern.roles ADD CONSTRAINT unique_role_position
     UNIQUE(party_id, position) DEFERRABLE INITIALLY DEFERRED;
 
@@ -1126,8 +1122,6 @@ CREATE INDEX msg_content_idx                ON lantern.messages         USING bt
 -- Use HASH for this to save space
 CREATE INDEX embed_url_idx                  ON lantern.embeds           USING HASH(url);
 CREATE INDEX embed_ty_idx                   ON lantern.embeds           USING btree((embed->>'ty'));
-
-CREATE INDEX attachment_msg_idx             ON lantern.attachments      USING btree(message_id); -- INCLUDE(flags) ?
 
 CREATE INDEX emote_party_idx                ON lantern.emotes           USING btree(party_id);
 CREATE INDEX role_party_idx                 ON lantern.roles            USING btree(party_id);
@@ -2146,13 +2140,10 @@ SELECT
     party_members.flags,
     party_members.joined_at,
     (
-        SELECT
-            ARRAY_AGG(role_id) as roles
-        FROM
-            lantern.role_members INNER JOIN lantern.roles
-            ON  roles.id = role_members.role_id
-            AND roles.party_id = party_members.party_id
-            AND role_members.user_id = party_members.user_id
+        SELECT ARRAY_AGG(role_members.role_id) as roles
+        FROM lantern.role_members INNER JOIN lantern.roles ON roles.id = role_members.role_id
+        WHERE role_members.user_id = party_members.user_id
+        AND roles.party_id = party_members.party_id
     )
 FROM
     lantern.party_members
