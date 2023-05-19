@@ -85,7 +85,7 @@ async fn main() -> anyhow::Result<()> {
     server::tasks::startup::run_startup_tasks(&state).await;
 
     log::info!("Starting tasks...");
-    let runner = TaskRunner::new();
+    let runner = TaskRunner::default();
     server::tasks::add_tasks(&state, &runner);
 
     log::trace!("Setting up shutdown signal for Ctrl+C");

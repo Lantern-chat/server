@@ -70,6 +70,7 @@ pub fn get_sysinfo() -> Option<SysInfo> {
     None
 }
 
+#[allow(clippy::field_reassign_with_default)]
 #[cfg(windows)]
 pub fn get_sysinfo() -> Option<SysInfo> {
     use windows::Win32::System::SystemInformation::{GlobalMemoryStatusEx, MEMORYSTATUSEX};

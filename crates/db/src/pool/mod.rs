@@ -811,7 +811,7 @@ impl Transaction<'_> {
         self.t.rollback().await.map_err(Error::from)
     }
 
-    pub async fn transaction<'a>(&'a mut self) -> Result<Transaction<'a>, Error> {
+    pub async fn transaction(&mut self) -> Result<Transaction, Error> {
         Ok(Transaction {
             readonly: self.readonly,
             id: self.id,
@@ -820,7 +820,7 @@ impl Transaction<'_> {
         })
     }
 
-    pub async fn savepoint<'a, I>(&'a mut self, name: I) -> Result<Transaction<'a>, Error>
+    pub async fn savepoint<I>(&mut self, name: I) -> Result<Transaction, Error>
     where
         I: Into<String>,
     {

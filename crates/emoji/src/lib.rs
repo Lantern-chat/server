@@ -16,9 +16,7 @@ pub fn find(e: &str) -> Option<&'static str> {
 
 /// Iterates through all fully-qualified emojis
 pub fn iter() -> impl Iterator<Item = &'static str> {
-    EMOJI_INDICES
-        .windows(2)
-        .map(|i| unsafe { EMOJIS.get_unchecked((i[0] as usize)..(i[1] as usize)) })
+    EMOJI_INDICES.windows(2).map(|i| unsafe { EMOJIS.get_unchecked((i[0] as usize)..(i[1] as usize)) })
 }
 
 use once_cell::sync::Lazy;
@@ -80,7 +78,7 @@ impl<'a> Match<'a> {
 }
 
 /// Finds emojis in the string *and* filters out single strings of `/#*[0-9]/`
-pub fn find_emojis<'a>(input: &'a str) -> impl Iterator<Item = Match<'a>> {
+pub fn find_emojis(input: &str) -> impl Iterator<Item = Match> {
     EMOJI_RE.find_iter(input.as_bytes()).filter_map(|(start, end)| {
         if (end - start) == 1
             && matches!(

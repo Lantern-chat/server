@@ -40,8 +40,9 @@ impl Default for Timeouts {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecyclingMethod {
+    #[default]
     Fast,
     Verified,
     Clean,
@@ -62,12 +63,6 @@ impl RecyclingMethod {
                 DISCARD SEQUENCES;"
             }),
         }
-    }
-}
-
-impl Default for RecyclingMethod {
-    fn default() -> Self {
-        RecyclingMethod::Fast
     }
 }
 

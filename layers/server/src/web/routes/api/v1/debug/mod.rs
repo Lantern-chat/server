@@ -11,12 +11,9 @@ pub fn debug(mut route: Route<ServerState>) -> RouteResult {
 async fn test_exception(state: ServerState) -> WebResult {
     let db = state.db.read.get().await.unwrap();
 
-    match db.execute("CALL lantern.do_thing()", &[]).await {
-        Ok(_) => {}
-        Err(e) => {
-            if let Some(db) = e.as_db_error() {
-                log::debug!("{:?}", db);
-            }
+    if let Err(e) = db.execute("CALL lantern.do_thing()", &[]).await {
+        if let Some(db) = e.as_db_error() {
+            log::debug!("{:?}", db);
         }
     }
 

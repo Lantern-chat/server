@@ -11,6 +11,7 @@ use tracing_subscriber::{
 fn create_filter(verbose: Option<u8>, level: Option<LevelFilter>) -> anyhow::Result<EnvFilter> {
     let mut extreme_trace = false;
 
+    #[allow(clippy::wildcard_in_or_patterns)]
     let level_filter = level.unwrap_or_else(|| match verbose {
         None | Some(0) => LevelFilter::INFO,
         Some(1) => LevelFilter::DEBUG,
@@ -42,12 +43,7 @@ pub fn generate(
 
     Ok(match dir {
         None => (
-            Dispatch::new(
-                Subscriber::builder()
-                    .with_env_filter(filter)
-                    .with_writer(std::io::stdout)
-                    .finish(),
-            ),
+            Dispatch::new(Subscriber::builder().with_env_filter(filter).with_writer(std::io::stdout).finish()),
             None,
         ),
         Some(dir) => {
@@ -57,10 +53,7 @@ pub fn generate(
             let file_logger = Layer::new().with_writer(non_blocking).with_ansi(false);
             let stdout_logger = Layer::new().with_writer(std::io::stdout);
 
-            let collector = tracing_subscriber::registry()
-                .with(filter)
-                .with(file_logger)
-                .with(stdout_logger);
+            let collector = tracing_subscriber::registry().with(filter).with(file_logger).with(stdout_logger);
 
             (Dispatch::new(collector), Some(_guard))
         }

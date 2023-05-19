@@ -27,7 +27,7 @@ impl<W: AsyncWrite + Unpin> AsyncFramedWriter<W> {
         AsyncFramedWriter { inner }
     }
 
-    pub fn new_message<'a>(&'a mut self) -> BufWriter<AsyncMessageWriter<'a, W>> {
+    pub fn new_message(&mut self) -> BufWriter<AsyncMessageWriter<W>> {
         BufWriter::new(AsyncMessageWriter {
             w: self,
             len: 0,
@@ -43,7 +43,7 @@ impl<W: AsyncWrite + Unpin> AsyncFramedWriter<W> {
                 // don't let AsyncMessageWriter drop...
                 std::mem::forget(msg.into_inner());
 
-                Err(e.into())
+                Err(e)
             }
         }
     }
@@ -198,7 +198,7 @@ impl<R: AsyncRead + Unpin> AsyncFramedReader<R> {
         }
     }
 
-    pub async fn next_msg<'a>(&'a mut self) -> io::Result<Option<&'a mut Self>> {
+    pub async fn next_msg(&mut self) -> io::Result<Option<&mut Self>> {
         if self.len > 0 {
             io::copy(self, &mut io::sink()).await?;
         }

@@ -1,3 +1,5 @@
+#![allow(clippy::single_match, clippy::new_ret_no_self)]
+
 //! Task Runner
 //!
 //! This small crate defines a simple structure for collecting and running tasks, which are simply
@@ -40,14 +42,16 @@ pub struct TaskRunner {
     alive: ShutdownSignal,
 }
 
-impl TaskRunner {
-    pub fn new() -> Self {
+impl Default for TaskRunner {
+    fn default() -> Self {
         TaskRunner {
             tasks: FuturesUnordered::new(),
             alive: ShutdownSignal::new(),
         }
     }
+}
 
+impl TaskRunner {
     pub fn add(&self, task: impl Task) {
         self.tasks.push(task.start(self.alive.subscribe()))
     }

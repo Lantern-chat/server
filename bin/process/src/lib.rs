@@ -10,18 +10,9 @@ pub enum EncodingFormat {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum Command {
-    Initialize {
-        width: u32,
-        height: u32,
-        max_pixels: u32,
-    },
-    ReadAndProcess {
-        length: u64,
-    },
-    Encode {
-        format: EncodingFormat,
-        quality: u8,
-    },
+    Initialize { width: u32, height: u32, max_pixels: u32 },
+    ReadAndProcess { length: u64 },
+    Encode { format: EncodingFormat, quality: u8 },
     Pause,
     Exit,
     Clear,

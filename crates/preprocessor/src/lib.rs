@@ -1,3 +1,5 @@
+#![allow(clippy::single_char_add_str)]
+
 use std::{
     collections::HashMap,
     io,
@@ -196,7 +198,7 @@ impl Context {
             if word.starts_with(char::is_alphabetic) {
                 if let Some(replacement) = defines.get(word) {
                     // recurse to replace any replacements
-                    Self::substitute_append(depth + 1, max_depth, defines, out, &replacement)?;
+                    Self::substitute_append(depth + 1, max_depth, defines, out, replacement)?;
                     continue;
                 }
             }

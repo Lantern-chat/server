@@ -41,9 +41,9 @@ pub async fn post_file(state: &ServerState, user_id: Snowflake, body: FilePostBo
         None => None,
         Some(preview) => Some({
             use blurhash::decode;
-            use z85::FromZ85;
+            use z85::ParseZ85;
 
-            let preview = preview.from_z85()?;
+            let preview = preview.parse_z85()?;
 
             if !decode::is_valid(&preview)? {
                 return Err(Error::InvalidPreview);

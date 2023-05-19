@@ -8,6 +8,7 @@ use smol_str::SmolStr;
 #[repr(transparent)]
 pub struct HexidecimalInt<T>(pub T);
 
+/// # Safety
 pub unsafe trait SafeInt: Sized + LowerHex + Copy {
     type Bytes: Default + AsRef<[u8]> + AsMut<[u8]> + Debug;
     type HexBytes: Default + AsRef<[u8]> + AsMut<[u8]> + Debug;
@@ -80,6 +81,7 @@ mod test {
 
     #[test]
     fn test_hex() {
+        #[allow(clippy::unusual_byte_groupings)]
         let num: u64 = 0xFF_DEAD_BEEF_EE_AA_04;
 
         let h = HexidecimalInt(num);

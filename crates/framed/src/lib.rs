@@ -18,7 +18,7 @@ impl<W: Write> FramedWriter<W> {
     /// Constructs a new message writer that will
     /// take care of closing the messagee and flushing
     /// the buffer on drop
-    pub fn new_message<'a>(&'a mut self) -> BufWriter<MessageWriter<'a, W>> {
+    pub fn new_message(&mut self) -> BufWriter<MessageWriter<W>> {
         BufWriter::new(MessageWriter { w: self, len: 0 })
     }
 
@@ -121,7 +121,7 @@ impl<R: Read> FramedReader<R> {
 
     /// Once the previous message is finished,
     /// this will try to begin reading the next message.
-    pub fn next_msg<'a>(&'a mut self) -> io::Result<Option<&'a mut Self>> {
+    pub fn next_msg(&mut self) -> io::Result<Option<&mut Self>> {
         if self.len > 0 {
             // consume the rest of this message, INCLUDING THE CLOSING FRAME
             self.sink()?;

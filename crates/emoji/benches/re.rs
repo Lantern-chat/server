@@ -49,16 +49,13 @@ pub static EMOJI_RE_REGEX: Lazy<regex::Regex> = Lazy::new(|| {
 
 /// Finds emojis in the string *and* filters out single strings of `/#*[0-9]/`
 pub fn find_emojis_regex(e: &str) -> impl Iterator<Item = regex::Match> {
-    EMOJI_RE_REGEX.find_iter(e).filter(|m| {
-        !((m.end() - m.start()) == 1 && matches!(m.as_str().as_bytes()[0], b'#' | b'*' | b'0'..=b'9'))
-    })
+    EMOJI_RE_REGEX
+        .find_iter(e)
+        .filter(|m| !((m.end() - m.start()) == 1 && matches!(m.as_str().as_bytes()[0], b'#' | b'*' | b'0'..=b'9')))
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    assert_eq!(
-        emoji::find_emojis(INPUT).count(),
-        find_emojis_regex(INPUT).count()
-    );
+    assert_eq!(emoji::find_emojis(INPUT).count(), find_emojis_regex(INPUT).count());
 
     let mut g = c.benchmark_group("find_emojis");
     g.bench_with_input("automata", INPUT, |b, x| b.iter(|| emoji::find_emojis(x).count()));

@@ -29,5 +29,5 @@ fn print_chars(c: std::str::Chars) {
     for c in c {
         print!("{:X} ", c as u32);
     }
-    println!("");
+    println!();
 }

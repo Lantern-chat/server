@@ -19,12 +19,7 @@ pub fn lanczos(x: f32, t: f32) -> f32 {
     }
 }
 
-pub fn crop_and_resize<I, P>(
-    image: &I,
-    rect: Rect,
-    new_width: u32,
-    new_height: u32,
-) -> ImageBuffer<P, Vec<u8>>
+pub fn crop_and_resize<I, P>(image: &I, rect: Rect, new_width: u32, new_height: u32) -> ImageBuffer<P, Vec<u8>>
 where
     I: GenericImageView<Pixel = P>,
     P: Pixel<Subpixel = u8>,
@@ -336,30 +331,14 @@ where
 pub fn crop_and_reduce(image: &DynamicImage, Rect { x, y, width, height }: Rect) -> DynamicImage {
     match image {
         DynamicImage::ImageRgb8(_) | DynamicImage::ImageRgba8(_) => image.crop_imm(x, y, width, height),
-        DynamicImage::ImageLuma8(img) => {
-            DynamicImage::ImageRgb8(reduce_to_u8(&*img.view(x, y, width, height)))
-        }
-        DynamicImage::ImageLumaA8(img) => {
-            DynamicImage::ImageRgba8(reduce_to_u8(&*img.view(x, y, width, height)))
-        }
-        DynamicImage::ImageLuma16(img) => {
-            DynamicImage::ImageRgb8(reduce_to_u8(&*img.view(x, y, width, height)))
-        }
-        DynamicImage::ImageLumaA16(img) => {
-            DynamicImage::ImageRgba8(reduce_to_u8(&*img.view(x, y, width, height)))
-        }
-        DynamicImage::ImageRgb16(img) => {
-            DynamicImage::ImageRgb8(reduce_to_u8(&*img.view(x, y, width, height)))
-        }
-        DynamicImage::ImageRgba16(img) => {
-            DynamicImage::ImageRgba8(reduce_to_u8(&*img.view(x, y, width, height)))
-        }
-        DynamicImage::ImageRgb32F(img) => {
-            DynamicImage::ImageRgb8(reduce_to_u8(&*img.view(x, y, width, height)))
-        }
-        DynamicImage::ImageRgba32F(img) => {
-            DynamicImage::ImageRgba8(reduce_to_u8(&*img.view(x, y, width, height)))
-        }
+        DynamicImage::ImageLuma8(img) => DynamicImage::ImageRgb8(reduce_to_u8(&*img.view(x, y, width, height))),
+        DynamicImage::ImageLumaA8(img) => DynamicImage::ImageRgba8(reduce_to_u8(&*img.view(x, y, width, height))),
+        DynamicImage::ImageLuma16(img) => DynamicImage::ImageRgb8(reduce_to_u8(&*img.view(x, y, width, height))),
+        DynamicImage::ImageLumaA16(img) => DynamicImage::ImageRgba8(reduce_to_u8(&*img.view(x, y, width, height))),
+        DynamicImage::ImageRgb16(img) => DynamicImage::ImageRgb8(reduce_to_u8(&*img.view(x, y, width, height))),
+        DynamicImage::ImageRgba16(img) => DynamicImage::ImageRgba8(reduce_to_u8(&*img.view(x, y, width, height))),
+        DynamicImage::ImageRgb32F(img) => DynamicImage::ImageRgb8(reduce_to_u8(&*img.view(x, y, width, height))),
+        DynamicImage::ImageRgba32F(img) => DynamicImage::ImageRgba8(reduce_to_u8(&*img.view(x, y, width, height))),
 
         // DynamicImage is non-exhaustive, so fallback to two-step crop and convert
         _ => {

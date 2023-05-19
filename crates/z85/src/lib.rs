@@ -51,10 +51,10 @@ impl std::error::Error for FromZ85Error {}
 impl std::error::Error for ToZ85Error {}
 
 /// A trait for converting from z85 encoded values.
-pub trait FromZ85 {
+pub trait ParseZ85 {
     /// Converts the value of `self`, interpreted as z85 encoded data,
     /// into an owned vector of bytes, returning the vector.
-    fn from_z85(&self) -> Result<Vec<u8>, FromZ85Error>;
+    fn parse_z85(&self) -> Result<Vec<u8>, FromZ85Error>;
 }
 
 /// A trait for converting a value to z85 encoding.
@@ -64,18 +64,18 @@ pub trait ToZ85 {
     fn to_z85(&self) -> Result<String, ToZ85Error>;
 }
 
-impl FromZ85 for str {
+impl ParseZ85 for str {
     /// Convert any z85 encoded string
     /// to the byte values it encodes.
     /// You can use the `String::from_utf8` function to turn a `Vec<u8>` into a
     /// string with characters corresponding to those values.
-    fn from_z85(&self) -> Result<Vec<u8>, FromZ85Error> {
-        self.as_bytes().from_z85()
+    fn parse_z85(&self) -> Result<Vec<u8>, FromZ85Error> {
+        self.as_bytes().parse_z85()
     }
 }
 
-impl FromZ85 for [u8] {
-    fn from_z85(&self) -> Result<Vec<u8>, FromZ85Error> {
+impl ParseZ85 for [u8] {
+    fn parse_z85(&self) -> Result<Vec<u8>, FromZ85Error> {
         let len = self.len();
         if len == 0 || len % 5 != 0 {
             return Err(FromZ85Error::InvalidZ85Length(len));

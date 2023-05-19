@@ -2,7 +2,7 @@ use std::fs::File;
 
 use image::ImageDecoder;
 
-use z85::{FromZ85, ToZ85};
+use z85::{ParseZ85, ToZ85};
 
 fn main() {
     let mut file = File::open("deps/blurhash/e.jpg").unwrap();
@@ -29,19 +29,19 @@ fn main() {
 
     println!("{cx}x{cy}");
 
-    let buf = blurhash::encode::encode::<true>(cx, cy, w as usize, h as usize, &mut bytes, 3).unwrap();
+    let buf = blurhash::encode::encode::<true>(cx, cy, w as usize, h as usize, &bytes, 3).unwrap();
 
     let encoded = buf.to_z85().unwrap();
 
     println!("{w}x{h}={}\n{encoded}", buf.len());
 
-    let decoded = encoded.from_z85().unwrap();
+    let decoded = encoded.parse_z85().unwrap();
 
     println!("{:?}", decoded);
 
     //let o = 512;
-    let ox = res.0 as u32;
-    let oy = res.1 as u32;
+    let ox = res.0;
+    let oy = res.1;
 
     let blurred = blurhash::decode::decode(&decoded, ox as usize, oy as usize, 1.4).unwrap();
 

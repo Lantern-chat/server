@@ -11,6 +11,7 @@ static GLOBAL: allocator::MyAllocator = allocator::MyAllocator;
 #[global_allocator]
 static GLOBAL: Global = Global {};
 
+#[allow(clippy::module_inception)]
 #[cfg(feature = "memory_metrics")]
 mod allocator {
     use super::Global;

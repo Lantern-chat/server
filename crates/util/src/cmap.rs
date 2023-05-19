@@ -45,10 +45,7 @@ where
 
     pub fn with_hasher(num_shards: usize, hash_builder: S) -> Self {
         CHashMap {
-            shards: (0..num_shards)
-                .into_iter()
-                .map(|_| RwLock::new(HashMap::with_hasher(hash_builder.clone())))
-                .collect(),
+            shards: (0..num_shards).map(|_| RwLock::new(HashMap::with_hasher(hash_builder.clone()))).collect(),
             hash_builder,
             size: AtomicUsize::new(0),
         }
@@ -187,10 +184,7 @@ where
     {
         let (hash, shard_idx) = self.hash_and_shard(key);
         let shard = unsafe { self.shards.get_unchecked(shard_idx).read().await };
-        shard
-            .raw_entry()
-            .from_key_hashed_nocheck(hash, key)
-            .map(|(_, value)| value.clone())
+        shard.raw_entry().from_key_hashed_nocheck(hash, key).map(|(_, value)| value.clone())
     }
 
     pub async fn get<Q: ?Sized>(&self, key: &Q) -> Option<ReadValue<'_, K, T, S>>
@@ -202,6 +196,7 @@ where
 
         let shard = unsafe { self.shards.get_unchecked(shard_idx).read().await };
 
+        #[allow(clippy::manual_map)]
         match shard.raw_entry().from_key_hashed_nocheck(hash, key) {
             Some((_, value)) => Some(ReadValue {
                 // cast lifetime, but it's fine because we own it while the lock is valid
@@ -291,13 +286,10 @@ where
 
         let mut shard = unsafe { self.shards.get_unchecked(shard_idx).write().await };
 
-        let (_, value) = shard
-            .raw_entry_mut()
-            .from_key_hashed_nocheck(hash, key)
-            .or_insert_with(|| {
-                self.size.fetch_add(1, Ordering::Relaxed);
-                (key.clone(), on_insert())
-            });
+        let (_, value) = shard.raw_entry_mut().from_key_hashed_nocheck(hash, key).or_insert_with(|| {
+            self.size.fetch_add(1, Ordering::Relaxed);
+            (key.clone(), on_insert())
+        });
 
         ReadValue {
             value: unsafe { std::mem::transmute(value) },
@@ -313,14 +305,11 @@ where
 
         let mut shard = unsafe { self.shards.get_unchecked(shard_idx).write().await };
 
-        let (_, value) = shard
-            .raw_entry_mut()
-            .from_key_hashed_nocheck(hash, key)
-            .or_insert_with(|| {
-                self.size.fetch_add(1, Ordering::Relaxed);
+        let (_, value) = shard.raw_entry_mut().from_key_hashed_nocheck(hash, key).or_insert_with(|| {
+            self.size.fetch_add(1, Ordering::Relaxed);
 
-                (key.clone(), on_insert())
-            });
+            (key.clone(), on_insert())
+        });
 
         WriteValue {
             value: unsafe { std::mem::transmute(value) },

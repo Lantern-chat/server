@@ -1,3 +1,5 @@
+#![allow(clippy::identity_op)]
+
 use image::{DynamicImage, ImageBuffer, ImageDecoder, ImageFormat};
 use png::{PixelDimensions, ScaledFloat, SourceChromaticities, SrgbRenderingIntent};
 
@@ -110,10 +112,7 @@ pub fn read_image<R: Read>(
     }
 }
 
-fn read_generic<'a, D: ImageDecoder<'a>>(
-    decoder: D,
-    config: &ProcessConfig,
-) -> Result<Image, ImageReadError> {
+fn read_generic<'a, D: ImageDecoder<'a>>(decoder: D, config: &ProcessConfig) -> Result<Image, ImageReadError> {
     let (width, height) = decoder.dimensions();
 
     if (width as u64 * height as u64) > config.max_pixels as u64 {
