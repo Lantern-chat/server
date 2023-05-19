@@ -1,8 +1,10 @@
 use std::sync::Arc;
 use std::time::SystemTime;
 
+use parking_lot::Mutex;
+
 /// A single set of metrics recorded for a single quanta
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Metrics {
     pub mem: i64,
     pub upload: i64,
@@ -13,6 +15,27 @@ pub struct Metrics {
     pub p50: i16,
     pub p95: i16,
     pub p99: i16,
+}
+
+impl Metrics {
+    pub const fn default() -> Self {
+        Metrics {
+            mem: 0,
+            upload: 0,
+            reqs: 0,
+            errs: 0,
+            conns: 0,
+            events: 0,
+            p50: 0,
+            p95: 0,
+            p99: 0,
+        }
+    }
+
+    /// Check fields that are summed up when aggregating for zeroes
+    pub fn is_empty(&self) -> bool {
+        self.upload == 0 && self.reqs == 0 && self.errs == 0 && self.events == 0
+    }
 }
 
 /// Metrics aggregated over multiple quanta
@@ -33,13 +56,16 @@ use crate::metrics::{ApiMetrics, API_METRICS, MEMORY_METRICS};
 
 use crate::ServerState;
 
+// This will always be uncontested due to the scheduling system.
+static LAST_METRICS: Mutex<Metrics> = Mutex::new(Metrics::default());
+
 impl Metrics {
-    pub fn acquire(state: &ServerState) -> Self {
+    pub fn acquire(state: &ServerState) -> Option<Self> {
         let metrics = API_METRICS.swap(Arc::new(ApiMetrics::default()));
 
         let (count, [p50, p95, p99]) = metrics.percentiles();
 
-        Metrics {
+        let new_metrics = Metrics {
             mem: MEMORY_METRICS.allocated.get() as i64,
             upload: metrics.upload.get() as i64,
             reqs: count as i32,
@@ -49,13 +75,21 @@ impl Metrics {
             p50: p50 as i16,
             p95: p95 as i16,
             p99: p99 as i16,
+        };
+
+        let mut last = LAST_METRICS.lock();
+        if new_metrics.is_empty() && *last == new_metrics {
+            return None;
         }
+        *last = new_metrics;
+
+        Some(new_metrics)
     }
 }
 
 use futures::{FutureExt, Stream, StreamExt};
 use smol_str::SmolStr;
-use timestamp::{formats::ShortMilliseconds, Timestamp, TimestampStr};
+use timestamp::{formats::ShortMilliseconds, Duration, Timestamp, TimestampStr};
 
 use crate::Error;
 
@@ -70,127 +104,92 @@ pub struct MetricsOptions {
     pub end: Option<Timestamp>,
 }
 
-#[allow(deprecated)]
 pub async fn get_metrics(
     state: &ServerState,
     options: MetricsOptions,
 ) -> Result<impl Stream<Item = Result<(TimestampStr<ShortMilliseconds>, AggregatedMetrics), Error>>, Error> {
     let MetricsOptions { resolution, start, end } = options;
 
-    let minute_resolution = match resolution {
-        Some(res) if res > 5 => res as i64,
-        _ => 5,
-    };
+    let seconds = 60
+        * match resolution {
+            Some(res) if res > 5 => res as i64,
+            _ => 5,
+        };
 
-    let secs = minute_resolution * 60;
+    #[rustfmt::skip]
+    let stream = state.db.read.get().await?.query_stream2(schema::sql! {
+        tables! {
+            struct RoundedMetrics {
+                RoundedTs: Type::INT8,
+                Mem: Metrics::Mem,
+                Upload: Metrics::Upload,
+                Reqs: Metrics::Reqs,
+                Errs: Metrics::Errs,
+                Conns: Metrics::Conns,
+                Events: Metrics::Events,
+                P50: Metrics::P50,
+                P95: Metrics::P95,
+                P99: Metrics::P99,
+            }
+        };
 
-    let db = state.db.read.get().await?;
-
-    let mut parameters = arrayvec::ArrayVec::<&(dyn pg::ToSql + Sync), 3>::new();
-
-    parameters.push(&secs);
-
-    let statement_future = match (start.as_ref(), end.as_ref()) {
-        (None, None) => db.prepare_cached_typed(|| query(false, false)).boxed(),
-        (Some(start), Some(end)) => {
-            parameters.push(start);
-            parameters.push(end);
-
-            db.prepare_cached_typed(|| query(true, true)).boxed()
-        }
-        (Some(start), None) => {
-            parameters.push(start);
-
-            db.prepare_cached_typed(|| query(true, false)).boxed()
-        }
-        (None, Some(end)) => {
-            parameters.push(end);
-
-            db.prepare_cached_typed(|| query(false, true)).boxed()
-        }
-    };
-
-    let statement = statement_future.await?;
-    let stream = db.query_stream(&statement, &parameters).await?;
+        WITH RoundedMetrics AS (
+            SELECT
+                (ROUND(date_part("epoch", Metrics.Ts)) / #{&seconds as Type::INT8})::int8 * #{&seconds as Type::INT8}
+                                AS RoundedMetrics.RoundedTs,
+                Metrics.Mem     AS RoundedMetrics.Mem,
+                Metrics.Upload  AS RoundedMetrics.Upload,
+                Metrics.Reqs    AS RoundedMetrics.Reqs,
+                Metrics.Errs    AS RoundedMetrics.Errs,
+                Metrics.Conns   AS RoundedMetrics.Conns,
+                Metrics.Events  AS RoundedMetrics.Events,
+                Metrics.P50     AS RoundedMetrics.P50,
+                Metrics.P95     AS RoundedMetrics.P95,
+                Metrics.P99     AS RoundedMetrics.P99
+            FROM Metrics
+            WHERE TRUE
+            if let Some(ref start) = start {
+                AND Metrics.Ts >= #{start as Metrics::Ts}
+            }
+            if let Some(ref end) = end {
+                AND Metrics.Ts < #{end as Metrics::Ts}
+            }
+            ORDER BY Metrics.Ts DESC
+        )
+        SELECT
+            RoundedMetrics.RoundedTs            AS @RoundedTs,
+            AVG(RoundedMetrics.Mem)::float4     AS @Mem,
+            SUM(RoundedMetrics.Upload)::int8    AS @Upload,
+            SUM(RoundedMetrics.Reqs)::int8      AS @Reqs,
+            SUM(RoundedMetrics.Errs)::int8      AS @Errs,
+            AVG(RoundedMetrics.Conns)::float4   AS @Conns,
+            SUM(RoundedMetrics.Events)::int8    AS @Events,
+            AVG(RoundedMetrics.P50)::float4     AS @P50,
+            AVG(RoundedMetrics.P95)::float4     AS @P95,
+            AVG(RoundedMetrics.P99)::float4     AS @P99
+        FROM RoundedMetrics
+        GROUP BY RoundedMetrics.RoundedTs
+        ORDER BY RoundedMetrics.RoundedTs DESC
+        LIMIT 100
+    }).await?;
 
     Ok(stream.map(|row| match row {
         Err(e) => Err(e.into()),
         Ok(row) => Ok((
             // key
-            Timestamp::from_unix_timestamp(row.try_get(0)?).format_short(),
+            (Timestamp::UNIX_EPOCH + Duration::seconds(row.rounded_ts()?)).format_short(),
             // value
             AggregatedMetrics {
-                mem: row.try_get(1)?,
-                upload: row.try_get(2)?,
-                reqs: row.try_get(3)?,
-                errs: row.try_get(4)?,
-                conns: row.try_get(5)?,
-                events: row.try_get(6)?,
-                p50: row.try_get(7)?,
-                p95: row.try_get(8)?,
-                p99: row.try_get(9)?,
+                mem: row.mem()?,
+                upload: row.upload()?,
+                reqs: row.reqs()?,
+                errs: row.errs()?,
+                conns: row.conns()?,
+                events: row.events()?,
+                p50: row.p50()?,
+                p95: row.p95()?,
+                p99: row.p99()?,
             },
         )),
     }))
-}
-
-use thorn::*;
-
-fn query(start: bool, end: bool) -> impl AnyQuery {
-    use schema::*;
-
-    const AVG_COLS: &[(Metrics, bool)] = &[
-        (Metrics::Mem, false),
-        (Metrics::Upload, true),
-        (Metrics::Reqs, true),
-        (Metrics::Errs, true),
-        (Metrics::Conns, false),
-        (Metrics::Events, true),
-        (Metrics::P50, false),
-        (Metrics::P95, false),
-        (Metrics::P99, false),
-    ];
-
-    let resolution = Var::at(Type::INT8, 1);
-    let first_ts = Var::at(Metrics::Ts, 2);
-    let second_ts = Var::at(Metrics::Ts, 3);
-
-    let rounded_ts = Builtin::round(
-        Call::custom("date_part")
-            .args(("epoch".lit(), Metrics::Ts))
-            .div(resolution.clone()),
-    )
-    .cast(Type::INT8) // ensures integer rounding
-    .mul(resolution)
-    .rename_as("rounded_ts")
-    .unwrap();
-
-    let query = Query::select()
-        .from_table::<Metrics>()
-        .group_by(rounded_ts.reference())
-        .expr(rounded_ts)
-        .exprs(AVG_COLS.iter().map(|(col, use_sum)| {
-            if *use_sum {
-                Builtin::sum(*col).cast(Type::INT8)
-            } else {
-                Builtin::avg(*col).cast(Type::FLOAT4)
-            }
-        }));
-
-    //query = if start {
-    //    query.order_by(Metrics::Ts.ascending())
-    //} else {
-    //    query.order_by(Metrics::Ts.descending())
-    //}.limit_n(500);
-
-    match (start, end) {
-        (false, false) => query,
-        (true, false) => query.and_where(Metrics::Ts.greater_than_equal(first_ts)),
-        (false, true) => query.and_where(Metrics::Ts.less_than(first_ts)),
-        (true, true) => query.and_where(
-            Metrics::Ts
-                .greater_than_equal(first_ts)
-                .and(Metrics::Ts.less_than(second_ts)),
-        ),
-    }
 }

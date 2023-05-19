@@ -1160,8 +1160,6 @@ CREATE INDEX relationship_b_idx             ON lantern.relationships    USING bt
 CREATE INDEX user_presence_conn_idx         ON lantern.user_presence    USING btree(conn_id);
 CREATE INDEX user_presence_idx              ON lantern.user_presence    USING btree(user_id, updated_at);
 
-CREATE INDEX metrics_ts_idx                 ON lantern.metrics          USING btree(ts);
-
 CREATE INDEX room_member_wallpaper_idx      ON lantern.room_members     USING btree(wallpaper_id) WHERE wallpaper_id IS NOT NULL;
 
 ----------------------------------------
