@@ -1528,6 +1528,50 @@ $$;
 CREATE TRIGGER reaction_user_addremove AFTER INSERT OR DELETE ON lantern.reaction_users
 FOR EACH ROW EXECUTE FUNCTION lantern.reaction_user_trigger();
 
+CREATE OR REPLACE FUNCTION lantern.on_party_update()
+RETURNS trigger
+LANGUAGE plpgsql AS
+$$
+BEGIN
+    IF NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL THEN
+        -- only update non-deleted rooms to be deleted at the exact time the party was
+        UPDATE lantern.rooms SET deleted_at = NEW.deleted_at
+        WHERE rooms.party_id = NEW.id AND rooms.deleted_at IS NULL;
+
+        INSERT INTO lantern.event_log (code, id, party_id) VALUES (
+            'party_delete'::lantern.event_code, NEW.id, NEW.id
+        );
+    END IF;
+
+    -- TODO: Also handle undelete as party_create?
+    -- in that case, only undelete rooms if they have
+    -- the same timestamp as party.deleted_at
+
+    RETURN NEW;
+END
+$$;
+
+CREATE TRIGGER party_update AFTER UPDATE ON lantern.party
+FOR EACH ROW EXECUTE FUNCTION lantern.on_party_update();
+
+CREATE OR REPLACE FUNCTION lantern.on_room_update()
+RETURNS trigger
+LANGUAGE plpgsql AS
+$$
+BEGIN
+    IF NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL THEN
+        INSERT INTO lantern.event_log (code, id, party_id) VALUES (
+            'room_delete'::lantern.event_code, NEW.id, NEW.party_id
+        );
+    END IF;
+
+    RETURN NEW;
+END
+$$;
+
+CREATE TRIGGER room_update AFTER UPDATE ON lantern.rooms
+FOR EACH ROW EXECUTE FUNCTION lantern.on_room_update();
+
 ----------------------------------------
 ------------ PERM TRIGGERS -------------
 ----------------------------------------
