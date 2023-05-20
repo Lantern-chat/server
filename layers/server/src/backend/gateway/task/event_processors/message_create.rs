@@ -2,7 +2,7 @@ use futures::StreamExt;
 use thorn::pg::Json;
 
 use crate::backend::{
-    api::room::messages::get2::get_one,
+    api::room::messages::get::get_one,
     util::encrypted_asset::{encrypt_snowflake, encrypt_snowflake_opt},
 };
 

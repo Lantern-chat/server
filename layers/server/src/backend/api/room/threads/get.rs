@@ -2,7 +2,6 @@ use schema::Snowflake;
 
 use sdk::models::*;
 
-use crate::backend::api::room::messages::get::get_one;
 use crate::{Authorization, Error, ServerState};
 
 pub async fn get_thread(

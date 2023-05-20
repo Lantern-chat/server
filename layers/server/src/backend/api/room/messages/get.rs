@@ -258,11 +258,10 @@ where
                 SelectedMessages AS (
                     SELECT
                         Messages.Id AS SelectedMessages.Id,
-                        Rooms.PartyId AS SelectedMessages.PartyId,
+                        LiveRooms.PartyId AS SelectedMessages.PartyId,
                         FALSE AS SelectedMessages.Starred
-                    FROM Messages INNER JOIN Rooms ON Rooms.Id = Messages.RoomId
+                    FROM LiveMessages AS Messages INNER JOIN LiveRooms ON LiveRooms.Id = Messages.RoomId
                     WHERE Messages.Id = #{msg_id as Messages::Id}
-                    AND Messages.Flags & {MessageFlags::DELETED.bits()} = 0
                 )
             }
             SearchRequest::Many {
@@ -277,14 +276,14 @@ where
                 SelectedMessages AS MATERIALIZED (
                     SELECT
                         Messages.Id AS SelectedMessages.Id,
-                        Rooms.PartyId AS SelectedMessages.PartyId,
+                        LiveRooms.PartyId AS SelectedMessages.PartyId,
                         EXISTS(
                             SELECT FROM MessageStars
                             WHERE MessageStars.MsgId = Messages.Id
                             AND MessageStars.UserId = #{user_id as Users::Id}
                         ) AS SelectedMessages.Starred
 
-                    FROM Messages INNER JOIN Rooms ON Rooms.Id = Messages.RoomId
+                    FROM LiveMessages AS Messages INNER JOIN LiveRooms ON LiveRooms.Id = Messages.RoomId
 
                     if needs_perms {
                         INNER JOIN AggRoomPerms
@@ -292,9 +291,7 @@ where
                             AND AggRoomPerms.UserId = #{user_id as Users::Id}
                     }
 
-                    // always start off with selecting non-deleted messages
-                    WHERE Messages.Flags & {MessageFlags::DELETED.bits()} = 0
-                    AND   Messages.RoomId = #{room_id as Rooms::Id}
+                    WHERE Messages.RoomId = #{room_id as Rooms::Id}
 
                     if let Some(ref parent) = parent {
                         AND Messages.ThreadId = #{parent as Messages::ThreadId}
@@ -397,8 +394,8 @@ where
                         } AS SelectedMessages.Starred
 
                     FROM Messages
-                        INNER JOIN Rooms ON Rooms.Id = Messages.RoomId
                         INNER JOIN AllowedRooms ON AllowedRooms.RoomId = Messages.RoomId
+                        INNER JOIN Rooms ON Rooms.Id = Messages.RoomId
 
                     if has_many_pins {
                         INNER JOIN MessagePins ON MessagePins.MsgId = Messages.Id

@@ -261,11 +261,7 @@ pub(crate) async fn insert_message(
                     .into::<Attachments>()
                     .cols(&[Attachments::FileId, Attachments::MessageId])
                     .query(
-                        Query::select()
-                            .col(AggIds::Id)
-                            .expr(Params::msg_id())
-                            .from_table::<AggIds>()
-                            .as_value(),
+                        Query::select().col(AggIds::Id).expr(Params::msg_id()).from_table::<AggIds>().as_value(),
                     )
             },
             &Params {
@@ -277,7 +273,7 @@ pub(crate) async fn insert_message(
         .await?;
     }
 
-    let msg = super::get::get_one_transactional(state, msg_id, room_id, &t).await?;
+    let msg = super::get::get_one(state, &t, msg_id).await?;
 
     t.commit().await?;
 
