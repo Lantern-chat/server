@@ -63,7 +63,7 @@ thorn::enums! {
 
 lazy_static::lazy_static! {
     /// See [EventCode] for full documentation
-    pub static ref EVENT_CODE: Type = <EventCode as EnumType>::ty(37462);
+    pub static ref EVENT_CODE: Type = <EventCode as EnumType>::ty(38355);
 }
 
 thorn::tables! {
@@ -333,6 +333,58 @@ thorn::tables! {
         Expires: Nullable(Type::TIMESTAMPTZ),
         Address: Nullable(Type::INET),
         Network: Nullable(Type::CIDR),
+    }
+
+    pub struct LiveMessages in Lantern {
+        Id: Nullable(Type::INT8),
+        UserId: Nullable(Type::INT8),
+        RoomId: Nullable(Type::INT8),
+        ThreadId: Nullable(Type::INT8),
+        UpdatedAt: Nullable(Type::TIMESTAMPTZ),
+        EditedAt: Nullable(Type::TIMESTAMPTZ),
+        Kind: Nullable(Type::INT2),
+        Flags: Nullable(Type::INT2),
+        Content: Nullable(Type::TEXT),
+        Ts: Nullable(Type::TS_VECTOR),
+    }
+
+    pub struct LiveParties in Lantern {
+        Id: Nullable(Type::INT8),
+        OwnerId: Nullable(Type::INT8),
+        DefaultRoom: Nullable(Type::INT8),
+        AvatarId: Nullable(Type::INT8),
+        BannerId: Nullable(Type::INT8),
+        DeletedAt: Nullable(Type::TIMESTAMPTZ),
+        Flags: Nullable(Type::INT4),
+        Name: Nullable(Type::TEXT),
+        Description: Nullable(Type::TEXT),
+    }
+
+    pub struct LiveRooms in Lantern {
+        Id: Nullable(Type::INT8),
+        PartyId: Nullable(Type::INT8),
+        AvatarId: Nullable(Type::INT8),
+        ParentId: Nullable(Type::INT8),
+        DeletedAt: Nullable(Type::TIMESTAMPTZ),
+        Position: Nullable(Type::INT2),
+        Flags: Nullable(Type::INT2),
+        Name: Nullable(Type::TEXT),
+        Topic: Nullable(Type::TEXT),
+    }
+
+    pub struct LiveUsers in Lantern {
+        Id: Nullable(Type::INT8),
+        DeletedAt: Nullable(Type::TIMESTAMPTZ),
+        LastActive: Nullable(Type::TIMESTAMPTZ),
+        Dob: Nullable(Type::DATE),
+        Flags: Nullable(Type::INT4),
+        Discriminator: Nullable(Type::INT4),
+        Username: Nullable(Type::TEXT),
+        Email: Nullable(Type::TEXT),
+        Passhash: Nullable(Type::TEXT),
+        MfaSecret: Nullable(Type::BYTEA),
+        MfaBackup: Nullable(Type::BYTEA),
+        Preferences: Nullable(Type::JSONB),
     }
 
     pub struct Mentions in Lantern {
