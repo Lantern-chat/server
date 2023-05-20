@@ -424,8 +424,10 @@ CREATE TABLE lantern.messages (
     flags       smallint    NOT NULL    DEFAULT 0,
     content     text,
 
-    -- take the top 6 bits of the smallint flags as a language code
-    ts tsvector GENERATED ALWAYS AS (to_tsvector(lantern.to_language(flags >> 10), content)) STORED,
+    -- only generated for non-deleted, and take the top 6 bits of the smallint flags as a language code
+    ts tsvector GENERATED ALWAYS AS (
+        CASE WHEN flags & 1 = 1 THEN NULL ELSE to_tsvector(lantern.to_language(flags >> 10), content) END
+    ) STORED,
 
     CONSTRAINT messages_pk PRIMARY KEY (id)
 );
