@@ -8,16 +8,19 @@ use crate::{Authorization, Error, ServerState};
 use sdk::models::gateway::message::ServerMsg;
 
 pub async fn trigger_typing(state: ServerState, auth: Authorization, room_id: Snowflake) -> Result<(), Error> {
-    let permissions = get_cached_room_permissions(&state, auth.user_id, room_id).await?;
+    let has_perms = match state.perm_cache.get(auth.user_id, room_id).await {
+        Some(perms) => {
+            if !perms.contains(Permissions::SEND_MESSAGES) {
+                return Err(Error::NotFound);
+            }
 
-    if !permissions.contains(Permissions::SEND_MESSAGES) {
-        return Err(Error::NotFound);
-    }
-
-    let db = state.db.read.get().await?;
+            true
+        }
+        _ => false,
+    };
 
     #[rustfmt::skip]
-    let row = db.query_opt2(schema::sql! {
+    let row = state.db.read.get().await?.query_opt2(schema::sql! {
         tables! {
             pub struct AggRoom {
                 PartyId: Rooms::PartyId,
@@ -25,8 +28,18 @@ pub async fn trigger_typing(state: ServerState, auth: Authorization, room_id: Sn
         };
 
         WITH AggRoom AS (
-            SELECT Rooms.PartyId AS AggRoom.PartyId
-            FROM Rooms WHERE Rooms.Id = #{&room_id as SNOWFLAKE}
+            if has_perms {
+                SELECT LiveRooms.PartyId AS AggRoom.PartyId
+                FROM LiveRooms WHERE LiveRooms.Id = #{&room_id as Rooms::Id}
+            } else {
+                SELECT AggRoomPerms.PartyId AS AggRoom.PartyId
+                FROM  AggRoomPerms
+                WHERE AggRoomPerms.UserId = #{&auth.user_id as Users::Id}
+                AND   AggRoomPerms.RoomId = #{&room_id as Rooms::Id}
+
+                let perms = Permissions::SEND_MESSAGES.to_i64();
+                AND AggRoomPerms.Permissions1 & {perms[0]} = {perms[0]}
+            }
         )
 
         SELECT

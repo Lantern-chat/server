@@ -90,12 +90,12 @@ pub async fn add_reaction(
                     }
                     EmoteOrEmojiId::Emote(ref emote_id) => {
                         Rooms.PartyId AS Checked.PartyId
-                        FROM  Rooms INNER JOIN Emotes ON Rooms.PartyId = Emotes.PartyId
+                        FROM  LiveRooms AS Rooms INNER JOIN Emotes ON Rooms.PartyId = Emotes.PartyId
                         WHERE Rooms.Id = #{&room_id as Rooms::Id}
                         AND   Emotes.Id = #{emote_id as Emotes::Id}
                     }
                     EmoteOrEmojiId::Emoji(_) => {
-                        Rooms.PartyId AS Checked.PartyId FROM Rooms WHERE Rooms.Id = #{&room_id as Rooms::Id}
+                        Rooms.PartyId AS Checked.PartyId FROM LiveRooms AS Rooms WHERE Rooms.Id = #{&room_id as Rooms::Id}
                     }
                 }
             } else {

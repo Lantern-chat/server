@@ -53,7 +53,7 @@ pub async fn create_invite(
                 let perms = Permissions::CREATE_INVITE.to_i64();
                 (PartyMembers.Permissions1 & {perms[0]} = {perms[0]} AND
                  PartyMembers.Permissions2 & {perms[1]} = {perms[1]}) AS Checked.Allowed
-            FROM PartyMembers INNER JOIN Party ON Party.Id = PartyMembers.PartyId
+            FROM PartyMembers INNER JOIN LiveParties AS Party ON Party.Id = PartyMembers.PartyId
             WHERE PartyMembers.UserId = #{&auth.user_id as Users::Id}
             AND PartyMembers.PartyId = #{&party_id as Party::Id}
         ), Inserted AS (

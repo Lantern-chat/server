@@ -30,10 +30,8 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) ->
             Users.Passhash  AS @Passhash,
             Users.MfaSecret AS @MfaSecret,
             Users.MfaBackup AS @MfaBackup
-        FROM Users
-        WHERE
-            Users.Email = #{&form.email as Users::Email} AND Users.DeletedAt IS NULL
-
+        FROM  LiveUsers AS Users
+        WHERE Users.Email = #{&form.email as Users::Email}
     }).await?;
 
     let Some(user) = user else { return Err(Error::InvalidCredentials); };

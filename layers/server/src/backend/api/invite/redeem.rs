@@ -90,7 +90,7 @@ pub async fn redeem_invite(
                     #{&auth.user_id as Messages::UserId},
                     Party.DefaultRoom,
                     {MessageKind::Welcome as i16}
-                FROM Invite INNER JOIN Party ON Party.Id = Invite.PartyId
+                FROM Invite INNER JOIN LiveParties AS Party ON Party.Id = Invite.PartyId
                 WHERE Invite.Id = #{&invite_id as Invite::Id}
             )
         })

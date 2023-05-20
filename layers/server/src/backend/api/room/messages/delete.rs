@@ -46,8 +46,7 @@ pub async fn delete_msg(
 
         if perms.is_none() { FROM TempPerms } // include CTE if needed
 
-        WHERE
-            Messages.Id = #{&msg_id as Messages::Id}
+        WHERE Messages.Id = #{&msg_id as Messages::Id}
         AND Messages.Flags & {MessageFlags::DELETED.bits()} = 0 // prevent double updates
 
         match perms {

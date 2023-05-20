@@ -67,7 +67,7 @@ pub async fn ready(state: ServerState, conn_id: Snowflake, auth: Authorization) 
 
                 AggRoles.RoleIds AS @RoleIds
             FROM
-                Party INNER JOIN PartyMembers
+                LiveParties AS Party INNER JOIN PartyMembers
                     ON PartyMembers.PartyId = Party.Id
                 LEFT JOIN Profiles AS BaseProfile
                     ON (BaseProfile.UserId = PartyMembers.UserId AND BaseProfile.PartyId IS NULL)
@@ -80,8 +80,7 @@ pub async fn ready(state: ServerState, conn_id: Snowflake, auth: Authorization) 
                     AND Roles.PartyId = PartyMembers.PartyId
                     AND RoleMembers.UserId = PartyMembers.UserId
                 ) AS AggRoles ON TRUE
-            WHERE
-                Party.DeletedAt IS NULL AND PartyMembers.UserId = #{&auth.user_id as Users::Id}
+            WHERE PartyMembers.UserId = #{&auth.user_id as Users::Id}
         }).await?;
 
         let mut parties = HashMap::with_capacity(rows.len());
