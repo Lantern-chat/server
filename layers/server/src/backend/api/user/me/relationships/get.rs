@@ -71,7 +71,7 @@ pub async fn get_relationships(
                     preferences: None,
                     profile: match row.try_get(ProfileColumns::bits())? {
                         None => Nullable::Null,
-                        Some(bits) => Nullable::Some(Box::new(UserProfile {
+                        Some(bits) => Nullable::Some(Arc::new(UserProfile {
                             bits,
                             extra: Default::default(),
                             nick: match associated {

@@ -15,7 +15,7 @@ pub async fn search(mut route: Route<ServerState>, auth: Authorization, party_id
     let terms = schema::search::parse_search_terms(std::str::from_utf8(&body)?)?;
 
 
-    let res = crate::backend::api::room::messages::get2::get_search(route.state, auth, party_id, terms).await?;
+    let res = crate::backend::api::room::messages::get::get_search(route.state, auth, party_id, terms).await?;
 
     let count = res.lower_bound.load(std::sync::atomic::Ordering::Relaxed);
 
