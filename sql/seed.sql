@@ -1583,7 +1583,7 @@ BEGIN
     -- TODO: See if this can be made more efficient for the conflcit query
     WITH rm AS (
         SELECT party_members.user_id, rooms.id AS room_id
-        FROM lantern.party_members LEFT JOIN lantern.rooms ON rooms.party_id = party_members.party_id
+        FROM lantern.party_members LEFT JOIN lantern.live_rooms rooms ON rooms.party_id = party_members.party_id
     ), perms AS (
         SELECT
             rm.user_id, rm.room_id,
@@ -1612,6 +1612,7 @@ BEGIN
             roles.permissions2
         FROM lantern.party_members
             INNER JOIN lantern.roles ON roles.party_id = party_members.party_id
+            INNER JOIN lantern.live_parties party ON party.id = party_members.party_id
             INNER JOIN lantern.role_members
                 ON role_members.role_id = roles.id AND role_members.user_id = party_members.user_id
 
@@ -1625,7 +1626,7 @@ BEGIN
 
         FROM lantern.party_members
             INNER JOIN lantern.roles ON roles.party_id = party_members.party_id AND roles.party_id = roles.id
-            INNER JOIN lantern.party ON party.id = roles.party_id
+            INNER JOIN lantern.live_parties party ON party.id = roles.party_id
     ), perms AS (
         SELECT user_roles.party_id, user_roles.user_id,
             bit_or(user_roles.permissions1) AS permissions1,
@@ -1818,7 +1819,7 @@ BEGIN
     -- TODO: Delete any active per-member information that should not be retained
 
     DELETE FROM lantern.room_members m
-    USING lantern.rooms
+    USING lantern.live_rooms rooms
     WHERE m.user_id = OLD.user_id
         AND m.room_id = rooms.id
         AND rooms.party_id = OLD.party_id;
@@ -1846,7 +1847,7 @@ BEGIN
             -- deny | user_deny, NULL if 0
             NULLIF(COALESCE(bit_or(o.deny1), 0) | COALESCE(bit_or(o.user_deny1), 0), 0) AS deny1,
             NULLIF(COALESCE(bit_or(o.deny2), 0) | COALESCE(bit_or(o.user_deny2), 0), 0) AS deny2
-        FROM lantern.agg_overwrites o INNER JOIN lantern.rooms ON rooms.id = o.room_id
+        FROM lantern.agg_overwrites o INNER JOIN lantern.live_rooms rooms ON rooms.id = o.room_id
         WHERE rooms.party_id = NEW.party_id
         GROUP BY o.room_id
     );
@@ -1881,7 +1882,7 @@ BEGIN
 END
 $$;
 
-CREATE TRIGGER room_insert_member AFTER INSERT ON lantern.rooms
+CREATE TRIGGER room_add AFTER INSERT ON lantern.rooms
 FOR EACH ROW EXECUTE FUNCTION lantern.on_room_add();
 
 -- when users are given or removed from a role, update their permissions
@@ -1902,7 +1903,7 @@ BEGIN
     WITH r AS (
         -- get all rooms in party based on the role given/removed
         SELECT rooms.id AS room_id, rooms.party_id
-        FROM lantern.rooms INNER JOIN lantern.roles ON roles.party_id = rooms.party_id
+        FROM lantern.live_rooms rooms INNER JOIN lantern.roles ON roles.party_id = rooms.party_id
         WHERE roles.id = _role_id
     ), perms AS (
         -- iterate through rooms and accumulate overwrites
@@ -1938,7 +1939,7 @@ BEGIN
     WITH p AS (
         -- get party_id of role being given/removed
         SELECT roles.party_id, party.owner_id
-        FROM lantern.roles INNER JOIN lantern.party ON party.id = roles.party_id
+        FROM lantern.roles INNER JOIN lantern.live_parties party ON party.id = roles.party_id
         WHERE roles.id = _role_id
     ), perms AS (
         -- pass through p.party_id to limit party_members below
@@ -2103,7 +2104,7 @@ SELECT
 FROM
     lantern.party_members INNER JOIN
         lantern.roles INNER JOIN
-            lantern.overwrites INNER JOIN lantern.rooms ON rooms.id = overwrites.room_id
+            lantern.overwrites INNER JOIN lantern.live_rooms rooms ON rooms.id = overwrites.room_id
         ON roles.id = rooms.party_id AND roles.id = overwrites.role_id
     ON party_members.party_id = rooms.party_id;
 
@@ -2119,7 +2120,7 @@ SELECT
         COALESCE(allow2, 0) | (party_members.permissions2 & ~COALESCE(deny2, 0))
     END AS permissions2
 FROM
-    lantern.party_members INNER JOIN lantern.rooms ON rooms.party_id = party_members.party_id
+    lantern.party_members INNER JOIN lantern.live_rooms rooms ON rooms.party_id = party_members.party_id
     LEFT JOIN lantern.room_members ON room_members.room_id = rooms.id AND room_members.user_id = party_members.user_id
 ;
 
@@ -2408,7 +2409,7 @@ BEGIN
     UPDATE lantern.invite
         SET uses = uses - 1
     FROM
-        lantern.party
+        lantern.live_parties party
             LEFT JOIN lantern.party_bans ON party_bans.party_id = party.id AND party_bans.user_id = _user_id
     WHERE
         invite.uses > 0
@@ -2587,7 +2588,7 @@ BEGIN
     END IF;
 
     -- edge case, replying to a reply to a thread, use the ancestor thread_id
-    SELECT thread_id INTO _existing_thread_id FROM lantern.messages WHERE messages.id = _parent_id;
+    SELECT thread_id INTO _existing_thread_id FROM lantern.live_messages messages WHERE messages.id = _parent_id;
     IF _existing_thread_id IS NOT NULL THEN
         RETURN _existing_thread_id;
     END IF;
