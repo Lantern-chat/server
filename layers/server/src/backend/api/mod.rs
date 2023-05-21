@@ -42,6 +42,7 @@ pub mod party {
     pub mod get;
     pub mod members;
     pub mod roles;
+    pub mod stats;
 
     pub mod rooms {
         pub mod get;

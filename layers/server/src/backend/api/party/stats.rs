@@ -37,7 +37,7 @@ pub async fn get_stats(
         };
 
         WITH AllowedRooms AS (
-            SELECT AggRoomPerms.RoomId AS AllowedRooms.RoomId
+            SELECT AggRoomPerms.Id AS AllowedRooms.RoomId
             FROM   AggRoomPerms
             WHERE  AggRoomPerms.UserId = #{&auth.user_id as Users::Id}
             AND (
@@ -49,7 +49,7 @@ pub async fn get_stats(
             )
 
             AND match form.room_id {
-                Some(ref room_id) => { AggRoomPerms.RoomId = #{room_id as Rooms::Id} }
+                Some(ref room_id) => { AggRoomPerms.Id      = #{room_id as Rooms::Id} }
                 None              => { AggRoomPerms.PartyId = #{&party_id as Party::Id} },
             }
         )

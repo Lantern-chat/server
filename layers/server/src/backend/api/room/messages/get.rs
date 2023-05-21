@@ -287,7 +287,7 @@ where
 
                     if needs_perms {
                         INNER JOIN AggRoomPerms
-                            ON AggRoomPerms.RoomId = Messages.RoomId
+                            ON  AggRoomPerms.Id     = Messages.RoomId
                             AND AggRoomPerms.UserId = #{user_id as Users::Id}
                     }
 
@@ -333,7 +333,7 @@ where
                 let data = data.as_ref().unwrap();
 
                 AllowedRooms AS (
-                    SELECT AggRoomPerms.RoomId AS AllowedRooms.RoomId
+                    SELECT AggRoomPerms.Id AS AllowedRooms.RoomId
                     FROM   AggRoomPerms
                     WHERE  AggRoomPerms.UserId = #{&auth.user_id as Users::Id}
                     AND (
@@ -346,7 +346,7 @@ where
 
                     AND match scope {
                         SearchScope::Party(ref party_id) => { AggRoomPerms.PartyId = #{party_id as Party::Id} },
-                        SearchScope::Room(ref room_id) => { AggRoomPerms.RoomId = #{room_id as Rooms::Id} }
+                        SearchScope::Room(ref room_id)   => {      AggRoomPerms.Id = #{room_id as Rooms::Id} }
                     }
                 ),
                 if let Some(ref query) = data.query {

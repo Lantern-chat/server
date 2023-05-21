@@ -99,13 +99,15 @@ pub async fn add_reaction(
                     }
                 }
             } else {
+                // hacky, but whatever
+                type Rooms = AggRoomPerms;
+
                 match emote {
                     EmoteOrEmojiId::Emoji(_) => {
                         Rooms.PartyId AS Checked.PartyId
-                        FROM Rooms INNER JOIN AggRoomPerms
-                            ON AggRoomPerms.RoomId = Rooms.Id
-                            AND AggRoomPerms.UserId = #{&auth.user_id as Users::Id}
-                        WHERE Rooms.Id = #{&room_id as Rooms::Id}
+                        FROM AggRoomPerms AS Rooms
+                        WHERE Rooms.Id     = #{&room_id as Rooms::Id}
+                        AND   Rooms.UserId = #{&auth.user_id as Users::Id}
                     }
                     EmoteOrEmojiId::Emote(ref emote_id) => {
                         PartyMembers.PartyId AS Checked.PartyId
@@ -113,27 +115,25 @@ pub async fn add_reaction(
                             // ensure user is a member of the party they're using the emote from
                             INNER JOIN Emotes ON Emotes.PartyId = PartyMembers.PartyId
                             // join with rooms to get target party id
-                            INNER JOIN Rooms ON Rooms.Id = #{&room_id as Rooms::Id}
-                            INNER JOIN AggRoomPerms
-                                ON  AggRoomPerms.RoomId = Rooms.Id
-                                AND AggRoomPerms.UserId = PartyMembers.UserId
+                            INNER JOIN AggRoomPerms AS Rooms ON Rooms.UserId = PartyMembers.UserId
                         WHERE
                             PartyMembers.UserId = #{&auth.user_id as Users::Id}
+                        AND Rooms.Id = #{&room_id as Rooms::Id}
                         AND Emotes.Id = #{emote_id as Emotes::Id}
                         // emote is in same party as the room we're sending to,
                         // or the user has the permissions to use external emotes
                         AND (Emotes.PartyId = Rooms.PartyId OR (
                             let use_external = Permissions::USE_EXTERNAL_EMOTES.to_i64();
 
-                                (AggRoomPerms.Permissions1 & {use_external[0]} = {use_external[0]})
-                            AND (AggRoomPerms.Permissions2 & {use_external[1]} = {use_external[1]})
+                                (Rooms.Permissions1 & {use_external[0]} = {use_external[0]})
+                            AND (Rooms.Permissions2 & {use_external[1]} = {use_external[1]})
                         ))
                     }
                 }
 
                 let add_reactions = Permissions::ADD_REACTIONS.to_i64();
-                AND (AggRoomPerms.Permissions1 & {add_reactions[0]} = {add_reactions[0]})
-                AND (AggRoomPerms.Permissions2 & {add_reactions[1]} = {add_reactions[1]})
+                AND (Rooms.Permissions1 & {add_reactions[0]} = {add_reactions[0]})
+                AND (Rooms.Permissions2 & {add_reactions[1]} = {add_reactions[1]})
             }
         ),
 

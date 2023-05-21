@@ -35,8 +35,7 @@ pub async fn delete_msg(
                     AggRoomPerms.Permissions1 AS TempPerms.Permissions1,
                     AggRoomPerms.Permissions2 AS TempPerms.Permissions2
                 FROM AggRoomPerms
-                WHERE
-                    AggRoomPerms.RoomId = #{&room_id as Rooms::Id}
+                WHERE   AggRoomPerms.Id = #{&room_id as Rooms::Id}
                 AND AggRoomPerms.UserId = #{&auth.user_id as Users::Id}
             )
         }

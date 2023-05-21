@@ -2110,9 +2110,9 @@ FROM
 
 --
 
-CREATE OR REPLACE VIEW lantern.agg_room_perms(party_id, room_id, user_id, permissions1, permissions2) AS
+CREATE OR REPLACE VIEW lantern.agg_room_perms AS
 SELECT
-    rooms.party_id, rooms.id, party_members.user_id,
+    rooms.*, party_members.user_id,
     CASE WHEN party_members.permissions1 = -1 THEN -1 ELSE
         COALESCE(allow1, 0) | (party_members.permissions1 & ~COALESCE(deny1, 0))
     END AS permissions1,

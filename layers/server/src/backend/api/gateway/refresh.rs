@@ -14,7 +14,7 @@ pub async fn refresh_room_perms(
     #[rustfmt::skip]
     let stream = db.query_stream2(schema::sql! {
         SELECT
-            AggRoomPerms.RoomId         AS @RoomId,
+            AggRoomPerms.Id             AS @RoomId,
             AggRoomPerms.Permissions1   AS @Permissions1,
             AggRoomPerms.Permissions2   AS @Permissions2
         FROM AggRoomPerms

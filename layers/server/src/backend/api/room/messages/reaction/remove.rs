@@ -43,7 +43,7 @@ pub async fn remove_own_reaction(
             if perms.is_none() {
                 INNER JOIN AggRoomPerms ON
                     AggRoomPerms.UserId = #{&auth.user_id as Users::Id}
-                AND AggRoomPerms.RoomId = #{&room_id as Rooms::Id}
+                AND AggRoomPerms.Id     = #{&room_id as Rooms::Id}
             }
 
             WHERE Reactions.MsgId = #{&msg_id as Messages::Id}
