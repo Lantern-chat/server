@@ -45,6 +45,7 @@ pub mod party {
     pub mod stats;
 
     pub mod rooms {
+        pub mod create;
         pub mod get;
     }
 }

@@ -59,15 +59,7 @@ pub async fn get_room(state: ServerState, auth: Authorization, room_id: Snowflak
                     let mut overwrites = ThinVec::with_capacity(raw.len());
 
                     for ow in raw {
-                        let Some(id) = ow.r.or(ow.u) else {
-                            return Err(Error::InternalErrorStatic("No ID for Overwrite!"));
-                        };
-
-                        overwrites.push(Overwrite {
-                            id,
-                            allow: Permissions::from_i64_opt(ow.a1, ow.a2),
-                            deny: Permissions::from_i64_opt(ow.d1, ow.d2),
-                        });
+                        overwrites.push(ow.to_overwrite()?);
                     }
 
                     overwrites
@@ -88,4 +80,19 @@ struct RawOverwrite {
     a2: Option<i64>,
     d1: Option<i64>,
     d2: Option<i64>,
+}
+
+#[allow(clippy::wrong_self_convention)]
+impl RawOverwrite {
+    pub fn to_overwrite(self) -> Result<Overwrite, Error> {
+        let Some(id) = self.r.or(self.u) else {
+            return Err(Error::InternalErrorStatic("No ID for Overwrite!"));
+        };
+
+        Ok(Overwrite {
+            id,
+            allow: Permissions::from_i64_opt(self.a1, self.a2),
+            deny: Permissions::from_i64_opt(self.d1, self.d2),
+        })
+    }
 }

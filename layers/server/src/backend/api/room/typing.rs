@@ -35,7 +35,7 @@ pub async fn trigger_typing(state: ServerState, auth: Authorization, room_id: Sn
                 SELECT AggRoomPerms.PartyId AS AggRoom.PartyId
                 FROM  AggRoomPerms
                 WHERE AggRoomPerms.UserId = #{&auth.user_id as Users::Id}
-                AND   AggRoomPerms.RoomId = #{&room_id as Rooms::Id}
+                AND   AggRoomPerms.Id = #{&room_id as Rooms::Id}
 
                 let perms = Permissions::SEND_MESSAGES.to_i64();
                 AND AggRoomPerms.Permissions1 & {perms[0]} = {perms[0]}
