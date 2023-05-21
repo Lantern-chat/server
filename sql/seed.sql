@@ -275,7 +275,7 @@ CREATE TABLE lantern.rooms (
     avatar_id       bigint,
     parent_id       bigint,
     deleted_at      timestamptz,
-    position        smallint    NOT NULL,
+    position        smallint    NOT NULL    DEFAULT 0,
     flags           smallint    NOT NULL    DEFAULT 0,
     name            text        NOT NULL,
     topic           text,
@@ -1005,14 +1005,6 @@ ALTER TABLE lantern.pin_tags ADD CONSTRAINT icon_fk FOREIGN KEY (icon_id)
 ----------------------------------------
 ------------ CONSTRAINTS ---------------
 ----------------------------------------
-
--- per-user, their parties must be sorted with unique positions
-ALTER TABLE lantern.party_members ADD CONSTRAINT unique_party_position
-    UNIQUE(user_id, position) DEFERRABLE INITIALLY DEFERRED; -- positions may be invalid for a short time before commit
-
--- per-party, their rooms must be sorted with unique positions
-ALTER TABLE lantern.rooms ADD CONSTRAINT unique_room_position
-    UNIQUE(party_id, position) DEFERRABLE INITIALLY DEFERRED; -- positions may be invalid for a short time before commit
 
 ALTER TABLE lantern.roles ADD CONSTRAINT unique_role_position
     UNIQUE(party_id, position) DEFERRABLE INITIALLY DEFERRED; -- positions may be invalid for a short time before commit
