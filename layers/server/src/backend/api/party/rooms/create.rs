@@ -16,6 +16,37 @@ pub async fn create_room(
     party_id: Snowflake,
     form: CreateRoomForm,
 ) -> Result<FullRoom, Error> {
+    if !state.config().party.roomname_len.contains(&form.name.len()) {
+        return Err(Error::InvalidName);
+    }
+
+    // check permissions AND check for the room limit at the same time.
+    #[rustfmt::skip]
+    let Some(row) = state.db.read.get().await?.query_opt2(schema::sql! {
+        SELECT
+            COUNT(Rooms.Id)::int4 AS @TotalRooms,
+            COUNT(CASE WHEN Rooms.DeletedAt IS NULL THEN Rooms.Id ELSE NULL END)::int4 AS @LiveRooms
+        FROM PartyMembers INNER JOIN Rooms ON Rooms.PartyId = PartyMembers.PartyId
+        WHERE PartyMembers.PartyId = #{&party_id as Party::Id}
+        AND PartyMembers.UserId = #{&auth.user_id as Users::Id}
+
+        let perms = Permissions::MANAGE_ROOMS.to_i64();
+        assert_eq!(perms[1], 0);
+
+        AND PartyMembers.Permissions1 & {perms[0]} = {perms[0]}
+    }).await? else {
+        return Err(Error::Unauthorized);
+    };
+
+    let total_rooms: i32 = row.total_rooms()?;
+    let live_rooms: i32 = row.live_rooms()?;
+
+    let config = state.config();
+    if total_rooms >= config.party.max_rooms as i32 || live_rooms >= config.party.max_active_rooms as i32 {
+        // TODO: Better error message here
+        return Err(Error::Unauthorized);
+    }
+
     #[rustfmt::skip]
     let flags = RoomFlags::empty() | match form.kind {
         CreateRoomKind::Text => RoomFlags::from(RoomKind::Text),
@@ -54,7 +85,8 @@ pub async fn create_room(
             SELECT Ow.Id, NULL, #{&room_id as Rooms::Id},
                 NULLIF(Ow.Allow1, 0), NULLIF(Ow.Allow2, 0),
                 NULLIF(Ow.Deny1, 0),  NULLIF(Ow.Deny2, 0)
-            FROM Ow INNER JOIN LiveUsers ON LiveUsers.Id = Ow.Id
+            FROM Ow INNER JOIN PartyMembers ON PartyMembers.UserId = Ow.Id
+            WHERE PartyMembers.PartyId = #{&party_id as Party::Id} // validate that given user is within party
 
             UNION ALL // at least one branch has it
 
@@ -62,6 +94,7 @@ pub async fn create_room(
                 NULLIF(Ow.Allow1, 0), NULLIF(Ow.Allow2, 0),
                 NULLIF(Ow.Deny1, 0),  NULLIF(Ow.Deny2, 0)
             FROM Ow INNER JOIN Roles ON Roles.Id = Ow.Id
+            WHERE Roles.PartyId = #{&party_id as Party::Id} // validate that given role is within the party
         )
     })
     .await?;
@@ -98,7 +131,12 @@ pub struct RawOverwrites {
 }
 
 impl RawOverwrites {
-    pub fn new(ows: impl IntoIterator<Item = Overwrite>) -> Self {
+    pub fn new(mut ows: ThinVec<Overwrite>) -> Self {
+        if ows.len() > 1 {
+            ows.sort_unstable_by_key(|ow| ow.id);
+            ows.dedup_by_key(|ow| ow.id);
+        }
+
         let mut raw = RawOverwrites::default();
 
         // collect overwrites in a SoA format that can be sent to the db
