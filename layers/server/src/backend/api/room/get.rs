@@ -1,122 +1,91 @@
 use futures::FutureExt;
 
 use schema::Snowflake;
+use thorn::pg::Json;
 
 use crate::backend::{cache::permission_cache::PermMute, util::encrypted_asset::encrypt_snowflake_opt};
 use crate::{Authorization, Error, ServerState};
 
 use sdk::models::*;
 
-pub async fn get_room(state: ServerState, auth: Authorization, room_id: Snowflake) -> Result<Room, Error> {
-    // TODO: Ensure the room permissions are cached after this
-    let perms = match state.perm_cache.get(auth.user_id, room_id).await {
-        Some(PermMute { perms, .. }) => {
-            if !perms.contains(Permissions::VIEW_ROOM) {
-                return Err(Error::NotFound);
-            }
+pub async fn get_room(state: ServerState, auth: Authorization, room_id: Snowflake) -> Result<FullRoom, Error> {
+    #[rustfmt::skip]
+    let Some(row) = state.db.read.get().await?.query_opt2(schema::sql! {
+        SELECT
+            Rooms.PartyId       AS @PartyId,
+            Rooms.AvatarId      AS @AvatarId,
+            Rooms.ParentId      AS @ParentId,
+            Rooms.Permissions1  AS @Permissions1,
+            Rooms.Permissions2  AS @Permissions2,
+            Rooms.Position      AS @Position,
+            Rooms.Flags         AS @Flags,
+            Rooms.Name          AS @Name,
+            Rooms.Topic         AS @Topic,
 
-            Some(perms)
-        }
-        None => None,
+            (SELECT jsonb_agg(jsonb_build_object(
+                "u", Overwrites.UserId,
+                "r", Overwrites.RoleId,
+                "a1", Overwrites.Allow1,
+                "a2", Overwrites.Allow2,
+                "d1", Overwrites.Deny1,
+                "d2", Overwrites.Deny2
+            )) FROM Overwrites WHERE Overwrites.RoomId = Rooms.Id) AS @Overwrites
+
+        FROM AggRoomPerms AS Rooms
+
+        WHERE Rooms.Id = #{&room_id as Rooms::Id}
+        AND Rooms.UserId = #{&auth.user_id as Users::Id}
+
+        let perms = Permissions::VIEW_ROOM.to_i64();
+        assert_eq!(perms[1], 0);
+        AND Rooms.Permissions1 & {perms[0]} = {perms[0]}
+    }).await? else {
+        return Err(Error::NotFound);
     };
 
-    let db = state.db.read.get().await?;
-
-    if let Some(perms) = perms {
-        // simple fast-path for cached permissions AND without needing overwrites, so most connected users
-        // NOTE: Having a cached permission implies they are in the party/DM of where that room exists
-        if !perms.contains(Permissions::MANAGE_PERMS) {
-            return get_room_simple(state, db, room_id).await;
-        }
-    }
-
-    get_room_full(state, db, auth.user_id, room_id, perms).boxed().await
-}
-
-/// Simple version for regular users with cached permissions saying they cannot view overwrites
-/// which results in just a simple single lookup
-async fn get_room_simple(state: ServerState, db: db::pool::Object, room_id: Snowflake) -> Result<Room, Error> {
-    let row = db
-        .query_opt_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
-
-                Query::select()
-                    .cols(&[
-                        /*0*/ Rooms::PartyId,
-                        /*1*/ Rooms::AvatarId,
-                        /*2*/ Rooms::Name,
-                        /*3*/ Rooms::Topic,
-                        /*4*/ Rooms::Position,
-                        /*5*/ Rooms::Flags,
-                        /*6*/ Rooms::ParentId,
-                    ])
-                    .and_where(Rooms::Id.equals(Var::of(Rooms::Id)))
-                    .and_where(Rooms::DeletedAt.is_null())
-            },
-            &[&room_id],
-        )
-        .await?;
-
-    match row {
-        None => Err(Error::NotFound),
-        Some(row) => Ok(Room {
+    Ok(FullRoom {
+        room: Room {
             id: room_id,
-            party_id: row.try_get(0)?,
-            avatar: encrypt_snowflake_opt(&state, row.try_get(1)?),
-            name: row.try_get(2)?,
-            topic: row.try_get(3)?,
-            position: row.try_get(4)?,
-            flags: row.try_get(5)?,
-            rate_limit_per_user: None,
-            parent_id: row.try_get(6)?,
-            overwrites: ThinVec::new(),
-        }),
-    }
+            flags: row.flags()?,
+            party_id: row.party_id()?,
+            parent_id: row.parent_id()?,
+            avatar: encrypt_snowflake_opt(&state, row.avatar_id()?),
+            position: row.position()?,
+            rate_limit_per_user: None, // TODO
+            overwrites: match row.overwrites::<Option<Json<Vec<RawOverwrite>>>>()? {
+                None => ThinVec::new(),
+                Some(Json(raw)) => {
+                    let raw: Vec<RawOverwrite> = raw; // force RA to type inference
+                    let mut overwrites = ThinVec::with_capacity(raw.len());
+
+                    for ow in raw {
+                        let Some(id) = ow.r.or(ow.u) else {
+                            return Err(Error::InternalErrorStatic("No ID for Overwrite!"));
+                        };
+
+                        overwrites.push(Overwrite {
+                            id,
+                            allow: Permissions::from_i64_opt(ow.a1, ow.a2),
+                            deny: Permissions::from_i64_opt(ow.d1, ow.d2),
+                        });
+                    }
+
+                    overwrites
+                }
+            },
+            name: row.name()?,
+            topic: row.topic()?,
+        },
+        perms: Permissions::from_i64(row.permissions1()?, row.permissions2()?),
+    })
 }
 
-async fn get_room_full(
-    state: ServerState,
-    db: db::pool::Object,
-    user_id: Snowflake,
-    room_id: Snowflake,
-    perms: Option<Permissions>,
-) -> Result<Room, Error> {
-    let base_perm_future = async {
-        let row = db
-            .query_opt_cached_typed(
-                || {
-                    use schema::*;
-                    use thorn::*;
-
-                    let room_id_var = Var::at(Rooms::Id, 1);
-                    let user_id_var = Var::at(Users::Id, 2);
-
-                    Query::select()
-                        .col(Party::OwnerId)
-                        .expr(Builtin::array_agg_nonnull(Roles::Id))
-                        .expr(Builtin::bit_or(Roles::Permissions1))
-                        .expr(Builtin::bit_or(Roles::Permissions2))
-                        .from(
-                            // select rooms and everything else dervied
-                            Rooms::inner_join(
-                                Roles::left_join_table::<Party>()
-                                    .on(Roles::PartyId.equals(Party::Id))
-                                    .left_join_table::<RoleMembers>()
-                                    .on(RoleMembers::RoleId.equals(Roles::Id)),
-                            )
-                            .on(Party::Id.equals(Rooms::PartyId)),
-                        )
-                        .and_where(Rooms::Id.equals(room_id_var))
-                        .and_where(RoleMembers::UserId.equals(user_id_var).or(Roles::Id.equals(Party::Id)))
-                },
-                &[&room_id, &user_id],
-            )
-            .await?;
-
-        Ok::<_, Error>(())
-    };
-
-    unimplemented!()
+#[derive(Deserialize)]
+struct RawOverwrite {
+    u: Option<Snowflake>,
+    r: Option<Snowflake>,
+    a1: Option<i64>,
+    a2: Option<i64>,
+    d1: Option<i64>,
+    d2: Option<i64>,
 }
