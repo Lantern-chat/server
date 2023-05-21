@@ -1101,6 +1101,7 @@ CREATE INDEX user_tokens_expires_idx        ON lantern.user_tokens      USING bt
 CREATE INDEX party_name_idx                 ON lantern.party            USING btree(name);
 CREATE INDEX party_member_user_idx          ON lantern.party_members    USING btree(user_id);
 CREATE INDEX room_name_idx                  ON lantern.rooms            USING btree(name);
+CREATE INDEX room_party_idx                 ON lantern.rooms            USING btree(party_id);
 CREATE INDEX room_avatar_idx                ON lantern.rooms            USING btree(avatar_id) WHERE avatar_id IS NOT NULL;
 CREATE INDEX file_idx                       ON lantern.files            USING btree(user_id, id)        INCLUDE (size);
 CREATE INDEX user_asset_original_file_idx   ON lantern.user_assets      USING btree(file_id);
