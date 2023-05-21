@@ -733,7 +733,7 @@ ALTER TABLE lantern.rooms ADD CONSTRAINT parent_fk FOREIGN KEY (parent_id)
 ALTER TABLE lantern.party ADD CONSTRAINT default_room_fk FOREIGN KEY (default_room)
     REFERENCES lantern.rooms (id) MATCH FULL
     ON DELETE RESTRICT ON UPDATE CASCADE -- don't allow deleting default room
-    DEFERRABLE INITIALLY DEFERRED;
+    DEFERRABLE INITIALLY DEFERRED; -- party must be inserted before room
 
 ALTER TABLE lantern.room_members ADD CONSTRAINT room_fk FOREIGN KEY (room_id)
     REFERENCES lantern.rooms (id) MATCH FULL
@@ -916,7 +916,8 @@ ALTER TABLE lantern.group_members ADD CONSTRAINT user_id_fk FOREIGN KEY (user_id
 
 ALTER TABLE lantern.overwrites ADD CONSTRAINT room_id_fk FOREIGN KEY (room_id)
     REFERENCES lantern.rooms (id) MATCH FULL
-    ON DELETE CASCADE ON UPDATE CASCADE;
+    ON DELETE CASCADE ON UPDATE CASCADE
+    DEFERRABLE INITIALLY DEFERRED; -- insert overwrites, insert room, commit
 
 ALTER TABLE lantern.overwrites ADD CONSTRAINT role_id_fk FOREIGN KEY (role_id)
     REFERENCES lantern.roles (id) MATCH FULL
@@ -1007,14 +1008,14 @@ ALTER TABLE lantern.pin_tags ADD CONSTRAINT icon_fk FOREIGN KEY (icon_id)
 
 -- per-user, their parties must be sorted with unique positions
 ALTER TABLE lantern.party_members ADD CONSTRAINT unique_party_position
-    UNIQUE(user_id, position) DEFERRABLE INITIALLY DEFERRED;
+    UNIQUE(user_id, position) DEFERRABLE INITIALLY DEFERRED; -- positions may be invalid for a short time before commit
 
 -- per-party, their rooms must be sorted with unique positions
 ALTER TABLE lantern.rooms ADD CONSTRAINT unique_room_position
-    UNIQUE(party_id, position) DEFERRABLE INITIALLY DEFERRED;
+    UNIQUE(party_id, position) DEFERRABLE INITIALLY DEFERRED; -- positions may be invalid for a short time before commit
 
 ALTER TABLE lantern.roles ADD CONSTRAINT unique_role_position
-    UNIQUE(party_id, position) DEFERRABLE INITIALLY DEFERRED;
+    UNIQUE(party_id, position) DEFERRABLE INITIALLY DEFERRED; -- positions may be invalid for a short time before commit
 
 -- It's impossible to deny admin rights
 ALTER TABLE lantern.overwrites ADD CONSTRAINT ch_deny1 CHECK (deny1 & PERMISSIONS1_ADMINISTRATOR = 0);
