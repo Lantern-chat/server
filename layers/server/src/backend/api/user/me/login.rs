@@ -147,7 +147,7 @@ pub async fn process_2fa(
 
     let mfa_key = state.config().keys.mfa_key;
 
-    let Ok(secret) = decrypt_user_message(&mfa_key, user_id, secret) else {
+    let Some(secret) = decrypt_user_message(&mfa_key, user_id, secret) else {
         return Err(Error::InternalErrorStatic("Decrypt Error!"));
     };
 
@@ -160,7 +160,7 @@ pub async fn process_2fa(
         }
         13 => {
             let mut backup = match decrypt_user_message(&mfa_key, user_id, backup) {
-                Ok(backup) if backup.len() % 8 == 0 => backup,
+                Some(backup) if backup.len() % 8 == 0 => backup,
                 _ => return Err(Error::InternalErrorStatic("Decrypt Error!")),
             };
 

@@ -13,11 +13,11 @@ fn nonce_from_user_id(user_id: Snowflake) -> Nonce {
 
 pub fn encrypt_user_message(key: &[u8], user_id: Snowflake, plaintext: &[u8]) -> Vec<u8> {
     let gcm = Aes256GcmSiv::new_from_slice(key).unwrap();
-    gcm.encrypt(&nonce_from_user_id(user_id), plaintext)
-        .expect("Unable to encrypt")
+    gcm.encrypt(&nonce_from_user_id(user_id), plaintext).expect("Unable to encrypt")
 }
 
-pub fn decrypt_user_message(key: &[u8], user_id: Snowflake, ciphertext: &[u8]) -> Result<Vec<u8>, ()> {
+/// Returns None in cases of invalid or corrupted input
+pub fn decrypt_user_message(key: &[u8], user_id: Snowflake, ciphertext: &[u8]) -> Option<Vec<u8>> {
     let gcm = Aes256GcmSiv::new_from_slice(key).unwrap();
-    gcm.decrypt(&nonce_from_user_id(user_id), ciphertext).map_err(|_| ()) // can error from invalid signatures, so allow it through.
+    gcm.decrypt(&nonce_from_user_id(user_id), ciphertext).ok()
 }
