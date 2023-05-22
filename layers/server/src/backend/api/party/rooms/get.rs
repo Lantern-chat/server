@@ -1,205 +1,113 @@
-use futures::{Stream, StreamExt, TryStreamExt};
-
-use hashbrown::HashMap;
+use futures::{Stream, StreamExt};
 
 use schema::Snowflake;
 
 use sdk::models::*;
+use thorn::pg::Json;
 
 use crate::backend::util::encrypted_asset::encrypt_snowflake_opt;
 use crate::{Authorization, Error, ServerState};
 
-#[derive(Clone, Copy)]
-struct RawOverwrite {
-    room_id: Snowflake,
-    user_id: Option<Snowflake>,
-    role_id: Option<Snowflake>,
-    deny_packed: (i64, i64),
-    allow_packed: (i64, i64),
+pub enum RoomScope {
+    Party(Snowflake),
+    Room(Snowflake),
 }
 
-impl From<RawOverwrite> for Overwrite {
-    fn from(raw: RawOverwrite) -> Self {
-        Overwrite {
-            id: raw.user_id.or(raw.role_id).expect("No valid ID given"),
-            allow: Permissions::from_i64(raw.allow_packed.0, raw.allow_packed.1),
-            deny: Permissions::from_i64(raw.deny_packed.0, raw.deny_packed.1),
+pub async fn get_rooms(
+    state: ServerState,
+    auth: Authorization,
+    scope: RoomScope,
+) -> Result<impl Stream<Item = Result<FullRoom, Error>>, Error> {
+    #[rustfmt::skip]
+    let stream = state.db.read.get().await?.query_stream2(schema::sql! {
+        SELECT
+            Rooms.Id            AS @RoomId,
+            Rooms.PartyId       AS @PartyId,
+            Rooms.AvatarId      AS @AvatarId,
+            Rooms.ParentId      AS @ParentId,
+            Rooms.Permissions1  AS @Permissions1,
+            Rooms.Permissions2  AS @Permissions2,
+            Rooms.Position      AS @Position,
+            Rooms.Flags         AS @Flags,
+            Rooms.Name          AS @Name,
+            Rooms.Topic         AS @Topic,
+
+            (SELECT jsonb_agg(jsonb_build_object(
+                "u", Overwrites.UserId,
+                "r", Overwrites.RoleId,
+                "a1", Overwrites.Allow1,
+                "a2", Overwrites.Allow2,
+                "d1", Overwrites.Deny1,
+                "d2", Overwrites.Deny2
+            )) FROM Overwrites WHERE Overwrites.RoomId = Rooms.Id) AS @Overwrites
+
+        FROM AggRoomPerms AS Rooms
+
+        WHERE match scope {
+            RoomScope::Party(ref party_id) => { Rooms.PartyId = #{party_id as Rooms::PartyId} },
+            RoomScope::Room(ref room_id)   => { Rooms.Id      = #{room_id  as Rooms::Id} }
         }
-    }
+
+        AND Rooms.UserId = #{&auth.user_id as Users::Id}
+
+        let perms = Permissions::VIEW_ROOM.to_i64();
+        assert_eq!(perms[1], 0);
+        AND Rooms.Permissions1 & {perms[0]} = {perms[0]}
+    }).await?;
+
+    Ok(stream.map(move |row| match row {
+        Err(e) => Err(e.into()),
+        Ok(row) => Ok(FullRoom {
+            room: Room {
+                id: row.room_id()?,
+                flags: row.flags()?,
+                party_id: row.party_id()?,
+                parent_id: row.parent_id()?,
+                avatar: encrypt_snowflake_opt(&state, row.avatar_id()?),
+                position: row.position()?,
+                rate_limit_per_user: None, // TODO
+                overwrites: match row.overwrites::<Option<Json<Vec<RawOverwrite>>>>()? {
+                    None => ThinVec::new(),
+                    Some(Json(raw)) => {
+                        let raw: Vec<RawOverwrite> = raw; // force RA to type inference
+                        let mut overwrites = ThinVec::with_capacity(raw.len());
+
+                        for ow in raw {
+                            overwrites.push(ow.to_overwrite()?);
+                        }
+
+                        overwrites
+                    }
+                },
+                name: row.name()?,
+                topic: row.topic()?,
+            },
+            perms: Permissions::from_i64(row.permissions1()?, row.permissions2()?),
+        }),
+    }))
 }
 
-pub async fn get_rooms(state: ServerState, auth: Authorization, party_id: Snowflake) -> Result<Vec<Room>, Error> {
-    let db = state.db.read.get().await?;
+#[derive(Deserialize)]
+struct RawOverwrite {
+    u: Option<Snowflake>,
+    r: Option<Snowflake>,
+    a1: Option<i64>,
+    a2: Option<i64>,
+    d1: Option<i64>,
+    d2: Option<i64>,
+}
 
-    let base_perm_future = async {
-        let row = db
-            .query_one_cached_typed(
-                || {
-                    use schema::*;
-                    use thorn::*;
-
-                    Query::select()
-                        .col(Party::OwnerId)
-                        .expr(Builtin::array_agg_nonnull(Roles::Id))
-                        .expr(Builtin::bit_or(Roles::Permissions1))
-                        .expr(Builtin::bit_or(Roles::Permissions2))
-                        .from(
-                            Roles::left_join_table::<Party>()
-                                .on(Roles::PartyId.equals(Party::Id))
-                                .left_join_table::<RoleMembers>()
-                                .on(RoleMembers::RoleId.equals(Roles::Id)),
-                        )
-                        .and_where(Party::Id.equals(Var::of(Party::Id)))
-                        .and_where(
-                            // @user and @everyone roles
-                            RoleMembers::UserId.equals(Var::of(Users::Id)).or(Roles::Id.equals(Party::Id)),
-                        )
-                        .group_by(Party::OwnerId)
-                },
-                &[&party_id, &auth.user_id],
-            )
-            .await?;
-
-        let owner_id: Snowflake = row.try_get(0)?;
-        let role_ids: Vec<Snowflake> = row.try_get(1)?;
-
-        let permissions = if owner_id == auth.user_id {
-            Permissions::all()
-        } else {
-            Permissions::from_i64(row.try_get(2)?, row.try_get(3)?)
+#[allow(clippy::wrong_self_convention)]
+impl RawOverwrite {
+    pub fn to_overwrite(self) -> Result<Overwrite, Error> {
+        let Some(id) = self.r.or(self.u) else {
+            return Err(Error::InternalErrorStatic("No ID for Overwrite!"));
         };
 
-        Ok((permissions, role_ids))
-    };
-
-    let rooms_future = async {
-        let rows = db
-            .query_cached_typed(
-                || {
-                    use schema::*;
-                    use thorn::*;
-
-                    Query::select()
-                        .from(
-                            Rooms::inner_join_table::<PartyMembers>()
-                                .on(Rooms::PartyId.equals(PartyMembers::PartyId)),
-                        )
-                        .and_where(PartyMembers::UserId.equals(Var::of(Users::Id)))
-                        .cols(&[
-                            Rooms::Id,
-                            Rooms::Name,
-                            Rooms::Topic,
-                            Rooms::Flags,
-                            Rooms::AvatarId,
-                            Rooms::Position,
-                            Rooms::ParentId,
-                        ])
-                        .and_where(Rooms::DeletedAt.is_null())
-                        .and_where(Rooms::PartyId.equals(Var::of(Party::Id)))
-                },
-                &[&auth.user_id, &party_id],
-            )
-            .await?;
-
-        let mut rooms = HashMap::with_capacity(rows.len());
-
-        for row in &rows {
-            let room = Room {
-                id: row.try_get(0)?,
-                party_id: Some(party_id),
-                name: row.try_get(1)?,
-                topic: row.try_get(2)?,
-                flags: row.try_get(3)?,
-                avatar: encrypt_snowflake_opt(&state, row.try_get(4)?),
-                position: row.try_get(5)?,
-                rate_limit_per_user: None,
-                parent_id: row.try_get(6)?,
-                overwrites: ThinVec::new(),
-            };
-
-            rooms.insert(room.id, room);
-        }
-
-        Ok(rooms)
-    };
-
-    let overwrites_future = async {
-        let rows = db
-            .query_cached_typed(
-                || {
-                    use schema::*;
-                    use thorn::*;
-
-                    Query::select()
-                        .cols(&[
-                            Overwrites::RoomId,
-                            Overwrites::Allow1,
-                            Overwrites::Allow2,
-                            Overwrites::Deny1,
-                            Overwrites::Deny2,
-                            Overwrites::RoleId,
-                            Overwrites::UserId,
-                        ])
-                        .order_by(Overwrites::RoomId.ascending()) // group by room_id
-                        .order_by(Overwrites::RoleId.ascending().nulls_last()) // sort role overwrites first
-                        .from(Overwrites::left_join_table::<Rooms>().on(Overwrites::RoomId.equals(Rooms::Id)))
-                        .and_where(Rooms::PartyId.equals(Var::of(Party::Id)))
-                },
-                &[&party_id],
-            )
-            .await?;
-
-        let mut raw_overwrites = Vec::with_capacity(rows.len());
-
-        for row in rows {
-            raw_overwrites.push(RawOverwrite {
-                room_id: row.try_get(0)?,
-                allow_packed: (row.try_get(1)?, row.try_get(2)?),
-                deny_packed: (row.try_get(3)?, row.try_get(4)?),
-                role_id: row.try_get(5)?,
-                user_id: row.try_get(6)?,
-            });
-        }
-
-        Ok::<_, Error>(raw_overwrites)
-    };
-
-    let ((base_perm, roles), mut rooms, raw_overwrites) =
-        tokio::try_join!(base_perm_future, rooms_future, overwrites_future)?;
-
-    // iterate over raw overwrites and accumulate them in the correct room
-    // this lazily fetches different rooms only when the room_id changes,
-    // rather than a hashtable look up each iteration. Just an opportunistic thing for free.
-    let mut raw_overwrites = raw_overwrites.into_iter();
-    if let Some(raw) = raw_overwrites.next() {
-        let mut room = rooms.get_mut(&raw.room_id).unwrap();
-
-        room.overwrites.push(raw.into());
-
-        for raw in raw_overwrites {
-            if room.id != raw.room_id {
-                room = rooms.get_mut(&raw.room_id).unwrap();
-            }
-
-            room.overwrites.push(raw.into());
-        }
+        Ok(Overwrite {
+            id,
+            allow: Permissions::from_i64_opt(self.a1, self.a2),
+            deny: Permissions::from_i64_opt(self.d1, self.d2),
+        })
     }
-
-    if !base_perm.contains(Permissions::ADMINISTRATOR) {
-        rooms.retain(|_, room| {
-            let room_perm = base_perm.compute_overwrites(&room.overwrites, &roles, auth.user_id);
-
-            let can_view = room_perm.contains(Permissions::VIEW_ROOM);
-
-            // TODO: Determine the usefulness of hiding stuff
-            //// Do not display overwrites to users without the permission to manage permissions
-            //if can_view && !room_perm.contains(PartyPermissions::MANAGE_PERMS) {
-            //    room.overwrites.clear();
-            //}
-
-            can_view
-        });
-    }
-
-    Ok(rooms.into_iter().map(|(_, v)| v).collect())
 }
