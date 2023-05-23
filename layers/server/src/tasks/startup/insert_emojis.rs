@@ -7,23 +7,14 @@ pub fn add_emoji_insert_task(state: ServerState, runner: &TaskRunner) {
         log::trace!("Refreshing emoji list");
 
         let res = async {
-            let db = state.db.write.get().await?;
-
             let emojis: Vec<_> = emoji::iter().collect();
 
-            db.execute_cached_typed(
-                || {
-                    use schema::*;
-                    use thorn::*;
+            let db = state.db.write.get().await?;
 
-                    Query::insert()
-                        .into::<Emojis>()
-                        .cols(&[Emojis::Emoji])
-                        .value(Builtin::unnest(Var::of(Type::TEXT_ARRAY)))
-                        .on_conflict([Emojis::Emoji], ConflictAction::DoNothing)
-                },
-                &[&emojis],
-            )
+            db.execute2(schema::sql! {
+                INSERT INTO Emojis (Emoji) VALUES ( UNNEST(#{&emojis as Type::TEXT_ARRAY}) )
+                ON CONFLICT DO NOTHING
+            })
             .await?;
 
             Ok::<(), crate::Error>(())

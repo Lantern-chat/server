@@ -26,6 +26,7 @@ use sdk::models::{Permissions, Snowflake};
 type UserId = Snowflake;
 type RoomId = Snowflake;
 
+#[allow(clippy::upper_case_acronyms)]
 type SHB = SharedBuildHasher<ahash::RandomState>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

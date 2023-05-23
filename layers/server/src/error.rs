@@ -381,14 +381,14 @@ impl Error {
     }
 
     fn into_json(self) -> reply::Json {
-        reply::json(&ApiError {
+        reply::json(ApiError {
             code: self.to_apierror(),
             message: self.format(),
         })
     }
 
     fn into_cbor(self) -> reply::cbor::Cbor {
-        reply::cbor::cbor(&ApiError {
+        reply::cbor::cbor(ApiError {
             code: self.to_apierror(),
             message: self.format(),
         })

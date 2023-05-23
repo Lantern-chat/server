@@ -17,17 +17,9 @@ pub fn add_event_log_cleanup_task(state: &ServerState, runner: &TaskRunner) {
 
                 let last_event = state.gateway.last_events[1].load(Ordering::SeqCst);
 
-                db.execute_cached_typed(
-                    || {
-                        use schema::*;
-                        use thorn::*;
-
-                        Query::delete()
-                            .from::<EventLog>()
-                            .and_where(EventLog::Counter.less_than_equal(Var::of(EventLog::Counter)))
-                    },
-                    &[&last_event],
-                )
+                db.execute2(schema::sql! {
+                    DELETE FROM EventLog WHERE EventLog.Counter <= #{&last_event as EventLog::Counter}
+                })
                 .await?;
 
                 // take most recent event and put it into the second element

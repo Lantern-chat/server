@@ -1,4 +1,9 @@
-#![allow(unused_imports, clippy::redundant_pattern_matching)]
+#![allow(
+    unused_imports,
+    clippy::redundant_pattern_matching,
+    clippy::identity_op,
+    clippy::redundant_closure
+)]
 #![deny(deprecated)]
 
 #[macro_use]

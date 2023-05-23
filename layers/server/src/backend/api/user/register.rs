@@ -93,6 +93,7 @@ pub const fn hash_memory_cost() -> u32 {
     8 * 1024 // 8 MiB
 }
 
+#[allow(clippy::field_reassign_with_default)]
 pub fn hash_config() -> argon2::Config<'static> {
     let mut config = argon2::Config::default();
 

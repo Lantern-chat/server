@@ -11,10 +11,13 @@ pub fn add_cleanup_sessions_task(state: &ServerState, runner: &TaskRunner) {
 
             let now = SystemTime::now();
 
+            #[rustfmt::skip]
             let db_task = async {
                 match state.db.write.get().await {
                     Ok(db) => {
-                        if let Err(e) = db.execute_cached_typed(|| query(), &[&now]).await {
+                        if let Err(e) = db.execute2(schema::sql! {
+                            DELETE FROM Sessions WHERE Sessions.Expires < #{&now as Sessions::Expires}
+                        }).await {
                             log::error!("Error during session cleanup: {e}");
                         }
                     }
@@ -28,14 +31,4 @@ pub fn add_cleanup_sessions_task(state: &ServerState, runner: &TaskRunner) {
             };
         },
     )))
-}
-
-use thorn::*;
-
-fn query() -> impl AnyQuery {
-    use schema::*;
-
-    Query::delete()
-        .from::<Sessions>()
-        .and_where(Sessions::Expires.less_than(Var::of(Sessions::Expires)))
 }
