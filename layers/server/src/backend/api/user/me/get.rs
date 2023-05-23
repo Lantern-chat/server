@@ -34,6 +34,7 @@ pub async fn get_full_self_inner(
         FROM LiveUsers AS Users
             LEFT JOIN Profiles ON Profiles.UserId = Users.Id AND Profiles.PartyId IS NULL
             LEFT JOIN AggPresence ON AggPresence.UserId = Users.Id
+        WHERE Users.Id = #{&user_id as Users::Id}
     }).await?;
 
     Ok(User {
