@@ -89,7 +89,7 @@ async fn root(State(state): State<Arc<CamoState>>, req: Request<Body>) -> impl I
         return Err((StatusCode::BAD_REQUEST, "Invalid Encoding"));
     };
 
-    if let Err(_) = Hmac::new(&state.signing_key).chain_update(&url).verify_slice(&sig) {
+    if Hmac::new(&state.signing_key).chain_update(&url).verify_slice(&sig).is_err() {
         return Err((StatusCode::UNAUTHORIZED, "Incorrect Signature"));
     };
 

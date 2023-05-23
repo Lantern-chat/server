@@ -67,14 +67,14 @@ pub async fn main(req: Request, env: Env, _ctx: worker::Context) -> Result<Respo
         let mut raw_key = Key::<Hmac>::default();
 
         // keys are allowed to be shorter than the entire raw key. Will be padded internally.
-        if let Err(_) = hex::decode_to_slice(&hex_key, &mut raw_key[..hex_key.len() / 2]) {
+        if hex::decode_to_slice(&hex_key, &mut raw_key[..hex_key.len() / 2]).is_err() {
             return Response::error("", 500);
         }
 
         Hmac::new(&raw_key)
     };
 
-    if let Err(_) = hmac.chain_update(&url).verify_slice(&sig) {
+    if hmac.chain_update(&url).verify_slice(&sig).is_err() {
         return Response::error("Incorrect Signature", 401);
     };
 
