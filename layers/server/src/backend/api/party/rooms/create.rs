@@ -11,8 +11,17 @@ pub async fn create_room(
     party_id: Snowflake,
     form: CreateRoomForm,
 ) -> Result<FullRoom, Error> {
-    if !state.config().party.roomname_len.contains(&form.name.len()) {
+    let config = state.config().clone();
+
+    if !config.party.room_name_len.contains(&form.name.len()) {
         return Err(Error::InvalidName);
+    }
+
+    match form.topic {
+        Some(ref topic) if config.party.room_topic_len.contains(&topic.len()) => {
+            return Err(Error::InvalidTopic);
+        }
+        _ => {}
     }
 
     // check permissions AND check for the room limit at the same time.
@@ -36,7 +45,6 @@ pub async fn create_room(
     let total_rooms: i32 = row.total_rooms()?;
     let live_rooms: i32 = row.live_rooms()?;
 
-    let config = state.config();
     if total_rooms >= config.party.max_rooms as i32 || live_rooms >= config.party.max_active_rooms as i32 {
         // TODO: Better error message here
         return Err(Error::Unauthorized);

@@ -4,10 +4,13 @@ section! {
     #[serde(default)]
     pub struct Party {
         #[serde(with = "super::util::range")]
-        pub partyname_len: Range<usize>     = 3..64,
+        pub party_name_len: Range<usize>     = 3..64,
 
         #[serde(with = "super::util::range")]
-        pub roomname_len: Range<usize>      = 3..64,
+        pub room_name_len: Range<usize>      = 3..64,
+
+        #[serde(with = "super::util::range")]
+        pub room_topic_len: Range<usize>    = 1..512,
 
         /// Max rooms that are not deleted at any given time
         pub max_active_rooms: u16   = 128,
