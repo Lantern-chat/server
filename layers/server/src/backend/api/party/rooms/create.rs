@@ -1,10 +1,5 @@
-use futures::FutureExt;
-
 use schema::{Snowflake, SnowflakeExt};
-use smallvec::SmallVec;
-use thorn::pg::Json;
 
-use crate::backend::{cache::permission_cache::PermMute, util::encrypted_asset::encrypt_snowflake_opt};
 use crate::{Authorization, Error, ServerState};
 
 use sdk::api::commands::party::{CreateRoomForm, CreateRoomKind};
@@ -100,17 +95,20 @@ pub async fn create_room(
     .await?;
 
     if num_inserted != raw.id.len() as u64 {
+        t.rollback().await?;
+
         // TODO: Better error here
         return Err(Error::BadRequest);
     }
 
     t.execute2(schema::sql! {
-        INSERT INTO Rooms (Id, PartyId, Position, Flags, Name) VALUES (
-            #{&room_id as Rooms::Id},
-            #{&party_id as Party::Id},
-            #{&form.position as Rooms::Position},
-            #{&flags as Rooms::Flags},
-            #{&form.name as Rooms::Name}
+        INSERT INTO Rooms (Id, PartyId, Position, Flags, Name, Topic) VALUES (
+            #{&room_id          as Rooms::Id},
+            #{&party_id         as Party::Id},
+            #{&form.position    as Rooms::Position},
+            #{&flags            as Rooms::Flags},
+            #{&form.name        as Rooms::Name},
+            #{&form.topic       as Rooms::Topic}
         )
     })
     .await?;
