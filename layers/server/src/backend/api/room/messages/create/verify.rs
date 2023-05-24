@@ -1,12 +1,11 @@
 use std::borrow::Cow;
 
-use futures::FutureExt;
 use sdk::{models::Permissions, Snowflake};
 use smallvec::SmallVec;
 
 use crate::{Authorization, Error, ServerState};
 
-use md_utils::{is_spoilered, Span, SpanType};
+use md_utils::{Span, SpanType};
 
 pub async fn verify<'a>(
     t: &db::pool::Transaction<'_>,
@@ -38,30 +37,30 @@ pub async fn verify<'a>(
     emote_ids.sort_unstable();
     emote_ids.dedup();
 
-    let can_use_external = perms.contains(Permissions::USE_EXTERNAL_EMOTES);
-
-    use q::{Columns, Parameters, Params};
-
-    let params = Params {
-        kind_id: if can_use_external { auth.user_id } else { room_id },
-        ids: &emote_ids,
-    };
+    let emote_ids = emote_ids.as_slice();
 
     #[rustfmt::skip]
-    let rows = match can_use_external {
-        true => t.query_cached_typed(q::match_all_usable_emotes, &params.as_params()).boxed().await,
-        false => t.query_cached_typed(q::match_locally_usable_emotes, &params.as_params()).boxed().await,
-    };
-
-    let rows = rows?;
+    let rows = t.query2(schema::sql! {
+        SELECT
+            Emotes.Id AS @_,
+            Emotes.Name AS @_
+        FROM Emotes INNER JOIN match perms.contains(Permissions::USE_EXTERNAL_EMOTES) {
+            true => {
+                PartyMembers ON PartyMembers.PartyId = Emotes.PartyId
+                WHERE PartyMembers.UserId = #{&auth.user_id as Users::Id}
+            },
+            false => {
+                LiveRooms AS Rooms ON Rooms.PartyId = Emotes.PartyId
+                WHERE Rooms.Id = #{&room_id as Rooms::Id}
+            },
+        }
+        AND Emotes.Id = ANY(#{&emote_ids as SNOWFLAKE_ARRAY})
+    }).await?;
 
     let mut usable_emotes: SmallVec<[(&str, Snowflake); 16]> = SmallVec::new();
 
     for row in &rows {
-        usable_emotes.push((
-            row.try_get(Columns::name())?, //
-            row.try_get(Columns::id())?,
-        ));
+        usable_emotes.push((row.emotes_name()?, row.emotes_id()?));
     }
 
     let mut new_content = String::with_capacity(content.len());
@@ -89,41 +88,4 @@ pub async fn verify<'a>(
     new_content.push_str(&content[last_end..]);
 
     Ok(new_content.into())
-}
-
-mod q {
-    use super::*;
-
-    pub use schema::*;
-    pub use thorn::*;
-
-    thorn::params! {
-        pub struct Params<'a> {
-            pub kind_id: Snowflake = SNOWFLAKE,
-            pub ids: &'a [Snowflake] = SNOWFLAKE_ARRAY,
-        }
-    }
-
-    thorn::indexed_columns! {
-        pub enum Columns {
-            Emotes::Id,
-            Emotes::Name,
-        }
-    }
-
-    pub fn match_all_usable_emotes() -> impl AnyQuery {
-        Query::select()
-            .cols(Columns::default())
-            .from(PartyMembers::inner_join_table::<Emotes>().on(Emotes::PartyId.equals(PartyMembers::PartyId)))
-            .and_where(PartyMembers::UserId.equals(Params::kind_id()))
-            .and_where(Emotes::Id.equals(Builtin::any((Params::ids(),))))
-    }
-
-    pub fn match_locally_usable_emotes() -> impl AnyQuery {
-        Query::select()
-            .cols(Columns::default())
-            .from(Rooms::inner_join_table::<Emotes>().on(Emotes::PartyId.equals(Rooms::PartyId)))
-            .and_where(Rooms::Id.equals(Params::kind_id()))
-            .and_where(Emotes::Id.equals(Builtin::any((Params::ids(),))))
-    }
 }
