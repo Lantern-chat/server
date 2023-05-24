@@ -1,21 +1,11 @@
-use std::sync::{
-    atomic::{AtomicI16, Ordering},
-    Arc,
-};
-
-use futures::{
-    stream::{FuturesUnordered, Stream, StreamExt},
-    Future, FutureExt,
-};
+use futures::stream::{FuturesUnordered, StreamExt};
 use hashbrown::HashSet;
 use schema::SnowflakeExt;
 use sdk::models::*;
 
-use tokio::task::JoinHandle;
-
 use crate::{Error, ServerState};
 
-use md_utils::{Span, SpanList, SpanType};
+use md_utils::{Span, SpanType};
 
 pub fn process_embeds(state: ServerState, msg_id: Snowflake, msg: &str, spans: &[Span]) {
     let mut position = 0;

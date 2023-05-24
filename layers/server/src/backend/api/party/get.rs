@@ -1,4 +1,4 @@
-use futures::{StreamExt, TryStreamExt};
+use futures::TryStreamExt;
 
 use schema::Snowflake;
 

@@ -1,8 +1,8 @@
 use schema::Snowflake;
 use sdk::models::*;
 
+use crate::backend::gateway::Event;
 use crate::backend::util::encrypted_asset::encrypt_snowflake_opt;
-use crate::backend::{api::perm::get_cached_room_permissions, gateway::Event};
 use crate::{Authorization, Error, ServerState};
 
 use sdk::models::gateway::message::ServerMsg;
@@ -21,11 +21,7 @@ pub async fn trigger_typing(state: ServerState, auth: Authorization, room_id: Sn
 
     #[rustfmt::skip]
     let row = state.db.read.get().await?.query_opt2(schema::sql! {
-        tables! {
-            pub struct AggRoom {
-                PartyId: Rooms::PartyId,
-            }
-        };
+        tables! { pub struct AggRoom { PartyId: Rooms::PartyId } };
 
         WITH AggRoom AS (
             if has_perms {

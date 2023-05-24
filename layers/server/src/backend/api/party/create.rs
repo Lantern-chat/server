@@ -1,5 +1,3 @@
-use std::time::SystemTime;
-
 use schema::SnowflakeExt;
 
 use sdk::models::*;

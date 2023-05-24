@@ -1,11 +1,8 @@
 use std::{collections::BTreeSet, sync::atomic::AtomicUsize};
 
 use arrayvec::ArrayVec;
-use db::{
-    pg::Statement,
-    pool::{Client, Object, Transaction},
-};
-use futures::{FutureExt, Stream, StreamExt};
+
+use futures::{Stream, StreamExt};
 
 use schema::{
     flags::AttachmentFlags,
@@ -13,8 +10,7 @@ use schema::{
     Snowflake, SnowflakeExt,
 };
 use sdk::models::*;
-use smallvec::SmallVec;
-use thorn::pg::{Json, ToSql};
+use thorn::pg::Json;
 
 use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Authorization, Error, ServerState};
 

@@ -1,5 +1,3 @@
-use std::fmt;
-use std::str::FromStr;
 use std::time::SystemTime;
 
 use futures::FutureExt;

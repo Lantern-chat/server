@@ -1,5 +1,5 @@
 use arrayvec::ArrayVec;
-use futures::{future::Either, FutureExt, TryFutureExt};
+use futures::FutureExt;
 use sdk::{api::commands::user::UpdateUserProfileBody, models::*};
 
 use crate::{
@@ -197,7 +197,6 @@ pub async fn patch_profile(
 
 fn insert_or_update_profile(cols: &[schema::Profiles]) -> impl thorn::AnyQuery {
     use schema::*;
-    use thorn::conflict::ConflictAction;
     use thorn::table::ColumnExt;
     use thorn::*;
 

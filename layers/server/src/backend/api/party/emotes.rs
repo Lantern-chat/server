@@ -1,20 +1,11 @@
-use futures::{Stream, StreamExt, TryStreamExt};
+use futures::{Stream, StreamExt};
 
-use db::pool::Client;
-use schema::Snowflake;
-
-use crate::{
-    backend::{
-        api::{auth::Authorization, SearchMode},
-        util::encrypted_asset::encrypt_snowflake_opt,
-    },
-    Error, ServerState,
-};
+use crate::{backend::api::SearchMode, Error};
 
 use sdk::models::*;
 
-pub async fn get_custom_emotes_raw<'a>(
-    db: &Client,
+pub async fn get_custom_emotes_raw<'a, DB: db::pool::AnyClient>(
+    db: &DB,
     party_id: SearchMode<'a>,
 ) -> Result<impl Stream<Item = Result<CustomEmote, Error>> + 'static, Error> {
     let stream = db

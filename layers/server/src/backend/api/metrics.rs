@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::time::SystemTime;
 
 use parking_lot::Mutex;
 
@@ -87,8 +86,7 @@ impl Metrics {
     }
 }
 
-use futures::{FutureExt, Stream, StreamExt};
-use smol_str::SmolStr;
+use futures::{Stream, StreamExt};
 use timestamp::{formats::ShortMilliseconds, Duration, Timestamp, TimestampStr};
 
 use crate::Error;

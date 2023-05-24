@@ -1,5 +1,4 @@
-use schema::{Snowflake, SnowflakeExt};
-use smol_str::SmolStr;
+use schema::Snowflake;
 
 use crate::{Authorization, Error, ServerState};
 
