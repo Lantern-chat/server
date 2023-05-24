@@ -1,3 +1,5 @@
+#![allow(clippy::identity_op)]
+
 #[macro_use]
 extern crate serde;
 extern crate tracing as log;
@@ -65,8 +67,8 @@ pub mod sections {
     pub mod paths;
     pub mod services;
     pub mod upload;
-    pub mod web;
     pub mod user;
+    pub mod web;
 }
 
 mod util;

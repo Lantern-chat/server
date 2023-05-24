@@ -4,7 +4,6 @@ use std::{
 };
 
 use ftl::{rate_limit::RateLimiter, Route};
-use sdk::Snowflake;
 use util::cmap::CHashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

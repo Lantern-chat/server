@@ -1,4 +1,3 @@
-use futures::FutureExt;
 use headers::HeaderName;
 
 use ftl::Route;

@@ -1,20 +1,13 @@
-use std::{
-    borrow::Cow,
-    error::Error,
-    net::IpAddr,
-    pin::Pin,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{borrow::Cow, net::IpAddr, time::Duration};
 
 use futures::{
-    future::{self, Either},
-    stream::{self, AbortHandle, Abortable, BoxStream, SelectAll},
-    Future, FutureExt, SinkExt, Stream, StreamExt, TryStreamExt,
+    future,
+    stream::{self, AbortHandle, BoxStream, SelectAll},
+    FutureExt, SinkExt, StreamExt,
 };
 
 use sdk::{api::gateway::GatewayQueryParams, driver::Encoding, models::Permissions};
-use tokio::sync::{broadcast::error::RecvError, mpsc};
+use tokio::sync::broadcast::error::RecvError;
 use tokio_stream::wrappers::{errors::BroadcastStreamRecvError, BroadcastStream, ReceiverStream};
 
 use hashbrown::{HashMap, HashSet};
@@ -24,18 +17,15 @@ use schema::Snowflake;
 
 use crate::{
     backend::{
-        api::auth::Authorization,
         api::gateway::presence::{clear_presence, set_presence},
         cache::permission_cache::PermMute,
-        gateway::event::{EventInner, InternalEvent},
+        gateway::{
+            conn::GatewayConnection,
+            event::{Event, EventInner, InternalEvent},
+            PartySubscription,
+        },
     },
     ServerState,
-};
-
-use crate::backend::gateway::{
-    conn::GatewayConnection,
-    event::{EncodedEvent, Event},
-    PartySubscription,
 };
 
 use sdk::models::gateway::message::{ClientMsg, ServerMsg};
@@ -152,8 +142,6 @@ pub async fn client_connection(ws: WebSocket, query: GatewayQueryParams, _addr: 
             }
 
             Item::Event(Ok(mut event)) => {
-                use sdk::models::gateway::message::server_msg_payloads::*;
-
                 let e = match *event {
                     EventInner::External(ref e) => e,
                     EventInner::Internal(ref event) => {

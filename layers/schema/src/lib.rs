@@ -1,3 +1,6 @@
+#![cfg_attr(not(debug_assertions), allow(unused_mut, unused_variables, unused_imports))]
+#![allow(clippy::single_char_add_str)]
+
 pub mod codes;
 pub use codes::*;
 

@@ -1,7 +1,7 @@
 use futures::{future::BoxFuture, stream::FuturesUnordered};
 use futures::{FutureExt, StreamExt};
 use std::future::Future;
-use tokio::sync::mpsc::{self, error::SendError};
+use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 
 pub trait WorkItem: Future<Output = ()> + Send + 'static {}

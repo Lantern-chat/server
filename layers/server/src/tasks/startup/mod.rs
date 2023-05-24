@@ -1,5 +1,5 @@
 use crate::ServerState;
-use task_runner::{AsyncFnTask, IntervalFnTask, RetryTask, TaskRunner};
+use task_runner::{AsyncFnTask, TaskRunner};
 
 // structured this way to allow for batching of future tasks
 pub async fn run_startup_tasks(state: &ServerState) {

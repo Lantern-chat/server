@@ -1,4 +1,3 @@
-use smol_str::SmolStr;
 use tokio::sync::Semaphore;
 
 use crate::Error;
@@ -45,8 +44,6 @@ pub struct HCaptchaParameters<'a> {
     pub sitekey: Option<&'a str>,
 }
 
-use timestamp::Timestamp;
-
 #[derive(Debug, Deserialize)]
 struct RawHCaptchaResponse {
     pub success: bool,
@@ -84,12 +81,7 @@ impl HCaptchaClient {
 
         log::debug!("Sending hCaptcha verification");
 
-        let res = self
-            .client
-            .post("https://hcaptcha.com/siteverify")
-            .form(&params)
-            .send()
-            .await?;
+        let res = self.client.post("https://hcaptcha.com/siteverify").form(&params).send().await?;
 
         let full = res.bytes().await?;
 

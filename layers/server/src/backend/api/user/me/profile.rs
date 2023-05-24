@@ -134,20 +134,18 @@ pub async fn patch_profile(
     {
         let new_avatar_id_future = async {
             match new_profile.avatar {
-                Nullable::Some(file_id) => add_asset(&state, AssetMode::Avatar, auth.user_id, file_id)
-                    .boxed()
-                    .await
-                    .map(Nullable::Some),
+                Nullable::Some(file_id) => {
+                    add_asset(&state, AssetMode::Avatar, auth.user_id, file_id).boxed().await.map(Nullable::Some)
+                }
                 _ => Ok(new_profile.avatar), // fallback to None/Undefined
             }
         };
 
         let new_banner_id_future = async {
             match new_profile.banner {
-                Nullable::Some(file_id) => add_asset(&state, AssetMode::Banner, auth.user_id, file_id)
-                    .boxed()
-                    .await
-                    .map(Nullable::Some),
+                Nullable::Some(file_id) => {
+                    add_asset(&state, AssetMode::Banner, auth.user_id, file_id).boxed().await.map(Nullable::Some)
+                }
                 _ => Ok(new_profile.banner), // fallback to None/Undefined
             }
         };

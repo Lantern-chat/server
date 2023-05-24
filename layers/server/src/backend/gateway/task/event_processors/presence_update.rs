@@ -1,7 +1,4 @@
 use futures::StreamExt;
-use std::sync::Arc;
-
-use crate::backend::util::encrypted_asset::encrypt_snowflake_opt;
 
 use super::prelude::*;
 

@@ -2,14 +2,11 @@ pub mod conn;
 pub mod event;
 pub mod task;
 
-use std::sync::{atomic::AtomicI64, Arc};
-use std::{borrow::Cow, error::Error, pin::Pin, time::Duration};
-
-use futures::{future, Future, FutureExt, SinkExt, StreamExt, TryStreamExt};
+use std::sync::atomic::AtomicI64;
+use std::time::Duration;
 
 use hashbrown::HashMap;
-use tokio::sync::{broadcast, mpsc, Notify, RwLock};
-use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio::sync::{broadcast, mpsc, Notify};
 
 use schema::Snowflake;
 

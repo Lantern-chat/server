@@ -1,16 +1,10 @@
-use std::{
-    ops::Deref,
-    sync::atomic::{AtomicBool, AtomicU64, Ordering},
-    time::Instant,
-};
-
+use std::{ops::Deref, sync::atomic::AtomicBool, time::Instant};
+use tokio::sync::{mpsc, Notify, RwLock};
 use triomphe::Arc;
 
 use schema::{Snowflake, SnowflakeExt};
 
 use super::Event;
-
-use tokio::sync::{broadcast, mpsc, Notify, RwLock};
 
 pub struct GatewayConnectionInner {
     pub id: Snowflake,

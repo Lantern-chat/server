@@ -1,24 +1,15 @@
-use std::{io::SeekFrom, str::FromStr, time::Instant};
+use std::{io::SeekFrom, time::Instant};
 
-use bytes::{Bytes, BytesMut};
-use ftl::{
-    fs::{bytes_range, Cond, Conditionals},
-    *,
-};
+use bytes::BytesMut;
+use ftl::{fs::bytes_range, *};
 
 use filesystem::store::{CipherOptions, FileExt, OpenMode};
-use futures::FutureExt;
 use headers::{
     AcceptRanges, ContentLength, ContentRange, ContentType, HeaderMap, HeaderMapExt, HeaderName, HeaderValue,
-    IfModifiedSince, LastModified, Range,
+    LastModified, Range,
 };
 use hyper::Body;
-use smol_str::SmolStr;
-use thorn::pg::ToSql;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
-
-use schema::flags::FileFlags;
-use sdk::models::Snowflake;
 
 use crate::{Error, ServerState};
 
@@ -75,8 +66,7 @@ pub async fn send_file(
         if len != sub_len {
             *res.status_mut() = StatusCode::PARTIAL_CONTENT;
 
-            res.headers_mut()
-                .typed_insert(ContentRange::bytes(start..end, len).expect("valid ContentRange"));
+            res.headers_mut().typed_insert(ContentRange::bytes(start..end, len).expect("valid ContentRange"));
 
             len = sub_len;
         }

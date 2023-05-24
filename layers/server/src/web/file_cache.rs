@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::io::{self, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
@@ -8,8 +7,7 @@ use triomphe::Arc;
 
 use tokio::io::{AsyncRead, AsyncSeek, ReadBuf};
 
-use ftl::fs::{EncodedFile, FileCache, FileMetadata, GenericFile};
-use ftl::*;
+use ftl::fs::{EncodedFile, FileCache, FileMetadata};
 
 use headers::ContentCoding;
 
@@ -132,7 +130,6 @@ impl MainFileCache {
 }
 
 use headers::AcceptEncoding;
-use util::cmap::EntryValue;
 
 use crate::ServerState;
 

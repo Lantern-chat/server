@@ -1,6 +1,6 @@
 use schema::Snowflake;
 use std::sync::Arc;
-use tokio::sync::{Mutex, OwnedMutexGuard, Semaphore};
+use tokio::sync::{Mutex, OwnedMutexGuard};
 
 /// Simple concurrent map structure containing locks for any particular snowflake ID
 #[derive(Default, Debug)]

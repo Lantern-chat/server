@@ -1,11 +1,9 @@
-use futures::{future::BoxFuture, Future, TryFutureExt};
+use futures::Future;
 use std::sync::Arc;
 use tokio::{
-    sync::{AcquireError, OwnedSemaphorePermit, Semaphore, SemaphorePermit},
+    sync::{AcquireError, Semaphore},
     task::JoinHandle,
 };
-
-use crate::Error;
 
 pub trait WorkItem: Future<Output = Self::Res> + Send + 'static {
     type Res: Send + 'static;

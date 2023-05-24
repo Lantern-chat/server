@@ -1,7 +1,3 @@
-use thorn::pg::Json;
-
-use crate::backend::util::encrypted_asset::encrypt_snowflake_opt;
-
 use sdk::models::gateway::{
     events::{PartyPositionUpdate, PartyUpdateEvent},
     message::ServerMsg,

@@ -4,7 +4,7 @@ use ftl::*;
 
 use headers::{ContentType, HeaderName, HeaderValue};
 
-use crate::{Error, ServerState};
+use crate::ServerState;
 
 pub mod api;
 pub mod cdn;

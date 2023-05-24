@@ -1,6 +1,4 @@
-use smol_str::SmolStr;
-
-use sdk::api::asset::{AssetFlags, AssetQuery};
+use sdk::api::asset::AssetFlags;
 
 use crate::backend::{cdn::AssetKind, util::encrypted_asset::decrypt_snowflake};
 
@@ -77,9 +75,7 @@ pub async fn asset(mut route: Route<ServerState>) -> WebResult {
 
     let flags = match route.raw_query().map(schema::asset::parse) {
         Some(Ok(q)) => q.into(),
-        _ => AssetFlags::all()
-            .difference(AssetFlags::MAYBE_UNSUPPORTED_FORMATS)
-            .with_quality(80),
+        _ => AssetFlags::all().difference(AssetFlags::MAYBE_UNSUPPORTED_FORMATS).with_quality(80),
     };
 
     log::debug!("REQUESTED ASSET FLAGS: {}={:?}", flags.bits(), flags);

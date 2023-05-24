@@ -1,5 +1,6 @@
 use super::*;
 
+#[allow(clippy::field_reassign_with_default)]
 pub fn gateway(route: Route<crate::ServerState>) -> WebResult {
     let Ok(addr) = real_ip::get_real_ip(&route) else {
         return Err(Error::BadRequest);
@@ -20,7 +21,5 @@ pub fn gateway(route: Route<crate::ServerState>) -> WebResult {
 
     let ws = ws::Ws::new(route, Some(config))?;
 
-    Ok(ws
-        .on_upgrade(move |ws| crate::web::gateway::client_connected(ws, query, addr, state))
-        .into())
+    Ok(ws.on_upgrade(move |ws| crate::web::gateway::client_connected(ws, query, addr, state)).into())
 }

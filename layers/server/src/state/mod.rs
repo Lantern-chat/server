@@ -1,17 +1,10 @@
-use std::{
-    ops::Deref,
-    sync::{
-        atomic::{AtomicBool, AtomicI64, Ordering},
-        Arc,
-    },
-};
+use std::{ops::Deref, sync::Arc};
 
 use arc_swap::ArcSwap;
 use config::Config;
 use filesystem::store::FileStore;
 use futures::{Stream, StreamExt};
-use schema::Snowflake;
-use tokio::sync::{watch, Mutex, Notify, OwnedMutexGuard, Semaphore};
+use tokio::sync::{Notify, Semaphore};
 
 use crate::{
     backend::{

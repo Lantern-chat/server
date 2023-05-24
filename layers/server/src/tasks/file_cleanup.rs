@@ -1,5 +1,3 @@
-use std::sync::atomic::Ordering;
-
 use schema::{Snowflake, SnowflakeExt};
 use tokio_stream::StreamExt;
 

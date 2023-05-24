@@ -18,7 +18,5 @@ pub struct EncodingQuery {
 //}
 
 pub fn bytes_as_json(bytes: Bytes) -> Response {
-    hyper::Body::from(bytes)
-        .with_header(ContentType::json())
-        .into_response()
+    hyper::Body::from(bytes).with_header(ContentType::json()).into_response()
 }

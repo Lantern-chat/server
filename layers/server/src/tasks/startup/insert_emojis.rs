@@ -1,5 +1,3 @@
-use thorn::conflict::ConflictAction;
-
 use super::*;
 
 pub fn add_emoji_insert_task(state: ServerState, runner: &TaskRunner) {

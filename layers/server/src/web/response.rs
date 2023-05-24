@@ -5,11 +5,10 @@ use futures::future::BoxFuture;
 use futures::Future;
 use headers::ContentType;
 use http::header::IntoHeaderName;
-use http::{HeaderMap, HeaderName, HeaderValue, StatusCode};
+use http::{HeaderMap, HeaderValue, StatusCode};
 use sdk::driver::Encoding;
 
-use crate::web::encoding::EncodingQuery;
-use crate::{Error, ServerState};
+use crate::Error;
 
 use ftl::reply::deferred::*;
 
@@ -47,6 +46,7 @@ impl WebResponse {
         }
     }
 
+    #[inline]
     pub fn with_header(mut self, k: impl IntoHeaderName, v: HeaderValue) -> Self {
         match self {
             WebResponse::Status(_, ref mut headers)

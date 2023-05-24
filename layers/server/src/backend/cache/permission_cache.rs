@@ -1,6 +1,6 @@
 use std::{
     hash::BuildHasher,
-    sync::atomic::{AtomicIsize, AtomicU64, Ordering},
+    sync::atomic::{AtomicIsize, Ordering},
 };
 
 use triomphe::Arc;
