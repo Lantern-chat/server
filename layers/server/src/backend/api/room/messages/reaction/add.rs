@@ -3,7 +3,6 @@ use crate::{
     state::emoji::EmoteOrEmojiId,
     Authorization, Error, ServerState,
 };
-use futures::FutureExt;
 use schema::SnowflakeExt;
 use sdk::models::{events::UserReactionEvent, gateway::message::ServerMsg, *};
 

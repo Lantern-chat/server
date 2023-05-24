@@ -11,17 +11,12 @@ use crate::{Error, ServerState};
 //        .unwrap();
 //}
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum OEmbedFormat {
+    #[default]
     Json,
     XML,
-}
-
-impl Default for OEmbedFormat {
-    fn default() -> Self {
-        OEmbedFormat::Json
-    }
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]

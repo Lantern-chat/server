@@ -1,7 +1,7 @@
 use sdk::models::*;
 use thorn::pg::Json;
 
-use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Authorization, Error, ServerState};
+use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Error, ServerState};
 
 pub async fn get_full_self(state: &ServerState, user_id: Snowflake) -> Result<User, Error> {
     let db = state.db.read.get().await?;

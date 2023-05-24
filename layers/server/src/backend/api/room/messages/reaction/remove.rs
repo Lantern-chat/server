@@ -1,10 +1,4 @@
-use futures::FutureExt;
-
-use crate::{
-    backend::{gateway::Event, util::encrypted_asset::encrypt_snowflake_opt},
-    state::emoji::EmoteOrEmojiId,
-    Authorization, Error, ServerState,
-};
+use crate::{backend::gateway::Event, state::emoji::EmoteOrEmojiId, Authorization, Error, ServerState};
 use sdk::models::{events::UserReactionEvent, gateway::message::ServerMsg, *};
 
 pub async fn remove_own_reaction(

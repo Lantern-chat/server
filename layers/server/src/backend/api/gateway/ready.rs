@@ -2,13 +2,14 @@ use futures::TryStreamExt;
 use hashbrown::HashMap;
 
 use schema::Snowflake;
-use thorn::pg::Json;
 
-use crate::backend::{
-    api::SearchMode,
-    util::encrypted_asset::{encrypt_snowflake, encrypt_snowflake_opt},
+use crate::{
+    backend::{
+        api::SearchMode,
+        util::encrypted_asset::{encrypt_snowflake, encrypt_snowflake_opt},
+    },
+    Authorization, Error, ServerState,
 };
-use crate::{Authorization, Error, ServerState};
 
 //struct Associated<T> {
 //    pub party_id: Snowflake,
@@ -151,7 +152,7 @@ pub async fn ready(state: ServerState, conn_id: Snowflake, auth: Authorization) 
                     .await
             },
             async {
-                crate::backend::api::party::emotes::get_custom_emotes_raw(&db, SearchMode::Many(&ids))
+                crate::backend::api::party::emotes::get_custom_emotes_raw(&*db, SearchMode::Many(&ids))
                     .await?
                     .try_collect::<Vec<_>>()
                     .await
