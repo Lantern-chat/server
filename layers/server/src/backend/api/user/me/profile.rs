@@ -1,234 +1,148 @@
-use arrayvec::ArrayVec;
-use futures::FutureExt;
 use sdk::{api::commands::user::UpdateUserProfileBody, models::*};
 
 use crate::{
     backend::{
-        asset::{add_asset, AssetMode},
+        asset::{maybe_add_asset, AssetMode},
         util::encrypted_asset::encrypt_snowflake,
     },
     Authorization, Error, ServerState,
 };
 
-use schema::Profiles;
-
 pub async fn patch_profile(
     state: ServerState,
     auth: Authorization,
-    mut new_profile: UpdateUserProfileBody,
+    mut profile: UpdateUserProfileBody,
     party_id: Option<Snowflake>,
 ) -> Result<UserProfile, Error> {
-    // if status/bio have a value, insert/update the profile
-    let has_status = !new_profile.status.is_undefined();
-    let has_bio = !new_profile.bio.is_undefined();
-    let has_nick = !new_profile.nick.is_undefined();
+    {
+        // TODO: Better errors here
+        let config = state.config();
+        if matches!(profile.status, Nullable::Some(ref status) if status.len() > config.user.max_custom_status_len)
+        {
+            return Err(Error::BadRequest);
+        }
 
-    let db = state.db.write.get().await?;
-
-    if party_id.is_some() {
-        // TODO: Add permissions?
-        let is_member = db
-            .query_opt_cached_typed(
-                || {
-                    use schema::*;
-                    use thorn::*;
-
-                    Query::select()
-                        .expr(1.lit())
-                        .from_table::<PartyMembers>()
-                        .and_where(PartyMembers::UserId.equals(Var::of(Users::Id)))
-                        .and_where(PartyMembers::PartyId.equals(Var::of(Party::Id)))
-                },
-                &[&auth.user_id, &party_id],
-            )
-            .await?
-            .is_some();
-
-        if !is_member {
-            return Err(Error::Unauthorized);
+        if matches!(profile.bio, Nullable::Some(ref bio) if bio.len() > config.user.max_biography_len) {
+            return Err(Error::BadRequest);
         }
     }
 
-    // try to avoid as many triggers as possible by grouping together queries
-    #[rustfmt::skip]
-    let prepared_stmt = match (has_status, has_bio, has_nick) {
-        (true,  true,  false) => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::Bits, Profiles::CustomStatus, Profiles::Biography])).boxed(),
-        (true,  false, false) => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::Bits, Profiles::CustomStatus])).boxed(),
-        (false, true,  false) => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::Bits, Profiles::Biography])).boxed(),
-        (true,  true,  true)  => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::Bits, Profiles::CustomStatus, Profiles::Biography, Profiles::Nickname])).boxed(),
-        (true,  false, true)  => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::Bits, Profiles::CustomStatus, Profiles::Nickname])).boxed(),
-        (false, true,  true)  => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::Bits, Profiles::Biography, Profiles::Nickname])).boxed(),
-        (false, false, true)  => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::Bits, Profiles::Nickname])).boxed(),
-        (false, false, false) => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::Bits])).boxed(),
-    };
+    let needs_to_do_work = !profile.avatar.is_undefined() || !profile.banner.is_undefined();
 
-    let mut params = ArrayVec::<&(dyn db::pg::types::ToSql + Sync), 6>::new();
+    let mut perms = Permissions::all();
+    let db = state.db.read.get().await?;
 
-    params.push(&auth.user_id);
-    params.push(&party_id);
-    params.push(&new_profile.bits);
+    // check permissions and file ids before we try to adjust profile
+    if needs_to_do_work {
+        let mut avatar_id: Option<Snowflake> = None;
+        let mut banner_id: Option<Snowflake> = None;
 
-    if has_status {
-        params.push(&new_profile.status);
+        // if party, check permissions at the same time as acquiring the file ids
+        if party_id.is_some() {
+            #[rustfmt::skip]
+            let Some(row) = db.query_opt2(schema::sql! {
+                SELECT
+                    PartyMembers.Permissions1 AS @Permissions1,
+                    PartyMembers.Permissions2 AS @Permissions2,
+                    Profiles.AvatarFileId AS @AvatarId,
+                    Profiles.BannerFileId AS @BannerId
+                 FROM PartyMembers LEFT JOIN AggOriginalProfileFiles AS Profiles
+                   ON Profiles.PartyId = PartyMembers.PartyId AND Profiles.UserId = PartyMembers.UserId
+                WHERE PartyMembers.UserId = #{&auth.user_id as Users::Id}
+                  AND PartyMembers.PartyId = #{&party_id as Party::Id}
+            }).await? else {
+                return Err(Error::Unauthorized);
+            };
+
+            perms = Permissions::from_i64(row.permissions1()?, row.permissions2()?);
+
+            avatar_id = row.avatar_id()?;
+            banner_id = row.banner_id()?;
+        } else if let Some(row) = db
+            .query_opt2(schema::sql! {
+                SELECT
+                    Profiles.AvatarFileId AS @AvatarId,
+                    Profiles.BannerFileId AS @BannerId
+                FROM AggOriginalProfileFiles AS Profiles
+                WHERE Profiles.UserId = #{&auth.user_id as Users::Id}
+                AND Profiles.PartyId IS NULL
+            })
+            .await?
+        {
+            avatar_id = row.avatar_id()?;
+            banner_id = row.banner_id()?;
+        }
+
+        // No change, don't change
+        if Nullable::from(avatar_id) == profile.avatar {
+            profile.avatar = Nullable::Undefined;
+        }
+
+        if Nullable::from(banner_id) == profile.banner {
+            profile.banner = Nullable::Undefined;
+        }
+    } else if party_id.is_some() {
+        // TODO: Recombine the logic to merge with other query
+        #[rustfmt::skip]
+        let Some(row) = db.query_opt2(schema::sql! {
+            SELECT
+                PartyMembers.Permissions1 AS @Permissions1,
+                PartyMembers.Permissions2 AS @Permissions2
+            FROM PartyMembers
+            WHERE PartyMembers.UserId = #{&auth.user_id as Users::Id}
+                AND PartyMembers.PartyId = #{&party_id as Party::Id}
+        }).await? else {
+            return Err(Error::Unauthorized);
+        };
+
+        perms = Permissions::from_i64(row.permissions1()?, row.permissions2()?);
     }
-
-    if has_bio {
-        params.push(&new_profile.bio);
-    }
-
-    if has_nick {
-        params.push(&new_profile.nick);
-    }
-
-    db.execute(&prepared_stmt.await?, &params).await?;
-
-    drop(params);
-
-    // using the existing database connection, go ahead and fetch the old file ids
-
-    let row = db
-        .query_opt_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
-
-                Query::select()
-                    .and_where(AggOriginalProfileFiles::UserId.equals(Var::of(AggOriginalProfileFiles::UserId)))
-                    .and_where(AggOriginalProfileFiles::PartyId.equals(Var::of(AggOriginalProfileFiles::PartyId)))
-                    .from_table::<AggOriginalProfileFiles>()
-                    .cols(&[
-                        AggOriginalProfileFiles::AvatarFileId,
-                        AggOriginalProfileFiles::BannerFileId,
-                    ])
-            },
-            &[&auth.user_id, &party_id],
-        )
-        .await?;
 
     drop(db);
 
-    let (old_avatar_id, old_banner_id) = match row {
-        None => (None, None),
-        Some(row) => (
-            row.try_get::<_, Option<Snowflake>>(0)?,
-            row.try_get::<_, Option<Snowflake>>(1)?,
-        ),
-    };
-
-    // avoid reprocessing the same files if they were somehow resent
-
-    if let Some(old_avatar_id) = old_avatar_id {
-        if Nullable::Some(old_avatar_id) == new_profile.avatar {
-            new_profile.avatar = Nullable::Undefined; // unchanged
-        }
+    if !perms.contains(Permissions::CHANGE_NICKNAME) && profile.nick.is_some() {
+        return Err(Error::Unauthorized);
     }
 
-    if let Some(old_banner_id) = old_banner_id {
-        if Nullable::Some(old_banner_id) == new_profile.banner {
-            new_profile.banner = Nullable::Undefined; // unchanged
-        }
+    let (avatar_id, banner_id) = tokio::try_join!(
+        maybe_add_asset(&state, AssetMode::Avatar, auth.user_id, profile.avatar),
+        maybe_add_asset(&state, AssetMode::Banner, auth.user_id, profile.banner),
+    )?;
+
+    #[rustfmt::skip]
+    let res = state.db.write.get().await?.execute2(schema::sql! {
+        INSERT INTO Profiles (UserId, PartyId, Bits, AvatarId, BannerId, Nickname, CustomStatus, Biography) VALUES (
+            #{&auth.user_id     as Users::Id},
+            #{&party_id         as Party::Id},
+            #{&profile.bits     as Profiles::Bits},
+            #{&avatar_id        as Profiles::AvatarId},
+            #{&banner_id        as Profiles::BannerId},
+            #{&profile.nick     as Profiles::Nickname},
+            #{&profile.status   as Profiles::CustomStatus},
+            #{&profile.bio      as Profiles::Biography}
+        )
+        ON CONFLICT (Profiles./UserId, COALESCE(Profiles./PartyId, 1)) DO UPDATE SET
+            if !avatar_id.is_undefined()      { Profiles./AvatarId = #{&avatar_id as Profiles::AvatarId}, }
+            if !banner_id.is_undefined()      { Profiles./BannerId = #{&banner_id as Profiles::BannerId}, }
+            if !profile.nick.is_undefined()   { Profiles./Nickname = #{&profile.nick as Profiles::Nickname}, }
+            if !profile.status.is_undefined() { Profiles./CustomStatus = #{&profile.status as Profiles::CustomStatus}, }
+            if !profile.bio.is_undefined()    { Profiles./Biography = #{&profile.bio as Profiles::Biography}, }
+
+            Profiles./Bits = #{&profile.bits as Profiles::Bits}
+
+    }).await?;
+
+    if res == 0 {
+        return Err(Error::InternalErrorStatic("Unknown error setting profile"));
     }
-
-    let (new_avatar_id, new_banner_id) = if !new_profile.avatar.is_undefined()
-        || !new_profile.banner.is_undefined()
-    {
-        let new_avatar_id_future = async {
-            match new_profile.avatar {
-                Nullable::Some(file_id) => {
-                    add_asset(&state, AssetMode::Avatar, auth.user_id, file_id).boxed().await.map(Nullable::Some)
-                }
-                _ => Ok(new_profile.avatar), // fallback to None/Undefined
-            }
-        };
-
-        let new_banner_id_future = async {
-            match new_profile.banner {
-                Nullable::Some(file_id) => {
-                    add_asset(&state, AssetMode::Banner, auth.user_id, file_id).boxed().await.map(Nullable::Some)
-                }
-                _ => Ok(new_profile.banner), // fallback to None/Undefined
-            }
-        };
-
-        let (new_avatar_id, new_banner_id) = tokio::try_join!(new_avatar_id_future, new_banner_id_future)?;
-
-        let db = state.db.write.get().await?;
-
-        'do_thing: {
-            #[rustfmt::skip]
-            let prepared_stmt = match (new_avatar_id, new_banner_id) {
-                (Nullable::Undefined, Nullable::Undefined) => break 'do_thing,
-                (_, Nullable::Undefined) => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::AvatarId])).boxed(),
-                (Nullable::Undefined, _) => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::BannerId])).boxed(),
-                (_, _) => db.prepare_cached_typed(|| insert_or_update_profile(&[Profiles::AvatarId, Profiles::BannerId])).boxed()
-            };
-
-            let mut params = ArrayVec::<&(dyn db::pg::types::ToSql + Sync), 4>::new();
-
-            params.push(&auth.user_id);
-            params.push(&party_id);
-
-            if !new_avatar_id.is_undefined() {
-                params.push(&new_avatar_id);
-            }
-
-            if !new_banner_id.is_undefined() {
-                params.push(&new_banner_id);
-            }
-
-            db.execute(&prepared_stmt.await?, &params).await?;
-        }
-
-        (new_avatar_id, new_banner_id)
-    } else {
-        (new_profile.avatar, new_profile.banner)
-    };
 
     Ok(UserProfile {
-        bits: new_profile.bits,
+        bits: profile.bits,
         extra: Default::default(),
-        nick: new_profile.nick,
-        status: new_profile.status,
-        bio: new_profile.bio,
-        avatar: new_avatar_id.map(|id| encrypt_snowflake(&state, id)),
-        banner: new_banner_id.map(|id| encrypt_snowflake(&state, id)),
+        nick: profile.nick,
+        status: profile.status,
+        bio: profile.bio,
+        avatar: avatar_id.map(|id| encrypt_snowflake(&state, id)),
+        banner: banner_id.map(|id| encrypt_snowflake(&state, id)),
     })
-}
-
-fn insert_or_update_profile(cols: &[schema::Profiles]) -> impl thorn::AnyQuery {
-    use schema::*;
-    use thorn::table::ColumnExt;
-    use thorn::*;
-
-    let user_id_var = Var::at(Profiles::UserId, 1);
-    let party_id_var = Var::at(Profiles::PartyId, 2);
-
-    let mut q = Query::insert().into::<Profiles>();
-
-    q = q.cols(&[Profiles::UserId, Profiles::PartyId]).cols(cols);
-
-    q = q.values([user_id_var, party_id_var]);
-    q = q.values(cols.iter().enumerate().map(|(v, c)| Var::at(*c, v + 3)));
-
-    // TODO: Make this more ergonomic...
-    q = q.on_expr_conflict(
-        [
-            Box::new(Profiles::UserId.as_name_only()) as Box<dyn Expr>,
-            Box::new(Builtin::coalesce((Profiles::PartyId.as_name_only(), 1i64.lit()))) as Box<dyn Expr>,
-        ],
-        {
-            let mut i = cols.iter().enumerate();
-
-            let first = i.next().unwrap();
-            let mut action = DoUpdate.set(*first.1, Var::at(*first.1, first.0 + 3));
-
-            for (v, c) in i {
-                action = action.set(*c, Var::at(*c, v + 3));
-            }
-
-            action
-        },
-    );
-
-    q
 }

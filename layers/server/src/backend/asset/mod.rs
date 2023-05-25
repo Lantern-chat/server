@@ -1,5 +1,6 @@
 use filesystem::store::{CipherOptions, OpenMode};
 use framed::tokio::{AsyncFramedReader, AsyncFramedWriter};
+use futures::FutureExt;
 use process::{Command, EncodingFormat, ProcessedResponse, Response};
 use rand::Rng;
 
@@ -8,7 +9,7 @@ use std::process::Stdio;
 use tokio::process::Command as SystemCommand;
 
 use schema::{flags::FileFlags, SnowflakeExt};
-use sdk::Snowflake;
+use sdk::{models::Nullable, Snowflake};
 
 use crate::{Error, ServerState};
 
@@ -37,6 +38,18 @@ fn gen_formats(state: &ServerState, mode: AssetMode) -> Vec<(EncodingFormat, u8)
     all_formats.extend(formats.png.iter().copied().map(|q| (EncodingFormat::Png, q)));
 
     all_formats
+}
+
+pub async fn maybe_add_asset(
+    state: &ServerState,
+    mode: AssetMode,
+    user_id: Snowflake,
+    file_id: Nullable<Snowflake>,
+) -> Result<Nullable<Snowflake>, Error> {
+    match file_id {
+        Nullable::Some(file_id) => add_asset(state, mode, user_id, file_id).boxed().await.map(Nullable::Some),
+        _ => Ok(file_id),
+    }
 }
 
 pub async fn add_asset(
