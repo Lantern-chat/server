@@ -14,6 +14,11 @@ pub async fn modify_room(
     room_id: Snowflake,
     mut form: PatchRoomForm,
 ) -> Result<FullRoom, Error> {
+    // TODO: Maybe change this?
+    if form == PatchRoomForm::default() {
+        return Err(Error::BadRequest);
+    }
+
     let name;
     {
         let config = state.config();
@@ -28,14 +33,9 @@ pub async fn modify_room(
         }
     }
 
-    // TODO: Maybe change this?
-    if form == PatchRoomForm::default() {
-        return Err(Error::BadRequest);
-    }
-
     let has_assets = form.avatar.is_some();
 
-    let mut old_avatar_id: Option<Snowflake> = None;
+    let mut old_avatar_id: Nullable<Snowflake> = Nullable::Null;
 
     let mut needs_perms = true;
     if let Some(perms) = state.perm_cache.get(auth.user_id, room_id).await {
@@ -69,7 +69,7 @@ pub async fn modify_room(
         old_avatar_id = row.avatar_file_id()?;
     }
 
-    if has_assets && Nullable::from(old_avatar_id) == form.avatar {
+    if has_assets && old_avatar_id == form.avatar {
         form.avatar = Nullable::Undefined;
     }
 

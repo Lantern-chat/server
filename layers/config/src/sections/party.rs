@@ -7,6 +7,9 @@ section! {
         pub party_name_len: Range<usize>     = 3..64,
 
         #[serde(with = "super::util::range")]
+        pub party_description_len: Range<usize> = 1..1024,
+
+        #[serde(with = "super::util::range")]
         pub room_name_len: Range<usize>      = 3..64,
 
         #[serde(with = "super::util::range")]

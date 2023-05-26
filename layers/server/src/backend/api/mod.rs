@@ -41,6 +41,7 @@ pub mod party {
     pub mod emotes;
     pub mod get;
     pub mod members;
+    pub mod modify;
     pub mod roles;
     pub mod stats;
 
