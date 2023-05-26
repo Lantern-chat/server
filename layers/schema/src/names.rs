@@ -19,6 +19,18 @@ pub fn slug_name(name: &str) -> String {
     new_name
 }
 
+pub fn contains_bad_words(name: &str) -> bool {
+    use rustrict::{Censor, Type};
+
+    let c = Censor::from_str(name).analyze();
+
+    let offensive = Type::OFFENSIVE & Type::MODERATE_OR_HIGHER;
+    let extreme = (Type::PROFANE | Type::SEXUAL | Type::MEAN) & Type::SEVERE;
+    let not_evasive = !(Type::EVASIVE & Type::MODERATE_OR_HIGHER);
+
+    c.is((offensive | extreme) & not_evasive)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
