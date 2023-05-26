@@ -171,9 +171,10 @@ pub async fn modify_room(
                 Some(false) => { Rooms./Flags & ~{RoomFlags::NSFW.bits()} },
                 None        => { Rooms./Flags }
             }
+        WHERE Rooms.Id = #{&room_id as Rooms::Id}
     }).await?;
 
-    if res == 0 {
+    if res != 1 {
         t.rollback().await?;
 
         return Err(Error::InternalErrorStatic("Unable to update room"));

@@ -5,8 +5,11 @@ use crate::{Authorization, Error, ServerState};
 use sdk::models::*;
 
 pub async fn remove_room(state: ServerState, auth: Authorization, room_id: Snowflake) -> Result<(), Error> {
+    let mut db = state.db.write.get().await?;
+    let t = db.transaction().await?;
+
     #[rustfmt::skip]
-    let res = state.db.write.get().await?.execute2(schema::sql! {
+    let res = t.execute2(schema::sql! {
         tables! { struct PendingRoom { Id: Rooms::Id } };
 
         WITH PendingRoom AS (
@@ -23,9 +26,13 @@ pub async fn remove_room(state: ServerState, auth: Authorization, room_id: Snowf
         FROM PendingRoom WHERE Rooms.Id = PendingRoom.Id
     }).await?;
 
-    if res == 0 {
+    if res != 1 {
+        t.rollback().await?;
+
         return Err(Error::Unauthorized);
     }
+
+    t.commit().await?;
 
     Ok(())
 }
