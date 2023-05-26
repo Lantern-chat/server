@@ -2459,9 +2459,9 @@ BEGIN
     IF _discriminator IS NULL THEN
         SELECT MAX(discriminator) INTO _discriminator FROM lantern.users WHERE username = _username;
 
-        IF NOT FOUND THEN
+        IF _discriminator IS NULL THEN
             _discriminator := 0;
-        ELSIF _discriminator >= x'FFFF' THEN
+        ELSIF _discriminator >= 65535 THEN
             RAISE EXCEPTION 'Username % exhausted', _username;
         ELSE
             _discriminator := _discriminator + 1;
