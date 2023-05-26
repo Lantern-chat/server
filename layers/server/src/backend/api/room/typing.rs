@@ -7,7 +7,12 @@ use crate::{Authorization, Error, ServerState};
 
 use sdk::models::gateway::message::ServerMsg;
 
-pub async fn trigger_typing(state: ServerState, auth: Authorization, room_id: Snowflake) -> Result<(), Error> {
+pub async fn trigger_typing(
+    state: ServerState,
+    auth: Authorization,
+    room_id: Snowflake,
+    body: sdk::api::commands::room::StartTypingBody,
+) -> Result<(), Error> {
     let has_perms = match state.perm_cache.get(auth.user_id, room_id).await {
         Some(perms) => {
             if !perms.contains(Permissions::SEND_MESSAGES) {
@@ -119,6 +124,7 @@ pub async fn trigger_typing(state: ServerState, auth: Authorization, room_id: Sn
                 user_id: auth.user_id,
                 party_id: Some(party_id),
                 member: Some(member),
+                parent: body.parent,
             });
 
             state.gateway.broadcast_event(Event::new(event, Some(room_id))?, party_id);
