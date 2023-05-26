@@ -56,8 +56,8 @@ pub async fn modify_room(
             FROM AggRoomPerms AS Rooms if has_assets {
                 LEFT JOIN UserAssets ON UserAssets.Id = Rooms.AvatarId
             }
-            WHERE AggRoomPerms.UserId = #{&auth.user_id as Users::Id}
-              AND AggRoomPerms.Id = #{&room_id as Rooms::Id}
+            WHERE Rooms.UserId = #{&auth.user_id as Users::Id}
+              AND Rooms.Id = #{&room_id as Rooms::Id}
         }).await? else {
             return Err(Error::Unauthorized);
         };
