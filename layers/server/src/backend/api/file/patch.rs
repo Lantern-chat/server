@@ -1,14 +1,13 @@
-use std::{error::Error as _, io::SeekFrom};
+use std::io::SeekFrom;
 
-use bytes::Bytes;
 use filesystem::store::{CipherOptions, FileExt, OpenMode};
 
 use crate::{Authorization, Error, ServerState};
 
-use futures::{FutureExt, Stream, StreamExt};
-use tokio::io::{AsyncSeekExt, AsyncWriteExt};
+use futures::{FutureExt, StreamExt};
+use tokio::io::AsyncSeekExt;
 
-use schema::{flags::FileFlags, Snowflake, SnowflakeExt};
+use schema::{flags::FileFlags, Snowflake};
 
 pub struct FilePatch {
     pub complete: bool,
