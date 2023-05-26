@@ -26,6 +26,7 @@ fn create_filter(verbose: Option<u8>, level: Option<LevelFilter>) -> anyhow::Res
         .add_directive(level_filter.into())
         .add_directive("hyper::client::pool=info".parse()?)
         .add_directive("hyper::proto=info".parse()?)
+        .add_directive("h2::proto=info".parse()?)
         .add_directive("tokio_util::codec=info".parse()?);
 
     if !extreme_trace {
