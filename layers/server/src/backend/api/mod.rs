@@ -52,6 +52,8 @@ pub mod party {
 
 pub mod room {
     pub mod get;
+    pub mod modify;
+    pub mod remove;
     pub mod typing;
 
     pub mod messages {

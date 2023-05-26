@@ -27,7 +27,7 @@ pub async fn patch_profile(
         }
     }
 
-    let has_assets = !profile.avatar.is_undefined() || !profile.banner.is_undefined();
+    let has_assets = profile.avatar.is_some() || profile.banner.is_some();
 
     let mut perms = Permissions::all();
     let mut old_avatar_id: Option<Snowflake> = None;
@@ -42,8 +42,8 @@ pub async fn patch_profile(
             SELECT
                 PartyMembers.Permissions1 AS @Permissions1,
                 PartyMembers.Permissions2 AS @Permissions2,
-                if has_assets { Profiles.AvatarFileId } else { NULL } AS @AvatarId,
-                if has_assets { Profiles.BannerFileId } else { NULL } AS @BannerId
+                if has_assets { Profiles.AvatarFileId } else { NULL } AS @AvatarFileId,
+                if has_assets { Profiles.BannerFileId } else { NULL } AS @BannerFileId
             FROM PartyMembers if has_assets {
                 LEFT JOIN AggOriginalProfileFiles AS Profiles
                 ON Profiles.PartyId = PartyMembers.PartyId AND Profiles.UserId = PartyMembers.UserId
@@ -56,8 +56,8 @@ pub async fn patch_profile(
 
         perms = Permissions::from_i64(row.permissions1()?, row.permissions2()?);
 
-        old_avatar_id = row.avatar_id()?;
-        old_banner_id = row.banner_id()?;
+        old_avatar_id = row.avatar_file_id()?;
+        old_banner_id = row.banner_file_id()?;
     } else if has_assets {
         // old asset files for non-party profiles are only necessary if they're being replaced
         #[rustfmt::skip]

@@ -79,23 +79,19 @@ pub async fn create_room(
         WITH Ow AS (
             SELECT
                 UNNEST(#{&raw.id as SNOWFLAKE_ARRAY}) AS Ow.Id,
-                UNNEST(#{&raw.a1 as Type::INT8_ARRAY}) AS Ow.Allow1,
-                UNNEST(#{&raw.a2 as Type::INT8_ARRAY}) AS Ow.Allow2,
-                UNNEST(#{&raw.d1 as Type::INT8_ARRAY}) AS Ow.Deny1,
-                UNNEST(#{&raw.d2 as Type::INT8_ARRAY}) AS Ow.Deny2
+                NULLIF(UNNEST(#{&raw.a1 as Type::INT8_ARRAY}), 0) AS Ow.Allow1,
+                NULLIF(UNNEST(#{&raw.a2 as Type::INT8_ARRAY}), 0) AS Ow.Allow2,
+                NULLIF(UNNEST(#{&raw.d1 as Type::INT8_ARRAY}), 0) AS Ow.Deny1,
+                NULLIF(UNNEST(#{&raw.d2 as Type::INT8_ARRAY}), 0) AS Ow.Deny2
         )
         INSERT INTO Overwrites (UserId, RoleId, RoomId, Allow1, Allow2, Deny1, Deny2) (
-            SELECT Ow.Id, NULL, #{&room_id as Rooms::Id},
-                NULLIF(Ow.Allow1, 0), NULLIF(Ow.Allow2, 0),
-                NULLIF(Ow.Deny1, 0),  NULLIF(Ow.Deny2, 0)
+            SELECT Ow.Id, NULL, #{&room_id as Rooms::Id}, Ow.Allow1, Ow.Allow2, Ow.Deny1, Ow.Deny2
             FROM Ow INNER JOIN PartyMembers ON PartyMembers.UserId = Ow.Id
             WHERE PartyMembers.PartyId = #{&party_id as Party::Id} // validate that given user is within party
 
-            UNION ALL // at least one branch has it
+            UNION ALL
 
-            SELECT NULL, Ow.Id, #{&room_id as Rooms::Id},
-                NULLIF(Ow.Allow1, 0), NULLIF(Ow.Allow2, 0),
-                NULLIF(Ow.Deny1, 0),  NULLIF(Ow.Deny2, 0)
+            SELECT NULL, Ow.Id, #{&room_id as Rooms::Id}, Ow.Allow1, Ow.Allow2, Ow.Deny1, Ow.Deny2
             FROM Ow INNER JOIN Roles ON Roles.Id = Ow.Id
             WHERE Roles.PartyId = #{&party_id as Party::Id} // validate that given role is within the party
         )
@@ -129,11 +125,11 @@ pub async fn create_room(
 
 #[derive(Default)]
 pub struct RawOverwrites {
-    id: Vec<Snowflake>,
-    a1: Vec<i64>,
-    a2: Vec<i64>,
-    d1: Vec<i64>,
-    d2: Vec<i64>,
+    pub id: Vec<Snowflake>,
+    pub a1: Vec<i64>,
+    pub a2: Vec<i64>,
+    pub d1: Vec<i64>,
+    pub d2: Vec<i64>,
 }
 
 impl RawOverwrites {

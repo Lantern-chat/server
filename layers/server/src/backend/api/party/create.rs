@@ -1,22 +1,11 @@
 use schema::SnowflakeExt;
 
-use sdk::models::*;
+use sdk::{api::commands::party::CreatePartyForm, models::*};
 use smol_str::SmolStr;
 
 use crate::{Authorization, Error, ServerState};
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct PartyCreateForm {
-    name: SmolStr,
-
-    #[serde(default)]
-    description: Option<SmolStr>,
-
-    #[serde(default)]
-    flags: PartyFlags,
-}
-
-pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCreateForm) -> Result<Party, Error> {
+pub async fn create_party(state: ServerState, auth: Authorization, form: CreatePartyForm) -> Result<Party, Error> {
     if !state.config().party.party_name_len.contains(&form.name.len()) {
         return Err(Error::InvalidName);
     }
@@ -57,9 +46,7 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
 
     // insert party first to avoid foreign key issues
     t.execute2(schema::sql! {
-        INSERT INTO Party (
-            Id, Name, Description, OwnerId, DefaultRoom
-        ) VALUES (
+        INSERT INTO Party (Id, Name, Description, OwnerId, DefaultRoom) VALUES (
             #{&party.id           as Party::Id          },
             #{&party.name         as Party::Name        },
             #{&party.description  as Party::Description },
@@ -69,6 +56,7 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
     })
     .await?;
 
+    // TODO: Revisit this, it should probably go on top...
     let position = {
         #[rustfmt::skip]
         let row = t.query_one2(schema::sql! {
@@ -89,18 +77,14 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
     // NOTE: This is used to avoid lifetime issues
     futures::future::try_join3(
         t.execute2(schema::sql! {
-            INSERT INTO PartyMembers (
-                PartyId, UserId, Position
-            ) VALUES (
+            INSERT INTO PartyMembers (PartyId, UserId, Position) VALUES (
                 #{&party.id     as PartyMembers::PartyId  },
                 #{&auth.user_id as PartyMembers::UserId   },
                 #{&position     as PartyMembers::Position }
             )
         }),
         t.execute2(schema::sql! {
-            INSERT INTO Roles (
-                Id, Name, PartyId, Permissions1, Permissions2
-            ) VALUES (
+            INSERT INTO Roles (Id, Name, PartyId, Permissions1, Permissions2) VALUES (
                 #{&default_role.id   as Roles::Id           },
                 #{&default_role.name as Roles::Name         },
                 #{&party.id          as Roles::PartyId      },
@@ -109,11 +93,10 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: PartyCr
             )
         }),
         t.execute2(schema::sql! {
-            INSERT INTO Rooms (
-                Id, PartyId, Name, Position, Flags
-            ) VALUES (
+            INSERT INTO Rooms (Id, PartyId, Name, Position, Flags) VALUES (
                 #{&room_id              as Rooms::Id       },
                 #{&party.id             as Rooms::PartyId  },
+                // TODO: Get translations of this based on the provided language flags?
                 #{&"general"            as Rooms::Name     },
                 #{&0i16                 as Rooms::Position },
                 #{&RoomFlags::DEFAULT   as Rooms::Flags    }
