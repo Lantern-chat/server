@@ -1868,7 +1868,7 @@ LANGUAGE plpgsql AS
 $$
 BEGIN
     INSERT INTO lantern.room_members (user_id, room_id, allow1, allow2, deny1, deny2) (
-        SELECT party_members.user_id, NEW.room_id, NULL, NULL, NULL, NULL
+        SELECT party_members.user_id, NEW.id, NULL, NULL, NULL, NULL
         FROM lantern.party_members WHERE party_members.party_id = NEW.party_id
     );
 
