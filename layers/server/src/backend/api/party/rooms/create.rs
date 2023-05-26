@@ -13,15 +13,17 @@ pub async fn create_room(
 ) -> Result<FullRoom, Error> {
     let config = state.config().clone();
 
-    if !config.party.room_name_len.contains(&form.name.len()) {
-        return Err(Error::InvalidName);
-    }
-
     match form.topic {
-        Some(ref topic) if config.party.room_topic_len.contains(&topic.len()) => {
+        Some(ref topic) if !config.party.room_topic_len.contains(&topic.len()) => {
             return Err(Error::InvalidTopic);
         }
         _ => {}
+    }
+
+    let name = schema::names::slug_name(&form.name);
+
+    if !config.party.room_name_len.contains(&name.len()) {
+        return Err(Error::InvalidName);
     }
 
     // check permissions AND check for the room limit at the same time.
@@ -111,7 +113,7 @@ pub async fn create_room(
             #{&party_id         as Party::Id},
             #{&form.position    as Rooms::Position},
             #{&flags            as Rooms::Flags},
-            #{&form.name        as Rooms::Name},
+            #{&name             as Rooms::Name},
             #{&form.topic       as Rooms::Topic}
         )
     })

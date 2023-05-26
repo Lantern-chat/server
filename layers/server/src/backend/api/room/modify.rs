@@ -14,13 +14,17 @@ pub async fn modify_room(
     room_id: Snowflake,
     mut form: PatchRoomForm,
 ) -> Result<FullRoom, Error> {
+    let name;
     {
         let config = state.config();
-        if matches!(form.name, Some(ref name) if !config.party.room_name_len.contains(&name.len())) {
-            return Err(Error::InvalidName);
-        }
         if matches!(form.topic, Nullable::Some(ref topic) if !config.party.room_topic_len.contains(&topic.len())) {
             return Err(Error::InvalidTopic);
+        }
+
+        name = form.name.as_ref().map(|name| schema::names::slug_name(name));
+
+        if matches!(name, Some(ref name) if !config.party.room_name_len.contains(&name.len())) {
+            return Err(Error::InvalidName);
         }
     }
 
@@ -158,7 +162,7 @@ pub async fn modify_room(
     #[rustfmt::skip]
     let res = t.execute2(schema::sql! {
         UPDATE Rooms SET
-            if form.name.is_some()        { Rooms./Name     = #{&form.name  as Rooms::Name}, }
+            if name.is_some()             { Rooms./Name     = #{&name       as Rooms::Name}, }
             if position.is_some()         { Rooms./Position = #{&position   as Rooms::Position}, }
             if !form.topic.is_undefined() { Rooms./Topic    = #{&form.topic as Rooms::Topic}, }
             if !avatar_id.is_undefined()  { Rooms./AvatarId = #{&avatar_id  as Rooms::AvatarId}, }
