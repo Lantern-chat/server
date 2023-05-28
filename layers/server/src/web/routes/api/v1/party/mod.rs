@@ -32,11 +32,9 @@ pub fn party(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
                 // ANY /api/v1/party/1234/members
                 (_, Exact("members")) => members::members(route, auth, party_id),
 
-                (m, Exact("search")) if m == *crate::web::METHOD_QUERY => {
+                (m, Exact("search")) if m == Method::POST || m == *crate::web::METHOD_QUERY => {
                     Ok(search::search(route, auth, party_id))
                 }
-
-                (&Method::POST, Exact("search")) => Ok(search::search(route, auth, party_id)),
 
                 _ => Err(Error::NotFound),
             },
