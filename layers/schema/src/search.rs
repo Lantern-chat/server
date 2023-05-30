@@ -5,6 +5,10 @@ use sdk::{framework_utils::args::ArgumentSplitter, models::*, Snowflake};
 
 use crate::SnowflakeExt;
 
+pub use vec_collections::VecSet;
+
+pub type SearchTerms = VecSet<[SearchTerm; 8]>;
+
 #[derive(Debug, thiserror::Error)]
 pub enum SearchError {
     #[error("Empty Search")]
@@ -122,8 +126,8 @@ bitflags::bitflags! {
 }
 
 /// A BTreeSet is used to ensure consistent ordering
-pub fn parse_search_terms(q: &str) -> Result<BTreeSet<SearchTerm>, SearchError> {
-    let mut terms = BTreeSet::new();
+pub fn parse_search_terms(q: &str) -> Result<SearchTerms, SearchError> {
+    let mut terms = SearchTerms::empty();
     let args = ArgumentSplitter::split(q);
 
     let mut websearch = String::new();
