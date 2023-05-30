@@ -133,6 +133,7 @@ pub fn parse_search_terms(q: &str) -> Result<SearchTerms, SearchError> {
     let mut websearch = String::new();
 
     let mut existing = Existing::empty();
+    let mut num_pins = 0;
 
     let mut args_iter = args.arguments().iter().peekable();
 
@@ -233,8 +234,11 @@ pub fn parse_search_terms(q: &str) -> Result<SearchTerms, SearchError> {
                 term.kind = SearchTermKind::Sort(order);
                 existing |= Existing::SORT;
             }
-            ("pinned", tag_id) => match Snowflake::from_str(tag_id) {
-                Ok(id) => term.kind = SearchTermKind::Pinned(id),
+            ("pinned" | "pin", tag_id) => match Snowflake::from_str(tag_id) {
+                Ok(id) if num_pins < 10 => {
+                    num_pins += 1;
+                    term.kind = SearchTermKind::Pinned(id)
+                }
                 _ => {}
             },
             ("thread" | "parent", thread_id) if !existing.contains(Existing::THREAD) => {
