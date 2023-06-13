@@ -1,5 +1,4 @@
 use futures::FutureExt;
-use md_utils::SpanType;
 use schema::{Snowflake, SnowflakeExt};
 
 use crate::{backend::cache::permission_cache::PermMute, Authorization, Error, ServerState};
@@ -85,6 +84,9 @@ pub async fn create_message(
 
     let spans = md_utils::scan_markdown(&modified_content);
 
+    // TODO: Set flags
+    let flags = MessageFlags::empty();
+
     let msg_id = Snowflake::now();
 
     // if we avoided getting a database connection until now, do it now
@@ -96,17 +98,9 @@ pub async fn create_message(
     // TODO: Determine if repeatable-read is needed?
     let t = db.transaction().await?;
 
-    // NOTE: This can potentially modify the content, hence why it takes ownership. Do not assume
-    // spans are valid after this call
-    let modified_content = verify::verify(&t, &state, auth, room_id, perms, modified_content, &spans).await?;
-
-    let mut flags = MessageFlags::empty();
-
-    for span in &spans {
-        if span.kind() == SpanType::Url {
-            flags |= MessageFlags::HAS_LINK;
-        }
-    }
+    // NOTE: This can potentially modify the content, hence why it takes ownership.
+    // Do not assume spans are valid after this call
+    let modified_content = verify::verify(&t, &state, auth, room_id, perms, modified_content).await?;
 
     let msg = insert_message(t, state.clone(), auth, room_id, msg_id, &body, &modified_content, flags)
         .boxed()
@@ -131,146 +125,38 @@ pub(crate) async fn insert_message(
     content: &str,
     flags: MessageFlags,
 ) -> Result<Message, Error> {
-    // allow it to be null
-    let content = if content.is_empty() { None } else { Some(content) };
+    let flags = flags.bits();
 
-    if let Some(parent_msg_id) = body.parent {
-        let thread_id = Snowflake::now();
-
-        use schema::*;
-        use thorn::*;
-
-        params! {
-            pub struct Params<'a> {
-                pub msg_id: Snowflake = Messages::Id,
-                pub user_id: Snowflake = Users::Id,
-                pub room_id: Snowflake = Rooms::Id,
-                pub parent_msg_id: Snowflake = Messages::Id,
-                pub thread_id: Snowflake = Threads::Id,
-                pub new_thread_flags: ThreadFlags = Threads::Flags,
-                pub content: Option<&'a str> = Messages::Content,
-                pub flags: i16 = Messages::Flags,
-            }
-        }
-
-        t.execute_cached_typed(
-            || {
-                Query::insert()
-                    .into::<Messages>()
-                    .cols(&[
-                        Messages::ThreadId,
-                        Messages::Id,
-                        Messages::UserId,
-                        Messages::RoomId,
-                        Messages::Flags,
-                        Messages::Content,
-                    ])
-                    .value(
-                        Query::select()
-                            .expr(Call::custom("lantern.create_thread").args((
-                                Params::thread_id(),
-                                Params::parent_msg_id(),
-                                Params::new_thread_flags(),
-                            )))
-                            .as_value(),
-                    )
-                    .values([
-                        Params::msg_id(),
-                        Params::user_id(),
-                        Params::room_id(),
-                        Params::content(),
-                        Params::flags(),
-                    ])
-            },
-            &Params {
-                msg_id,
-                user_id: auth.user_id,
-                room_id,
-                parent_msg_id,
-                thread_id,
-                new_thread_flags: ThreadFlags::empty(), // TODO
-                content,
-                flags: flags.bits(),
-            }
-            .as_params(),
+    // TODO: Threads
+    #[rustfmt::skip]
+    let res = t.execute2(schema::sql! {
+        INSERT INTO Messages (Id, UserId, RoomId, Flags, Content) VALUES (
+            #{&msg_id as Messages::Id},
+            #{&auth.user_id as Messages::UserId},
+            #{&room_id as Messages::RoomId},
+            #{&flags as Messages::Flags},
+            if content.is_empty() { NULL } else { #{&content as Messages::Content} }
         )
-        .await?;
-    } else {
-        use schema::*;
-        use thorn::*;
+    }).await?;
 
-        params! {
-            pub struct Params<'a> {
-                msg_id: Snowflake = Messages::Id,
-                user_id: Snowflake = Messages::UserId,
-                room_id: Snowflake = Messages::RoomId,
-                content: Option<&'a str> = Messages::Content,
-            }
-        }
-
-        t.execute_cached_typed(
-            || {
-                Query::insert()
-                    .into::<Messages>()
-                    .cols(&[Messages::Id, Messages::UserId, Messages::RoomId, Messages::Content])
-                    .values([
-                        Params::msg_id(),
-                        Params::user_id(),
-                        Params::room_id(),
-                        Params::content(),
-                    ])
-            },
-            &Params {
-                msg_id,
-                user_id: auth.user_id,
-                room_id,
-                content,
-            }
-            .as_params(),
-        )
-        .await?;
+    if res != 1 {
+        t.rollback().await?;
+        return Err(Error::InternalErrorStatic("Unable to insert message"));
     }
 
     if !body.attachments.is_empty() {
-        use schema::*;
-        use thorn::*;
-
-        params! {
-            pub struct Params<'a> {
-                msg_id: Snowflake = Messages::Id,
-                attachments: &'a [Snowflake] = SNOWFLAKE_ARRAY,
-            }
-        }
-
-        t.execute_cached_typed(
-            || {
-                tables! {
-                    struct AggIds {
-                        Id: Files::Id,
-                    }
-                }
-
-                Query::with()
-                    .with(
-                        AggIds::as_query(
-                            Query::select().expr(Builtin::unnest((Params::attachments(),)).alias_to(AggIds::Id)),
-                        )
-                        .exclude(),
-                    )
-                    .insert()
-                    .into::<Attachments>()
-                    .cols(&[Attachments::FileId, Attachments::MessageId])
-                    .query(
-                        Query::select().col(AggIds::Id).expr(Params::msg_id()).from_table::<AggIds>().as_value(),
-                    )
-            },
-            &Params {
-                msg_id,
-                attachments: &body.attachments,
-            }
-            .as_params(),
-        )
+        #[rustfmt::skip]
+        let res = t.execute2(schema::sql! {
+            INSERT INTO Attachments (MsgId, FileId) (
+                SELECT #{&msg_id as Messages::Id}, UNNEST(#{&body.attachments as SNOWFLAKE_ARRAY})
+            )
+        })
         .await?;
+
+        if res != body.attachments.len() as u64 {
+            t.rollback().await?;
+            return Err(Error::InternalErrorStatic("Unable to insert attachments"));
+        }
     }
 
     let msg = super::get::get_one(state, &t, msg_id).await?;

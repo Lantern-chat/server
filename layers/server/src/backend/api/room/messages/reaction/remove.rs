@@ -41,6 +41,10 @@ pub async fn remove_own_reaction(
             }
 
             WHERE Reactions.MsgId = #{&msg_id as Messages::Id}
+
+            // double check that the message we're unreacting to exists
+            AND EXISTS (SELECT FROM LiveMessages WHERE LiveMessages.Id = Reactions.MsgId)
+
             AND match emote {
                 EmoteOrEmojiId::Emote(ref emote_id) => { Reactions.EmoteId = #{emote_id as Reactions::EmoteId} }
                 EmoteOrEmojiId::Emoji(ref emoji_id) => { Reactions.EmojiId = #{emoji_id as Reactions::EmojiId} }
@@ -95,52 +99,3 @@ pub async fn remove_own_reaction(
 
     Ok(())
 }
-
-// mod q {
-//     use sdk::Snowflake;
-
-//     pub use schema::*;
-//     pub use thorn::*;
-
-//     thorn::tables! {
-//         pub struct Updated {
-//             MsgId: Reactions::MsgId,
-//         }
-//     }
-
-//     thorn::params! {
-//         pub struct Params {
-//             pub user_id: Snowflake = Users::Id,
-//             pub msg_id: Snowflake = Messages::Id,
-//             pub emote_id: Option<Snowflake> = Emotes::Id,
-//             pub emoji_id: Option<i32> = Emojis::Id,
-//             pub room_id: Snowflake = Rooms::Id,
-//         }
-//     }
-
-//     pub fn query(emoji: bool) -> impl AnyQuery {
-//         let update = Query::update()
-//             .table::<Reactions>()
-//             .set(
-//                 Reactions::UserIds,
-//                 Builtin::array_remove((Reactions::UserIds, Params::user_id())),
-//             )
-//             .and_where(Reactions::MsgId.equals(Params::msg_id()))
-//             .and_where(match emoji {
-//                 true => Reactions::EmojiId.equals(Params::emoji_id()),
-//                 false => Reactions::EmoteId.equals(Params::emote_id()),
-//             })
-//             .and_where(match !emoji {
-//                 true => Params::emoji_id().is_null(),
-//                 false => Params::emote_id().is_null(),
-//             })
-//             .and_where(Params::user_id().equals(Builtin::any(Reactions::UserIds)))
-//             .returning(Reactions::MsgId.alias_to(Updated::MsgId));
-
-//         Query::select()
-//             .with(Updated::as_query(update).exclude())
-//             .col(Rooms::PartyId)
-//             .from(Rooms::inner_join_table::<Updated>().on(true.lit()))
-//             .and_where(Rooms::Id.equals(Params::room_id()))
-//     }
-// }

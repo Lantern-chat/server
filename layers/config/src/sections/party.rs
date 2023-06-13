@@ -15,6 +15,9 @@ section! {
         #[serde(with = "super::util::range")]
         pub room_topic_len: Range<usize>    = 1..512,
 
+        #[serde(with = "super::util::range")]
+        pub role_name_len: Range<usize>     = 1..64,
+
         /// Max rooms that are not deleted at any given time
         pub max_active_rooms: u16   = 128,
 

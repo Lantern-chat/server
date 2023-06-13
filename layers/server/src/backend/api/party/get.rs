@@ -92,7 +92,7 @@ pub async fn get_party_inner(
 
         (party.roles, party.emotes) = tokio::try_join!(
             async {
-                super::roles::get_roles_raw(db, &state, SearchMode::Single(party_id))
+                super::roles::get::get_roles_raw(db, &state, SearchMode::Single(party_id))
                     .await?
                     .try_collect::<ThinVec<_>>()
                     .await

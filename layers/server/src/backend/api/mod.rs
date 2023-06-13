@@ -42,12 +42,19 @@ pub mod party {
     pub mod get;
     pub mod members;
     pub mod modify;
-    pub mod roles;
+    pub mod remove;
     pub mod stats;
 
     pub mod rooms {
         pub mod create;
         pub mod get;
+    }
+
+    pub mod roles {
+        pub mod create;
+        pub mod get;
+        pub mod modify;
+        pub mod remove;
     }
 }
 

@@ -83,18 +83,20 @@ pub async fn add_reaction(
                     // verify the user sending this emote is a member of the party the emote belongs to
                     EmoteOrEmojiId::Emote(ref emote_id) if perms.contains(Permissions::USE_EXTERNAL_EMOTES) => {
                         PartyMembers.PartyId AS Checked.PartyId
-                        FROM  PartyMembers INNER JOIN Emotes ON Emotes.PartyId = PartyMembers.PartyId
+                         FROM PartyMembers INNER JOIN Emotes ON Emotes.PartyId = PartyMembers.PartyId
                         WHERE PartyMembers.UserId = #{&auth.user_id as Users::Id}
-                        AND   Emotes.Id = #{emote_id as Emotes::Id}
+                          AND Emotes.Id = #{emote_id as Emotes::Id}
                     }
                     EmoteOrEmojiId::Emote(ref emote_id) => {
                         Rooms.PartyId AS Checked.PartyId
-                        FROM  LiveRooms AS Rooms INNER JOIN Emotes ON Rooms.PartyId = Emotes.PartyId
+                         FROM LiveRooms AS Rooms INNER JOIN Emotes ON Rooms.PartyId = Emotes.PartyId
                         WHERE Rooms.Id = #{&room_id as Rooms::Id}
-                        AND   Emotes.Id = #{emote_id as Emotes::Id}
+                          AND Emotes.Id = #{emote_id as Emotes::Id}
                     }
                     EmoteOrEmojiId::Emoji(_) => {
-                        Rooms.PartyId AS Checked.PartyId FROM LiveRooms AS Rooms WHERE Rooms.Id = #{&room_id as Rooms::Id}
+                        Rooms.PartyId AS Checked.PartyId
+                         FROM LiveRooms AS Rooms
+                        WHERE Rooms.Id = #{&room_id as Rooms::Id}
                     }
                 }
             } else {
@@ -104,9 +106,9 @@ pub async fn add_reaction(
                 match emote {
                     EmoteOrEmojiId::Emoji(_) => {
                         Rooms.PartyId AS Checked.PartyId
-                        FROM AggRoomPerms AS Rooms
+                         FROM AggRoomPerms AS Rooms
                         WHERE Rooms.Id     = #{&room_id as Rooms::Id}
-                        AND   Rooms.UserId = #{&auth.user_id as Users::Id}
+                          AND Rooms.UserId = #{&auth.user_id as Users::Id}
                     }
                     EmoteOrEmojiId::Emote(ref emote_id) => {
                         PartyMembers.PartyId AS Checked.PartyId
@@ -145,6 +147,8 @@ pub async fn add_reaction(
                 EmoteOrEmojiId::Emoji(ref emoji_id) => { Reactions.EmojiId = #{emoji_id as Reactions::EmojiId} }
                 EmoteOrEmojiId::Emote(ref emote_id) => { Reactions.EmoteId = #{emote_id as Reactions::EmoteId} }
             }
+
+            AND EXISTS (SELECT FROM LiveMessages WHERE LiveMessages.Id = Reactions.MsgId)
         ),
 
         InsertedReaction AS (

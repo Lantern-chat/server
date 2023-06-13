@@ -44,7 +44,7 @@ pub async fn process(
 
     match code {
         EventCode::MessageCreate => message_create::message_create(state, db, id).await,
-        EventCode::MessageDelete => message_delete::message_delete(state, db, id, party_id).await,
+        EventCode::MessageDelete => message_delete::message_delete(state, db, id, party_id, room_id).await,
         EventCode::MessageUpdate => message_update::message_update(state, db, id).await,
         EventCode::PresenceUpdated => presence_update::presence_updated(state, db, id, party_id).await,
         EventCode::MemberJoined

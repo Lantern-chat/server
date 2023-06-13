@@ -146,7 +146,7 @@ pub async fn ready(state: ServerState, conn_id: Snowflake, auth: Authorization) 
 
         let (roles, emotes) = tokio::try_join!(
             async {
-                crate::backend::api::party::roles::get_roles_raw(&db, &state, SearchMode::Many(&ids))
+                crate::backend::api::party::roles::get::get_roles_raw(&db, &state, SearchMode::Many(&ids))
                     .await?
                     .try_collect::<Vec<_>>()
                     .await

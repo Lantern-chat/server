@@ -148,7 +148,7 @@ pub async fn get_attachment(
             Files.Name  AS @Name,
             Files.Mime  AS @Mime
         FROM Attachments
-            INNER JOIN Messages ON Attachments.MessageId = Messages.Id
+            INNER JOIN Messages ON Attachments.MsgId = Messages.Id
             INNER JOIN Files ON Files.Id = Attachments.FileId
         WHERE
             Files.Id        = #{&file_id as Files::Id}

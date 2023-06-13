@@ -17,10 +17,12 @@ failsafe = { git = "https://github.com/Lantern-chat/failsafe-rs" }
 
 # postgres-inet = { git = "https://github.com/Lantern-chat/postgres-inet" }
 
-[patch.'https://github.com/Lantern-chat/client-sdk-rs']
+[patch."https://github.com/Lantern-chat/client-sdk-rs"]
+client-sdk-common = { path = "../client-sdk-rs/common" }
 client-sdk = { path = "../client-sdk-rs" }
 
 [workspace]
+resolver = "2"
 members = ["crates/*", "bin/*", "layers/*", "edge/*"]
 # exclude = ["edge/embed-worker", "edge/camo"]
 

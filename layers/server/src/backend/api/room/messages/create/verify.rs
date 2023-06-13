@@ -5,7 +5,7 @@ use smallvec::SmallVec;
 
 use crate::{Authorization, Error, ServerState};
 
-use md_utils::{Span, SpanType};
+use md_utils::SpanType;
 
 pub async fn verify<'a>(
     t: &db::pool::Transaction<'_>,
@@ -14,8 +14,9 @@ pub async fn verify<'a>(
     room_id: Snowflake,
     perms: Permissions,
     content: Cow<'a, str>,
-    spans: &[Span],
 ) -> Result<Cow<'a, str>, Error> {
+    let spans = md_utils::scan_markdown(&content);
+
     let mut emotes = Vec::new();
 
     for span in spans {

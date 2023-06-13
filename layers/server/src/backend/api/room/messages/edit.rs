@@ -176,7 +176,7 @@ fn query_existing_message() -> impl thorn::AnyQuery {
                 Query::select()
                     .from_table::<Attachments>()
                     .expr(Builtin::array_agg(Attachments::FileId).alias_to(AggFileIds::FileIds))
-                    .and_where(Attachments::MessageId.equals(Messages::Id)),
+                    .and_where(Attachments::MsgId.equals(Messages::Id)),
             )))
             .on(true.lit()),
         )
@@ -203,7 +203,7 @@ fn add_attachments_query() -> impl thorn::AnyQuery {
         )
         .insert()
         .into::<Attachments>()
-        .cols(&[Attachments::FileId, Attachments::MessageId])
+        .cols(&[Attachments::FileId, Attachments::MsgId])
         .query(Query::select().col(AggIds::Id).expr(msg_id_var).from_table::<AggIds>().as_value())
 }
 

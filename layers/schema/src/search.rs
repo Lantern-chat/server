@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::str::FromStr;
 
 use sdk::{framework_utils::args::ArgumentSplitter, models::*, Snowflake};
@@ -35,6 +34,7 @@ pub enum Sort {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Has {
     Text,
+    Code,
     Image,
     Video,
     Audio,
@@ -47,6 +47,7 @@ impl Has {
     pub fn as_str(self) -> &'static str {
         match self {
             Has::Text => "text",
+            Has::Code => "code",
             Has::Image => "img",
             Has::Video => "vid",
             Has::Audio => "audio",
@@ -220,6 +221,7 @@ pub fn parse_search_terms(q: &str) -> Result<SearchTerms, SearchError> {
             ("has", "embed") => term.kind = SearchTermKind::Has(Has::Embed),
             ("has", "file" | "attachment") => term.kind = SearchTermKind::Has(Has::File),
             ("has", "text" | "txt" | "message" | "msg" | "content") => term.kind = SearchTermKind::Has(Has::Text),
+            ("has", "code") => term.kind = SearchTermKind::Has(Has::Code),
             ("in", "thread") => term.kind = SearchTermKind::InThread,
             ("is", "pinned") => term.kind = SearchTermKind::IsPinned,
             ("is", "starred") => term.kind = SearchTermKind::IsStarred,

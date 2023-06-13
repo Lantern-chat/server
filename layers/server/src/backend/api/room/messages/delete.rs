@@ -21,48 +21,45 @@ pub async fn delete_msg(
 
     #[rustfmt::skip]
     let res = state.db.write.get().await?.execute2(schema::sql! {
-        tables! {
-            struct TempPerms {
-                Permissions1: AggRoomPerms::Permissions1,
-                Permissions2: AggRoomPerms::Permissions2,
-            }
-        };
+        tables! { struct TempPerms { Permissions1: AggRoomPerms::Permissions1 } };
 
         if perms.is_none() {
             WITH TempPerms AS (
-                SELECT
-                    AggRoomPerms.Permissions1 AS TempPerms.Permissions1,
-                    AggRoomPerms.Permissions2 AS TempPerms.Permissions2
-                FROM AggRoomPerms
-                WHERE   AggRoomPerms.Id = #{&room_id as Rooms::Id}
-                AND AggRoomPerms.UserId = #{&auth.user_id as Users::Id}
+                SELECT AggRoomPerms.Permissions1 AS TempPerms.Permissions1
+                  FROM AggRoomPerms
+                 WHERE AggRoomPerms.Id = #{&room_id as Rooms::Id}
+                   AND AggRoomPerms.UserId = #{&auth.user_id as Users::Id}
             )
         }
 
         // Update Flags to include the deleted bit
-        UPDATE Messages SET (Flags) = (Messages.Flags | {MessageFlags::DELETED.bits()})
+        UPDATE Messages SET (Flags) = (Messages.Flags | CASE WHEN Messages.UserId = #{&auth.user_id as Users::Id} THEN
+            // Add REMOVED if not deleted by the author
+            {MessageFlags::DELETED.bits()} ELSE {(MessageFlags::DELETED | MessageFlags::REMOVED).bits()} END
+        )
 
         if perms.is_none() { FROM TempPerms } // include CTE if needed
 
         WHERE Messages.Id = #{&msg_id as Messages::Id}
-        AND Messages.Flags & {MessageFlags::DELETED.bits()} = 0 // prevent double updates
+          AND Messages.Flags & {MessageFlags::DELETED.bits()} = 0 // prevent double updates
 
         match perms {
             Some(perm) if !perm.contains(Permissions::MANAGE_MESSAGES) => {
                 // if they are a known party member and without manage perm
                 AND Messages.UserId = #{&auth.user_id as Users::Id}
+                // Some(perm) implies membership
             }
             None => {
                 let m = Permissions::MANAGE_MESSAGES.to_i64();
+                assert_eq!(m[1], 0);
 
                 AND ((
                     // if the user has permissions to manage messages
-                    ({m[0]} & TempPerms.Permissions1 = {m[0]}) AND
-                    ({m[1]} & TempPerms.Permissions2 = {m[1]})
+                    {m[0]} & TempPerms.Permissions1 = {m[0]}
                 ) OR (
                     // or they are a valid party member and it's their own message
-                    Messages.UserId = #{&auth.user_id as Users::Id} AND
-                    TempPerms.Permissions1 IS NOT NULL
+                    Messages.UserId = #{&auth.user_id as Users::Id}
+                    AND TempPerms.Permissions1 IS NOT NULL
                 ))
             }
             _ => {} // no additional constraints

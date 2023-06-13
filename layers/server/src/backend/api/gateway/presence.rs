@@ -1,4 +1,4 @@
-use sdk::models::{Snowflake, UserPresence, UserPresenceFlags};
+use sdk::models::{Snowflake, UserPresence};
 
 use crate::{Error, ServerState};
 
@@ -23,10 +23,12 @@ pub async fn set_presence(
     Ok(())
 }
 
-pub async fn clear_presence(state: ServerState, conn_id: Snowflake) -> Result<(), Error> {
+pub async fn clear_presence(state: ServerState, user_id: Snowflake, conn_id: Snowflake) -> Result<(), Error> {
     #[rustfmt::skip]
     state.db.write.get().await?.execute2(schema::sql! {
-        DELETE FROM UserPresence WHERE UserPresence.ConnId = #{&conn_id as UserPresence::ConnId}
+        DELETE FROM UserPresence
+        WHERE UserPresence.UserId = #{&user_id as UserPresence::UserId}
+          AND UserPresence.ConnId = #{&conn_id as UserPresence::ConnId}
     }).await?;
 
     Ok(())

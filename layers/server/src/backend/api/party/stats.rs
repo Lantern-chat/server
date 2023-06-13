@@ -62,7 +62,7 @@ pub async fn get_stats(
             SUM((
                 SELECT COUNT(Attachments.FileId)::int8
                 FROM Attachments
-                WHERE Attachments.MessageId = Messages.Id
+                WHERE Attachments.MsgId = Messages.Id
             )) AS @FileCount
 
         FROM Messages INNER JOIN AllowedRooms ON Messages.RoomId = AllowedRooms.RoomId

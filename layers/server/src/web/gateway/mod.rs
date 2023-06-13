@@ -379,7 +379,7 @@ pub async fn client_connection(ws: WebSocket, query: GatewayQueryParams, _addr: 
         tokio::spawn(async move {
             tokio::time::sleep(Duration::from_secs(5)).await;
 
-            if let Err(e) = clear_presence(state, conn_id).await {
+            if let Err(e) = clear_presence(state, user_id, conn_id).await {
                 log::error!("Error clearing connection presence: {e}");
             }
         });
