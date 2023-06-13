@@ -433,7 +433,7 @@ CREATE TABLE lantern.messages (
 );
 ALTER TABLE lantern.messages SET (toast_tuple_target = 256);
 
-CREATE VIEW lantern.live_messages AS SELECT * FROM lantern.messages WHERE flags & MESSAGE_DELETED_RETAINED != MESSAGE_DELETED;
+CREATE VIEW lantern.live_messages AS SELECT * FROM lantern.messages WHERE flags & MESSAGE_DELETED_PARENT != MESSAGE_DELETED;
 
 CREATE TABLE lantern.unindexed_messages (
     id bigint NOT NULL PRIMARY KEY
@@ -1090,10 +1090,10 @@ CREATE INDEX user_asset_original_file_idx   ON lantern.user_assets      USING bt
 CREATE INDEX user_asset_file_idx            ON lantern.user_asset_files USING btree(asset_id, file_id)  INCLUDE (flags);
 
 CREATE INDEX msg_room_idx                   ON lantern.messages USING btree(room_id, id)
-    WHERE flags & MESSAGE_DELETED_RETAINED != MESSAGE_DELETED; -- live messages only
+    WHERE flags & MESSAGE_DELETED_PARENT != MESSAGE_DELETED; -- live messages only
 
 CREATE INDEX msg_parent_idx                 ON lantern.messages USING btree(parent_id, id)
-    WHERE flags & MESSAGE_DELETED_RETAINED != MESSAGE_DELETED -- live messages only
+    WHERE flags & MESSAGE_DELETED_PARENT != MESSAGE_DELETED -- live messages only
       AND parent_id IS NOT NULL; -- only children
 
 -- Use HASH for this to save space
