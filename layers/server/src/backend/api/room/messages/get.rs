@@ -399,12 +399,6 @@ where
             msg.kind = MessageKind::try_from(row.kind::<i16>()?).unwrap_or_default();
             msg.flags = MessageFlags::from_bits_truncate_public(row.flags()?);
 
-            if msg.flags.contains(MessageFlags::DELETED) {
-                msg.flags &= MessageFlags::DELETED | MessageFlags::REMOVED;
-
-                return Ok(msg);
-            }
-
             msg.author = {
                 let id = row.user_id()?;
 
@@ -439,6 +433,12 @@ where
                     }
                 }
             };
+
+            if msg.flags.contains(MessageFlags::DELETED) {
+                msg.flags &= MessageFlags::DELETED | MessageFlags::REMOVED;
+
+                return Ok(msg);
+            }
 
             msg.member = match party_id {
                 None => None,
