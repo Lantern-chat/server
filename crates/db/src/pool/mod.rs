@@ -1131,6 +1131,10 @@ impl Client {
 
 impl Transaction<'_> {
     pub async fn prepare_cached2<'a, E: From<Row>>(&self, query: &mut Query<'a, E>) -> Result<Statement, Error> {
+        if let Some(stmt) = self.stmt_cache.get2(&query.q) {
+            return Ok(stmt);
+        }
+
         log::debug!("Preparing query: \"{}\"", query.q);
 
         let stmt = self.t.prepare_typed(&query.q, &query.param_tys).await?;
