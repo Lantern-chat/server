@@ -60,7 +60,7 @@ pub enum Error {
 
 #[cfg(feature = "binary")]
 const _: () = {
-    use processing::{process::ProcessingError, read_image::ImageReadError};
+    use image_processing::{image::ImageError, process::ProcessingError, read_image::ImageReadError};
 
     impl From<bincode::Error> for Error {
         fn from(_: bincode::Error) -> Self {
@@ -77,10 +77,8 @@ const _: () = {
         }
     }
 
-    impl From<processing::image::ImageError> for Error {
-        fn from(err: processing::image::ImageError) -> Self {
-            use processing::image::ImageError;
-
+    impl From<ImageError> for Error {
+        fn from(err: ImageError) -> Self {
             match err {
                 ImageError::Decoding(err) => Error::DecodingError(err.to_string()),
                 ImageError::Encoding(err) => Error::EncodingError(err.to_string()),

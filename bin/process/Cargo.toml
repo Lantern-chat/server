@@ -11,14 +11,14 @@ serde = { version = "1", features = ["derive"] }
 thiserror = "1"
 
 framed = { path = "../../crates/framed", features = ["encoding"] }
-processing = { optional = true, path = "../../crates/processing" }
+image_processing = { optional = true, path = "../../crates/image_processing" }
 process_utils = { path = "../../crates/process_utils" }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
 
 [features]
-binary = ["processing"]
+binary = ["image_processing"]
 
 [[bin]]
 name = "process"

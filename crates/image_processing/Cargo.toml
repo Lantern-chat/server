@@ -1,5 +1,5 @@
 [package]
-name = "processing"
+name = "image_processing"
 version = "0.1.0"
 edition = "2021"
 publish = false
@@ -19,3 +19,4 @@ oxipng = { git = "https://github.com/shssoichiro/oxipng", default-features = fal
 mozjpeg = { version = "0.9.3" }
 ravif = { git = "https://github.com/kornelski/cavif-rs" }
 rgb = "0.8"
+

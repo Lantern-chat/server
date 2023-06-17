@@ -2,7 +2,8 @@ use std::io;
 
 use framed::{FramedReader, FramedWriter};
 use process::{Command, EncodingFormat, Error, ProcessedResponse, Response};
-use processing::{
+
+use image_processing::{
     heuristic::HeuristicsInfo,
     image::DynamicImage,
     read_image::{read_image, Image},
@@ -49,7 +50,7 @@ impl ProcessState {
                 if let Some(msg) = input.next_msg()? {
                     let mut image = read_image(msg, &self.config, Some(length))?;
 
-                    let p = processing::process::process_image(&mut image, self.config)?;
+                    let p = image_processing::process::process_image(&mut image, self.config)?;
 
                     output.write_object(&Response::Processed(ProcessedResponse {
                         preview: p.preview,
@@ -82,7 +83,7 @@ impl ProcessState {
                         // even if mozjpeg can handle RGBA bytes, it still needs to be
                         // premultiplied or it'll be a mess
                         if let DynamicImage::ImageRgba8(ref mut rgba) = image.image {
-                            processing::process::imageops::fast_premultiply_alpha(rgba);
+                            image_processing::process::imageops::fast_premultiply_alpha(rgba);
                         }
 
                         ImageFormat::Jpeg
@@ -93,7 +94,7 @@ impl ProcessState {
                 output.write_object(&Response::Encoded)?;
 
                 output.with_msg(|msg| {
-                    processing::encode::encode(msg, image, format, self.heuristics.unwrap(), quality)
+                    image_processing::encode::encode(msg, image, format, self.heuristics.unwrap(), quality)
                 })?;
             }
         }
