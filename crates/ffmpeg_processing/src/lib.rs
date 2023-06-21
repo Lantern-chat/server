@@ -412,8 +412,8 @@ impl<R> Drop for Input<'_, R> {
         let tmps = std::mem::take(&mut self.tmps);
 
         tokio::task::spawn_blocking(move || {
-            for _path in tmps {
-                //let _ = std::fs::remove_file(&path);
+            for path in tmps {
+                let _ = std::fs::remove_file(&path);
             }
         });
     }
