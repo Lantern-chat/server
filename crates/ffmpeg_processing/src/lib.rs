@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::process::Stdio;
 
 use gcd::Gcd;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncWriteExt};
 use tokio::{fs::File, process::Command};
 
 pub mod probe;
@@ -109,16 +109,10 @@ impl Encode {
     }
 }
 
-enum State<R> {
-    Unwritten { src: Option<R> },
-    Started { src: R, tmp: File },
-    Written,
-}
-
 pub struct Input<'a, R> {
     ffmpeg: &'a Ffmpeg,
     name: &'a str,
-    state: State<R>,
+    src: Option<R>,
     pub probe: Option<probe::FfProbeOutput>,
     len: u64,
     tmps: Vec<PathBuf>,
@@ -129,7 +123,7 @@ impl Ffmpeg {
         Input {
             ffmpeg: self,
             name,
-            state: State::Unwritten { src: Some(src) },
+            src: Some(src),
             probe: None,
             len: 0,
             tmps: Vec::new(),
@@ -151,10 +145,8 @@ impl Ffmpeg {
 
 impl<'a, R: AsyncRead + Unpin> Input<'a, R> {
     pub async fn probe(&mut self) -> Result<(), FfmpegError> {
-        let mut src = match &mut self.state {
-            State::Unwritten { src: src @ Some(_) } => src.take().unwrap(),
-            State::Unwritten { src: None } => return Err(FfmpegError::MissingFile),
-            _ => return Ok(()),
+        let Some(mut src) = self.src.take() else {
+            return Err(FfmpegError::MissingFile);
         };
 
         let path = self.ffmpeg.tmp(self.name);
@@ -174,8 +166,7 @@ impl<'a, R: AsyncRead + Unpin> Input<'a, R> {
         // push it to the tmps list for later cleanup
         self.tmps.push(path);
 
-        // copy some of the file to fs
-        self.len += tokio::io::copy(&mut (&mut src).take(1024 * 1024 * 5), &mut tmp).await?;
+        self.len += tokio::io::copy(&mut src, &mut tmp).await?;
         tmp.flush().await?;
 
         let ffprobe = ffprobe_cmd.spawn()?;
@@ -188,23 +179,10 @@ impl<'a, R: AsyncRead + Unpin> Input<'a, R> {
 
         self.probe = Some(serde_json::from_slice(&out.stdout)?);
 
-        self.state = State::Started { src, tmp };
-
         Ok(())
     }
 
     pub async fn encode(&mut self, opts: Encode) -> Result<PathBuf, FfmpegError> {
-        match &mut self.state {
-            State::Written => {}
-            State::Unwritten { .. } => return Err(FfmpegError::NeedsProbe),
-            State::Started { src, tmp } => {
-                self.len += tokio::io::copy(src, tmp).await?;
-                tmp.flush().await?;
-
-                self.state = State::Written;
-            }
-        }
-
         let Some(ref probe) = self.probe else {
             return Err(FfmpegError::NeedsProbe);
         };
@@ -227,9 +205,9 @@ impl<'a, R: AsyncRead + Unpin> Input<'a, R> {
         #[rustfmt::skip]
         let crop = match opts.crop {
             Crop::Center => format!("'min(iw,ih)':'min(ih,ow*{ah}/{aw})'"),
-            Crop::Top    => format!("'min(iw,ih*{aw}/{ah})':ow*{ah}/{aw}:-1:0"),
-            Crop::Middle => format!("'min(iw,ih*{aw}/{ah})':ow*{ah}/{aw}:-1"),
-            Crop::Bottom => format!("'min(iw,ih*{aw}/{ah})':ow*{ah}/{aw}:-1:ih-ow"),
+            Crop::Top    => format!("'min(iw,ih*{aw}/{ah})':ow*{ah}/{aw}:(iw-ow)/2:0"),
+            Crop::Middle => format!("'min(iw,ih*{aw}/{ah})':ow*{ah}/{aw}"),
+            Crop::Bottom => format!("'min(iw,ih*{aw}/{ah})':ow*{ah}/{aw}:(iw-ow)/2:ih-ow"),
         };
 
         let mut ffmpeg_args = format!(
@@ -238,8 +216,8 @@ impl<'a, R: AsyncRead + Unpin> Input<'a, R> {
         );
 
         let mut filter = format!(
-            "[v:{}]crop={crop},scale='min(iw,{w})':'min(ih,{h})':flags=bicubic:force_original_aspect_ratio=increase",
-            stream.index,
+            "[v:{}]crop={crop},scale='min(iw,{w})':'min(ih,{h})':flags=lanczos:force_original_aspect_ratio=increase{}",
+            stream.index, if opts.format == Format::Mp4 { ":force_divisible_by=2" } else { "" }
         );
 
         // GIFs are terrible, filter out dithering artifacts
@@ -247,7 +225,8 @@ impl<'a, R: AsyncRead + Unpin> Input<'a, R> {
             let block_size = w.min(h).ilog2().next_power_of_two().clamp(8, 256);
 
             filter += &format!(
-                ",atadenoise=0.3:0.04:0.3:0.04:0.3:0.04:s=9,fftdnoiz=sigma=15:block={block_size}:overlap=0.8[c];"
+                ",atadenoise=0.3:0.04:0.3:0.04:0.3:0.04:s=9,\
+                fftdnoiz=sigma=15:block={block_size}:overlap=0.8[c];"
             );
         } else {
             filter += "[c];"; // otherwise just end filter node here
@@ -256,7 +235,10 @@ impl<'a, R: AsyncRead + Unpin> Input<'a, R> {
         match opts.format {
             Format::Gif => {
                 // GIF lossy score
-                let lossy = 3 * (100u8.saturating_sub(opts.quality) as u32);
+                let mut lossy = 100u8.saturating_sub(opts.quality) as u32;
+                if opts.quality < 90 {
+                    lossy = lossy * 3 - 20;
+                }
 
                 let max_colors = match opts.quality {
                     00..=39 => 64,
@@ -303,7 +285,7 @@ impl<'a, R: AsyncRead + Unpin> Input<'a, R> {
                     .args(format!("--conserve-memory -O3 --lossy={lossy} -b -i").split_whitespace())
                     .arg(&out_path)
                     .stdin(Stdio::null())
-                    .stdout(Stdio::null())
+                    .stdout(Stdio::inherit())
                     .stderr(Stdio::inherit())
                     .kill_on_drop(true);
 
@@ -347,9 +329,18 @@ impl<'a, R: AsyncRead + Unpin> Input<'a, R> {
                 Ok(out_path)
             }
             Format::WebM | Format::Mp4 => {
-                filter += "[c]copy";
+                if Format::WebM == opts.format {
+                    filter += "[c]copy";
+                    ffmpeg_args += "-c:v libvpx-vp9 -frame-parallel 0 -cpu-used 1 -quality good -auto-alt-ref 0 ";
+                } else {
+                    // overlay it on a black background to remove any transparency
+                    filter += "color=black[k];[k][c]scale2ref[k][c];[k][c]overlay=format=auto:shortest=1,setsar=1";
+                    // specify a decent crf here to shrink file some, as it doesn't need to be high-quality
+                    ffmpeg_args += "-c:v libx264 -pix_fmt yuv420p -crf 24 -bufsize 14000 -profile:v main \
+                                    -level 3.1 -preset slow -x264-params ref=4 ";
+                }
 
-                let mut crf = match opts.quality {
+                let mut q = match opts.quality {
                     00..=14 => 36,
                     15..=39 => 32,
                     40..=79 => 30,
@@ -359,10 +350,14 @@ impl<'a, R: AsyncRead + Unpin> Input<'a, R> {
 
                 // VP9 is more efficient
                 if Format::WebM == opts.format {
-                    crf += 6;
+                    q += 6;
                 }
 
-                ffmpeg_args += &format!("-crf {crf} -b:v 0 -movflags +faststart ");
+                q -= 16 - (w.max(h).clamp(64, 512) - 64) * 16 / (512 - 64);
+
+                ffmpeg_args += &format!("-movflags +faststart -qmin {q} -qmax {} ", q + 20);
+
+                let mut has_br = false;
 
                 // if the old codec was similar, we can probably do better than that, so constrain the bitrate to the original
                 if matches!(stream.codec_name, Some(ref n) if ["h264", "h265", "vp9", "vp8"].contains(&n.as_str()))
@@ -370,20 +365,23 @@ impl<'a, R: AsyncRead + Unpin> Input<'a, R> {
                     if let Some(br) = stream.max_bit_rate.as_ref().or(stream.bit_rate.as_ref()) {
                         if let Ok(br) = br.parse::<u64>() {
                             ffmpeg_args += &format!("-b:v {br} -maxrate {br} ");
+                            has_br = true;
                         }
                     }
                 }
 
-                if Format::WebM == opts.format {
-                    ffmpeg_args += "-c:v libvpx-vp9 -cpu-used 1 -quality good -auto-alt-ref 0 -f webm";
-                } else {
-                    ffmpeg_args +=
-                        "-c:v libx264 -pix_fmt yuv420p -profile:v main -level 3.1 -preset slow -x264-params ref=4 -f mp4";
+                if !has_br {
+                    let min = 128;
+                    let max = 512;
+
+                    let br = opts.quality as u32 * (max - min) / 100 + min;
+
+                    ffmpeg_args += &format!("-minrate {min}k -b:v {br}k -maxrate {max}k ");
                 }
 
                 let mut ffmpeg: Command = Command::new(self.ffmpeg.ffmpeg());
                 ffmpeg
-                    .args("-loglevel error -y -i".split_whitespace())
+                    .args("-y -i".split_whitespace())
                     .arg(&in_path)
                     .args(["-filter_complex", &filter])
                     .args(ffmpeg_args.split_whitespace())
@@ -393,7 +391,7 @@ impl<'a, R: AsyncRead + Unpin> Input<'a, R> {
                     .stderr(Stdio::inherit())
                     .kill_on_drop(true);
 
-                println!("{ffmpeg:?}");
+                log::debug!("{ffmpeg:?}");
 
                 let mut ffmpeg = ffmpeg.spawn()?;
 
@@ -414,8 +412,8 @@ impl<R> Drop for Input<'_, R> {
         let tmps = std::mem::take(&mut self.tmps);
 
         tokio::task::spawn_blocking(move || {
-            for path in tmps {
-                let _ = std::fs::remove_file(&path);
+            for _path in tmps {
+                //let _ = std::fs::remove_file(&path);
             }
         });
     }
