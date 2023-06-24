@@ -36,7 +36,7 @@ else echo "Skipping Lantern asset processor"; fi;
 
 if [[ !($1) || $1 == "gif_probe" ]]; then
     echo "Building Lantern gif_probe";
-    cross build --release $SHARED_FLAGS --bin gif_probe -p gif_probe || {
+    cross build $SHARED_FLAGS --bin gif_probe -p gif_probe || {
         echo "Building Lantern gif_probe failed"; exit 1;
     }
 else echo "Skipping Lantern gif_probe"; fi;
