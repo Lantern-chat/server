@@ -68,10 +68,10 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, addr: IpAddr, 
 }
 
 pub async fn client_connection(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr, state: ServerState) {
-    let (conn, conn_rx) = GatewayConnection::new();
-    let conn_rx = ReceiverStream::new(conn_rx);
-
     let (ws_tx, ws_rx) = ws.split();
+
+    let (conn, conn_rx) = state.gateway.new_connection().await;
+    let conn_rx = ReceiverStream::new(conn_rx);
 
     // map each incoming websocket message such that it will decompress/decode the message
     // AND update the last_msg value concurrently.
@@ -125,9 +125,6 @@ pub async fn client_connection(ws: WebSocket, query: GatewayQueryParams, _addr: 
     events.push(stream::once(future::ready(Item::Event(Ok(HELLO_EVENT.clone())))).boxed());
     events.push(ws_rx.map(Item::Msg).boxed());
     events.push(conn_rx.map(|msg| Item::Event(Ok(msg))).boxed());
-
-    // Make the new connection known to the gateway
-    state.gateway.add_connection(conn.clone()).await;
 
     let mut user_id = None;
     let mut intent = sdk::models::Intent::empty();

@@ -1,5 +1,6 @@
 pub mod conn;
 pub mod event;
+pub mod heart;
 pub mod task;
 
 use std::sync::atomic::AtomicI64;
@@ -7,6 +8,7 @@ use std::time::Duration;
 
 use hashbrown::HashMap;
 use tokio::sync::{broadcast, mpsc, Notify};
+use triomphe::Arc;
 
 use schema::Snowflake;
 
@@ -16,6 +18,7 @@ pub type EventId = Snowflake;
 pub type ConnectionId = Snowflake;
 
 pub use event::Event;
+pub use heart::Heart;
 
 /// Stored in the gateway, provides a channel directly
 /// to a user connection
@@ -93,6 +96,9 @@ pub struct Gateway {
     /// Identified gateway connections that can targetted by UserId
     pub users: scc::HashMap<UserId, HashMap<ConnectionId, GatewayConnection>>,
 
+    /// Tracks connection heartbeats using a monotonic clock
+    pub heart: Arc<Heart>,
+
     /// First element stores the actual last event, updated frequently
     ///
     /// Second element stores the last event 60 seconds ago as determined by the `event_cleanup` task.
@@ -103,6 +109,13 @@ pub struct Gateway {
 }
 
 impl Gateway {
+    pub async fn new_connection(&self) -> (GatewayConnection, mpsc::Receiver<Event>) {
+        let (conn, rx) = GatewayConnection::new(self.heart.clone());
+        _ = self.conns.insert_async(conn.id, conn.clone()).await;
+
+        (conn, rx)
+    }
+
     #[inline]
     pub fn last_event(&self) -> &AtomicI64 {
         &self.last_events[0]
@@ -166,10 +179,6 @@ impl Gateway {
         );
 
         subs
-    }
-
-    pub async fn add_connection(&self, conn: GatewayConnection) {
-        _ = self.conns.insert_async(conn.id, conn).await;
     }
 
     pub async fn remove_connection(&self, conn_id: Snowflake, user_id: Option<Snowflake>) {
