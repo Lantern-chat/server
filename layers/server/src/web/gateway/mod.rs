@@ -52,6 +52,7 @@ impl From<BroadcastStreamRecvError> for EventError {
 pub enum Item {
     Event(Result<Event, EventError>),
     Msg(Result<ClientMsg, MessageIncomingError>),
+    Ping,
     MissedHeartbeat,
 }
 
@@ -78,8 +79,13 @@ pub async fn client_connection(ws: WebSocket, query: GatewayQueryParams, _addr: 
     let conn2 = conn.clone();
     let ws_rx = ws_rx.map(|msg| (msg, &conn2)).then(move |(msg, conn)| async move {
         match msg {
-            Err(e) => Err(MessageIncomingError::from(e)),
-            Ok(msg) if msg.is_close() => Err(MessageIncomingError::SocketClosed),
+            Err(e) => Item::Msg(Err(MessageIncomingError::from(e))),
+            Ok(msg) if msg.is_close() => Item::Msg(Err(MessageIncomingError::SocketClosed)),
+            Ok(msg) if msg.is_ping() => {
+                conn.heartbeat().await;
+
+                Item::Ping
+            }
             Ok(msg) => {
                 // Block to decompress and parse
                 let block = tokio::task::spawn_blocking(move || -> Result<_, MessageIncomingError> {
@@ -95,7 +101,10 @@ pub async fn client_connection(ws: WebSocket, query: GatewayQueryParams, _addr: 
                 // TODO: Only count heartbeats on the actual event?
                 let (res, _) = tokio::join!(block, conn.heartbeat());
 
-                res?
+                match res {
+                    Ok(msg) => Item::Msg(msg),
+                    Err(e) => Item::Msg(Err(e.into())),
+                }
             }
         }
     });
@@ -123,7 +132,7 @@ pub async fn client_connection(ws: WebSocket, query: GatewayQueryParams, _addr: 
 
     // Push Hello event to begin stream and forward ws_rx/conn_rx into events
     events.push(stream::once(future::ready(Item::Event(Ok(HELLO_EVENT.clone())))).boxed());
-    events.push(ws_rx.map(Item::Msg).boxed());
+    events.push(ws_rx.boxed());
     events.push(conn_rx.map(|msg| Item::Event(Ok(msg))).boxed());
 
     let mut user_id = None;
@@ -132,6 +141,10 @@ pub async fn client_connection(ws: WebSocket, query: GatewayQueryParams, _addr: 
     'event_loop: while let Some(event) = events.next().await {
         let resp = match event {
             Item::MissedHeartbeat => Err(MessageOutgoingError::SocketClosed),
+
+            // Pong resposes should be handled by the underlying socket,
+            // but we still need to ignore the message
+            Item::Ping => continue,
 
             Item::Event(Err(e)) => {
                 log::warn!("Event error: {e}");
