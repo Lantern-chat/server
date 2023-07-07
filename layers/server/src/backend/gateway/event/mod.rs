@@ -56,7 +56,15 @@ impl Deref for Event {
 
 impl Event {
     pub fn new(msg: ServerMsg, room_id: Option<Snowflake>) -> Result<Event, EventEncodingError> {
-        let encoded = EncodedEvent::new(&msg)?;
+        Self::new_compressed(msg, room_id, 7)
+    }
+
+    pub fn new_compressed(
+        msg: ServerMsg,
+        room_id: Option<Snowflake>,
+        compression_level: u8,
+    ) -> Result<Event, EventEncodingError> {
+        let encoded = EncodedEvent::new(&msg, compression_level)?;
 
         Ok(Event(Arc::new(EventInner::External(ExternalEvent {
             msg,
@@ -71,7 +79,7 @@ impl Event {
 }
 
 impl EncodedEvent {
-    pub fn new<S: serde::Serialize>(value: &S) -> Result<Self, EventEncodingError> {
+    pub fn new<S: serde::Serialize>(value: &S, compression_level: u8) -> Result<Self, EventEncodingError> {
         let as_json = serde_json::to_vec(value)?;
         let as_cbor = {
             let mut buf = Vec::with_capacity(128);
@@ -80,8 +88,8 @@ impl EncodedEvent {
         };
 
         Ok(EncodedEvent {
-            json: CompressedEvent::new(as_json)?,
-            cbor: CompressedEvent::new(as_cbor)?,
+            json: CompressedEvent::new(as_json, compression_level)?,
+            cbor: CompressedEvent::new(as_cbor, compression_level)?,
         })
     }
 
@@ -95,8 +103,8 @@ impl EncodedEvent {
 
 impl CompressedEvent {
     // TODO: Make async with `async-compression`?
-    pub fn new(value: Vec<u8>) -> Result<Self, EventEncodingError> {
-        let compressed = miniz_oxide::deflate::compress_to_vec_zlib(&value, 7);
+    pub fn new(value: Vec<u8>, level: u8) -> Result<Self, EventEncodingError> {
+        let compressed = thread_local_compress(&value, level)?;
 
         Ok(CompressedEvent {
             uncompressed: value,
@@ -120,6 +128,64 @@ pub enum EventEncodingError {
     #[error("Cbor Encoding Error: {0}")]
     CborEncodingError(#[from] ciborium::ser::Error<std::io::Error>),
 
+    #[error("Compression Error")]
+    CompressionError,
+
     #[error("IO Error: {0}")]
     IoError(#[from] std::io::Error),
+}
+
+// Near exact copy of `miniz_oxide::deflate::compress_to_vec_inner` with thread-local compressor to reuse memory
+fn thread_local_compress(input: &[u8], level: u8) -> Result<Vec<u8>, EventEncodingError> {
+    use miniz_oxide::deflate::core::{
+        compress, create_comp_flags_from_zip_params, CompressorOxide, TDEFLFlush, TDEFLStatus,
+    };
+    use std::cell::RefCell;
+
+    thread_local! {
+        static COMPRESSOR: RefCell<CompressorOxide> = RefCell::new(CompressorOxide::new(create_comp_flags_from_zip_params(7, 1, 0)));
+    }
+
+    COMPRESSOR.with(|compressor| {
+        let Ok(mut compressor) = compressor.try_borrow_mut() else {
+            return Err(EventEncodingError::CompressionError);
+        };
+
+        compressor.reset();
+        compressor.set_compression_level_raw(level);
+
+        let mut output = vec![0; std::cmp::max(input.len() / 2, 2)];
+
+        let mut in_pos = 0;
+        let mut out_pos = 0;
+
+        loop {
+            let (status, bytes_in, bytes_out) = compress(
+                &mut compressor,
+                &input[in_pos..],
+                &mut output[out_pos..],
+                TDEFLFlush::Finish,
+            );
+
+            out_pos += bytes_out;
+            in_pos += bytes_in;
+
+            match status {
+                TDEFLStatus::Done => {
+                    output.truncate(out_pos);
+                    break;
+                }
+                TDEFLStatus::Okay => {
+                    // We need more space, so resize the vector.
+                    if output.len().saturating_sub(out_pos) < 30 {
+                        output.resize(output.len() * 2, 0)
+                    }
+                }
+                // Not supposed to happen unless there is a bug.
+                _ => return Err(EventEncodingError::CompressionError),
+            }
+        }
+
+        Ok(output)
+    })
 }

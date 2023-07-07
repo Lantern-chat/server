@@ -56,9 +56,9 @@ pub enum Item {
 }
 
 lazy_static::lazy_static! {
-    pub static ref HELLO_EVENT: Event = Event::new(ServerMsg::new_hello(sdk::models::events::Hello::default()), None).unwrap();
-    pub static ref HEARTBEAT_ACK: Event = Event::new(ServerMsg::new_heartbeat_ack(), None).unwrap();
-    pub static ref INVALID_SESSION: Event = Event::new(ServerMsg::new_invalid_session(), None).unwrap();
+    pub static ref HELLO_EVENT: Event = Event::new_compressed(ServerMsg::new_hello(sdk::models::events::Hello::default()), None, 10).unwrap();
+    pub static ref HEARTBEAT_ACK: Event = Event::new_compressed(ServerMsg::new_heartbeat_ack(), None, 10).unwrap();
+    pub static ref INVALID_SESSION: Event = Event::new_compressed(ServerMsg::new_invalid_session(), None, 10).unwrap();
 }
 
 type ListenerTable = HashMap<Snowflake, AbortHandle>;
