@@ -27,7 +27,9 @@ impl Heart {
         use scc::hash_index::ModifyAction;
 
         let ts = self.now();
-        _ = self.beats.modify_async(&conn_id, |_, _| ModifyAction::Update(ts)).await;
+        if !self.beats.modify_async(&conn_id, |_, _| ModifyAction::Update(ts)).await {
+            log::warn!("Tried to beat a nonexistent heart");
+        }
     }
 
     pub async fn add(&self, conn_id: Snowflake) {

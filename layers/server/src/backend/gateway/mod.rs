@@ -111,7 +111,8 @@ pub struct Gateway {
 impl Gateway {
     pub async fn new_connection(&self) -> (GatewayConnection, mpsc::Receiver<Event>) {
         let (conn, rx) = GatewayConnection::new(self.heart.clone());
-        _ = self.conns.insert_async(conn.id, conn.clone()).await;
+
+        _ = tokio::join!(self.conns.insert_async(conn.id, conn.clone()), self.heart.add(conn.id));
 
         (conn, rx)
     }
@@ -182,7 +183,7 @@ impl Gateway {
     }
 
     pub async fn remove_connection(&self, conn_id: Snowflake, user_id: Option<Snowflake>) {
-        tokio::join!(self.conns.remove_async(&conn_id), async {
+        tokio::join!(self.heart.remove(conn_id), self.conns.remove_async(&conn_id), async {
             if let Some(user_id) = user_id {
                 if let scc::hash_map::Entry::Occupied(mut occupied) = self.users.entry_async(user_id).await {
                     let user = occupied.get_mut();
