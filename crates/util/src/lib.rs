@@ -9,6 +9,7 @@ pub mod rng;
 pub mod serde;
 pub mod string;
 pub mod time;
+pub mod zlib;
 
 pub fn parse_boolean(value: &str) -> Result<bool, std::num::ParseIntError> {
     Ok(if value.eq_ignore_ascii_case("true") {

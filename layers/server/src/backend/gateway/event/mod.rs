@@ -25,6 +25,8 @@ pub struct EncodedEvent {
 
 pub use internal::InternalEvent;
 
+use util::zlib::{deflate, DeflateError};
+
 /// An event that is intended to reach the external world
 #[derive(Debug)]
 pub struct ExternalEvent {
@@ -104,7 +106,7 @@ impl EncodedEvent {
 impl CompressedEvent {
     // TODO: Make async with `async-compression`?
     pub fn new(value: Vec<u8>, level: u8) -> Result<Self, EventEncodingError> {
-        let compressed = thread_local_compress(&value, level)?;
+        let compressed = deflate(&value, level)?;
 
         Ok(CompressedEvent {
             uncompressed: value,
@@ -128,64 +130,9 @@ pub enum EventEncodingError {
     #[error("Cbor Encoding Error: {0}")]
     CborEncodingError(#[from] ciborium::ser::Error<std::io::Error>),
 
-    #[error("Compression Error")]
-    CompressionError,
+    #[error("Compression Error: {0}")]
+    CompressionError(#[from] DeflateError),
 
     #[error("IO Error: {0}")]
     IoError(#[from] std::io::Error),
-}
-
-// Near exact copy of `miniz_oxide::deflate::compress_to_vec_inner` with thread-local compressor to reuse memory
-fn thread_local_compress(input: &[u8], level: u8) -> Result<Vec<u8>, EventEncodingError> {
-    use miniz_oxide::deflate::core::{
-        compress, create_comp_flags_from_zip_params, CompressorOxide, TDEFLFlush, TDEFLStatus,
-    };
-    use std::cell::RefCell;
-
-    thread_local! {
-        static COMPRESSOR: RefCell<CompressorOxide> = RefCell::new(CompressorOxide::new(create_comp_flags_from_zip_params(7, 1, 0)));
-    }
-
-    COMPRESSOR.with(|compressor| {
-        let Ok(mut compressor) = compressor.try_borrow_mut() else {
-            return Err(EventEncodingError::CompressionError);
-        };
-
-        compressor.reset();
-        compressor.set_compression_level_raw(level);
-
-        let mut output = vec![0; std::cmp::max(input.len() / 2, 2)];
-
-        let mut in_pos = 0;
-        let mut out_pos = 0;
-
-        loop {
-            let (status, bytes_in, bytes_out) = compress(
-                &mut compressor,
-                &input[in_pos..],
-                &mut output[out_pos..],
-                TDEFLFlush::Finish,
-            );
-
-            out_pos += bytes_out;
-            in_pos += bytes_in;
-
-            match status {
-                TDEFLStatus::Done => {
-                    output.truncate(out_pos);
-                    break;
-                }
-                TDEFLStatus::Okay => {
-                    // We need more space, so resize the vector.
-                    if output.len().saturating_sub(out_pos) < 30 {
-                        output.resize(output.len() * 2, 0)
-                    }
-                }
-                // Not supposed to happen unless there is a bug.
-                _ => return Err(EventEncodingError::CompressionError),
-            }
-        }
-
-        Ok(output)
-    })
 }

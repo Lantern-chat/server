@@ -445,20 +445,10 @@ fn decompress_if(cond: bool, msg: &[u8]) -> Result<Cow<[u8]>, std::io::Error> {
         return Ok(Cow::Borrowed(msg));
     }
 
-    use miniz_oxide::inflate::{self, TINFLStatus};
-
-    let err = match inflate::decompress_to_vec_zlib(msg) {
-        Ok(decompressed) => return Ok(Cow::Owned(decompressed)),
-        Err(err) => match err.status {
-            TINFLStatus::Done => unreachable!("TINFLStatus::Done"),
-            TINFLStatus::FailedCannotMakeProgress => "Truncated Stream",
-            TINFLStatus::BadParam => "Bad Param",
-            TINFLStatus::Adler32Mismatch => "Adler32 Mismatch",
-            _ => "Corrupt Stream",
-        },
-    };
-
-    Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, err))
+    match util::zlib::inflate(msg, Some(1024 * 1024 * 1024)) {
+        Ok(decompressed) => Ok(Cow::Owned(decompressed)),
+        Err(err) => Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, err)),
+    }
 }
 
 async fn refresh(state: ServerState, user_id: Snowflake, room_id: Snowflake) -> Result<Option<PermMute>, crate::Error> {
