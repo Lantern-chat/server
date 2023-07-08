@@ -1,4 +1,7 @@
-use std::{ops::Deref, sync::atomic::AtomicBool};
+use std::{
+    ops::Deref,
+    sync::atomic::{AtomicBool, AtomicU32},
+};
 use tokio::sync::{mpsc, Notify};
 use triomphe::Arc;
 
@@ -11,14 +14,13 @@ pub struct GatewayConnectionInner {
     pub is_active: AtomicBool,
     pub kill: Notify,
     pub heart: Arc<Heart>,
+    pub last_heartbeat: AtomicU32,
     pub tx: mpsc::Sender<Event>,
 }
 
 #[cfg(debug_assertions)]
 impl Drop for GatewayConnectionInner {
     fn drop(&mut self) {
-        debug_assert!(!self.heart.beats.contains(&self.id));
-
         log::debug!("Dropping connection {}", self.id);
     }
 }
@@ -42,6 +44,7 @@ impl GatewayConnection {
             id: Snowflake::now(),
             kill: Notify::new(),
             is_active: AtomicBool::new(false),
+            last_heartbeat: AtomicU32::new(heart.now()),
             heart,
             tx,
         }));
@@ -49,7 +52,7 @@ impl GatewayConnection {
         (conn, rx)
     }
 
-    pub async fn heartbeat(&self) {
-        self.heart.beat(self.id).await;
+    pub fn heartbeat(&self) {
+        self.last_heartbeat.fetch_max(self.heart.now(), std::sync::atomic::Ordering::Relaxed);
     }
 }

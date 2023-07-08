@@ -82,7 +82,7 @@ pub async fn client_connection(ws: WebSocket, query: GatewayQueryParams, _addr: 
             Err(e) => Item::Msg(Err(MessageIncomingError::from(e))),
             Ok(msg) if msg.is_close() => Item::Msg(Err(MessageIncomingError::SocketClosed)),
             Ok(msg) if msg.is_ping() => {
-                conn.heartbeat().await;
+                conn.heartbeat();
 
                 Item::Ping
             }
@@ -97,11 +97,9 @@ pub async fn client_connection(ws: WebSocket, query: GatewayQueryParams, _addr: 
                     })
                 });
 
-                // do the parsing/decompressing at the same time as updating the heartbeat
-                // TODO: Only count heartbeats on the actual event?
-                let (res, _) = tokio::join!(block, conn.heartbeat());
+                conn.heartbeat();
 
-                match res {
+                match block.await {
                     Ok(msg) => Item::Msg(msg),
                     Err(e) => Item::Msg(Err(e.into())),
                 }
