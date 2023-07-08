@@ -39,7 +39,7 @@ impl Deref for GatewayConnection {
 
 impl GatewayConnection {
     pub fn new(heart: Arc<Heart>) -> (Self, mpsc::Receiver<Event>) {
-        let (tx, rx) = mpsc::channel(1);
+        let (tx, rx) = mpsc::channel(16);
         let conn = GatewayConnection(Arc::new(GatewayConnectionInner {
             id: Snowflake::now(),
             kill: Notify::new(),
