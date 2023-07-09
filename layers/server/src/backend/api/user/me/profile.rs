@@ -107,7 +107,7 @@ pub async fn patch_profile(
             #{&profile.status   as Profiles::CustomStatus},
             #{&profile.bio      as Profiles::Biography}
         )
-        ON CONFLICT (Profiles./UserId, COALESCE(Profiles./PartyId, 1)) DO UPDATE SET
+        ON CONFLICT (Profiles./UserId, Profiles./PartyId) DO UPDATE SET
             if !avatar_id.is_undefined()      { Profiles./AvatarId = #{&avatar_id as Profiles::AvatarId}, }
             if !banner_id.is_undefined()      { Profiles./BannerId = #{&banner_id as Profiles::BannerId}, }
             if !profile.nick.is_undefined()   { Profiles./Nickname = #{&profile.nick as Profiles::Nickname}, }
