@@ -13,7 +13,7 @@ pub struct RateLimitKey {
 
 #[derive(Default)]
 pub struct RateLimitTable {
-    pub limiter: FtlRateLimiter<RateLimitKey>,
+    pub limiter: FtlRateLimiter<RateLimitKey, ahash::RandomState>,
 }
 
 use crate::ServerState;
