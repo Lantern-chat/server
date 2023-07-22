@@ -14,7 +14,7 @@ smol_str = "0.2"
 rand = "0.8"
 rand_chacha = "0.3.0"
 tokio = { version = "1.4", features = ["sync"] }
-hashbrown = { version = "0.13", features = ["inline-more"] }
+hashbrown = { version = "0.14", features = ["inline-more"] }
 num_cpus = "1.13.0"
 lazy_static = "1.4.0"
 futures = "0.3.14"
@@ -33,7 +33,7 @@ miniz_oxide = { version = "0.7", features = ["std"] }
 # specialized-div-rem = { version = "1.0.1", default_features = false, features = ["implement", "std"] }
 
 [dev-dependencies]
-criterion = "0.4"
+criterion = "0.5"
 
 [[bench]]
 name = "utils"
