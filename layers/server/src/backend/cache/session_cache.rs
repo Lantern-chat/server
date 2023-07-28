@@ -20,7 +20,7 @@ pub struct SessionCache {
 
 impl SessionCache {
     pub fn get(&self, token: &RawAuthToken) -> Option<Authorization> {
-        self.map.read(token, |_, part| Authorization {
+        self.map.peek_with(token, |_, part| Authorization {
             token: *token,
             user_id: part.user_id,
             expires: part.expires,

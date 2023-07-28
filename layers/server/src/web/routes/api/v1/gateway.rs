@@ -16,8 +16,10 @@ pub fn gateway(route: Route<crate::ServerState>) -> WebResult {
     let state = route.state.clone();
 
     let mut config = ws::WebSocketConfig::default();
-    //config.max_message_size = Some(1024 * 512); // 512KIB
-    config.max_send_queue = Some(1);
+
+    config.write_buffer_size = 4 * 1024; // 4 KiB
+    config.max_write_buffer_size = config.write_buffer_size * 2;
+    config.max_message_size = Some(512 * 1024); // 512 KiB
 
     let ws = ws::Ws::new(route, Some(config))?;
 

@@ -7,6 +7,7 @@ use std::sync::atomic::AtomicI64;
 use std::time::Duration;
 
 use hashbrown::HashMap;
+use scc::ebr::Guard;
 use tokio::sync::{broadcast, mpsc, Notify};
 use triomphe::Arc;
 
@@ -144,23 +145,24 @@ impl Gateway {
     }
 
     pub fn broadcast_event(&self, event: Event, party_id: Snowflake) {
-        let sent = self.parties.read(&party_id, |_, party| {
-            match *event {
-                EventInner::External(ref event) => {
-                    log::debug!("Sending event {:?} to party tx: {party_id}", event.msg.opcode());
-                }
-                EventInner::Internal(_) => log::debug!("broadcasting internal event"),
+        match *event {
+            EventInner::Internal(_) => log::debug!("broadcasting internal event"),
+            EventInner::External(ref event) => {
+                log::debug!("Sending event {:?} to party tx: {party_id}", event.msg.opcode());
             }
+        }
 
-            if let Err(e) = party.tx.send(event) {
-                crate::metrics::API_METRICS.load().errs.add(1);
+        let guard = Guard::new();
 
-                log::error!("Could not broadcast to party: {e}");
-            }
-        });
+        let Some(party) = self.parties.peek(&party_id, &guard) else {
+            log::warn!("Could not find tx for party {party_id}!");
+            return;
+        };
 
-        if sent.is_none() {
-            log::warn!("Could not find party {party_id}!");
+        if let Err(e) = party.tx.send(event) {
+            crate::metrics::API_METRICS.load().errs.add(1);
+
+            log::error!("Could not broadcast to party: {e}");
         }
 
         crate::metrics::API_METRICS.load().add_event();
@@ -205,31 +207,25 @@ impl Gateway {
         let mut missing = Vec::new();
 
         {
-            let barrier = scc::ebr::Barrier::new();
+            let guard = scc::ebr::Guard::new();
 
             for &party_id in party_ids {
-                if self.parties.read_with(&party_id, |_, party| subs.push(party.subscribe()), &barrier).is_none() {
+                if let Some(party) = self.parties.peek(&party_id, &guard) {
+                    subs.push(party.subscribe())
+                } else {
                     missing.push(party_id);
                 }
             }
         }
 
-        // this is really only invoked on startup
+        // this is really only invoked on startup or new parties
         for party_id in missing {
-            let party = PartyEmitter::new(party_id);
-            let mut sub = party.subscribe();
-
-            // if this errors, then a race-condition occurred and we should just retry reading the party emitter
-            if self.parties.insert_async(party_id, party).await.is_err() {
-                if let Some(new_sub) = self.parties.read(&party_id, |_, party| party.subscribe()) {
-                    // forget the old sub and party
-                    sub = new_sub;
-                } else {
-                    panic!("Inconsistent state of gateway party emitters");
+            subs.push(match self.parties.entry_async(party_id).await {
+                scc::hash_index::Entry::Occupied(party) => party.get().subscribe(),
+                scc::hash_index::Entry::Vacant(vacant) => {
+                    vacant.insert_entry(PartyEmitter::new(party_id)).get().subscribe()
                 }
-            }
-
-            subs.push(sub);
+            });
         }
 
         subs
