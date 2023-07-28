@@ -1,3 +1,4 @@
+use std::hash::{BuildHasher, Hash, Hasher};
 use std::time::{Duration, Instant};
 
 use ftl::{
@@ -5,37 +6,28 @@ use ftl::{
     Route,
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct RateLimitKey {
-    pub addr_hash: u64,
-    pub path_hash: u64,
-}
-
 #[derive(Default)]
 pub struct RateLimitTable {
-    pub limiter: FtlRateLimiter<RateLimitKey, ahash::RandomState>,
+    limiter: FtlRateLimiter<u64, NoHasherBuilder>,
 }
 
 use crate::ServerState;
 
 impl RateLimitTable {
     pub async fn req(&self, route: &Route<ServerState>) -> bool {
-        let key = RateLimitKey {
-            addr_hash: route.state.hasher.hash_one(route.real_addr),
-            path_hash: {
-                use std::hash::{BuildHasher, Hash, Hasher};
+        let key = {
+            let mut hasher = route.state.hasher.build_hasher();
 
-                let mut hasher = route.state.hasher.build_hasher();
+            route.real_addr.hash(&mut hasher);
 
-                // split path on /, get alphabetic segments, hash those
-                route.path().split('/').for_each(|segment| {
-                    if segment.starts_with(|c: char| c.is_ascii_alphabetic()) {
-                        segment.hash(&mut hasher);
-                    }
-                });
+            // split path on /, get alphabetic segments, hash those
+            route.path().split('/').take(10).for_each(|segment| {
+                if segment.starts_with(|c: char| c.is_ascii_alphabetic()) {
+                    segment.hash(&mut hasher);
+                }
+            });
 
-                hasher.finish()
-            },
+            hasher.finish()
         };
 
         // TODO: Compute this during hash lookup?
@@ -46,5 +38,33 @@ impl RateLimitTable {
     pub async fn cleanup_at(&self, now: Instant) {
         let one_second_ago = now.checked_sub(Duration::from_secs(1)).expect("Failed to subtract one second");
         self.limiter.clean(one_second_ago).await;
+    }
+}
+
+/// A very specific hasher to use the u64 key as the hash itself,
+/// since it's already a hash.
+#[derive(Debug, Clone, Copy)]
+struct NoHasher([u8; 8]);
+#[derive(Debug, Default)]
+struct NoHasherBuilder;
+
+impl Hasher for NoHasher {
+    #[inline(always)]
+    fn finish(&self) -> u64 {
+        u64::from_ne_bytes(self.0)
+    }
+
+    #[inline(always)]
+    fn write(&mut self, bytes: &[u8]) {
+        self.0.copy_from_slice(bytes);
+    }
+}
+
+impl BuildHasher for NoHasherBuilder {
+    type Hasher = NoHasher;
+
+    #[inline(always)]
+    fn build_hasher(&self) -> Self::Hasher {
+        NoHasher([0; 8])
     }
 }
