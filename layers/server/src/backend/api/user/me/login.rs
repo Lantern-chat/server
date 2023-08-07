@@ -145,6 +145,10 @@ pub async fn process_2fa(
 ) -> Result<bool, Error> {
     let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
 
+    // TODO: Create a global cache for user_id -> last TOTP step to prevent reuse. This value is only useful for 30 seconds,
+    // so we can clear the cache after like 60.
+    let mut last = 0;
+
     let mfa_key = state.config().keys.mfa_key;
 
     let Some(secret) = decrypt_user_message(&mfa_key, user_id, secret) else {
@@ -152,58 +156,44 @@ pub async fn process_2fa(
     };
 
     match token.len() {
-        6 => {
-            // TODO: Account for time skew in the check method
-            if Ok(true) != totp::TOTP6::new(&secret).check_str(token, now) {
-                return Ok(false);
-            }
-        }
-        13 => {
-            let mut backup = match decrypt_user_message(&mfa_key, user_id, backup) {
-                Some(backup) if backup.len() % 8 == 0 => backup,
-                _ => return Err(Error::InternalErrorStatic("Decrypt Error!")),
-            };
+        // 6-digit TOTP code
+        6 => totp::TOTP6::new(&secret).check_str(token, now, &mut last).map_err(|_| Error::InvalidCredentials),
 
+        // 13-character backup code
+        13 => {
             let token = match base32::decode(base32::Alphabet::Crockford, token) {
                 Some(token) if token.len() == 8 => token,
                 _ => return Err(Error::InvalidCredentials),
             };
 
-            let mut found_idx = None;
+            let mut backup = match decrypt_user_message(&mfa_key, user_id, backup) {
+                Some(backup) if backup.len() % 8 == 0 => backup,
+                _ => return Err(Error::InternalErrorStatic("Decrypt Error!")),
+            };
 
-            for (idx, backup_code) in backup.chunks_exact(8).enumerate() {
-                if token == backup_code {
-                    found_idx = Some(idx);
-                    break;
-                }
-            }
+            if let Some(idx) = backup.chunks_exact(8).position(|code| code == token) {
+                log::debug!("MFA Backup token used, saving new backup array to database");
 
-            if let Some(idx) = found_idx {
-                let db = state.db.write.get().await?;
-
-                let start = idx * 8;
-                if true {
-                    // fill old backup code with randomness to prevent reuse
-                    util::rng::crypto_thread_rng().fill_bytes(&mut backup[start..start + 8]);
-                } else {
-                    // splice backup array to remove used code
-                    backup.drain(start..start + 8);
-                }
+                // fill old backup code with randomness to prevent reuse
+                util::rng::crypto_thread_rng().fill_bytes({
+                    let start = idx * 8;
+                    &mut backup[start..start + 8]
+                });
 
                 let backup = encrypt_user_message(&mfa_key, user_id, &backup);
 
-                log::debug!("MFA Backup token used, saving new backup array to database");
-                db.execute2(schema::sql! {
+                #[rustfmt::skip]
+                state.db.write.get().await?.execute2(schema::sql! {
                     UPDATE Users SET (MfaBackup) = (#{&backup as Users::MfaBackup})
-                    WHERE Users.Id = #{&user_id as Users::Id}
+                     WHERE Users.Id = #{&user_id as Users::Id}
                 })
                 .await?;
+
+                Ok(true)
             } else {
-                return Err(Error::InvalidCredentials);
+                Err(Error::InvalidCredentials)
             }
         }
-        _ => return Err(Error::InvalidCredentials),
+        _ => Err(Error::InvalidCredentials),
     }
-
-    Ok(true)
 }
