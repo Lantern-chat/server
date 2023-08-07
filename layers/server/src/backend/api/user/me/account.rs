@@ -95,28 +95,7 @@ pub async fn modify_account(
         }
     }
 
-    let verified = {
-        // NOTE: Given how expensive it can be to compute an argon2 hash,
-        // this only allows a given number to process at once.
-        let _permit = state.mem_semaphore.acquire_many(hash_memory_cost()).await?;
-
-        // SAFETY: This is only used within the following spawn_blocking block,
-        // but will remain alive until `drop(user)` below.
-        let passhash: &'static str = unsafe { std::mem::transmute(passhash) };
-
-        let password = form.current_password;
-        let verified = tokio::task::spawn_blocking(move || {
-            let config = hash_config();
-            argon2::verify_encoded_ext(passhash, password.as_bytes(), config.secret, config.ad)
-        })
-        .await??;
-
-        drop(_permit);
-
-        verified
-    };
-
-    if !verified {
+    if !super::login::verify_password(&state, passhash, form.current_password).await? {
         return Err(Error::InvalidCredentials);
     }
 
@@ -130,7 +109,7 @@ pub async fn modify_account(
 
     let mut password_hash_task = None;
 
-    if let Some(password) = std::mem::replace(&mut form.new_password, None) {
+    if let Some(password) = form.new_password.take() {
         let _permit = state.mem_semaphore.acquire_many(hash_memory_cost()).await?;
 
         password_hash_task = Some((

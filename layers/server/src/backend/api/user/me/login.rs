@@ -64,27 +64,7 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) ->
         return Err(Error::InternalErrorStatic("Secret/Backup Mismatch!"));
     }
 
-    let verified = {
-        let _permit =
-            state.mem_semaphore.acquire_many(crate::backend::api::user::register::hash_memory_cost()).await?;
-
-        // SAFETY: This is only used within the following spawn_blocking block,
-        // but will remain alive until `drop(user)` below.
-        let passhash: &'static str = unsafe { std::mem::transmute(passhash) };
-
-        let password = form.password;
-        let verified = tokio::task::spawn_blocking(move || {
-            let config = crate::backend::api::user::register::hash_config();
-            argon2::verify_encoded_ext(passhash, password.as_bytes(), config.secret, config.ad)
-        })
-        .await??;
-
-        drop(_permit);
-
-        verified
-    };
-
-    if !verified {
+    if !verify_password(&state, passhash, form.password).await? {
         return Err(Error::InvalidCredentials);
     }
 
@@ -134,6 +114,31 @@ pub async fn do_login(
         auth: token.into(),
         expires: expires.into(),
     })
+}
+
+pub async fn verify_password(
+    state: &ServerState,
+    passhash: &str,
+    password: smol_str::SmolStr,
+) -> Result<bool, Error> {
+    // NOTE: Given how expensive it can be to compute an argon2 hash,
+    // this only allows a given number to process at once.
+    let _permit =
+        state.mem_semaphore.acquire_many(crate::backend::api::user::register::hash_memory_cost()).await?;
+
+    // SAFETY: This is only used within the following spawn_blocking block,
+    // but will remain alive until `drop(user)` below.
+    let passhash: &'static str = unsafe { std::mem::transmute(passhash) };
+
+    let verified = tokio::task::spawn_blocking(move || {
+        let config = crate::backend::api::user::register::hash_config();
+        argon2::verify_encoded_ext(passhash, password.as_bytes(), config.secret, config.ad)
+    })
+    .await??;
+
+    drop(_permit);
+
+    Ok(verified)
 }
 
 pub async fn process_2fa(
