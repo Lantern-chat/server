@@ -18,16 +18,6 @@ use sdk::{
 pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) -> Result<Session, Error> {
     if form.password.len() < 8 {
         return Err(Error::InvalidCredentials);
-    } else {
-        // avoid loading config unless password if of min length, then check with the real length.
-        // Though they are likely the same, so whatever, still protects against some bots.
-        let config = state.config();
-
-        // NOTE: This validation may cause changes mid-deployment to render older passwords invalid,
-        // but users can just request a password reset and update it.
-        if !config.account.password_len.contains(&form.password.len()) {
-            return Err(Error::InvalidCredentials);
-        }
     }
 
     // early validation
@@ -251,7 +241,7 @@ pub async fn process_2fa(
             #[rustfmt::skip]
             state.db.write.get().await?.execute2(schema::sql! {
                 UPDATE Users SET (MfaBackup) = (#{&backup as Users::MfaBackup})
-                    WHERE Users.Id = #{&user_id as Users::Id}
+                 WHERE Users.Id = #{&user_id as Users::Id}
             })
             .await?;
         }
