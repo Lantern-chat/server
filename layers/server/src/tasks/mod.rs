@@ -11,6 +11,7 @@ pub fn add_tasks(state: &ServerState, runner: &TaskRunner) {
     rl_cleanup::add_cleanup_ratelimit_task(state, runner);
     event_log_cleanup::add_event_log_cleanup_task(state, runner);
     id_lock_cleanup::add_id_lock_cleanup_task(state, runner);
+    mfa_cleanup::add_cleanup_mfa_task(state, runner);
     perm_cache_cleanup::perm_cache_cleanup(state, runner);
     record_metrics::add_record_metrics_task(state, runner);
     session_cleanup::add_cleanup_sessions_task(state, runner);
@@ -29,6 +30,7 @@ mod file_cache_cleanup;
 mod file_cleanup;
 mod http_server;
 mod id_lock_cleanup;
+mod mfa_cleanup;
 mod perm_cache_cleanup;
 mod record_metrics;
 mod rl_cleanup;

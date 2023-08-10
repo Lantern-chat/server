@@ -125,6 +125,7 @@ decl_config! {
 impl Config {
     pub fn configure(&mut self) {
         self.general.configure();
+        self.account.configure();
         self.upload.configure();
     }
 }

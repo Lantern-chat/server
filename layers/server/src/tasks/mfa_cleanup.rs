@@ -1,0 +1,20 @@
+use std::time::SystemTime;
+
+use super::*;
+
+pub fn add_cleanup_mfa_task(state: &ServerState, runner: &TaskRunner) {
+    runner.add(RetryTask::new(IntervalFnTask::new(
+        state.clone(),
+        Duration::from_secs(120),
+        |state, _| async move {
+            // Get current time and divide it by the standard step size for TOTP MFA, being 30 seconds
+            let now_step = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs() / 30;
+
+            // clean any steps before 60 seconds ago.
+            let last_step = now_step - 2;
+
+            log::trace!("Cleaning old MFA steps");
+            state.mfa_last.retain_async(move |_, step| *step > last_step).await;
+        },
+    )))
+}

@@ -4,6 +4,7 @@ use arc_swap::ArcSwap;
 use config::Config;
 use filesystem::store::FileStore;
 use futures::{Stream, StreamExt};
+use sdk::Snowflake;
 use tokio::sync::{Notify, Semaphore};
 
 use crate::{
@@ -22,20 +23,27 @@ pub mod id_lock;
 pub struct InnerServerState {
     pub db: db::DatabasePools,
     pub config: ArcSwap<Config>,
+
     /// Triggered when the config is reloaded
     pub config_change: Notify,
+
     /// when triggered, should reload the config file
     pub config_reload: Notify,
 
+    /// Generic lock for anything with a Snowflake ID
     pub id_lock: id_lock::IdLockMap,
+
     /// Each permit represents 1 Kibibyte
     ///
     /// Used to limit how many memory-intensive tasks are run at a time
     pub mem_semaphore: Semaphore,
+
     /// Used to limit how many CPU-intensive tasks are run at a time
     pub cpu_semaphore: Semaphore,
+
     /// Used to limit how many files are open at a given time
     pub fs_semaphore: Semaphore,
+
     pub perm_cache: PermissionCache,
     pub session_cache: SessionCache,
     pub services: Services,
@@ -45,6 +53,9 @@ pub struct InnerServerState {
     pub file_cache: MainFileCache,
     pub emoji: self::emoji::EmojiMap,
     pub hasher: ahash::RandomState,
+
+    /// Last timestep used for MFA per-user.
+    pub mfa_last: scc::HashIndex<Snowflake, u64, ahash::RandomState>,
 }
 
 #[derive(Clone)]
@@ -80,6 +91,7 @@ impl ServerState {
             config: ArcSwap::from_pointee(config),
             config_change: Notify::new(),
             config_reload: Notify::new(),
+            mfa_last: Default::default(),
         }))
     }
 

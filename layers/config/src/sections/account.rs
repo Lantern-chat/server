@@ -21,3 +21,13 @@ section! {
         pub username_len: Range<usize>      = 3..64,
     }
 }
+
+impl Account {
+    pub fn configure(&mut self) {
+        if self.password_len.start < 8 {
+            log::error!("Password length set below 8, defaulting to 8. Use longer passwords.");
+
+            self.password_len.start = 8;
+        }
+    }
+}

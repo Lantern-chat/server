@@ -15,10 +15,27 @@ use sdk::{
     models::{ElevationLevel, Session, UserFlags},
 };
 
-// TODO: Determine if I should give any feedback at all or
-// just say catchall "invalid username/email/password"
 pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) -> Result<Session, Error> {
-    validate_email(&form.email)?;
+    if form.password.len() < 8 {
+        return Err(Error::InvalidCredentials);
+    } else {
+        // avoid loading config unless password if of min length, then check with the real length.
+        // Though they are likely the same, so whatever, still protects against some bots.
+        let config = state.config();
+
+        // NOTE: This validation may cause changes mid-deployment to render older passwords invalid,
+        // but users can just request a password reset and update it.
+        if !config.account.password_len.contains(&form.password.len()) {
+            return Err(Error::InvalidCredentials);
+        }
+    }
+
+    // early validation
+    if let Some(ref token) = form.totp {
+        validate_2fa_token(token)?;
+    }
+
+    validate_email(&form.email)?; // NOTE: Uses a regex, so it goes last.
 
     let db = state.db.read.get().await?;
 
@@ -42,18 +59,17 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) ->
     let secret: Option<&[u8]> = user.mfa_secret()?;
     let backup: Option<&[u8]> = user.mfa_backup()?;
 
-    let elevation = flags.elevation();
+    match flags.elevation() {
+        // System user flat out cannot log in. Pretend it doesn't exist.
+        ElevationLevel::System => return Err(Error::NotFound),
 
-    // System user flat out cannot log in. Pretend it doesn't exist.
-    if elevation == ElevationLevel::System {
-        return Err(Error::NotFound);
-    }
+        // don't allow staff to login without 2FA set up
+        ElevationLevel::Staff if secret.is_none() => {
+            log::error!("Staff user {user_id} tried to login without 2FA enabled");
 
-    // don't allow staff to login without 2FA
-    if elevation == ElevationLevel::Staff && secret.is_none() {
-        log::error!("Staff user {user_id} tried to login without 2FA enabled");
-
-        return Err(Error::NotFound);
+            return Err(Error::NotFound);
+        }
+        _ => {}
     }
 
     if flags.contains(UserFlags::BANNED) {
@@ -61,7 +77,12 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) ->
     }
 
     if secret.is_some() != backup.is_some() {
-        return Err(Error::InternalErrorStatic("Secret/Backup Mismatch!"));
+        return Err(Error::InternalErrorStatic("MFA Mismatch!"));
+    }
+
+    // early check, before any work is done
+    if secret.is_some() && form.totp.is_none() {
+        return Err(Error::TOTPRequired);
     }
 
     if !verify_password(&state, passhash, form.password).await? {
@@ -69,14 +90,10 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) ->
     }
 
     if let (Some(secret), Some(backup)) = (secret, backup) {
-        let Some(token) = form.totp else { return Err(Error::TOTPRequired); };
-
-        if !process_2fa(&state, user_id, secret, backup, &token).await? {
+        if !process_2fa(&state, user_id, secret, backup, &form.totp.unwrap()).await? {
             return Err(Error::InvalidCredentials);
         }
     }
-
-    drop(user);
 
     do_login(state, addr, user_id, std::time::SystemTime::now()).await
 }
@@ -141,6 +158,25 @@ pub async fn verify_password(
     Ok(verified)
 }
 
+fn validate_2fa_token(token: &str) -> Result<(), Error> {
+    match token.len() {
+        6 => {
+            if !token.chars().all(|c: char| c.is_ascii_digit()) {
+                return Err(Error::TOTPRequired);
+            }
+        }
+        13 => {
+            // Taken from base32::Alphabet::Crockford
+            if !token.bytes().all(|c: u8| b"0123456789ABCDEFGHJKMNPQRSTVWXYZ".contains(&c)) {
+                return Err(Error::TOTPRequired);
+            }
+        }
+        _ => return Err(Error::TOTPRequired),
+    }
+
+    Ok(())
+}
+
 pub async fn process_2fa(
     state: &ServerState,
     user_id: Snowflake,
@@ -148,21 +184,43 @@ pub async fn process_2fa(
     backup: &[u8],
     token: &str,
 ) -> Result<bool, Error> {
-    let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
-
-    // TODO: Create a global cache for user_id -> last TOTP step to prevent reuse. This value is only useful for 30 seconds,
-    // so we can clear the cache after like 60.
-    let mut last = 0;
+    // User's cannot do multiple 2fa requests at once
+    let _guard = state.id_lock.lock(user_id).await;
 
     let mfa_key = state.config().keys.mfa_key;
 
-    let Some(secret) = decrypt_user_message(&mfa_key, user_id, secret) else {
-        return Err(Error::InternalErrorStatic("Decrypt Error!"));
-    };
-
     match token.len() {
         // 6-digit TOTP code
-        6 => totp::TOTP6::new(&secret).check_str(token, now, &mut last).map_err(|_| Error::InvalidCredentials),
+        6 => {
+            let Ok(token) = token.parse() else {
+                return Err(Error::InvalidCredentials);
+            };
+
+            let Some(secret) = decrypt_user_message(&mfa_key, user_id, secret) else {
+                return Err(Error::InternalErrorStatic("Decrypt Error"));
+            };
+
+            let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
+
+            // Get the last used timestamp for this user's TOTP, or default to 0
+            //
+            // NOTE: Without the `id_lock _guard`, this might introduce security issues given `peek_with` is not linearizable,
+            //  however, with the lock, this will never happen.
+            let mut last = state.mfa_last.peek_with(&user_id, |_, last| *last).unwrap_or_default();
+
+            if !totp::TOTP6::new(&secret).check(token, now, &mut last) {
+                return Err(Error::InvalidCredentials);
+            }
+
+            use scc::hash_index::Entry;
+
+            match state.mfa_last.entry_async(user_id).await {
+                Entry::Occupied(entry) => entry.update(last),
+                Entry::Vacant(entry) => {
+                    entry.insert_entry(last);
+                }
+            }
+        }
 
         // 13-character backup code
         13 => {
@@ -173,32 +231,34 @@ pub async fn process_2fa(
 
             let mut backup = match decrypt_user_message(&mfa_key, user_id, backup) {
                 Some(backup) if backup.len() % 8 == 0 => backup,
-                _ => return Err(Error::InternalErrorStatic("Decrypt Error!")),
+                _ => return Err(Error::InternalErrorStatic("Decrypt Error")),
             };
 
-            if let Some(idx) = backup.chunks_exact(8).position(|code| code == token) {
-                log::debug!("MFA Backup token used, saving new backup array to database");
+            let Some(idx) = backup.chunks_exact(8).position(|code| code == token) else {
+                return Err(Error::InvalidCredentials);
+            };
 
-                // fill old backup code with randomness to prevent reuse
-                util::rng::crypto_thread_rng().fill_bytes({
-                    let start = idx * 8;
-                    &mut backup[start..start + 8]
-                });
+            log::debug!("MFA Backup token used, saving new backup array to database");
 
-                let backup = encrypt_user_message(&mfa_key, user_id, &backup);
+            // fill old backup code with randomness to prevent reuse
+            util::rng::crypto_thread_rng().fill_bytes({
+                let start = idx * 8;
+                &mut backup[start..start + 8]
+            });
 
-                #[rustfmt::skip]
-                state.db.write.get().await?.execute2(schema::sql! {
-                    UPDATE Users SET (MfaBackup) = (#{&backup as Users::MfaBackup})
-                     WHERE Users.Id = #{&user_id as Users::Id}
-                })
-                .await?;
+            let backup = encrypt_user_message(&mfa_key, user_id, &backup);
 
-                Ok(true)
-            } else {
-                Err(Error::InvalidCredentials)
-            }
+            #[rustfmt::skip]
+            state.db.write.get().await?.execute2(schema::sql! {
+                UPDATE Users SET (MfaBackup) = (#{&backup as Users::MfaBackup})
+                    WHERE Users.Id = #{&user_id as Users::Id}
+            })
+            .await?;
         }
-        _ => Err(Error::InvalidCredentials),
+        _ => return Err(Error::InvalidCredentials),
     }
+
+    drop(_guard);
+
+    Ok(true)
 }
