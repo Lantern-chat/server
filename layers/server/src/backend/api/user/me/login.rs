@@ -170,8 +170,8 @@ fn validate_2fa_token(token: &str) -> Result<(), Error> {
 pub async fn process_2fa(
     state: &ServerState,
     user_id: Snowflake,
-    secret: &[u8],
-    backup: &[u8],
+    encrypted_secret: &[u8],
+    encrypted_backup: &[u8],
     token: &str,
 ) -> Result<bool, Error> {
     // User's cannot do multiple 2fa requests at once
@@ -186,7 +186,7 @@ pub async fn process_2fa(
                 return Err(Error::InvalidCredentials);
             };
 
-            let Some(secret) = decrypt_user_message(&mfa_key, user_id, secret) else {
+            let Some(secret) = decrypt_user_message(&mfa_key, user_id, encrypted_secret) else {
                 return Err(Error::InternalErrorStatic("Decrypt Error"));
             };
 
@@ -219,7 +219,7 @@ pub async fn process_2fa(
                 _ => return Err(Error::InvalidCredentials),
             };
 
-            let mut backup = match decrypt_user_message(&mfa_key, user_id, backup) {
+            let mut backup = match decrypt_user_message(&mfa_key, user_id, encrypted_backup) {
                 Some(backup) if backup.len() % 8 == 0 => backup,
                 _ => return Err(Error::InternalErrorStatic("Decrypt Error")),
             };

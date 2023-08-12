@@ -19,6 +19,14 @@ section! {
 
         #[serde(with = "super::util::range")]
         pub username_len: Range<usize>      = 3..64,
+
+        /// Number of MFA/2FA backup codes generated on creation
+        pub num_mfa_backups: usize          = 8,
+
+        /// Minutes the MFA/2FA code can be left pending before expiring.
+        ///
+        /// Default is 30 minutes.
+        pub mfa_pending_time: usize = 30,
     }
 }
 

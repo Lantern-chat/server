@@ -235,6 +235,15 @@ CREATE TABLE lantern.user_tokens (
     CONSTRAINT user_tokens_pk PRIMARY KEY (id)
 );
 
+CREATE TABLE lantern.mfa_pending (
+    user_id     bigint      NOT NULL,
+    expires     timestamptz NOT NULL,
+    mfa_secret  bytea       NOT NULL,
+    mfa_backup  bytea       NOT NULL,
+
+    CONSTRAINT mfa_pending_pk PRIMARY KEY (user_id)
+);
+
 CREATE TABLE lantern.party (
     id              bigint      NOT NULL,
     owner_id        bigint      NOT NULL,

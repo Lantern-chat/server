@@ -467,6 +467,13 @@ thorn::tables! {
         P99: Type::INT2,
     }
 
+    pub struct MfaPending in Lantern {
+        UserId: Type::INT8,
+        Expires: Type::TIMESTAMPTZ,
+        MfaSecret: Type::BYTEA,
+        MfaBackup: Type::BYTEA,
+    }
+
     pub struct Overwrites in Lantern {
         RoomId: Type::INT8,
         Allow1: Type::INT8,
