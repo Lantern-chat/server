@@ -1,30 +1,12 @@
 use std::time::{Duration, SystemTime};
 
-use sdk::models::{SmolStr, Snowflake, UserFlags};
+use sdk::api::commands::user::{Added2FA, Confirm2FAForm, Enable2FAForm, Remove2FAForm};
+use sdk::models::{ElevationLevel, Snowflake, UserFlags};
 use totp::TOTP6;
 
 use crate::{backend::util::encrypt::encrypt_user_message, Error, ServerState};
 
-pub struct Add2FAForm {
-    pub password: SmolStr,
-    pub token: String,
-}
-
-pub struct Added2FA {
-    pub url: String,
-    pub backup: Vec<String>,
-}
-
-pub struct Confirm2FAForm {
-    pub totp: SmolStr,
-}
-
-pub struct Remove2FAForm {
-    pub password: SmolStr,
-    pub totp: SmolStr,
-}
-
-pub async fn add_2fa(state: ServerState, user_id: Snowflake, form: Add2FAForm) -> Result<Added2FA, Error> {
+pub async fn enable_2fa(state: ServerState, user_id: Snowflake, form: Enable2FAForm) -> Result<Added2FA, Error> {
     let config = state.config.load_full();
 
     if !config.account.password_len.contains(&form.password.len()) {
@@ -46,8 +28,8 @@ pub async fn add_2fa(state: ServerState, user_id: Snowflake, form: Add2FAForm) -
     let user = state.db.read.get().await?.query_one2(schema::sql! {
         SELECT
             Users.MfaSecret IS NOT NULL AS @HasMFA,
-            Users.Email AS @Email,
-            Users.Passhash AS @Passhash
+            Users.Email     AS @Email,
+            Users.Passhash  AS @Passhash
         FROM Users WHERE #{&user_id as Users::Id}
     }).await?;
 
@@ -67,7 +49,7 @@ pub async fn add_2fa(state: ServerState, user_id: Snowflake, form: Add2FAForm) -
 
         (
             rng.gen::<[u8; 32]>(), // 256-bit key and backup codes
-            (0..=config.account.num_mfa_backups)
+            (0..config.account.num_mfa_backups)
                 .flat_map(|_| rng.gen::<u64>().to_be_bytes())
                 .collect::<Vec<u8>>(),
         )
@@ -82,13 +64,13 @@ pub async fn add_2fa(state: ServerState, user_id: Snowflake, form: Add2FAForm) -
     #[rustfmt::skip]
     state.db.write.get().await?.execute2(schema::sql! {
         INSERT INTO MfaPending (UserId, Expires, MfaSecret, MfaBackup) VALUES (
-            #{&user_id as Users::Id},
-            #{&expires as MfaPending::Expires},
-            #{&encrypted_secret as MfaPending::MfaSecret},
+            #{&user_id           as Users::Id},
+            #{&expires           as MfaPending::Expires},
+            #{&encrypted_secret  as MfaPending::MfaSecret},
             #{&encrypted_backups as MfaPending::MfaBackup}
         ) ON CONFLICT DO UPDATE MfaPending SET (Expires, MfaSecret, MfaBackup) = (
-            #{&expires as MfaPending::Expires},
-            #{&encrypted_secret as MfaPending::MfaSecret},
+            #{&expires           as MfaPending::Expires},
+            #{&encrypted_secret  as MfaPending::MfaSecret},
             #{&encrypted_backups as MfaPending::MfaBackup}
         )
     }).await?;
@@ -153,9 +135,50 @@ pub async fn confirm_2fa(state: ServerState, user_id: Snowflake, form: Confirm2F
 }
 
 pub async fn remove_2fa(state: ServerState, user_id: Snowflake, form: Remove2FAForm) -> Result<(), Error> {
-    if form.password.len() < 8 {
+    if !state.config().account.password_len.contains(&form.password.len()) {
         return Err(Error::InvalidCredentials);
     }
 
-    unimplemented!()
+    super::login::validate_2fa_token(&form.totp)?;
+
+    #[rustfmt::skip]
+    let user = state.db.read.get().await?.query_one2(schema::sql! {
+        SELECT
+            Users.Flags     AS @Flags,
+            Users.Passhash  AS @Passhash,
+            Users.MfaSecret AS @MfaSecret,
+            Users.MfaBackup AS @MfaBackup
+        FROM Users WHERE Users.Id = #{&user_id as Users::Id}
+    }).await?;
+
+    let flags = UserFlags::from_bits_truncate(user.flags()?);
+
+    // these roles are not allowed to remove 2FA
+    if let ElevationLevel::System | ElevationLevel::Staff = flags.elevation() {
+        return Err(Error::Unauthorized);
+    }
+
+    let Some(mfa_secret) = user.mfa_secret()? else {
+        return Err(Error::NotFound);
+    };
+
+    let passhash = user.passhash()?;
+    let mfa_backup = user.mfa_backup()?;
+
+    if !super::login::verify_password(&state, passhash, form.password).await? {
+        return Err(Error::InvalidCredentials);
+    }
+
+    if !super::login::process_2fa(&state, user_id, mfa_secret, mfa_backup, &form.totp).await? {
+        return Err(Error::InvalidCredentials);
+    }
+
+    #[rustfmt::skip]
+    state.db.write.get().await?.execute2(schema::sql! {
+        UPDATE Users SET (MfaSecret, MfaBackup, Flags) = (
+            NULL, NULL, Users.Flags & ~{UserFlags::MFA_ENABLED.bits()}
+        ) WHERE Users.Id = #{&user_id as Users::Id}
+    }).await?;
+
+    Ok(())
 }

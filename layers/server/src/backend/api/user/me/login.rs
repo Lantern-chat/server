@@ -45,16 +45,16 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) ->
 
     let user_id: Snowflake = user.id()?;
     let flags = UserFlags::from_bits_truncate(user.flags()?);
-    let passhash: &str = user.passhash()?;
-    let secret: Option<&[u8]> = user.mfa_secret()?;
-    let backup: Option<&[u8]> = user.mfa_backup()?;
+    let passhash = user.passhash()?;
+    let mfa_secret: Option<&[u8]> = user.mfa_secret()?;
+    let mfa_backup: Option<&[u8]> = user.mfa_backup()?;
 
     match flags.elevation() {
         // System user flat out cannot log in. Pretend it doesn't exist.
         ElevationLevel::System => return Err(Error::NotFound),
 
         // don't allow staff to login without 2FA set up
-        ElevationLevel::Staff if secret.is_none() => {
+        ElevationLevel::Staff if mfa_secret.is_none() => {
             log::error!("Staff user {user_id} tried to login without 2FA enabled");
 
             return Err(Error::NotFound);
@@ -66,12 +66,12 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) ->
         return Err(Error::Banned);
     }
 
-    if secret.is_some() != backup.is_some() {
+    if mfa_secret.is_some() != mfa_backup.is_some() {
         return Err(Error::InternalErrorStatic("MFA Mismatch!"));
     }
 
     // early check, before any work is done
-    if secret.is_some() && form.totp.is_none() {
+    if mfa_secret.is_some() && form.totp.is_none() {
         return Err(Error::TOTPRequired);
     }
 
@@ -79,7 +79,7 @@ pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) ->
         return Err(Error::InvalidCredentials);
     }
 
-    if let (Some(secret), Some(backup)) = (secret, backup) {
+    if let (Some(secret), Some(backup)) = (mfa_secret, mfa_backup) {
         if !process_2fa(&state, user_id, secret, backup, &form.totp.unwrap()).await? {
             return Err(Error::InvalidCredentials);
         }
@@ -148,7 +148,7 @@ pub async fn verify_password(
     Ok(verified)
 }
 
-fn validate_2fa_token(token: &str) -> Result<(), Error> {
+pub fn validate_2fa_token(token: &str) -> Result<(), Error> {
     match token.len() {
         6 => {
             if !token.chars().all(|c: char| c.is_ascii_digit()) {

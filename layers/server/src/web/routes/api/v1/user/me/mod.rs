@@ -2,6 +2,7 @@ use super::*;
 
 pub mod account;
 pub mod billing;
+pub mod mfa;
 //pub mod friends;
 pub mod login;
 pub mod logout;
@@ -25,6 +26,19 @@ pub fn me(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
                 (&Method::PATCH, Exact("prefs")) => Ok(prefs::prefs(route, auth)),
                 (&Method::PATCH, Exact("account")) => Ok(account::patch_account(route, auth)),
                 (&Method::PATCH, Exact("profile")) => Ok(profile::patch_profile(route, auth)),
+                (_, Exact("2fa")) => {
+                    if auth.is_bot() {
+                        // bots do not use 2fa
+                        return Err(Error::BadRequest);
+                    }
+
+                    match *route.method() {
+                        Method::POST => Ok(mfa::post_2fa(route, auth)),
+                        Method::PATCH => Ok(mfa::patch_2fa(route, auth)),
+                        Method::DELETE => Ok(mfa::delete_2fa(route, auth)),
+                        _ => Err(Error::MethodNotAllowed),
+                    }
+                }
                 (_, Exact("relationships")) => {
                     if auth.is_bot() {
                         // bots cannot have friends :(
