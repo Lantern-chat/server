@@ -16,5 +16,23 @@ pub fn add_cleanup_mfa_task(state: &ServerState, runner: &TaskRunner) {
             log::trace!("Cleaning old MFA steps");
             state.mfa_last.retain_async(move |_, step| *step > last_step).await;
         },
-    )))
+    )));
+
+    #[rustfmt::skip]
+    runner.add(RetryTask::new(IntervalFnTask::new(
+        state.clone(),
+        Duration::from_secs(60 * 30), // 30 minutes
+        |state, _|  async move {
+            let Ok(db) = state.db.write.get().await else {
+                log::error!("Error getting database connection for MFA Cleanup task");
+                return;
+            };
+
+            if let Err(e) = db.execute2(schema::sql! {
+                DELETE FROM MfaPending WHERE MfaPending.Expires <= now()
+            }).await {
+                log::error!("Error running MFA Cleanup task: {e}");
+            }
+        },
+    )));
 }

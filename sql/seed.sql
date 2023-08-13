@@ -1084,6 +1084,8 @@ CREATE INDEX event_log_counter_idx          ON lantern.event_log        USING bt
 CREATE INDEX user_username_idx              ON lantern.users            USING btree(username);
 CREATE INDEX user_freelist_username_idx     ON lantern.user_freelist    USING btree(username);
 
+CREATE INDEX mfa_pending_expires_idx        ON lantern.mfa_pending      USING btree(expires);
+
 -- tokens are random bits, so hash-based lookup is fine
 CREATE INDEX user_tokens_token_idx          ON lantern.user_tokens      USING hash(token);
 CREATE INDEX user_tokens_expires_idx        ON lantern.user_tokens      USING btree(expires);

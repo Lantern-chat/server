@@ -97,7 +97,7 @@ pub async fn confirm_2fa(state: ServerState, user_id: Snowflake, form: Confirm2F
         SELECT
              MfaPending.MfaSecret AS @MfaSecret,
              MfaPending.MfaBackup AS @MfaBackup,
-            (MfaPending.Expires < now()) AS @Expired
+            (MfaPending.Expires <= now()) AS @Expired
          FROM MfaPending
         WHERE MfaPending.UserId = #{&user_id as Users::Id}
     }).await?;
