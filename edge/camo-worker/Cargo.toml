@@ -13,7 +13,7 @@ standalone = ["reqwest", "tokio", "axum", "dotenv"]
 
 [dependencies]
 # keep in sync with WORKERS_RS_VERSION in wrangler.toml
-worker = { version = "0.0.16", optional = true }
+worker = { version = "0.0.18", optional = true }
 console_error_panic_hook = { version = "0.1.1", optional = true }
 
 reqwest = { version = "0.11", optional = true, default_features = false, features = ["rustls-tls", "stream", "json"] }
