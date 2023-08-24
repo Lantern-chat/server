@@ -19,7 +19,7 @@ config = { path = "../config" }
 
 db = { path = "../../crates/db" }
 util = { path = "../../crates/util" }
-totp = { path = "../../crates/totp" }
+mfa_totp = { path = "../../crates/mfa_totp" }
 framed = { path = "../../crates/framed" }
 iplist = { path = "../../crates/iplist" }
 blurhash = { path = "../../crates/blurhash" }
@@ -65,7 +65,6 @@ base64 = "0.21.0"
 hex = "0.4.2"
 bytes = "1.0.1"
 lazy_static = "1.4.0"
-# sha3 = "0.9.1"
 miniz_oxide = "0.7"
 thiserror = "1.0.24"
 serde_repr = "0.1.6"

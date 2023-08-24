@@ -102,7 +102,6 @@ pub fn hash_config() -> argon2::Config<'static> {
     config.variant = argon2::Variant::Argon2id;
     config.lanes = 1;
     config.time_cost = 3;
-    config.thread_mode = argon2::ThreadMode::Sequential;
     config.hash_length = 24;
 
     config

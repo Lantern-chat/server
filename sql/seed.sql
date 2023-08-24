@@ -368,6 +368,8 @@ CREATE TABLE lantern.user_assets (
     -- original asset before processing
     file_id     bigint      NOT NULL,
 
+    version     smallint    NOT NULL,
+
     -- have one single blurhash preview for all versions of this asset
     preview     bytea,
 
@@ -1191,7 +1193,7 @@ $$
 BEGIN
     INSERT INTO lantern.event_log (code, id, room_id, party_id)
     SELECT
-        CASE (NEW.flags & MESSAGE_DELETED_OR_REMOVED) != 0
+        CASE WHEN (NEW.flags & MESSAGE_DELETED_OR_REMOVED) != 0
                 THEN 'message_delete'::lantern.event_code
 
              WHEN TG_OP = 'INSERT'
@@ -2367,6 +2369,31 @@ FROM
 -------- PROCEDURES & FUNCTIONS ---------
 -----------------------------------------
 
+CREATE OR REPLACE PROCEDURE lantern.add_member(
+    _user_id bigint,
+    _party_id bigint,
+    _invite_id bigint
+)
+LANGUAGE plpgsql AS
+$$
+BEGIN
+    -- new users just start out with @everyone permissions
+    WITH p AS (
+        SELECT r.permissions1, r.permissions2 FROM lantern.roles r WHERE r.id = _party_id
+    )
+    -- insert new one at the top
+    -- NOTE: Using -1 and doing this insert first avoids extra rollback work on failure
+    INSERT INTO lantern.party_members(party_id, user_id, invite_id, joined_at, position, permissions1, permissions2)
+    SELECT _party_id, _user_id, _invite_id, now(), -1, p.permissions1, p.permissions2 FROM p;
+
+    -- move all parties down to normalize
+    UPDATE lantern.party_members
+        SET position = position + 1
+    WHERE
+        party_members.user_id = _user_id;
+END
+$$;
+
 CREATE OR REPLACE PROCEDURE lantern.redeem_invite(
     _user_id bigint,
     INOUT _invite_id bigint,
@@ -2397,20 +2424,7 @@ BEGIN
     ELSIF _party_id IS NULL THEN
         RAISE EXCEPTION 'invalid_invite';
     ELSE
-        -- new users just start out with @everyone permissions
-        WITH p AS (
-            SELECT r.permissions1, r.permissions2 FROM lantern.roles r WHERE r.id = _party_id
-        )
-        -- insert new one at the top
-        -- NOTE: Using -1 and doing this insert first avoids extra rollback work on failure
-        INSERT INTO lantern.party_members(party_id, user_id, invite_id, joined_at, position, permissions1, permissions2)
-        SELECT _party_id, _user_id, _invite_id, now(), -1, p.permissions1, p.permissions2 FROM p;
-
-        -- move all parties down to normalize
-        UPDATE lantern.party_members
-            SET position = position + 1
-        WHERE
-            party_members.user_id = _user_id;
+        CALL lantern.add_member(_user_id, _party_id, _invite_id);
     END IF;
 END
 $$;

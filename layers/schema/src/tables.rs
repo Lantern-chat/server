@@ -3,6 +3,8 @@
 use thorn::{enums::EnumType, pg::Type, table::Nullable};
 
 thorn::functions! {
+    pub extern "pg" fn add_member(_user_id: Type::INT8, _party_id: Type::INT8, _invite_id: Type::INT8) in Lantern;
+
     pub extern "pg" fn array_diff(lhs: Type::ANYARRAY, rhs: Type::ANYARRAY) in Lantern;
 
     pub extern "pg" fn array_uniq(arr: Type::ANYARRAY) in Lantern;
@@ -59,7 +61,7 @@ thorn::enums! {
 
 lazy_static::lazy_static! {
     /// See [EventCode] for full documentation
-    pub static ref EVENT_CODE: Type = <EventCode as EnumType>::ty(16398);
+    pub static ref EVENT_CODE: Type = <EventCode as EnumType>::ty(19087);
 }
 
 thorn::tables! {
@@ -236,24 +238,6 @@ thorn::tables! {
         Flags: Nullable(Type::INT2),
     }
 
-    pub struct DeletedAttachments in Lantern {
-        MsgId: Type::INT8,
-        FileId: Type::INT8,
-        Flags: Nullable(Type::INT2),
-    }
-
-    pub struct DeletedMessages in Lantern {
-        Id: Type::INT8,
-        UserId: Type::INT8,
-        DeletedBy: Nullable(Type::INT8),
-        RoomId: Type::INT8,
-        ParentId: Nullable(Type::INT8),
-        EditedAt: Nullable(Type::TIMESTAMPTZ),
-        Flags: Type::INT4,
-        Kind: Type::INT2,
-        Content: Nullable(Type::TEXT),
-    }
-
     pub struct Dms in Lantern {
         UserIdA: Type::INT8,
         UserIdB: Type::INT8,
@@ -403,8 +387,7 @@ thorn::tables! {
         Username: Nullable(Type::TEXT),
         Email: Nullable(Type::TEXT),
         Passhash: Nullable(Type::TEXT),
-        MfaSecret: Nullable(Type::BYTEA),
-        MfaBackup: Nullable(Type::BYTEA),
+        Mfa: Nullable(Type::BYTEA),
         Preferences: Nullable(Type::JSONB),
     }
 
@@ -470,8 +453,7 @@ thorn::tables! {
     pub struct MfaPending in Lantern {
         UserId: Type::INT8,
         Expires: Type::TIMESTAMPTZ,
-        MfaSecret: Type::BYTEA,
-        MfaBackup: Type::BYTEA,
+        Mfa: Type::BYTEA,
     }
 
     pub struct Overwrites in Lantern {
@@ -631,6 +613,7 @@ thorn::tables! {
         Id: Type::INT8,
         /// Original asset before processing
         FileId: Type::INT8,
+        Version: Type::INT2,
         /// One single blurhash preview for all versions of this asset
         Preview: Nullable(Type::BYTEA),
     }
@@ -669,8 +652,7 @@ thorn::tables! {
         Username: Type::TEXT,
         Email: Type::TEXT,
         Passhash: Type::TEXT,
-        MfaSecret: Nullable(Type::BYTEA),
-        MfaBackup: Nullable(Type::BYTEA),
+        Mfa: Nullable(Type::BYTEA),
         /// this is for client-side user preferences, which can be stored as
         /// JSON easily enough
         Preferences: Nullable(Type::JSONB),
