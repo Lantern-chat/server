@@ -35,7 +35,7 @@ pub fn set_own_process_priority(priority: Priority) -> bool {
                 Priority::Realtime => REALTIME_PRIORITY_CLASS,
             },
         )
-        .as_bool()
+        .is_ok()
     }
 }
 
@@ -81,7 +81,7 @@ pub fn get_sysinfo() -> Option<SysInfo> {
     // https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/ns-sysinfoapi-memorystatusex
     mse.dwLength = std::mem::size_of::<MEMORYSTATUSEX>() as u32;
 
-    if unsafe { GlobalMemoryStatusEx(&mut mse).as_bool() } {
+    if unsafe { GlobalMemoryStatusEx(&mut mse).is_ok() } {
         Some(SysInfo {
             total_memory: mse.ullTotalPhys,
         })

@@ -66,12 +66,9 @@ fn try_encode_mozjpeg<W: Write>(mut w: W, image: &DynamicImage, quality: u8) -> 
             }
         }
 
-        encoder.set_mem_dest();
-        encoder.start_compress();
-        assert!(encoder.write_scanlines(image.as_bytes()));
-        encoder.finish_compress();
-
-        encoder
+        let mut comp = encoder.start_compress(Vec::new())?;
+        comp.write_scanlines(image.as_bytes())?;
+        comp.finish()
     });
 
     // NOTE: Getting the output slice and dropping the encoder should be
@@ -79,13 +76,9 @@ fn try_encode_mozjpeg<W: Write>(mut w: W, image: &DynamicImage, quality: u8) -> 
     // warrants a panic
 
     match res {
-        Ok(mut encoder) => match encoder.data_as_mut_slice() {
-            Ok(buf) => w.write_all(buf).map(|_| true),
-            Err(_) => Ok(false),
-        },
-        Err(_) => {
+        Ok(Ok(buf)) => w.write_all(&buf).map(|_| true),
+        _ => {
             log::error!("Error encoding JPEG with mozjpeg");
-
             Ok(false)
         }
     }
