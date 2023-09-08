@@ -23,7 +23,7 @@ use once_cell::sync::Lazy;
 
 pub static EMOJI_RE_REGEX: Lazy<regex::Regex> = Lazy::new(|| {
     regex::RegexBuilder::new(
-        r#"
+        r"
     \p{RI} \p{RI}
     | \p{Emoji}
         ( \p{EMod}
@@ -39,7 +39,7 @@ pub static EMOJI_RE_REGEX: Lazy<regex::Regex> = Lazy::new(|| {
                 )?
             )
         )*
-    "#,
+    ",
     )
     .ignore_whitespace(true)
     .unicode(true)

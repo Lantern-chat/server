@@ -582,7 +582,7 @@ use pg::{
 // TODO: I'm sure there is something better than a regex for this
 lazy_static::lazy_static! {
     static ref WRITE_REGEX: regex::Regex =
-        regex::RegexBuilder::new(r#"\b(UPDATE|INSERT|ALTER|CREATE|DROP|GRANT|REVOKE|DELETE|TRUNCATE)\b"#).build().unwrap();
+        regex::RegexBuilder::new(r"\b(UPDATE|INSERT|ALTER|CREATE|DROP|GRANT|REVOKE|DELETE|TRUNCATE)\b").build().unwrap();
 }
 
 impl Client {

@@ -33,7 +33,7 @@ pub static EMOJI_RE: Lazy<Regex<regex_automata::DenseDFA<Vec<u16>, u16>>> = Lazy
         .ignore_whitespace(true)
         .unicode(true)
         .build_with_size(
-            r#"
+            r"
         \p{RI} \p{RI}
         | \p{Emoji}
             ( \p{EMod}
@@ -49,7 +49,7 @@ pub static EMOJI_RE: Lazy<Regex<regex_automata::DenseDFA<Vec<u16>, u16>>> = Lazy
                     )?
                 )
             )*
-        "#,
+        ",
         )
         .unwrap()
 });

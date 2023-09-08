@@ -74,23 +74,6 @@ fn valid_url(c: &char) -> bool {
         && matches!(*c as u8, b'A'..=b'Z' | b'a'..=b'z' | b'#'..=b';' /*includes digits*/ | b'!' | b'=' | b'?' | b'@' | b'[' | b']' | b'_' | b'~')
 }
 
-#[cfg(test)]
-mod url_test {
-    use super::*;
-
-    const VALID_URL: &[u8] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-%._~:/?#[]@!$&'()*+,;=";
-
-    #[test]
-    fn test_valid_url() {
-        for c in 0..256 {
-            let c = char::from_u32(c).unwrap();
-
-            assert_eq!(VALID_URL.contains(&(c as u8)), valid_url(&c), "Invalid? {}", c as u8);
-        }
-    }
-}
-
 pub fn scan_markdown(input: &str) -> SpanList {
     let mut spans = SpanList::default();
 
@@ -362,4 +345,21 @@ pub fn trim_message(content: &str, limits: Option<TrimLimits>) -> Option<Cow<str
     }
 
     Some(trimmed_content)
+}
+
+#[cfg(test)]
+mod url_test {
+    use super::*;
+
+    const VALID_URL: &[u8] =
+        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-%._~:/?#[]@!$&'()*+,;=";
+
+    #[test]
+    fn test_valid_url() {
+        for c in 0..256 {
+            let c = char::from_u32(c).unwrap();
+
+            assert_eq!(VALID_URL.contains(&(c as u8)), valid_url(&c), "Invalid? {}", c as u8);
+        }
+    }
 }

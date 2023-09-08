@@ -130,20 +130,17 @@ pub async fn edit_message(
         }
     }
 
-    match (prev_content, modified_content.as_ref()) {
-        (Some(prev), modified) if prev == modified => {}
-        (None, "") => {}
-        _ => {
-            let content = if modified_content.is_empty() { None } else { Some(modified_content.as_ref()) };
+    // avoid reprocessing the message content if it's identical
+    if prev_content.unwrap_or("") != modified_content {
+        update_message = Either::Right(async {
+            #[rustfmt::skip]
+            t.execute2(schema::sql! {
+                UPDATE Messages SET (Content, EditedAt) = (NULLIF(#{&modified_content as Messages::Content}, ""), NOW())
+                 WHERE Messages.Id = #{&msg_id as Messages::Id}
+            }).await?;
 
-            let t = &t;
-
-            update_message = Either::Right(async move {
-                t.execute_cached_typed(|| update_message_query(), &[&msg_id, &content]).await?;
-
-                Ok(())
-            })
-        }
+            Ok(())
+        });
     }
 
     tokio::try_join!(add_attachments, orphan_attachments, update_message)?;
@@ -218,18 +215,4 @@ fn orphan_attachments_query() -> impl thorn::AnyQuery {
             Attachments::Flags.bitor(flags::AttachmentFlags::ORPHANED.bits().lit()),
         )
         .and_where(Attachments::FileId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))
-}
-
-fn update_message_query() -> impl thorn::AnyQuery {
-    use schema::*;
-    use thorn::*;
-
-    let msg_id_var = Var::at(Messages::Id, 1);
-    let msg_content_var = Var::at(Messages::Content, 2);
-
-    Query::update()
-        .table::<Messages>()
-        .and_where(Messages::Id.equals(msg_id_var))
-        .set(Messages::Content, msg_content_var)
-        .set(Messages::EditedAt, Builtin::now(()))
 }

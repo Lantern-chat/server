@@ -111,7 +111,7 @@ pub fn web_response(encoding: Encoding, res: WebResult) -> Response {
         };
 
         if let Some(headers) = headers {
-            resp.headers_mut().extend(headers.into_iter());
+            resp.headers_mut().extend(*headers);
         }
 
         Ok(resp)

@@ -6,11 +6,11 @@ use crate::Error;
 
 lazy_static::lazy_static! {
     /// Flexible email regex for username+whatever@domain.tld
-    static ref EMAIL_REGEX: Regex = Regex::new(r#"^[^@\s]{1,64}?(\+[^@\s]{1,128})?@[^@\s\.]+(?:\.[^.@\s\.]+)+$"#).unwrap();
-    static ref USERNAME_REGEX: Regex = Regex::new(r#"^[^\s].*[^\s]$"#).unwrap();
-    static ref PASSWORD_REGEX: Regex = Regex::new(r#"[^\P{L}]|\p{N}"#).unwrap();
+    static ref EMAIL_REGEX: Regex = Regex::new(r"^[^@\s]{1,64}?(\+[^@\s]{1,128})?@[^@\s\.]+(?:\.[^.@\s\.]+)+$").unwrap();
+    static ref USERNAME_REGEX: Regex = Regex::new(r"^[^\s].*[^\s]$").unwrap();
+    static ref PASSWORD_REGEX: Regex = Regex::new(r"[^\P{L}]|\p{N}").unwrap();
 
-    pub static ref USERNAME_SANITIZE_REGEX: Regex = Regex::new(r#"\s+"#).unwrap();
+    pub static ref USERNAME_SANITIZE_REGEX: Regex = Regex::new(r"\s+").unwrap();
 }
 
 const BANNED_USERNAMES: &[&str] = &["SYSTEM", "Admin", "Administrator", "Webmaster"];
