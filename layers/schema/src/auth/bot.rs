@@ -27,7 +27,7 @@ pub struct SplitBotToken {
     /// Bot identifier
     pub id: Snowflake,
     /// Seconds since UNIX epoch this token was created
-    pub ts: u64,
+    pub issued: u64,
     /// HMAC digest of the previous two fields with a private key
     pub hmac: HmacDigest,
 }
@@ -43,7 +43,7 @@ impl SplitBotToken {
 
         unsafe {
             w.write_u64::<LittleEndian>(self.id.to_u64()).unwrap_unchecked();
-            w.write_u64::<LittleEndian>(self.ts).unwrap_unchecked();
+            w.write_u64::<LittleEndian>(self.issued).unwrap_unchecked();
             w.write(&self.hmac).unwrap_unchecked();
         }
 
@@ -60,7 +60,7 @@ impl SplitBotToken {
         let mut t = SplitBotToken {
             id,
             hmac: [0; 20],
-            ts: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs(),
+            issued: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs(),
         };
 
         t.hmac = t.token_mac(key).finalize_fixed().into();
@@ -110,7 +110,7 @@ impl TryFrom<&[u8]> for SplitBotToken {
             None => return Err(InvalidAuthToken),
         };
 
-        Ok(SplitBotToken { id, ts, hmac })
+        Ok(SplitBotToken { id, issued: ts, hmac })
     }
 }
 
@@ -146,7 +146,7 @@ mod tests {
     fn test_splitbottoken_bytes() {
         let token = SplitBotToken {
             id: Snowflake::null(),
-            ts: 0,
+            issued: 0,
             hmac: [u8::MAX; 20],
         };
 

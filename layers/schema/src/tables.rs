@@ -56,12 +56,13 @@ thorn::enums! {
         MessageUnreact,
         ProfileUpdated,
         RelUpdated,
+        TokenRefresh,
     }
 }
 
 lazy_static::lazy_static! {
     /// See [EventCode] for full documentation
-    pub static ref EVENT_CODE: Type = <EventCode as EnumType>::ty(19087);
+    pub static ref EVENT_CODE: Type = <EventCode as EnumType>::ty(26410);
 }
 
 thorn::tables! {
@@ -230,6 +231,16 @@ thorn::tables! {
         PresenceFlags: Nullable(Type::INT2),
         PresenceUpdatedAt: Nullable(Type::TIMESTAMPTZ),
         PresenceActivity: Nullable(Type::JSONB),
+    }
+
+    pub struct Apps in Lantern {
+        Id: Type::INT8,
+        OwnerId: Type::INT8,
+        BotId: Nullable(Type::INT8),
+        Issued: Type::TIMESTAMPTZ,
+        Flags: Type::INT2,
+        Name: Type::TEXT,
+        Description: Nullable(Type::TEXT),
     }
 
     pub struct Attachments in Lantern {

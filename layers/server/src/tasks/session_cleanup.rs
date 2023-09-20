@@ -1,4 +1,4 @@
-use std::time::SystemTime;
+use timestamp::Timestamp;
 
 use super::*;
 
@@ -9,7 +9,7 @@ pub fn add_cleanup_sessions_task(state: &ServerState, runner: &TaskRunner) {
         |state, _| async move {
             log::trace!("Cleaning up old user sessions");
 
-            let now = SystemTime::now();
+            let now = Timestamp::now_utc();
 
             #[rustfmt::skip]
             let db_task = async {

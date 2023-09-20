@@ -214,5 +214,5 @@ pub async fn get_many(
     auth: Authorization,
     party_id: Snowflake,
 ) -> Result<impl Stream<Item = Result<PartyMember, Error>>, Error> {
-    get_members(state, party_id, Some(auth.user_id), None, MemberMode::Simple).await
+    get_members(state, party_id, Some(auth.user_id()), None, MemberMode::Simple).await
 }

@@ -249,7 +249,7 @@ pub async fn client_connection(ws: WebSocket, query: GatewayQueryParams, _addr: 
                                 roles.remove_party(p.id);
                                 true
                             }
-                            ServerMsg::RoomUpdate(ref r) => {
+                            ServerMsg::RoomUpdate(ref _r) => {
                                 // TODO
                                 true
                             }

@@ -10,14 +10,18 @@ use sdk::{
     models::{ElevationLevel, Session, UserFlags},
 };
 
-pub async fn login(state: ServerState, addr: SocketAddr, form: UserLoginForm) -> Result<Session, Error> {
+pub async fn login(state: ServerState, addr: SocketAddr, mut form: UserLoginForm) -> Result<Session, Error> {
     if form.password.len() < 8 {
         return Err(Error::InvalidCredentials);
     }
 
     // early validation
     if let Some(ref token) = form.totp {
-        validate_2fa_token(token)?;
+        if token.is_empty() {
+            form.totp = None;
+        } else {
+            validate_2fa_token(token)?;
+        }
     }
 
     validate_email(&form.email)?; // NOTE: Uses a regex, so it goes last.

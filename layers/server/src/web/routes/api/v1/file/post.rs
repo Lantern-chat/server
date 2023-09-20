@@ -4,7 +4,7 @@ use super::*;
 pub async fn post(mut route: Route<ServerState>, auth: Authorization) -> WebResult {
     let body = body::any(&mut route).await?;
 
-    let file_id = crate::backend::api::file::post::post_file(&route.state, auth.user_id, body).await?;
+    let file_id = crate::backend::api::file::post::post_file(&route.state, auth.user_id(), body).await?;
 
     let mut res = crate::web::response::wrap_response_once(&route, |_| {
         Ok(WebResponse::new(file_id).with_status(StatusCode::CREATED))

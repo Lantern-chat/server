@@ -38,7 +38,7 @@ pub async fn modify_room(
     let mut old_avatar_id: Nullable<Snowflake> = Nullable::Null;
 
     let mut needs_perms = true;
-    if let Some(perms) = state.perm_cache.get(auth.user_id, room_id).await {
+    if let Some(perms) = state.perm_cache.get(auth.user_id(), room_id).await {
         if !perms.contains(Permissions::MANAGE_ROOMS) {
             return Err(Error::Unauthorized);
         }
@@ -56,7 +56,7 @@ pub async fn modify_room(
             FROM AggRoomPerms AS Rooms if has_assets {
                 LEFT JOIN UserAssets ON UserAssets.Id = Rooms.AvatarId
             }
-            WHERE Rooms.UserId = #{&auth.user_id as Users::Id}
+            WHERE Rooms.UserId = #{auth.user_id_ref() as Users::Id}
               AND Rooms.Id = #{&room_id as Rooms::Id}
         }).await? else {
             return Err(Error::Unauthorized);
@@ -73,7 +73,7 @@ pub async fn modify_room(
         form.avatar = Nullable::Undefined;
     }
 
-    let avatar_id = maybe_add_asset(&state, AssetMode::Avatar, auth.user_id, form.avatar).await?;
+    let avatar_id = maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), form.avatar).await?;
     let position = form.position.map(|p| p as i16);
 
     // unique + avoiding conflicts

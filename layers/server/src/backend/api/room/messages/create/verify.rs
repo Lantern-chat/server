@@ -48,7 +48,7 @@ pub async fn verify<'a>(
         FROM Emotes INNER JOIN match perms.contains(Permissions::USE_EXTERNAL_EMOTES) {
             true => {
                 PartyMembers ON PartyMembers.PartyId = Emotes.PartyId
-                WHERE PartyMembers.UserId = #{&auth.user_id as Users::Id}
+                WHERE PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
             },
             false => {
                 LiveRooms AS Rooms ON Rooms.PartyId = Emotes.PartyId

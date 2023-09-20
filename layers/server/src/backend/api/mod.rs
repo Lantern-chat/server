@@ -25,6 +25,8 @@ pub mod user {
         pub mod get;
         pub mod login;
         pub mod logout;
+        pub mod mfa;
+        pub mod password;
         pub mod prefs;
         pub mod profile;
         pub mod sessions;

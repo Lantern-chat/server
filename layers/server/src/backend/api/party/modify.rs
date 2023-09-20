@@ -48,7 +48,7 @@ pub async fn modify_party(
             LEFT JOIN UserAssets AS BannerAsset ON BannerAsset.Id = Party.BannerId
         }
         WHERE Party.Id = #{&party_id as Party::Id}
-          AND PartyMembers.UserId = #{&auth.user_id as Users::Id}
+          AND PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
     }).await? else {
         return Err(Error::Unauthorized);
     };
@@ -73,8 +73,8 @@ pub async fn modify_party(
     }
 
     let (avatar_id, banner_id) = tokio::try_join!(
-        maybe_add_asset(&state, AssetMode::Avatar, auth.user_id, form.avatar),
-        maybe_add_asset(&state, AssetMode::Banner, auth.user_id, form.banner),
+        maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), form.avatar),
+        maybe_add_asset(&state, AssetMode::Banner, auth.user_id(), form.banner),
     )?;
 
     let set_room = form.default_room.is_some();

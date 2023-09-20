@@ -31,7 +31,7 @@ pub async fn change_password(
             Users.Passhash  AS @Passhash,
             Users.Mfa       AS @Mfa
         FROM  Users
-        WHERE Users.Id = #{&auth.user_id as Users::Id}
+        WHERE Users.Id = #{auth.user_id_ref() as Users::Id}
     }).await?;
 
     let passhash = user.passhash()?;
@@ -50,13 +50,13 @@ pub async fn change_password(
     // if MFA is enabled, it needs to be verified and re-encrypted with the new password
     if let (Some(token), Some(mfa)) = (form.totp, encrypted_mfa) {
         let mfa_key = config.keys.mfa_key;
-        let nonce = nonce_from_user_id(auth.user_id);
+        let nonce = nonce_from_user_id(auth.user_id());
 
         let Ok(mfa) = MFA::decrypt(&mfa_key, &nonce, &form.current, mfa) else {
             return Err(Error::InternalErrorStatic("Decrypt Error"));
         };
 
-        if !super::login::process_2fa(&state, auth.user_id, ProvidedMfa::Plain(&mfa), &form.current, &token)
+        if !super::login::process_2fa(&state, auth.user_id(), ProvidedMfa::Plain(&mfa), &form.current, &token)
             .await?
         {
             return Err(Error::InvalidCredentials);
@@ -89,7 +89,7 @@ pub async fn change_password(
         UPDATE Users SET (Passhash, Mfa) = (
             #{&passhash as Users::Passhash},
             #{&new_mfa as Users::Mfa}
-        ) WHERE Users.Id = #{&auth.user_id as Users::Id}
+        ) WHERE Users.Id = #{auth.user_id_ref() as Users::Id}
     }).await?;
 
     Ok(())

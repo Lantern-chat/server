@@ -17,7 +17,7 @@ pub async fn get_full_user(state: ServerState, auth: Authorization, user_id: Sno
     use q::{columns::*, Parameters, Params};
 
     let params = Params {
-        self_id: auth.user_id,
+        self_id: auth.user_id(),
         user_id,
         party_id: None,
     };
@@ -26,7 +26,7 @@ pub async fn get_full_user(state: ServerState, auth: Authorization, user_id: Sno
         return Err(Error::NotFound);
     };
 
-    let associated = auth.user_id == user_id || row.try_get(AssocColumns::associated())?;
+    let associated = params.self_id == user_id || row.try_get(AssocColumns::associated())?;
 
     Ok(User {
         id: user_id,

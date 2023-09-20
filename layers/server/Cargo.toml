@@ -9,7 +9,7 @@ publish = false
 brotli = ["sdk/brotli", "reqwest/brotli", "async-compression/brotli", "ftl/brotli"]
 
 [build-dependencies]
-built = { version = "0.6", features = ["chrono"] }
+built = { version = "0.7", features = ["chrono"] }
 
 [dependencies]
 process = { path = "../../bin/process" }

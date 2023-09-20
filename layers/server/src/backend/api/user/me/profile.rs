@@ -48,7 +48,7 @@ pub async fn patch_profile(
                 LEFT JOIN AggOriginalProfileFiles AS Profiles
                 ON Profiles.PartyId = PartyMembers.PartyId AND Profiles.UserId = PartyMembers.UserId
             }
-            WHERE PartyMembers.UserId = #{&auth.user_id as Users::Id}
+            WHERE PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
               AND PartyMembers.PartyId = #{&party_id as Party::Id}
         }).await? else {
             return Err(Error::Unauthorized);
@@ -66,7 +66,7 @@ pub async fn patch_profile(
                 Profiles.AvatarFileId AS @AvatarId,
                 Profiles.BannerFileId AS @BannerId
             FROM AggOriginalProfileFiles AS Profiles
-            WHERE Profiles.UserId = #{&auth.user_id as Users::Id} AND Profiles.PartyId IS NULL
+            WHERE Profiles.UserId = #{auth.user_id_ref() as Users::Id} AND Profiles.PartyId IS NULL
         }).await?;
 
         if let Some(row) = row {
@@ -91,14 +91,14 @@ pub async fn patch_profile(
     }
 
     let (avatar_id, banner_id) = tokio::try_join!(
-        maybe_add_asset(&state, AssetMode::Avatar, auth.user_id, profile.avatar),
-        maybe_add_asset(&state, AssetMode::Banner, auth.user_id, profile.banner),
+        maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), profile.avatar),
+        maybe_add_asset(&state, AssetMode::Banner, auth.user_id(), profile.banner),
     )?;
 
     #[rustfmt::skip]
     let res = state.db.write.get().await?.execute2(schema::sql! {
         INSERT INTO Profiles (UserId, PartyId, Bits, AvatarId, BannerId, Nickname, CustomStatus, Biography) VALUES (
-            #{&auth.user_id     as Users::Id},
+            #{auth.user_id_ref()     as Users::Id},
             #{&party_id         as Party::Id},
             #{&profile.bits     as Profiles::Bits},
             #{&avatar_id        as Profiles::AvatarId},

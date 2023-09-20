@@ -109,7 +109,8 @@ CREATE TYPE lantern.event_code AS ENUM (
     'message_react',
     'message_unreact',
     'profile_updated',
-    'rel_updated'
+    'rel_updated',
+    'token_refresh'
 );
 
 CREATE SEQUENCE lantern.event_id AS bigint;
@@ -191,6 +192,18 @@ COMMENT ON COLUMN lantern.metrics.p50 IS '50th latency percently';
 COMMENT ON COLUMN lantern.metrics.p95 IS '95th latency percentile';
 COMMENT ON COLUMN lantern.metrics.p99 IS '99th latency percentile';
 
+CREATE TABLE lantern.apps (
+    id              bigint              NOT NULL,
+    owner_id        bigint              NOT NULL,
+    bot_id          bigint, -- references user_id for bot
+    issued          timestamptz         NOT NULL,
+    flags           smallint            NOT NULL,
+    name            text                NOT NULL,
+    description     text,
+
+    CONSTRAINT apps_pk PRIMARY KEY (id)
+);
+
 CREATE TABLE lantern.users (
     --- Snowflake id
     id              bigint              NOT NULL,
@@ -205,9 +218,8 @@ CREATE TABLE lantern.users (
     email           text                NOT NULL,
     passhash        text                NOT NULL,
 
-    -- 2FA Secret key
-    mfa_secret      bytea,
-    mfa_backup      bytea,
+    -- 2FA data
+    mfa             bytea,
 
     -- this is for client-side user preferences, which can be stored as JSON easily enough
     preferences     jsonb,
@@ -238,8 +250,7 @@ CREATE TABLE lantern.user_tokens (
 CREATE TABLE lantern.mfa_pending (
     user_id     bigint      NOT NULL,
     expires     timestamptz NOT NULL,
-    mfa_secret  bytea       NOT NULL,
-    mfa_backup  bytea       NOT NULL,
+    mfa         bytea       NOT NULL,
 
     CONSTRAINT mfa_pending_pk PRIMARY KEY (user_id)
 );
@@ -707,6 +718,14 @@ ALTER TABLE lantern.event_log ADD CONSTRAINT user_fk FOREIGN KEY (user_id)
     REFERENCES lantern.users (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
 
+ALTER TABLE lantern.apps ADD CONSTRAINT owner_fk FOREIGN KEY (owner_id)
+    REFERENCES lantern.users (id) MATCH FULL
+    ON DELETE RESTRICT ON UPDATE CASCADE;
+
+ALTER TABLE lantern.apps ADD CONSTRAINT bot_user_fk FOREIGN KEY (bot_id)
+    REFERENCES lantern.users (id) MATCH FULL
+    ON DELETE SET NULL ON UPDATE CASCADE;
+
 ALTER TABLE lantern.user_tokens ADD CONSTRAINT user_fk FOREIGN KEY (user_id)
     REFERENCES lantern.users (id) MATCH FULL
     ON DELETE CASCADE ON UPDATE CASCADE;
@@ -1051,6 +1070,9 @@ CREATE UNIQUE INDEX user_email_idx ON lantern.users
 CREATE UNIQUE INDEX user_freelist_username_discriminator_idx ON lantern.user_freelist
     USING btree (username, discriminator);
 
+CREATE UNIQUE INDEX apps_bot_id ON lantern.apps
+    USING btree(bot_id) NULLS NOT DISTINCT; -- can be null
+
 -- ensure there can only be one profile per user per party (or no party)
 CREATE UNIQUE INDEX profiles_user_party_idx ON lantern.profiles
     USING btree(user_id, party_id) NULLS NOT DISTINCT; -- party_id can be NULL
@@ -1183,6 +1205,27 @@ $$;
 
 CREATE TRIGGER event_log_notify AFTER INSERT ON lantern.event_log
 FOR EACH ROW EXECUTE FUNCTION lantern.ev_notify_trigger();
+
+--
+
+CREATE OR REPLACE FUNCTION lantern.on_app_update()
+RETURNS TRIGGER
+LANGUAGE plpgsql AS
+$$
+BEGIN
+    IF NEW.issued != OLD.issued THEN
+        INSERT INTO lantern.event_log (code, id) VALUES (
+            'token_refresh'::lantern.event_code,
+            NEW.id
+        );
+    END IF;
+
+    RETURN NEW;
+END
+$$;
+
+CREATE TRIGGER app_update AFTER UPDATE ON lantern.apps
+FOR EACH ROW EXECUTE FUNCTION lantern.on_app_update();
 
 --
 

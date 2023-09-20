@@ -24,16 +24,18 @@ pub struct FullReady {
 pub async fn ready(state: ServerState, conn_id: Snowflake, auth: Authorization) -> Result<FullReady, Error> {
     use sdk::models::*;
 
-    log::trace!("Processing Ready Event for {}", auth.user_id);
+    let user_id = auth.user_id();
+
+    log::trace!("Processing Ready Event for {}", user_id);
 
     let db = state.db.read.get().await?;
 
-    let user = crate::backend::api::user::me::get::get_full_self_inner(&state, auth.user_id, &db).await?;
+    let user = crate::backend::api::user::me::get::get_full_self_inner(&state, user_id, &db).await?;
 
     let perms_future = async {
-        state.perm_cache.add_reference(auth.user_id).await;
+        state.perm_cache.add_reference(user_id).await;
 
-        super::refresh::refresh_room_perms(&state, &db, auth.user_id).await
+        super::refresh::refresh_room_perms(&state, &db, user_id).await
     };
 
     let parties_future = async {
@@ -81,7 +83,7 @@ pub async fn ready(state: ServerState, conn_id: Snowflake, auth: Authorization) 
                     AND Roles.PartyId = PartyMembers.PartyId
                     AND RoleMembers.UserId = PartyMembers.UserId
                 ) AS AggRoles ON TRUE
-            WHERE PartyMembers.UserId = #{&auth.user_id as Users::Id}
+            WHERE PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
         }).await?;
 
         let mut parties = HashMap::with_capacity(rows.len());
@@ -183,7 +185,7 @@ pub async fn ready(state: ServerState, conn_id: Snowflake, auth: Authorization) 
             log::warn!("Error during ready event: {e}");
 
             //if failed, make sure the cache reference is cleaned up
-            state.perm_cache.remove_reference(auth.user_id).await;
+            state.perm_cache.remove_reference(auth.user_id()).await;
 
             return Err(e);
         }

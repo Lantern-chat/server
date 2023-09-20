@@ -13,7 +13,7 @@ pub async fn add_reaction(
     msg_id: Snowflake,
     emote: EmoteOrEmojiId,
 ) -> Result<(), Error> {
-    let perms = state.perm_cache.get(auth.user_id, room_id).await;
+    let perms = state.perm_cache.get(auth.user_id(), room_id).await;
 
     if matches!(perms, Some(perms) if !perms.contains(Permissions::ADD_REACTIONS)) {
         return Err(Error::Unauthorized);
@@ -84,7 +84,7 @@ pub async fn add_reaction(
                     EmoteOrEmojiId::Emote(ref emote_id) if perms.contains(Permissions::USE_EXTERNAL_EMOTES) => {
                         PartyMembers.PartyId AS Checked.PartyId
                          FROM PartyMembers INNER JOIN Emotes ON Emotes.PartyId = PartyMembers.PartyId
-                        WHERE PartyMembers.UserId = #{&auth.user_id as Users::Id}
+                        WHERE PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
                           AND Emotes.Id = #{emote_id as Emotes::Id}
                     }
                     EmoteOrEmojiId::Emote(ref emote_id) => {
@@ -108,7 +108,7 @@ pub async fn add_reaction(
                         Rooms.PartyId AS Checked.PartyId
                          FROM AggRoomPerms AS Rooms
                         WHERE Rooms.Id     = #{&room_id as Rooms::Id}
-                          AND Rooms.UserId = #{&auth.user_id as Users::Id}
+                          AND Rooms.UserId = #{auth.user_id_ref() as Users::Id}
                     }
                     EmoteOrEmojiId::Emote(ref emote_id) => {
                         PartyMembers.PartyId AS Checked.PartyId
@@ -118,7 +118,7 @@ pub async fn add_reaction(
                             // join with rooms to get target party id
                             INNER JOIN AggRoomPerms AS Rooms ON Rooms.UserId = PartyMembers.UserId
                         WHERE
-                            PartyMembers.UserId = #{&auth.user_id as Users::Id}
+                            PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
                         AND Rooms.Id = #{&room_id as Rooms::Id}
                         AND Emotes.Id = #{emote_id as Emotes::Id}
                         // emote is in same party as the room we're sending to,
@@ -181,7 +181,7 @@ pub async fn add_reaction(
                 SELECT
                     // Must choose the inserted reaction first, as that likely means the ID was updated
                     COALESCE(InsertedReaction.ReactionId, SelectedReaction.ReactionId),
-                    #{&auth.user_id as Users::Id}
+                    #{auth.user_id_ref() as Users::Id}
                 FROM SelectedReaction FULL OUTER JOIN InsertedReaction ON TRUE
             )
             ON CONFLICT DO NOTHING
@@ -203,7 +203,7 @@ pub async fn add_reaction(
                 COALESCE(PartyProfile.AvatarId, BaseProfile.AvatarId) AS ReactionEvent.AvatarId,
                 .combine_profile_bits(BaseProfile.Bits, PartyProfile.Bits, PartyProfile.AvatarId) AS ReactionEvent.ProfileBits
             FROM Checked
-                INNER JOIN Users ON Users.Id = #{&auth.user_id as Users::Id}
+                INNER JOIN Users ON Users.Id = #{auth.user_id_ref() as Users::Id}
                 INNER JOIN InsertedReactionUser ON InsertedReactionUser.UserId = Users.Id
                 LEFT JOIN AggMembers ON AggMembers.UserId = Users.Id AND AggMembers.PartyId = Checked.PartyId
                 LEFT JOIN Profiles AS BaseProfile ON BaseProfile.UserId = Users.Id AND BaseProfile.PartyId IS NULL
@@ -227,7 +227,9 @@ pub async fn add_reaction(
         FROM Checked LEFT JOIN ReactionEvent ON TRUE
     }).await?;
 
-    let Some(row) = row else { return Err(Error::Unauthorized) };
+    let Some(row) = row else {
+        return Err(Error::Unauthorized);
+    };
 
     if let Some(msg_id) = row.msg_id()? {
         let emote = match state.emoji.lookup(emote) {
@@ -245,10 +247,10 @@ pub async fn add_reaction(
             msg_id,
             room_id,
             party_id,
-            user_id: auth.user_id,
+            user_id: auth.user_id(),
             member: Some(Box::new(PartyMember {
                 user: User {
-                    id: auth.user_id,
+                    id: auth.user_id(),
                     username: row.username()?,
                     discriminator: row.discriminator()?,
                     flags: UserFlags::from_bits_truncate_public(row.user_flags()?),

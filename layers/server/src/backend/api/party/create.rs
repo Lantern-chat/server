@@ -35,7 +35,7 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: CreateP
         banner: Nullable::Null,
         default_room: room_id,
         position: None,
-        owner: auth.user_id,
+        owner: auth.user_id(),
         roles: ThinVec::new(),
         emotes: ThinVec::new(),
         pin_folders: ThinVec::new(),
@@ -61,7 +61,7 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: CreateP
         #[rustfmt::skip]
         let row = t.query_one2(schema::sql! {
             SELECT MAX(PartyMembers.Position) AS @MaxPosition
-            FROM PartyMembers WHERE PartyMembers.UserId = #{&auth.user_id as PartyMembers::UserId}
+            FROM PartyMembers WHERE PartyMembers.UserId = #{auth.user_id_ref() as PartyMembers::UserId}
         }).await?;
 
         match row.max_position::<Option<i16>>()? {
@@ -78,9 +78,9 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: CreateP
     futures::future::try_join3(
         t.execute2(schema::sql! {
             INSERT INTO PartyMembers (PartyId, UserId, Position) VALUES (
-                #{&party.id     as PartyMembers::PartyId  },
-                #{&auth.user_id as PartyMembers::UserId   },
-                #{&position     as PartyMembers::Position }
+                #{&party.id          as PartyMembers::PartyId  },
+                #{auth.user_id_ref() as PartyMembers::UserId   },
+                #{&position          as PartyMembers::Position }
             )
         }),
         t.execute2(schema::sql! {

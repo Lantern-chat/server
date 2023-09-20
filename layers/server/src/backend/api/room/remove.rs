@@ -16,7 +16,7 @@ pub async fn remove_room(state: ServerState, auth: Authorization, room_id: Snowf
             SELECT Rooms.Id AS PendingRoom.Id
               FROM LiveRooms AS Rooms INNER JOIN PartyMembers ON PartyMembers.PartyId = Rooms.PartyId
              WHERE Rooms.Id = #{&room_id as Rooms::Id}
-               AND PartyMembers.UserId = #{&auth.user_id as Users::Id}
+               AND PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
 
             let perms = Permissions::MANAGE_ROOMS.to_i64();
             assert_eq!(perms[1], 0);

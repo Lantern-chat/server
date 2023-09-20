@@ -9,7 +9,7 @@ use tokio::sync::{Notify, Semaphore};
 
 use crate::{
     backend::{
-        cache::permission_cache::PermissionCache, cache::session_cache::SessionCache, gateway::Gateway,
+        cache::permission_cache::PermissionCache, cache::session_cache::AuthCache, gateway::Gateway,
         queues::Queues, services::Services,
     },
     Error,
@@ -45,7 +45,7 @@ pub struct InnerServerState {
     pub fs_semaphore: Semaphore,
 
     pub perm_cache: PermissionCache,
-    pub session_cache: SessionCache,
+    pub session_cache: AuthCache,
     pub services: Services,
     pub queues: Queues,
     pub gateway: Gateway,
@@ -80,7 +80,7 @@ impl ServerState {
             cpu_semaphore: Semaphore::new(config.general.cpu_limit as usize),
             fs_semaphore: Semaphore::new(1024),
             perm_cache: PermissionCache::default(),
-            session_cache: SessionCache::default(),
+            session_cache: AuthCache::default(),
             services: Services::start().expect("Services failed to start correctly"),
             queues: Queues::default(),
             gateway: Gateway::default(),

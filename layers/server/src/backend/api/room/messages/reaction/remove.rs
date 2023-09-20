@@ -8,7 +8,7 @@ pub async fn remove_own_reaction(
     msg_id: Snowflake,
     emote: EmoteOrEmojiId,
 ) -> Result<(), Error> {
-    let perms = state.perm_cache.get(auth.user_id, room_id).await;
+    let perms = state.perm_cache.get(auth.user_id(), room_id).await;
 
     match perms {
         Some(perms) if !perms.contains(Permissions::READ_MESSAGE_HISTORY) => return Err(Error::Unauthorized),
@@ -36,7 +36,7 @@ pub async fn remove_own_reaction(
 
             if perms.is_none() {
                 INNER JOIN AggRoomPerms ON
-                    AggRoomPerms.UserId = #{&auth.user_id as Users::Id}
+                    AggRoomPerms.UserId = #{auth.user_id_ref() as Users::Id}
                 AND AggRoomPerms.Id     = #{&room_id as Rooms::Id}
             }
 
@@ -59,7 +59,7 @@ pub async fn remove_own_reaction(
         ), DeletedReactionUser AS (
             DELETE FROM ReactionUsers USING SelectedReaction
             WHERE ReactionUsers.ReactionId = SelectedReaction.ReactionId
-            AND ReactionUsers.UserId = #{&auth.user_id as Users::Id}
+            AND ReactionUsers.UserId = #{auth.user_id_ref() as Users::Id}
             RETURNING ReactionUsers.ReactionId AS DeletedReactionUser.ReactionId
         )
         SELECT
@@ -69,7 +69,7 @@ pub async fn remove_own_reaction(
             INNER JOIN Rooms ON Rooms.Id = #{&room_id as Rooms::Id}
     }).await?;
 
-    let Some(row) = res else { return Ok(()); };
+    let Some(row) = res else { return Ok(()) };
 
     let party_id = row.party_id()?;
 
@@ -86,7 +86,7 @@ pub async fn remove_own_reaction(
         msg_id,
         room_id,
         party_id,
-        user_id: auth.user_id,
+        user_id: auth.user_id(),
         member: None,
     });
 

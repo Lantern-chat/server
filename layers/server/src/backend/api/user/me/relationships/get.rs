@@ -10,7 +10,7 @@ pub async fn get_relationships(
 ) -> Result<impl Stream<Item = Result<Relationship, Error>>, Error> {
     let db = state.db.read.get().await?;
 
-    let stream = db.query_stream_cached_typed(|| q::query(), &[&auth.user_id]).await?;
+    let stream = db.query_stream_cached_typed(|| q::query(), &[auth.user_id_ref()]).await?;
 
     use q::{AssocColumns, ProfileColumns, RelColumns, UserColumns};
 

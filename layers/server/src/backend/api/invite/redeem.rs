@@ -30,7 +30,7 @@ pub async fn redeem_invite(
     // redeem the invite and add user to party_member
     let row = t.query_one2(schema::sql! {
         CALL .redeem_invite(
-            #{&auth.user_id as Users::Id},
+            #{auth.user_id_ref() as Users::Id},
             #{&maybe_id as Invite::Id},
             #{&code as Invite::Vanity}
         )
@@ -87,7 +87,7 @@ pub async fn redeem_invite(
             INSERT INTO Messages (Id, UserId, RoomId, Kind) (
                 SELECT
                     #{&msg_id as Messages::Id},
-                    #{&auth.user_id as Messages::UserId},
+                    #{auth.user_id_ref() as Messages::UserId},
                     Party.DefaultRoom,
                     {MessageKind::Welcome as i16}
                 FROM Invite INNER JOIN LiveParties AS Party ON Party.Id = Invite.PartyId

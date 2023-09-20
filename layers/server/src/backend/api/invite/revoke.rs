@@ -31,7 +31,7 @@ pub async fn revoke_invite(state: ServerState, auth: Authorization, code: SmolSt
             FROM PartyMembers INNER JOIN Invite ON PartyMembers.PartyId = Invite.PartyId
             WHERE (Invite.Id = #{&maybe_id as Invite::Id}
             OR Invite.Vanity = #{&code as Invite::Vanity})
-            AND PartyMembers.UserId = #{&auth.user_id as Users::Id}
+            AND PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
         )
         UPDATE Invite SET (Uses, Expires) = (0, NOW())
         FROM Perms WHERE Invite.Id = Perms.InviteId AND Perms.Allowed IS TRUE

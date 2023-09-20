@@ -48,7 +48,7 @@ pub async fn get_rooms(
             RoomScope::Room(ref room_id)   => { Rooms.Id      = #{room_id  as Rooms::Id} }
         }
 
-        AND Rooms.UserId = #{&auth.user_id as Users::Id}
+        AND Rooms.UserId = #{auth.user_id_ref() as Users::Id}
 
         let perms = Permissions::VIEW_ROOM.to_i64();
         assert_eq!(perms[1], 0);

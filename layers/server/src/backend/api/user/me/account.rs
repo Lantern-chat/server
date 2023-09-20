@@ -52,10 +52,10 @@ pub async fn modify_account(
             Users.Username  AS @Username,
             Users.Passhash  AS @Passhash,
             Users.Mfa       AS @Mfa
-        FROM Users WHERE Users.Id = #{&auth.user_id as Users::Id}
+        FROM Users WHERE Users.Id = #{auth.user_id_ref() as Users::Id}
     }).await?;
 
-    let user_id: Snowflake = auth.user_id;
+    let user_id: Snowflake = auth.user_id();
     let old_username: &str = user.username()?;
     let passhash: &str = user.passhash()?;
     let mfa: Option<&[u8]> = user.mfa()?;
@@ -111,7 +111,7 @@ pub async fn modify_account(
     //             Var::of(Users::Passhash),
     //         ))
     //     },
-    //     &[&auth.user_id, &u, &e, &p],
+    //     &[auth.user_id(), &u, &e, &p],
     // )
     // .await?;
 

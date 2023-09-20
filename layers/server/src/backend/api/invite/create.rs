@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use crate::{Authorization, Error, ServerState};
 
 use schema::{Snowflake, SnowflakeExt};
@@ -7,10 +5,6 @@ use timestamp::Duration;
 
 use sdk::api::commands::party::CreatePartyInviteBody;
 use sdk::models::*;
-
-//use rand::Rng;
-use smol_str::SmolStr;
-use timestamp::Timestamp;
 
 // 100 years
 const MAX_DURATION: u64 = 100 * 365 * 24 * 60 * 60 * 1000;
@@ -54,14 +48,14 @@ pub async fn create_invite(
                 (PartyMembers.Permissions1 & {perms[0]} = {perms[0]} AND
                  PartyMembers.Permissions2 & {perms[1]} = {perms[1]}) AS Checked.Allowed
             FROM PartyMembers INNER JOIN LiveParties AS Party ON Party.Id = PartyMembers.PartyId
-            WHERE PartyMembers.UserId = #{&auth.user_id as Users::Id}
+            WHERE PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
             AND PartyMembers.PartyId = #{&party_id as Party::Id}
         ), Inserted AS (
             INSERT INTO Invite (Id, PartyId, UserId, Expires, Uses, MaxUses, Description) (
                 SELECT
                     #{&id as Invite::Id},
                     #{&party_id as Party::Id},
-                    #{&auth.user_id as Users::Id},
+                    #{auth.user_id_ref() as Users::Id},
                     #{&expires as Invite::Expires},
                     #{&uses as Invite::Uses},
                     #{&uses as Invite::MaxUses},
@@ -88,7 +82,7 @@ pub async fn create_invite(
             name: row.party_name()?,
             description: row.party_desc()?,
         },
-        inviter: Some(auth.user_id),
+        inviter: Some(auth.user_id()),
         description: body.description,
         expires,
         remaining: body.max_uses,

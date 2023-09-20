@@ -13,7 +13,7 @@ pub async fn trigger_typing(
     room_id: Snowflake,
     body: sdk::api::commands::room::StartTypingBody,
 ) -> Result<(), Error> {
-    let has_perms = match state.perm_cache.get(auth.user_id, room_id).await {
+    let has_perms = match state.perm_cache.get(auth.user_id(), room_id).await {
         Some(perms) => {
             if !perms.contains(Permissions::SEND_MESSAGES) {
                 return Err(Error::NotFound);
@@ -35,7 +35,7 @@ pub async fn trigger_typing(
             } else {
                 SELECT AggRoomPerms.PartyId AS AggRoom.PartyId
                 FROM  AggRoomPerms
-                WHERE AggRoomPerms.UserId = #{&auth.user_id as Users::Id}
+                WHERE AggRoomPerms.UserId = #{auth.user_id_ref() as Users::Id}
                 AND   AggRoomPerms.Id = #{&room_id as Rooms::Id}
 
                 let perms = Permissions::SEND_MESSAGES.to_i64();
@@ -79,7 +79,7 @@ pub async fn trigger_typing(
                     ON PartyProfile.UserId = Users.Id
                     AND PartyProfile.PartyId = PartyMembers.PartyId
 
-            WHERE Users.Id = #{&auth.user_id as SNOWFLAKE}
+            WHERE Users.Id = #{auth.user_id_ref() as SNOWFLAKE}
     }).await?;
 
     let Some(row) = row else { return Ok(()) };
@@ -87,7 +87,7 @@ pub async fn trigger_typing(
     let party_id: Option<Snowflake> = row.party_id()?;
 
     let user = User {
-        id: auth.user_id,
+        id: auth.user_id(),
         username: row.username()?,
         discriminator: row.discriminator()?,
         flags: UserFlags::from_bits_truncate_public(row.user_flags()?),
@@ -121,7 +121,7 @@ pub async fn trigger_typing(
 
             let event = ServerMsg::new_typing_start(events::TypingStart {
                 room_id,
-                user_id: auth.user_id,
+                user_id: auth.user_id(),
                 party_id: Some(party_id),
                 member: Some(member),
                 parent: body.parent,

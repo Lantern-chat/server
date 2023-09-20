@@ -25,7 +25,7 @@ pub async fn get_invite(state: &ServerState, auth: Authorization, code: SmolStr)
             Party.Name          AS @_,
             Party.Description   AS @_
         FROM Invite INNER JOIN LiveParties AS Party ON Party.Id = Invite.PartyId
-        LEFT JOIN PartyMembers ON PartyMembers.UserId = #{&auth.user_id as Users::Id}
+        LEFT JOIN PartyMembers ON PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
         WHERE Invite.Id = #{&id as Invite::Id} OR Invite.Vanity = #{&code as Invite::Vanity}
     }).await? else {
         return Err(Error::NotFound);
@@ -37,7 +37,7 @@ pub async fn get_invite(state: &ServerState, auth: Authorization, code: SmolStr)
         (Some(low), Some(high)) => {
             // the person that created the invite can always view it so long as they are a party member,
             // otherwise they need additional permissions
-            inviter == auth.user_id || Permissions::from_i64(low, high).intersects(Permissions::MANAGE_PARTY)
+            inviter == auth.user_id() || Permissions::from_i64(low, high).intersects(Permissions::MANAGE_PARTY)
         }
         _ => false,
     };

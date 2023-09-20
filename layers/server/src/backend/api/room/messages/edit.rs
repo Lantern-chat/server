@@ -14,7 +14,7 @@ pub async fn edit_message(
     body: EditMessageBody,
 ) -> Result<Option<Message>, Error> {
     // fast-path for if the perm_cache does contain a value
-    let perms = match state.perm_cache.get(auth.user_id, room_id).await {
+    let perms = match state.perm_cache.get(auth.user_id(), room_id).await {
         Some(PermMute { perms, .. }) => {
             // Mostly same rules as creating messages, as they are sending new content
             if !perms.contains(Permissions::SEND_MESSAGES) {
@@ -39,7 +39,7 @@ pub async fn edit_message(
     let perms = match perms {
         Some(perm) => perm,
         None => {
-            let perms = crate::backend::api::perm::get_room_permissions(&db, auth.user_id, room_id).await?;
+            let perms = crate::backend::api::perm::get_room_permissions(&db, auth.user_id(), room_id).await?;
 
             if !perms.contains(Permissions::SEND_MESSAGES) {
                 return Err(Error::Unauthorized);
@@ -52,11 +52,13 @@ pub async fn edit_message(
     // first read-only query is not within the transaction because without repeatable-read it doesn't matter anyway
     let prev = db.query_opt_cached_typed(|| query_existing_message(), &[&msg_id, &room_id]).await?;
 
-    let Some(row) = prev else { return Err(Error::NotFound); };
+    let Some(row) = prev else {
+        return Err(Error::NotFound);
+    };
 
     let author_id: Snowflake = row.try_get(0)?;
 
-    if author_id != auth.user_id {
+    if author_id != auth.user_id() {
         return Err(Error::Unauthorized);
     }
 
@@ -67,10 +69,13 @@ pub async fn edit_message(
     // do full trimming
     let Some(trimmed_content) = ({
         let config = state.config();
-        md_utils::trim_message(trimmed_content, Some(md_utils::TrimLimits {
-            len: config.message.message_len.clone(),
-            max_newlines: config.message.max_newlines
-        }))
+        md_utils::trim_message(
+            trimmed_content,
+            Some(md_utils::TrimLimits {
+                len: config.message.message_len.clone(),
+                max_newlines: config.message.max_newlines,
+            }),
+        )
     }) else {
         return Err(Error::BadRequest);
     };

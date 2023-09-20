@@ -19,7 +19,7 @@ pub async fn create_message(
     body: CreateMessageBody,
 ) -> Result<Option<Message>, Error> {
     // fast-path for if the perm_cache does contain a value, otherwise defer until content is checked
-    let perms = match state.perm_cache.get(auth.user_id, room_id).await {
+    let perms = match state.perm_cache.get(auth.user_id(), room_id).await {
         Some(PermMute { perms, .. }) => {
             if !perms.contains(Permissions::SEND_MESSAGES) {
                 return Err(Error::Unauthorized);
@@ -40,10 +40,13 @@ pub async fn create_message(
     // do full trimming
     let Some(trimmed_content) = ({
         let config = state.config();
-        md_utils::trim_message(trimmed_content, Some(md_utils::TrimLimits {
-            len: config.message.message_len.clone(),
-            max_newlines: config.message.max_newlines
-        }))
+        md_utils::trim_message(
+            trimmed_content,
+            Some(md_utils::TrimLimits {
+                len: config.message.message_len.clone(),
+                max_newlines: config.message.max_newlines,
+            }),
+        )
     }) else {
         return Err(Error::BadRequest);
     };
@@ -57,7 +60,7 @@ pub async fn create_message(
         None => {
             let db = state.db.write.get().await?;
 
-            let perms = crate::backend::api::perm::get_room_permissions(&db, auth.user_id, room_id).await?;
+            let perms = crate::backend::api::perm::get_room_permissions(&db, auth.user_id(), room_id).await?;
 
             if !perms.contains(Permissions::SEND_MESSAGES) {
                 return Err(Error::Unauthorized);
@@ -132,7 +135,7 @@ pub(crate) async fn insert_message(
     let res = t.execute2(schema::sql! {
         INSERT INTO Messages (Id, UserId, RoomId, Flags, Content) VALUES (
             #{&msg_id as Messages::Id},
-            #{&auth.user_id as Messages::UserId},
+            #{auth.user_id_ref() as Messages::UserId},
             #{&room_id as Messages::RoomId},
             #{&flags as Messages::Flags},
             if content.is_empty() { NULL } else { #{&content as Messages::Content} }

@@ -33,7 +33,7 @@ pub async fn get_stats(
         WITH AllowedRooms AS (
             SELECT AggRoomPerms.Id AS AllowedRooms.RoomId
             FROM   AggRoomPerms
-            WHERE  AggRoomPerms.UserId = #{&auth.user_id as Users::Id}
+            WHERE  AggRoomPerms.UserId = #{auth.user_id_ref() as Users::Id}
             AND (
                 // we know this perm is in the lower half, so only use that
                 let perms = Permissions::READ_MESSAGE_HISTORY.to_i64();

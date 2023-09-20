@@ -1,14 +1,12 @@
-use schema::auth::RawAuthToken;
-
 use crate::{Authorization, Error, ServerState};
 
 pub async fn logout_user(state: &ServerState, auth: Authorization) -> Result<(), Error> {
-    let RawAuthToken::Bearer(ref bytes) = auth.token else {
+    let Authorization::User { token, user_id, .. } = auth else {
         return Err(Error::BadRequest);
     };
 
     let db = state.db.write.get().await?;
-    let bytes = bytes.as_slice();
+    let bytes = token.as_slice();
 
     #[rustfmt::skip]
     let res = db.execute2(schema::sql! {
@@ -16,11 +14,7 @@ pub async fn logout_user(state: &ServerState, auth: Authorization) -> Result<(),
     }).await?;
 
     if res == 0 {
-        log::warn!(
-            "Attempted to delete nonexistent session: {}, user: {}",
-            auth.token,
-            auth.user_id
-        );
+        log::warn!("Attempted to delete nonexistent session: {token:?}, user: {user_id}");
     }
 
     Ok(())

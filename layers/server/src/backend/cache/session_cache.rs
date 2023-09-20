@@ -1,47 +1,77 @@
-use std::time::SystemTime;
+use sdk::models::{Timestamp, UserFlags};
 
-use sdk::models::UserFlags;
-
-use schema::{auth::RawAuthToken, Snowflake};
+use schema::{
+    auth::{RawAuthToken, UserToken},
+    Snowflake,
+};
 
 use crate::backend::api::auth::Authorization;
 
 #[derive(Debug, Clone, Copy)]
-struct PartialAuthorization {
+struct PartialUserAuthorization {
     user_id: Snowflake,
-    expires: SystemTime,
+    expires: Timestamp,
     flags: UserFlags,
 }
 
-#[derive(Default)]
-pub struct SessionCache {
-    map: scc::HashIndex<RawAuthToken, PartialAuthorization, ahash::RandomState>,
+#[derive(Debug, Clone, Copy)]
+struct PartialBotAuthorization {
+    issued: Timestamp,
+    flags: (),
 }
 
-impl SessionCache {
+#[derive(Default)]
+pub struct AuthCache {
+    users: scc::HashIndex<UserToken, PartialUserAuthorization, ahash::RandomState>,
+    bots: scc::HashIndex<Snowflake, PartialBotAuthorization, ahash::RandomState>,
+}
+
+impl AuthCache {
     pub fn get(&self, token: &RawAuthToken) -> Option<Authorization> {
-        self.map.peek_with(token, |_, part| Authorization {
-            token: *token,
-            user_id: part.user_id,
-            expires: part.expires,
-            flags: part.flags,
-        })
-    }
-
-    pub async fn set(&self, auth: Authorization) {
-        let part = PartialAuthorization {
-            user_id: auth.user_id,
-            expires: auth.expires,
-            flags: auth.flags,
-        };
-
-        if let Ok(_) = self.map.insert_async(auth.token, part).await {
-            log::trace!("Cached auth {}: {}", auth.user_id, auth.token);
+        match token {
+            RawAuthToken::Bearer(token) => self.users.peek_with(token, |_, partial| Authorization::User {
+                token: *token,
+                user_id: partial.user_id,
+                expires: partial.expires,
+                flags: partial.flags,
+            }),
+            RawAuthToken::Bot(token) => self.bots.peek_with(&token.id, |_, partial| Authorization::Bot {
+                bot_id: token.id,
+                issued: partial.issued,
+            }),
         }
     }
 
-    pub async fn cleanup(&self, now: SystemTime) {
-        self.map.retain_async(|_, part| part.expires < now).await;
+    pub async fn set(&self, auth: Authorization) {
+        match auth {
+            Authorization::User {
+                token,
+                user_id,
+                expires,
+                flags,
+            } => {
+                let partial = PartialUserAuthorization {
+                    user_id,
+                    expires,
+                    flags,
+                };
+
+                if let Ok(_) = self.users.insert_async(token, partial).await {
+                    log::trace!("Cached auth {}: {:?}", user_id, token);
+                }
+            }
+            Authorization::Bot { bot_id, issued } => {
+                let partial = PartialBotAuthorization { issued, flags: () };
+
+                if let Ok(_) = self.bots.insert_async(bot_id, partial).await {
+                    log::trace!("Cached bot auth: {}", bot_id);
+                }
+            }
+        }
+    }
+
+    pub async fn cleanup(&self, now: Timestamp) {
+        self.users.retain_async(|_, part| part.expires < now).await;
     }
 
     // pub async fn clear_user(&self, user_id: Snowflake) {

@@ -46,7 +46,7 @@ pub async fn create_role(
                 ) AS TempRole.Position
              FROM PartyMembers INNER JOIN Roles ON Roles.Id = PartyMembers.PartyId
             WHERE PartyMembers.PartyId = #{&party_id as Party::Id}
-              AND PartyMembers.UserId = #{&auth.user_id as Users::Id}
+              AND PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
 
             let perms = Permissions::MANAGE_ROLES.to_i64();
             assert_eq!(perms[1], 0);

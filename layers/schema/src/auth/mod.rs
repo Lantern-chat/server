@@ -5,7 +5,6 @@ use sdk::models::{BearerToken, BotToken, InvalidAuthToken};
 pub use sdk::models::AuthToken;
 
 mod bot;
-pub use bot::{BotTokenKey, SplitBotToken};
 
 // (4 * bytes) / 3, rounded up to nearest multiple of 4 for padding
 #[allow(dead_code)]
@@ -16,9 +15,13 @@ const fn base64bytes(bytes: usize) -> usize {
 const BEARER_BYTES_LEN: usize = 21;
 const BOT_BYTES_LEN: usize = SplitBotToken::SPLIT_BOT_TOKEN_SIZE; // should be 36
 
+pub use bot::{BotTokenKey, SplitBotToken};
+
+pub type UserToken = [u8; BEARER_BYTES_LEN];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RawAuthToken {
-    Bearer([u8; BEARER_BYTES_LEN]),
+    Bearer(UserToken),
     Bot(SplitBotToken),
 }
 

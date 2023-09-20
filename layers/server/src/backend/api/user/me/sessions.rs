@@ -1,5 +1,4 @@
 use futures::stream::{Stream, StreamExt};
-use schema::auth::RawAuthToken;
 
 use crate::{Authorization, Error, ServerState};
 
@@ -23,7 +22,7 @@ pub async fn list_sessions(
                     .and_where(Sessions::UserId.equals(Var::of(Sessions::UserId)))
                     .order_by(Sessions::Expires.ascending())
             },
-            &[&auth.user_id],
+            &[auth.user_id_ref()],
         )
         .await?;
 
@@ -36,7 +35,7 @@ pub async fn list_sessions(
 }
 
 pub async fn clear_other_sessions(state: ServerState, auth: Authorization) -> Result<u64, Error> {
-    let RawAuthToken::Bearer(bytes) = auth.token else {
+    let Authorization::User { token: bytes, .. } = auth else {
         return Err(Error::Unauthorized);
     };
 
@@ -53,7 +52,7 @@ pub async fn clear_other_sessions(state: ServerState, auth: Authorization) -> Re
                     .and_where(Sessions::UserId.equals(Var::of(Users::Id)))
                     .and_where(Sessions::Token.not_equals(Var::of(Sessions::Token)))
             },
-            &[&auth.user_id, &&bytes[..]],
+            &[auth.user_id_ref(), &&bytes[..]],
         )
         .await?;
 

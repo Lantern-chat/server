@@ -14,7 +14,7 @@ pub async fn get_many(
     room_id: Snowflake,
     form: GetMessagesQuery,
 ) -> Result<impl Stream<Item = Result<Message, Error>>, Error> {
-    let needs_perms = match state.perm_cache.get(auth.user_id, room_id).await {
+    let needs_perms = match state.perm_cache.get(auth.user_id(), room_id).await {
         Some(perms) => {
             if !perms.contains(Permissions::READ_MESSAGE_HISTORY) {
                 return Err(Error::NotFound);
@@ -31,7 +31,7 @@ pub async fn get_many(
     };
 
     let req = GetMsgRequest::Many {
-        user_id: auth.user_id,
+        user_id: auth.user_id(),
         room_id,
         needs_perms,
         cursor: form.query.unwrap_or_else(|| Cursor::Before(Snowflake::max_value())),

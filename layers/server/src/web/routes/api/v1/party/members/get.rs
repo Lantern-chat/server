@@ -17,7 +17,7 @@ pub async fn get_member(
     Ok(WebResponse::new(
         crate::backend::api::party::members::get_one(
             route.state,
-            auth.user_id,
+            auth.user_id(),
             party_id,
             member_id,
             crate::backend::api::party::members::MemberMode::Full,

@@ -10,7 +10,7 @@ pub async fn delete_msg(
     room_id: Snowflake,
     msg_id: Snowflake,
 ) -> Result<(), Error> {
-    let perms = state.perm_cache.get(auth.user_id, room_id).await;
+    let perms = state.perm_cache.get(auth.user_id(), room_id).await;
 
     if let Some(ref perms) = perms {
         // user cannot view room at all
@@ -28,12 +28,12 @@ pub async fn delete_msg(
                 SELECT AggRoomPerms.Permissions1 AS TempPerms.Permissions1
                   FROM AggRoomPerms
                  WHERE AggRoomPerms.Id = #{&room_id as Rooms::Id}
-                   AND AggRoomPerms.UserId = #{&auth.user_id as Users::Id}
+                   AND AggRoomPerms.UserId = #{auth.user_id_ref() as Users::Id}
             )
         }
 
         // Update Flags to include the deleted bit
-        UPDATE Messages SET (Flags) = (Messages.Flags | CASE WHEN Messages.UserId = #{&auth.user_id as Users::Id} THEN
+        UPDATE Messages SET (Flags) = (Messages.Flags | CASE WHEN Messages.UserId = #{auth.user_id_ref() as Users::Id} THEN
             // Add REMOVED if not deleted by the author
             {MessageFlags::DELETED.bits()} ELSE {(MessageFlags::DELETED | MessageFlags::REMOVED).bits()} END
         )
@@ -46,7 +46,7 @@ pub async fn delete_msg(
         match perms {
             Some(perm) if !perm.contains(Permissions::MANAGE_MESSAGES) => {
                 // if they are a known party member and without manage perm
-                AND Messages.UserId = #{&auth.user_id as Users::Id}
+                AND Messages.UserId = #{auth.user_id_ref() as Users::Id}
                 // Some(perm) implies membership
             }
             None => {
@@ -58,7 +58,7 @@ pub async fn delete_msg(
                     {m[0]} & TempPerms.Permissions1 = {m[0]}
                 ) OR (
                     // or they are a valid party member and it's their own message
-                    Messages.UserId = #{&auth.user_id as Users::Id}
+                    Messages.UserId = #{auth.user_id_ref() as Users::Id}
                     AND TempPerms.Permissions1 IS NOT NULL
                 ))
             }

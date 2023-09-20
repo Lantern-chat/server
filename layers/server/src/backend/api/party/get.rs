@@ -15,7 +15,7 @@ use sdk::models::*;
 pub async fn get_party(state: ServerState, auth: Authorization, party_id: Snowflake) -> Result<Party, Error> {
     let db = state.db.read.get().await?;
 
-    get_party_inner(state, &db, auth.user_id, party_id).await
+    get_party_inner(state, &db, auth.user_id(), party_id).await
 }
 
 pub async fn get_party_inner(

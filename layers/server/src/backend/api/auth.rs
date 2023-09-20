@@ -1,7 +1,7 @@
 use std::time::SystemTime;
 
 use futures::FutureExt;
-use schema::auth::{AuthToken, RawAuthToken, SplitBotToken};
+use schema::auth::{RawAuthToken, SplitBotToken, UserToken};
 
 pub trait AuthTokenExt {
     fn random_bearer() -> Self;
@@ -11,28 +11,46 @@ impl AuthTokenExt for RawAuthToken {
     fn random_bearer() -> Self {
         RawAuthToken::bearer(util::rng::crypto_thread_rng())
     }
-
-    //fn random_bot() -> Self {
-    //    RawAuthToken::bot(util::rng::crypto_thread_rng())
-    //}
 }
 
 use schema::Snowflake;
-use sdk::models::UserFlags;
+use sdk::models::{Timestamp, UserFlags};
 
 use crate::ServerState;
 
+/// User and Bot authorization structure, optimized for branchless user_id lookup
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Authorization {
-    pub token: RawAuthToken,
-    pub user_id: Snowflake,
-    pub expires: SystemTime,
-    pub flags: UserFlags,
+#[repr(C)]
+pub enum Authorization {
+    User {
+        user_id: Snowflake,
+        expires: Timestamp,
+        token: UserToken,
+        flags: UserFlags,
+    },
+    Bot {
+        bot_id: Snowflake,
+        issued: Timestamp,
+    },
 }
 
 impl Authorization {
-    pub fn is_bot(&self) -> bool {
-        matches!(self.token, RawAuthToken::Bot(_))
+    #[inline(always)]
+    pub const fn is_bot(&self) -> bool {
+        matches!(self, Authorization::Bot { .. })
+    }
+
+    #[inline(always)]
+    pub const fn user_id(&self) -> Snowflake {
+        *self.user_id_ref()
+    }
+
+    #[inline(always)]
+    pub const fn user_id_ref(&self) -> &Snowflake {
+        match self {
+            Authorization::User { user_id, .. } => user_id,
+            Authorization::Bot { bot_id, .. } => bot_id,
+        }
     }
 }
 
@@ -42,26 +60,25 @@ pub async fn do_auth(state: &ServerState, token: RawAuthToken) -> Result<Authori
     let auth = match state.session_cache.get(&token) {
         Some(auth) => Some(auth),
         None => match token {
-            RawAuthToken::Bearer(bytes) => do_user_auth(state, &bytes, token).boxed().await?,
+            RawAuthToken::Bearer(token) => do_user_auth(state, token).boxed().await?,
             RawAuthToken::Bot(token) => match token.verify(&state.config().keys.bt_key) {
+                true => return do_bot_auth(state, token).boxed().await,
                 false => return Err(Error::Unauthorized),
-                true => do_bot_auth(state, token).boxed().await?,
             },
         },
     };
 
     match auth {
-        Some(auth) if auth.expires > SystemTime::now() => Ok(auth),
+        Some(auth @ Authorization::Bot { .. }) => Ok(auth),
+        Some(auth @ Authorization::User { expires, .. }) if expires > Timestamp::now_utc() => Ok(auth),
         _ => Err(Error::NoSession),
     }
 }
 
-pub async fn do_user_auth(
-    state: &ServerState,
-    bytes: &[u8],
-    token: RawAuthToken,
-) -> Result<Option<Authorization>, Error> {
+pub async fn do_user_auth(state: &ServerState, token: UserToken) -> Result<Option<Authorization>, Error> {
     let db = state.db.read.get().await?;
+
+    let bytes = &token[..];
 
     #[rustfmt::skip]
     let row = db.query_opt2(schema::sql! {
@@ -77,7 +94,7 @@ pub async fn do_user_auth(
 
     Ok(match row {
         Some(row) => Some({
-            let auth = Authorization {
+            let auth = Authorization::User {
                 token,
                 user_id: row.user_id()?,
                 expires: row.expires()?,
@@ -92,6 +109,20 @@ pub async fn do_user_auth(
     })
 }
 
-pub async fn do_bot_auth(state: &ServerState, token: SplitBotToken) -> Result<Option<Authorization>, Error> {
+pub async fn do_bot_auth(state: &ServerState, token: SplitBotToken) -> Result<Authorization, Error> {
+    let db = state.db.read.get().await?;
+
+    #[rustfmt::skip]
+    let row = db.query_opt2(schema::sql! {
+        SELECT Apps.Issued AS @Issued
+        FROM Apps WHERE Apps.BotId = #{&token.id as Apps::BotId}
+    }).await?;
+
+    let Some(row) = row else {
+        return Err(Error::NoSession);
+    };
+
+    let issued: u64 = row.issued::<i64>()? as u64;
+
     unimplemented!()
 }

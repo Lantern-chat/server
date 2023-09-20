@@ -5,7 +5,7 @@ pub async fn post_2fa(mut route: Route<ServerState>, auth: Authorization) -> Web
     let form = body::any(&mut route).await?;
 
     Ok(WebResponse::new(
-        crate::backend::api::user::me::mfa::enable_2fa(route.state, auth.user_id, form).await?,
+        crate::backend::api::user::me::mfa::enable_2fa(route.state, auth.user_id(), form).await?,
     ))
 }
 
@@ -14,7 +14,7 @@ pub async fn patch_2fa(mut route: Route<ServerState>, auth: Authorization) -> We
     let form = body::any(&mut route).await?;
 
     Ok(WebResponse::new(
-        crate::backend::api::user::me::mfa::confirm_2fa(route.state, auth.user_id, form).await?,
+        crate::backend::api::user::me::mfa::confirm_2fa(route.state, auth.user_id(), form).await?,
     ))
 }
 
@@ -23,6 +23,6 @@ pub async fn delete_2fa(mut route: Route<ServerState>, auth: Authorization) -> W
     let form = body::any(&mut route).await?;
 
     Ok(WebResponse::new(
-        crate::backend::api::user::me::mfa::remove_2fa(route.state, auth.user_id, form).await?,
+        crate::backend::api::user::me::mfa::remove_2fa(route.state, auth.user_id(), form).await?,
     ))
 }
