@@ -25,9 +25,9 @@ pub struct RoleChecker {
     party_id: Snowflake,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum CheckStatus {
-    Allowed,
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CheckStatus<T> {
+    Allowed(T),
 
     /// The target role wasn't found
     NotFound,
@@ -71,7 +71,7 @@ impl RoleChecker {
         user_roles: &[Snowflake],
         other_roles: &[Snowflake],
         action: UserAction,
-    ) -> CheckStatus {
+    ) -> CheckStatus<()> {
         if user_roles.is_empty() {
             return CheckStatus::NoPerms;
         }
@@ -121,17 +121,22 @@ impl RoleChecker {
             return CheckStatus::AboveRank;
         }
 
-        CheckStatus::Allowed
+        CheckStatus::Allowed(())
     }
 
-    pub fn check_modify(&self, user_roles: &[Snowflake], role_id: Snowflake, form: &PatchRoleForm) -> CheckStatus {
+    pub fn check_modify(
+        &self,
+        user_roles: &[Snowflake],
+        role_id: Snowflake,
+        form: Option<&PatchRoleForm>,
+    ) -> CheckStatus<PartialRole> {
         let Some(target_role_idx) = self.roles.get_index_of(&role_id) else {
             return CheckStatus::NotFound;
         };
 
         let (everyone, ..) = self.everyone();
 
-        let mut permissions = Permissions::empty();
+        let mut permissions = self.roles[everyone].permissions;
         let mut highest = everyone;
 
         for role_id in user_roles {
@@ -155,7 +160,10 @@ impl RoleChecker {
             return CheckStatus::AboveRank;
         }
 
-        if let Some(new_permissions) = form.permissions {
+        if let Some(new_permissions) = match form {
+            Some(form) => form.permissions,
+            None => Some(Permissions::empty()),
+        } {
             // cannot assign permissions you don't have
             if !permissions.contains(new_permissions) {
                 return CheckStatus::InvalidAddition;
@@ -185,6 +193,10 @@ impl RoleChecker {
             }
         }
 
+        let Some(form) = form else {
+            return CheckStatus::Allowed(self.roles[target_role_idx]);
+        };
+
         if let Some(position) = form.position {
             // cannot move a role to be higher than your highest role (inverted priority)
             let (_, highest) = self.roles.get_index(highest).unwrap();
@@ -193,6 +205,6 @@ impl RoleChecker {
             }
         }
 
-        CheckStatus::Allowed
+        CheckStatus::Allowed(self.roles[target_role_idx])
     }
 }
