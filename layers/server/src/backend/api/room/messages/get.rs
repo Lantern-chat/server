@@ -91,7 +91,6 @@ where
                 Depth: Type::INT2,
                 Id: Messages::Id,
                 PartyId: Party::Id,
-                Starred: Type::BOOL,
             }
 
             pub struct SortedEmbeds {
@@ -116,8 +115,7 @@ where
                 SelectedMessages AS (
                     SELECT
                         Messages.Id AS SelectedMessages.Id,
-                        LiveRooms.PartyId AS SelectedMessages.PartyId,
-                        FALSE AS SelectedMessages.Starred
+                        LiveRooms.PartyId AS SelectedMessages.PartyId
                     FROM Messages INNER JOIN LiveRooms ON LiveRooms.Id = Messages.RoomId
                     WHERE Messages.Id = #{msg_id as Messages::Id}
                     LIMIT 1
@@ -139,12 +137,6 @@ where
                         1               AS SelectedMessages.Depth,
                         Messages.Id     AS SelectedMessages.Id,
                         Rooms.PartyId   AS SelectedMessages.PartyId
-
-                        if starred {
-                            // if one of the criteria is to be starred, this will always be true
-                            , TRUE AS SelectedMessages.Starred
-                        }
-
                     FROM LiveMessages AS Messages
 
                     if needs_perms {
@@ -220,13 +212,6 @@ where
                             SelectedMessages.Depth + 1  AS SelectedMessages.Depth,
                             Messages.Id                 AS SelectedMessages.Id,
                             SelectedMessages.PartyId    AS SelectedMessages.PartyId
-                            if starred {
-                                , EXISTS(
-                                    SELECT FROM MessageStars
-                                    WHERE MessageStars.MsgId = Messages.Id
-                                    AND MessageStars.UserId = #{user_id as Users::Id}
-                                ) AS SelectedMessages.Starred
-                            }
                         FROM LiveMessages AS Messages INNER JOIN SelectedMessages ON Messages.ParentId = SelectedMessages.Id
                         WHERE SelectedMessages.Depth < #{recurse as Type::INT2}
 
@@ -238,7 +223,8 @@ where
                 )
             }
         }
-        SELECT
+        // TODO: DISTINCT ON is a temporary fix
+        SELECT DISTINCT ON(SelectedMessages.Id)
             Messages.Id         AS @MsgId,
             Messages.UserId     AS @UserId,
             Messages.RoomId     AS @RoomId,
@@ -260,8 +246,7 @@ where
             } AS @Unavailable,
 
             match req {
-                GetMsgRequest::Many { starred: true, .. } => { SelectedMessages.Starred }
-                GetMsgRequest::Many { starred: false, ref user_id, .. } => { EXISTS(
+                GetMsgRequest::Many { ref user_id, .. } => { EXISTS(
                     SELECT FROM MessageStars
                     WHERE MessageStars.MsgId = Messages.Id
                     AND MessageStars.UserId = #{user_id as Users::Id}
