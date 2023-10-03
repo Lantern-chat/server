@@ -5,7 +5,7 @@ use tokio::sync::{Mutex, OwnedMutexGuard};
 /// Simple concurrent map structure containing locks for any particular snowflake ID
 #[derive(Default, Debug)]
 pub struct IdLockMap {
-    pub map: scc::HashMap<Snowflake, Arc<Mutex<()>>>,
+    pub map: scc::HashMap<Snowflake, Arc<Mutex<()>>, ahash::RandomState>,
 }
 
 impl IdLockMap {
