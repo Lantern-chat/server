@@ -11,8 +11,8 @@ use server::config::{Config, ConfigError};
 use task_runner::TaskRunner;
 
 async fn load_config(args: &CliOptions) -> anyhow::Result<Config> {
-    log::info!("Loading config from: {}", args.config_path.display());
-    let mut config = match Config::load(&args.config_path).await {
+    log::info!("Loading config from: {}", args.config.display());
+    let mut config = match Config::load(&args.config).await {
         Ok(config) => config,
         Err(ConfigError::IOError(e)) if e.kind() == std::io::ErrorKind::NotFound => {
             if args.write_config {
@@ -57,8 +57,8 @@ async fn main() -> anyhow::Result<()> {
     let config = load_config(&args).await?;
 
     if args.write_config {
-        log::info!("Saving config to: {}", args.config_path.display());
-        config.save(&args.config_path).await?;
+        log::info!("Saving config to: {}", args.config.display());
+        config.save(&args.config).await?;
         return Ok(());
     }
 

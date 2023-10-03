@@ -1,59 +1,42 @@
 use std::path::PathBuf;
 
-#[derive(Debug)]
+/// Lantern server
+#[derive(Debug, argh::FromArgs)]
 pub struct CliOptions {
+    /// print version information and exit
+    #[argh(switch, short = 'V')]
+    pub version: bool,
+
+    /// logging level (0 = Info, 1 = Debug, 2 = Trace) [env LANTERN_VERBOSE]
+    #[argh(option, short = 'v')]
     pub verbose: Option<u8>,
-    pub config_path: PathBuf,
+
+    /// specify Lantern configuration file location
+    #[argh(option, default = "PathBuf::from(\"./config.toml\")", short = 'c')]
+    pub config: PathBuf,
+
+    /// writes out the configuration file with overrides having been applied
+    #[argh(switch)]
     pub write_config: bool,
 }
 
 impl CliOptions {
     pub fn parse() -> Result<Self, anyhow::Error> {
-        let mut pargs = pico_args::Arguments::from_env();
+        let mut args: CliOptions = argh::from_env();
 
-        if pargs.contains(["-h", "--help"]) {
-            print!("{HELP}");
-            std::process::exit(0);
-        }
-
-        if pargs.contains(["-V", "--version"]) {
+        if args.version {
             println!("Lantern Server {}", server::built::PKG_VERSION);
             std::process::exit(0);
         }
 
-        // parse verbose parameter or fallback to environment variable
-        let verbose: Option<u8> = match pargs.opt_value_from_str(["-v", "--verbose"])? {
-            Some(v) => Some(v),
-            None => std::env::var("LANTERN_VERBOSE").ok().and_then(|s| s.parse().ok()),
-        };
-
-        let mut config_path = PathBuf::from("./config.toml");
-        if let Some(v) = pargs.opt_value_from_str::<_, String>(["-c", "--config"])? {
-            config_path = PathBuf::from(v);
+        if args.verbose.is_none() {
+            if let Ok(verbose) = std::env::var("LANTERN_VERBOSE") {
+                if let Ok(verbose) = verbose.parse() {
+                    args.verbose = Some(verbose);
+                }
+            }
         }
 
-        let write_config = pargs.contains("--write-config");
-
-        Ok(CliOptions {
-            verbose,
-            config_path,
-            write_config,
-        })
+        Ok(args)
     }
 }
-
-static HELP: &str = "\
-Lantern
-
-USAGE:
-    lantern [OPTIONS]
-
-FLAGS:
-    -h, --help      Prints help information
-    -V, --version   Prints version information
-
-OPTIONS:
-    -c, --config <path>     Specify Lantern configuration file location
-        --write-config      Writes out the configuration file with overrides having been applied
-    -v, --verbose <level>   Logging level (0 = Info, 1 = Debug, 2 = Trace) [env LANTERN_VERBOSE]
-";
