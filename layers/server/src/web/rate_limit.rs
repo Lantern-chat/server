@@ -1,3 +1,4 @@
+use std::hash::{BuildHasher, Hash, Hasher};
 use std::time::{Duration, Instant};
 
 use ftl::{
