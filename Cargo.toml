@@ -4,6 +4,7 @@ smol_str = { git = "https://github.com/Lantern-chat/smol_str", branch = "0.2" }
 thin-vec = { git = "https://github.com/Lantern-chat/thin-vec" }
 failsafe = { git = "https://github.com/Lantern-chat/failsafe-rs" }
 iso8601-timestamp = { git = "https://github.com/Lantern-chat/iso8601-timestamp" }
+rkyv = { git = "https://github.com/Lantern-chat/rkyv", branch = "0.7" }
 
 # Contains fixes for nightly
 # rand = { git = "https://github.com/rust-random/rand" }
@@ -24,8 +25,42 @@ client-sdk = { path = "../client-sdk-rs" }
 
 [workspace]
 resolver = "2"
-members = ["crates/*", "bin/*", "layers/*", "edge/*"]
+members = ["crates/*", "components/*", "edge/*", "bin/*"]
 # exclude = ["edge/embed-worker", "edge/camo"]
+
+[workspace.dependencies]
+db = { path = "crates/db" }
+emoji = { path = "crates/emoji" }
+filesystem = { path = "crates/filesystem" }
+framed = { path = "crates/framed" }
+md_utils = { path = "crates/md_utils" }
+mfa_totp = { path = "crates/mfa_totp" }
+task_runner = { path = "crates/task_runner" }
+util = { path = "crates/util" }
+z85 = { path = "crates/z85" }
+
+auth = { path = "components/auth" }
+config = { path = "components/config" }
+rpc = { path = "components/rpc" }
+schema = { path = "components/schema" }
+
+sdk = { git = "https://github.com/Lantern-chat/client-sdk-rs", default-features = false, package = "client-sdk" }
+
+rkyv = { version = "0.7", features = ["strict", "validation", "arbitrary_enum_discriminant"] }
+serde = { version = "1", features = ["derive"] }
+thorn = { git = "https://github.com/Lantern-chat/thorn" }
+bitflags = "1.2.1"
+
+argh = "0.1"
+dotenv = "0.15.0"
+anyhow = "1"
+
+futures = "0.3"
+tokio = { version = "1", features = ["parking_lot"] }
+tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
+tracing-futures = { version = "0.2.4", default-features = false, features = ["std-future"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "parking_lot", "registry"] }
+tracing-appender = { version = "0.2", features = ["parking_lot"] }
 
 [profile.dev]
 opt-level = 1
@@ -38,6 +73,7 @@ lto = 'fat'
 codegen-units = 1
 
 [profile.dev.build-override]
+codegen-units = 1
 opt-level = 3
 
 [profile.dev.package."*"]
