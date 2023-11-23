@@ -48,25 +48,33 @@ pub struct GifProbe {
     pub height: u16,
 }
 
+///
+#[derive(argh::FromArgs)]
+pub struct Arguments {
+    #[argh(positional)]
+    pub path: PathBuf,
+
+    /// stop processing after this duration is reached
+    #[argh(option, short = 'j')]
+    pub max_duration: Option<u64>,
+
+    /// panic if the given number of pixels is more than this
+    #[argh(option, short = 'd')]
+    pub max_pixels: Option<u64>,
+
+    /// don't decode if the decoder would allocate more than this (in bytes)
+    #[argh(option, short = 'm')]
+    pub max_memory: Option<u32>,
+}
+
 fn main() {
-    let mut args = pico_args::Arguments::from_env();
+    let args: Arguments = argh::from_env();
 
-    let Ok(path) = args.free_from_os_str(|s| PathBuf::try_from(s)) else {
-        panic!("No input file given");
-    };
-
-    // stop processing after this duration is reached
-    let max_duration = args.opt_value_from_str::<_, u64>("-l").unwrap().unwrap_or(u64::MAX);
-    // panic if the given number of pixels is too many
-    let max_pixels = args.opt_value_from_str::<_, u64>("-d").unwrap();
-    // don't decode if the decoder would allocate more than this
-    let max_memory = args.opt_value_from_str::<_, u32>("-m").unwrap();
-
-    let f = std::fs::OpenOptions::new().read(true).write(false).open(&path).expect("To open the file");
+    let f = std::fs::OpenOptions::new().read(true).write(false).open(&args.path).expect("To open the file");
 
     let mut opts = DecodeOptions::new();
 
-    opts.set_memory_limit(MemoryLimit(max_memory.unwrap_or(1024 * 1024 * 20))); // 20 MiB or user-specified
+    opts.set_memory_limit(MemoryLimit(args.max_memory.unwrap_or(1024 * 1024 * 20))); // 20 MiB or user-specified
     opts.set_color_output(ColorOutput::Indexed);
     opts.check_frame_consistency(true);
     opts.allow_unknown_blocks(false);
@@ -80,7 +88,7 @@ fn main() {
         ..GifProbe::default()
     };
 
-    if let Some(m) = max_pixels {
+    if let Some(m) = args.max_pixels {
         if m < (probe.width as u64 * probe.height as u64) {
             panic!("Image too large!");
         }
@@ -103,6 +111,8 @@ fn main() {
             probe.max_colors = probe.max_colors.max(u16::try_from(p.len() / 3).unwrap());
         }
     }
+
+    let max_duration = args.max_duration.unwrap_or(u64::MAX);
 
     while let Some(frame) = d.next_frame_info().expect("to read the frame") {
         if frame.dispose == DisposalMethod::Background && frame.width > 0 && frame.height > 0 {
