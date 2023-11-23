@@ -1,0 +1,10 @@
+[package]
+name = "rpc"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+serde = { workspace = true }
+rkyv = { workspace = true }
+sdk = { workspace = true, features = ["api", "rkyv"] }
+auth = { path = "../auth" }
