@@ -6,19 +6,19 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-util = { path = "../../crates/util" }
+util.workspace = true
+auth.workspace = true
+thorn.workspace = true
 
-sdk = { git = "https://github.com/Lantern-chat/client-sdk-rs", default-features = false, features = ["pg", "api", "framework_utils"], package = "client-sdk" }
-
-thorn = { git = "https://github.com/Lantern-chat/thorn" }
+sdk = { workspace = true, features = ["pg", "api", "framework_utils"] }
 
 smol_str = "0.2"
-serde = { version = "1", features = ["derive"] }
+serde = { workspace = true }
 postgres-types = { version = "0.2.1", features = ["array-impls"] }
 # enum_primitive = "0.1.1"
 # enum-primitive-derive = "0.2.2"
 # num-traits = "0.2"
-bitflags = "1.2.1"
+bitflags = { workspace = true }
 aes = "0.8"
 time = "0.3"
 static_assertions = "1"

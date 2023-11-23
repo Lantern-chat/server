@@ -20,6 +20,7 @@ pub struct PartialRole {
     pub position: u8,
 }
 
+#[derive(Debug)]
 pub struct RoleChecker {
     roles: IndexMap<Snowflake, PartialRole, FxBuildHasher>,
     party_id: Snowflake,
@@ -154,7 +155,7 @@ impl RoleChecker {
 
         if !permissions.contains(Permissions::MANAGE_ROLES) {
             return CheckStatus::NoPerms;
-        };
+        }
 
         if target_role_idx <= highest {
             return CheckStatus::AboveRank;
@@ -206,5 +207,101 @@ impl RoleChecker {
         }
 
         CheckStatus::Allowed(self.roles[target_role_idx])
+    }
+
+    pub fn compute_new_positions(&self, role_id: Snowflake, new_position: u8) -> Vec<(Snowflake, u8)> {
+        let target_role = self.roles.get(&role_id).expect("Unable to find target role");
+
+        let mut new_positions = Vec::new();
+
+        if new_position == target_role.position {
+            return new_positions;
+        }
+
+        if new_position < target_role.position {
+            let (start, end) = (new_position, target_role.position);
+
+            new_positions.push((role_id, start));
+
+            for (role_id, role) in self.roles.iter() {
+                if role.position < start {
+                    continue;
+                }
+
+                if role.position >= end {
+                    break;
+                }
+
+                new_positions.push((*role_id, role.position + 1));
+            }
+        } else {
+            let (start, end) = (target_role.position, new_position);
+
+            for (role_id, role) in self.roles.iter() {
+                if role.position <= start {
+                    continue;
+                }
+
+                if role.position > end {
+                    break;
+                }
+
+                new_positions.push((*role_id, role.position - 1));
+            }
+
+            new_positions.push((role_id, end));
+        };
+
+        if new_positions.len() == 1 {
+            return Vec::new();
+        }
+
+        new_positions
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::num::NonZeroU64;
+
+    use super::*;
+
+    #[test]
+    fn test_reorder() {
+        fn r(position: u8, id: Option<Snowflake>) -> (Snowflake, PartialRole) {
+            (
+                id.unwrap_or(Snowflake(NonZeroU64::new(position as u64).unwrap())),
+                PartialRole {
+                    permissions: Permissions::empty(),
+                    position,
+                },
+            )
+        }
+
+        let party_id = Snowflake(NonZeroU64::new(6).unwrap());
+
+        let roles = [
+            r(1, None),           // 0
+            r(2, None),           // 1
+            r(3, None),           // 2
+            r(4, None),           // 3
+            r(5, None),           // 4
+            r(6, Some(party_id)), // 5
+        ];
+
+        let checker = RoleChecker::new(party_id, roles);
+
+        let t = |from: usize, to: u8| {
+            println!(
+                "{from}->{to}: {:?}",
+                checker.compute_new_positions(roles[from - 1].0, to)
+            );
+        };
+
+        t(3, 5);
+        t(6, 2);
+        t(1, 1);
+        t(1, 0);
+        t(6, 7);
     }
 }

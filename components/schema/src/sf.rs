@@ -89,7 +89,7 @@ pub trait SnowflakeExt {
         let incr =
             INCR.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |incr| Some((incr + 1) & 0xFFF)).unwrap();
 
-        let mut max_ms = TIME.fetch_max(ms, Ordering::SeqCst);
+        let mut max_ms = TIME.fetch_max(ms, Ordering::SeqCst).max(ms);
 
         // clock went backwards and incr is/was at max
         if incr == 0xFFF && max_ms > ms {
@@ -190,5 +190,12 @@ mod test {
     #[test]
     fn test_snowflake_ser() {
         assert!(serde_json::to_string(&Snowflake::now()).unwrap().contains('"'));
+    }
+
+    #[test]
+    fn test_many_snowflakes() {
+        for _ in 0..100 {
+            Snowflake::now();
+        }
     }
 }

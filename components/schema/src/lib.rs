@@ -1,6 +1,11 @@
 #![cfg_attr(not(debug_assertions), allow(unused_mut, unused_variables, unused_imports))]
 #![allow(clippy::single_char_add_str)]
 
+#[macro_use]
+extern crate serde;
+
+pub extern crate auth;
+
 pub mod codes;
 pub use codes::*;
 
@@ -19,12 +24,11 @@ pub mod sf;
 pub use sf::{Snowflake, SnowflakeExt};
 
 pub mod asset;
+pub mod email;
 pub mod flags;
 pub mod names;
 pub mod roles;
 pub mod search;
-
-pub mod auth;
 
 pub fn has_all_permission_bits(
     perms: sdk::models::Permissions,
