@@ -1,43 +1,22 @@
-#[derive(Debug)]
-pub struct CliOptions {
-    pub db: String,
-    pub out: Option<String>,
-    pub schema: Option<String>,
+/// Print Schema
+#[derive(argh::FromArgs)]
+pub struct Arguments {
+    /// database connection string for PostgreSQL
+    #[argh(option, short = 'd')]
+    db: String,
+
+    /// where to store generated schema file
+    #[argh(option, short = 'o')]
+    out: Option<std::path::PathBuf>,
+
+    /// specific database schema to use
+    #[argh(option, short = 's')]
+    schema: Option<String>,
 }
-
-static HELP: &str = r#"
-Print Schema
-
-USAGE:
-    print_schema -d <db_str> [OPTIONS]
-
-FLAGS:
-    -h, --help      Prints help information
-
-REQUIRED:
-    -d, --db  <db_str>  PostgreSQL database connection string
-
-OPTIONS:
-    -o, --out <path>    Where to store generated schema file
-    -s, --schema <schema>   Specific database schema to use
-"#;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let args = {
-        let mut pargs = pico_args::Arguments::from_env();
-
-        if pargs.contains(["-h", "--help"]) {
-            print!("{HELP}");
-            return Ok(());
-        }
-
-        CliOptions {
-            out: pargs.opt_value_from_str(["-o", "--out"])?,
-            db: pargs.value_from_str(["-d", "--db"])?,
-            schema: pargs.opt_value_from_str(["-s", "--schema"])?,
-        }
-    };
+    let args: Arguments = argh::from_env();
 
     use db::pool::{Object, Pool};
 

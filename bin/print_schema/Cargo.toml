@@ -2,18 +2,17 @@
 name = "print_schema"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+publish = false
 
 [dependencies]
-db = { path = "../../crates/db" }
+thorn = { workspace = true, features = ["generate"] }
+tokio = { workspace = true, features = ["full"] }
 
-thorn = { git = "https://github.com/Lantern-chat/thorn", features = ["generate"] }
+db.workspace = true
 
-tokio = { version = "1", features = ["full", "parking_lot"] }
-futures = "0.3"
-tracing = { version = "0.1", default-features = false, features = ["log", "std"] }
-tracing-futures = { version = "0.2.4", default-features = false, features = ["std-future"] }
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-anyhow = "1"
-pico-args = "0.5.0"
+futures.workspace = true
+tracing.workspace = true
+tracing-futures.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+argh.workspace = true
