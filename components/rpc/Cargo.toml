@@ -6,5 +6,6 @@ edition = "2021"
 [dependencies]
 serde = { workspace = true }
 rkyv = { workspace = true }
+bytecheck = { workspace = true }
 sdk = { workspace = true, features = ["api", "rkyv"] }
 auth = { path = "../auth" }

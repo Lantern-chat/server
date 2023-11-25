@@ -3,6 +3,8 @@ use sdk::api::commands::all::*;
 #[derive(Debug, rkyv::Archive, rkyv::Serialize)]
 pub struct Message {
     pub proc: Procedure,
+
+    #[with(rkyv::with::Niche)]
     pub auth: Option<Box<crate::auth::Authorization>>,
 }
 
