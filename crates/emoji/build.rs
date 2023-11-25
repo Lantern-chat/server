@@ -44,7 +44,7 @@ pub fn minimize(s: &str) -> Cow<str> {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = Path::new(&env::var("OUT_DIR")?).join("codegen.rs");
-    let mut file = BufWriter::new(File::create(&path)?);
+    let mut file = BufWriter::new(File::create(path)?);
 
     println!("cargo:rerun-if-changed=emoji-test.txt");
     let src = include_str!("./emoji-test.txt");
@@ -79,9 +79,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let emoji = &line[..emoji_end_idx];
 
         // go past the emoji + ' E', trim unicode version (it's not whitespace), then trim whitespace to get the full name
-        let name = line[(emoji_end_idx + 2)..]
-            .trim_start_matches(|c: char| !c.is_ascii_whitespace())
-            .trim();
+        let name = line[(emoji_end_idx + 2)..].trim_start_matches(|c: char| !c.is_ascii_whitespace()).trim();
 
         match emojis.entry(name) {
             Entry::Vacant(v) => {
@@ -154,9 +152,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut forms_to_full_map = phf_codegen::Map::new();
 
     for (form, emoji) in forms_to_full.iter() {
-        let idx = emoji_to_idx
-            .get(emoji)
-            .unwrap_or_else(|| panic!("Indices not found for emoji: {}", emoji));
+        let idx = emoji_to_idx.get(emoji).unwrap_or_else(|| panic!("Indices not found for emoji: {}", emoji));
 
         forms_to_full_map.entry(form.as_ref(), &idx.to_string());
     }
