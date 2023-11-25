@@ -30,7 +30,8 @@ fn create_filter(verbose: Option<u8>, level: Option<LevelFilter>) -> anyhow::Res
         .add_directive("tokio_util::codec=info".parse()?);
 
     if !extreme_trace {
-        filter = filter.add_directive("server::tasks=debug".parse()?);
+        // TODO: Would this be good enough? Some other standard module name?
+        filter = filter.add_directive(format!("{}::tasks=debug", env!("CARGO_PKG_NAME")).parse()?);
     }
 
     Ok(filter)
