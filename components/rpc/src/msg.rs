@@ -15,6 +15,22 @@ macro_rules! decl_procs {
         pub enum Procedure {
             $($cmd(Box<$cmd>) = $code,)*
         }
+
+        $(
+            impl From<$cmd> for Procedure {
+                #[inline]
+                fn from(cmd: $cmd) -> Procedure {
+                    Procedure::$cmd(Box::new(cmd))
+                }
+            }
+
+            impl From<Box<$cmd>> for Procedure {
+                #[inline]
+                fn from(cmd: Box<$cmd>) -> Procedure {
+                    Procedure::$cmd(cmd)
+                }
+            }
+        )*
     };
 }
 
