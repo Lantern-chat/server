@@ -1,4 +1,4 @@
-section! {
+config::section! {
     #[serde(default)]
     pub struct Services {
         pub hcaptcha_secret: String     = "0x0000000000000000000000000000000000000000".to_owned()   => "HCAPTCHA_SECRET",

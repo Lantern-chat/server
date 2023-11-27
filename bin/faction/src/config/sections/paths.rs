@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-section! {
+config::section! {
     #[serde(default)]
     pub struct Paths {
         /// Path to where user data will be stored
@@ -26,5 +26,10 @@ section! {
 
         /// Where to write logfiles to. Automatically rotated.
         pub log_dir: PathBuf = "./logs".into() => "LANTERN_LOG_DIR",
+
+        /// WHere to store temporary unencrypted files
+        ///
+        /// Typically this would be on a tmpfs filesystem for security and speed.
+        pub tmp_dir: PathBuf = "./tmp".into() => "LANTERN_UNSAFE_TMP_DIR",
     }
 }

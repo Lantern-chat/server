@@ -38,10 +38,11 @@ mfa_totp = { path = "crates/mfa_totp" }
 task_runner = { path = "crates/task_runner" }
 util = { path = "crates/util" }
 z85 = { path = "crates/z85" }
+process_utils = { path = "crates/process_utils" }
 
 common = { path = "components/common" }
-auth = { path = "components/auth" }
 config = { path = "components/config" }
+auth = { path = "components/auth" }
 rpc = { path = "components/rpc" }
 schema = { path = "components/schema" }
 

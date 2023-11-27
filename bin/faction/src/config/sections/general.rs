@@ -1,10 +1,10 @@
-use super::util;
+use config::util;
 
 use uuid::Uuid;
 
-const HALF_GIB_AS_KIB: u64 = crate::GIBIBYTE as u64 / (2 * 1024);
+const HALF_GIB_AS_KIB: u64 = config::GIBIBYTE as u64 / (2 * 1024);
 
-section! {
+config::section! {
     #[serde(default)]
     pub struct General {
         /// Name of your service
@@ -32,31 +32,31 @@ section! {
         /// Setting this to 0 will use the default value.
         pub cpu_limit: u64 = 0u64 => "LANTERN_CPU_LIMIT" | util::parse[0u64],
     }
-}
 
-impl General {
-    pub fn configure(&mut self) {
-        use schema::sf;
+    impl Extra {
+        fn configure(&mut self) {
+            use schema::sf;
 
-        unsafe {
-            sf::INST = self.instance_id;
-            sf::WORK = self.worker_id;
-        }
+            unsafe {
+                sf::INST = self.instance_id;
+                sf::WORK = self.worker_id;
+            }
 
-        if self.cpu_limit == 0 {
-            self.cpu_limit = num_cpus::get() as u64;
+            if self.cpu_limit == 0 {
+                self.cpu_limit = num_cpus::get() as u64;
 
-            log::info!("Setting CPU limit to {}", self.cpu_limit);
-        }
+                log::info!("Setting CPU limit to {}", self.cpu_limit);
+            }
 
-        if self.memory_limit == 0 {
-            self.memory_limit = match process_utils::get_sysinfo() {
-                None => HALF_GIB_AS_KIB,
-                // divide by 2 and convert to KiB
-                Some(sysinfo) => sysinfo.total_memory / (2 * 1024),
-            };
+            if self.memory_limit == 0 {
+                self.memory_limit = match process_utils::get_sysinfo() {
+                    None => HALF_GIB_AS_KIB,
+                    // divide by 2 and convert to KiB
+                    Some(sysinfo) => sysinfo.total_memory / (2 * 1024),
+                };
 
-            log::info!("Setting memory limit to {} KiB", self.memory_limit);
+                log::info!("Setting memory limit to {} KiB", self.memory_limit);
+            }
         }
     }
 }

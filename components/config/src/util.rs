@@ -4,6 +4,8 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::str::FromStr;
 
+pub extern crate serde_aux as aux;
+
 pub fn parse<T: FromStr>(s: &str, default: T) -> T {
     s.parse().unwrap_or(default)
 }
@@ -142,6 +144,13 @@ pub mod duration {
         seq.end()
     }
 
+    // pub fn serialize<S>(value: &Duration, serializer: S) -> Result<S::Ok, S::Error>
+    // where
+    //     S: Serializer,
+    // {
+    //     serializer.serialize_str(&humantime::format_duration(value.clone()).to_string())
+    // }
+
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
     where
         D: Deserializer<'de>,
@@ -152,7 +161,7 @@ pub mod duration {
             type Value = Duration;
 
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("integer for whole seconds or two-element array for [seconds, nanoseconds]")
+                f.write_str("positive integer for whole seconds or two-element array for [seconds, nanoseconds]")
             }
 
             fn visit_u64<E: de::Error>(self, value: u64) -> Result<Duration, E> {
@@ -175,71 +184,38 @@ pub mod duration {
 
                 Ok(Duration::new(seconds, value.next_element::<u32>()?.unwrap_or(0)))
             }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                // TODO: Revisit this. humantime uses 30.44 days per month, which gives ugly results
+                humantime::parse_duration(v).map_err(|e| E::custom(e))
+            }
         }
 
         deserializer.deserialize_any(Visitor)
     }
 }
 
-// TODO: Revisit this. humantime uses 30.44 days per month, which gives ugly results
-/*
-pub mod duration {
-    use super::*;
-
-    use std::time::Duration;
-
-    pub fn serialize<S>(value: &Duration, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&humantime::format_duration(value.clone()).to_string())
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct Visitor;
-
-        impl<'de> de::Visitor<'de> for Visitor {
-            type Value = Duration;
-
-            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                f.write_str("duration string such as \"2d 1m 43s\"")
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<Duration, E>
-            where
-                E: de::Error,
-            {
-                humantime::parse_duration(value).map_err(|e| E::custom(e))
-            }
-        }
-
-        deserializer.deserialize_str(Visitor)
-    }
-}
- */
-
 // TODO: Revisit this in a way that actually preserves the values, as bytesize rounds off and loses all precision...
-/*
 pub mod bytes {
     use super::*;
 
     use bytesize::ByteSize;
 
-    pub fn serialize<S, T>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-        T: TryInto<u64> + Copy,
-    {
-        let bytes = match (*value).try_into() {
-            Ok(value) => ByteSize(value),
-            Err(_) => return Err(serde::ser::Error::custom("Could not convert field to u64")),
-        };
+    // pub fn serialize<S, T>(value: &T, serializer: S) -> Result<S::Ok, S::Error>
+    // where
+    //     S: Serializer,
+    //     T: TryInto<u64> + Copy,
+    // {
+    //     let bytes = match (*value).try_into() {
+    //         Ok(value) => ByteSize(value),
+    //         Err(_) => return Err(serde::ser::Error::custom("Could not convert field to u64")),
+    //     };
 
-        serializer.serialize_str(&bytes.to_string())
-    }
+    //     serializer.serialize_str(&bytes.to_string())
+    // }
 
     pub fn deserialize<'de, D, T>(deserializer: D) -> Result<T, D::Error>
     where
@@ -268,8 +244,6 @@ pub mod bytes {
             }
 
             fn visit_str<E: de::Error>(self, value: &str) -> Result<u64, E> {
-                use std::str::FromStr;
-
                 match ByteSize::from_str(value) {
                     Ok(value) => Ok(value.0),
                     Err(e) => Err(E::custom(e)),
@@ -279,13 +253,8 @@ pub mod bytes {
 
         deserializer.deserialize_any(Visitor).and_then(|bytes| {
             bytes.try_into().map_err(|_| {
-                de::Error::custom(format!(
-                    "{} cannot fit into {}",
-                    bytes,
-                    std::any::type_name::<T>()
-                ))
+                de::Error::custom(format!("{} cannot fit into {}", bytes, std::any::type_name::<T>()))
             })
         })
     }
 }
-*/

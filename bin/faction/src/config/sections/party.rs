@@ -1,21 +1,21 @@
 use std::ops::Range;
 
-section! {
+config::section! {
     #[serde(default)]
     pub struct Party {
-        #[serde(with = "super::util::range")]
+        #[serde(with = "config::util::range")]
         pub party_name_len: Range<usize>     = 3..64,
 
-        #[serde(with = "super::util::range")]
+        #[serde(with = "config::util::range")]
         pub party_description_len: Range<usize> = 1..1024,
 
-        #[serde(with = "super::util::range")]
+        #[serde(with = "config::util::range")]
         pub room_name_len: Range<usize>      = 3..64,
 
-        #[serde(with = "super::util::range")]
+        #[serde(with = "config::util::range")]
         pub room_topic_len: Range<usize>    = 1..512,
 
-        #[serde(with = "super::util::range")]
+        #[serde(with = "config::util::range")]
         pub role_name_len: Range<usize>     = 1..64,
 
         /// Max rooms that are not deleted at any given time

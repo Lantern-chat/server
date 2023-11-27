@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-section! {
+config::section! {
     #[serde(default)]
     pub struct Database {
         /// Database connection string

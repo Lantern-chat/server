@@ -1,11 +1,14 @@
 extern crate tracing as log;
+
+pub mod config;
+
+/*
 use cli::CliOptions;
 use db::{pg::NoTls, DatabasePools};
 use std::sync::Arc;
 
 pub mod allocator;
 pub mod cli;
-pub mod logging;
 
 use server::config::{Config, ConfigError};
 use task_runner::TaskRunner;
@@ -49,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
     let args = CliOptions::parse()?;
 
     // temporary logger until info needed for global logger is loaded
-    let (dispatch, _) = logging::generate(args.verbose, None)?;
+    let (dispatch, _) = common::logging::generate(args.verbose, None)?;
     let _log_guard = log::dispatcher::set_default(&dispatch);
 
     log::debug!("Arguments: {:?}", args);
@@ -160,3 +163,4 @@ impl<T> Drop for LogDropWrapper<T> {
         println!("Goodbye.");
     }
 }
+*/
