@@ -1,6 +1,12 @@
+#[macro_use]
+extern crate serde;
+
 extern crate tracing as log;
 
+pub mod allocator;
 pub mod config;
+
+fn main() {}
 
 /*
 use cli::CliOptions;

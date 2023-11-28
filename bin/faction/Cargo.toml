@@ -6,7 +6,7 @@ edition = "2021"
 publish = false
 
 [features]
-memory_metrics = []
+memory_metrics = ["tracking_allocator/enable"]
 default = ["memory_metrics"]
 
 [dependencies]
@@ -21,6 +21,7 @@ task_runner.workspace = true
 db.workspace = true
 util.workspace = true
 process_utils.workspace = true
+tracking_allocator.workspace = true
 
 futures.workspace = true
 tracing.workspace = true

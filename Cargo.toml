@@ -39,6 +39,7 @@ task_runner = { path = "crates/task_runner" }
 util = { path = "crates/util" }
 z85 = { path = "crates/z85" }
 process_utils = { path = "crates/process_utils" }
+tracking_allocator = { path = "crates/tracking_allocator" }
 
 common = { path = "components/common" }
 config = { path = "components/config" }
