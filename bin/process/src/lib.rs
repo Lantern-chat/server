@@ -1,6 +1,10 @@
 #[macro_use]
 extern crate serde;
 
+pub mod built {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum EncodingFormat {
     Jpeg,

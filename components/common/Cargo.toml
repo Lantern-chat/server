@@ -6,9 +6,16 @@ publish = false
 
 [dependencies]
 tokio = { workspace = true, features = ["full"] }
+sdk = { workspace = true, default-features = false }
+emoji.workspace = true
 
+scc.workspace = true
+ahash.workspace = true
 tracing.workspace = true
 tracing-futures.workspace = true
 tracing-subscriber.workspace = true
 tracing-appender.workspace = true
 anyhow.workspace = true
+
+arc-swap = "1.2.0"
+smol_str = "0.2"

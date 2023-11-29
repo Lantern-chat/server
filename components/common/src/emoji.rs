@@ -22,6 +22,7 @@ struct EmojiMapInner {
 }
 
 #[derive(Debug, Default)]
+#[repr(transparent)]
 pub struct EmojiMap(ArcSwap<EmojiMapInner>);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

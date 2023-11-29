@@ -12,8 +12,8 @@ config::section! {
     pub struct Upload {
         pub max_upload_size: u64                = i32::MAX as u64, // 2 GiB
         pub max_upload_chunk_size: i32          = config::MIBIBYTE as i32 * 8, // 8 MiB
-        pub monthly_upload_quota: i64           = config::GIBIBYTE as i64 * 1, // 1 GiB
-        pub monthly_premium_upload_quota: i64   = config::GIBIBYTE as i64 * 6, // 6 GiB
+        pub monthly_upload_quota: i64           = config::GIBIBYTE,            // 1 GiB
+        pub monthly_premium_upload_quota: i64   = config::GIBIBYTE        * 6, // 6 GiB
 
         pub max_avatar_size: i32                = config::MIBIBYTE as i32 * 4, // 4 MiB
         pub max_banner_size: i32                = config::MIBIBYTE as i32 * 8, // 8 MiB

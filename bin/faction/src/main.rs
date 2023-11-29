@@ -3,8 +3,15 @@ extern crate serde;
 
 extern crate tracing as log;
 
+pub mod built {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
+}
+
 pub mod allocator;
 pub mod config;
+pub mod state;
+
+pub use crate::state::ServerState;
 
 fn main() {}
 

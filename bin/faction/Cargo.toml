@@ -9,7 +9,14 @@ publish = false
 memory_metrics = ["tracking_allocator/enable"]
 default = ["memory_metrics"]
 
+[build-dependencies]
+built.workspace = true
+
 [dependencies]
+sdk = { workspace = true }
+rpc.workspace = true
+smol_str = { version = "0.2", features = ["serde", "pg"] }
+
 tokio = { workspace = true, features = ["full"] }
 serde.workspace = true
 
@@ -32,6 +39,11 @@ dotenv.workspace = true
 anyhow.workspace = true
 argh.workspace = true
 
+hashbrown.workspace = true
+triomphe = "0.1.8"
+scc = "2"
+ahash = "0.8.0"
+arc-swap = "1.2.0"
 num_cpus = "1.13"
 aes = "0.8"
 sha1 = "0.10.5"
