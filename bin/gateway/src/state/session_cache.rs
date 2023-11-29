@@ -17,7 +17,7 @@ struct PartialUserAuthorization {
 #[derive(Debug, Clone, Copy)]
 struct PartialBotAuthorization {
     issued: Timestamp,
-    flags: (),
+    _flags: (),
 }
 
 #[derive(Default)]
@@ -61,7 +61,7 @@ impl AuthCache {
                 }
             }
             Authorization::Bot { bot_id, issued } => {
-                let partial = PartialBotAuthorization { issued, flags: () };
+                let partial = PartialBotAuthorization { issued, _flags: () };
 
                 if let Ok(_) = self.bots.insert_async(bot_id, partial).await {
                     log::trace!("Cached bot auth: {}", bot_id);

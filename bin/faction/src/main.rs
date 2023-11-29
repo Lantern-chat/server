@@ -8,6 +8,7 @@ pub mod built {
 }
 
 pub mod allocator;
+pub mod api;
 pub mod config;
 pub mod state;
 

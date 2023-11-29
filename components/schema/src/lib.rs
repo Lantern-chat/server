@@ -5,6 +5,7 @@
 extern crate serde;
 
 pub extern crate auth;
+pub extern crate thorn;
 
 pub mod codes;
 pub use codes::*;
@@ -43,5 +44,5 @@ pub fn has_all_permission_bits(
 /// Wrapper around [`thorn::sql!`] which injects `use schema::*` ahead of the declaration
 #[macro_export]
 macro_rules! sql {
-    ($($tt:tt)*) => { thorn::sql! { use $crate::*; $($tt)* } };
+    ($($tt:tt)*) => { $crate::thorn::sql! { use $crate::*; $($tt)* } };
 }

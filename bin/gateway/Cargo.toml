@@ -1,0 +1,32 @@
+[package]
+name = "gateway"
+version = "0.1.0"
+authors = ["novacrazy <novacrazy@gmail.com>"]
+edition = "2021"
+publish = false
+
+[features]
+memory_metrics = []
+default = ["memory_metrics"]
+
+[build-dependencies]
+built.workspace = true
+
+[dependencies]
+tokio = { workspace = true, features = ["full"] }
+
+common.workspace = true
+task_runner.workspace = true
+db.workspace = true
+util.workspace = true
+futures.workspace = true
+tracing.workspace = true
+tracing-futures.workspace = true
+tracing-subscriber.workspace = true
+tracing-appender.workspace = true
+dotenv.workspace = true
+anyhow.workspace = true
+argh.workspace = true
+
+[target.'cfg(all(unix, any(target_arch = "x86", target_arch = "x86_64")))'.dependencies]
+tikv-jemallocator = { version = "0.5" }

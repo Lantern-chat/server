@@ -1,7 +1,7 @@
 #![allow(clippy::redundant_closure)]
 
-pub mod admin;
-pub mod auth;
+//pub mod admin;
+//pub mod auth;
 pub mod perm;
 
 #[derive(Debug, Clone, Copy)]
@@ -10,6 +10,7 @@ pub enum SearchMode<'a> {
     Many(&'a [schema::Snowflake]),
 }
 
+/*
 pub mod gateway {
     pub mod presence;
     pub mod ready;
@@ -104,3 +105,4 @@ pub mod metrics;
 pub mod oembed {
     pub mod get;
 }
+ */
