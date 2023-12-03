@@ -1,13 +1,21 @@
 use serde::de::{self, Deserialize, DeserializeOwned, Deserializer};
 use serde::ser::{Serialize, SerializeSeq, Serializer};
-use std::fmt;
-use std::marker::PhantomData;
-use std::str::FromStr;
+use std::{fmt, marker::PhantomData, net::SocketAddr, str::FromStr};
 
 pub extern crate serde_aux as aux;
 
 pub fn parse<T: FromStr>(s: &str, default: T) -> T {
     s.parse().unwrap_or(default)
+}
+
+pub fn parse_address(value: &str) -> SocketAddr {
+    SocketAddr::from_str(&value.replace("localhost", "127.0.0.1")).unwrap()
+}
+
+pub fn parse_hex_key<const N: usize>(value: &str, strict: bool) -> [u8; N] {
+    let mut key = [0; N];
+    hex_key::parse_hex_key_inner(&mut key, value, strict).expect("Error parsing key");
+    key
 }
 
 pub mod hex_key {

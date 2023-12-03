@@ -13,12 +13,23 @@ default = ["memory_metrics"]
 built.workspace = true
 
 [dependencies]
+sdk = { workspace = true }
+rpc.workspace = true
+smol_str = { version = "0.2", features = ["serde", "pg"] }
+
 tokio = { workspace = true, features = ["full"] }
+serde.workspace = true
+
+schema.workspace = true
 
 common.workspace = true
+config.workspace = true
 task_runner.workspace = true
 db.workspace = true
 util.workspace = true
+process_utils.workspace = true
+tracking_allocator.workspace = true
+
 futures.workspace = true
 tracing.workspace = true
 tracing-futures.workspace = true
@@ -27,6 +38,18 @@ tracing-appender.workspace = true
 dotenv.workspace = true
 anyhow.workspace = true
 argh.workspace = true
+
+hashbrown.workspace = true
+triomphe = "0.1.8"
+scc = "2"
+ahash = "0.8.0"
+arc-swap = "1.2.0"
+num_cpus = "1.13"
+aes = "0.8"
+sha1 = "0.10.5"
+hmac = "0.12.1"
+thiserror = "1"
+uuid = { version = "1.1.2", features = ["v4", "serde"] }
 
 [target.'cfg(all(unix, any(target_arch = "x86", target_arch = "x86_64")))'.dependencies]
 tikv-jemallocator = { version = "0.5" }

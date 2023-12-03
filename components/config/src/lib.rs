@@ -4,6 +4,7 @@ pub extern crate paste;
 pub extern crate serde;
 pub extern crate tracing;
 
+pub mod general;
 pub mod util;
 
 pub const KIBIBYTE: i64 = 1024;
@@ -33,7 +34,7 @@ macro_rules! section {
             $(#[$field_meta])*
             $(
                 #[doc = ""]
-                #[doc = "**Overridden by the `" $field_env "` environment variable.**"]
+                #[doc = "**Set by the `" $field_env "` environment variable.**"]
             )?
             $field_vis $field_name: $field_ty,
         )*}

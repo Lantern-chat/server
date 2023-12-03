@@ -1,20 +1,10 @@
-use config::util;
+use crate::util;
 
-use uuid::Uuid;
+const HALF_GIB_AS_KIB: u64 = crate::GIBIBYTE as u64 / (2 * 1024);
 
-const HALF_GIB_AS_KIB: u64 = config::GIBIBYTE as u64 / (2 * 1024);
-
-config::section! {
+crate::section! {
     #[serde(default)]
     pub struct General {
-        /// Name of your service
-        pub server_name: String = "Lantern Chat".to_owned() => "LANTERN_SERVER_NAME",
-
-        /// Unique identifier for your service, across all instances
-        ///
-        /// This is like a domain name, but should remain the same if the domain ever changes
-        pub service_uuid: Uuid = Uuid::new_v4() => "LANTERN_SERVICE_UUID" | util::parse[Uuid::new_v4()],
-
         /// ID of the sharded instance, just keep it at 0 if using one instance
         pub instance_id: u16 = 0 => "LANTERN_INSTANCE_ID" | util::parse[0u16],
 
@@ -45,7 +35,7 @@ config::section! {
             if self.cpu_limit == 0 {
                 self.cpu_limit = num_cpus::get() as u64;
 
-                log::info!("Setting CPU limit to {}", self.cpu_limit);
+                tracing::info!("Setting CPU limit to {}", self.cpu_limit);
             }
 
             if self.memory_limit == 0 {
@@ -55,7 +45,7 @@ config::section! {
                     Some(sysinfo) => sysinfo.total_memory / (2 * 1024),
                 };
 
-                log::info!("Setting memory limit to {} KiB", self.memory_limit);
+                tracing::info!("Setting memory limit to {} KiB", self.memory_limit);
             }
         }
     }

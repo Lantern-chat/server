@@ -1,3 +1,7 @@
+#![cfg_attr(not(debug_assertions), allow(unused_mut, unused_variables, unused_imports))]
+#![allow(clippy::redundant_pattern_matching, clippy::identity_op, clippy::redundant_closure)]
+#![deny(deprecated)]
+
 #[macro_use]
 extern crate serde;
 
@@ -14,7 +18,17 @@ pub mod state;
 
 pub use crate::state::ServerState;
 
-fn main() {}
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> anyhow::Result<()> {
+    println!("Build time: {}", built::BUILT_TIME_UTC);
+
+    dotenv::dotenv()?;
+
+    let mut config = config::Config::default();
+    ::config::Configuration::configure(&mut config);
+
+    Ok(())
+}
 
 /*
 use cli::CliOptions;
@@ -27,41 +41,9 @@ pub mod cli;
 use server::config::{Config, ConfigError};
 use task_runner::TaskRunner;
 
-async fn load_config(args: &CliOptions) -> anyhow::Result<Config> {
-    log::info!("Loading config from: {}", args.config.display());
-    let mut config = match Config::load(&args.config).await {
-        Ok(config) => config,
-        Err(ConfigError::IOError(e)) if e.kind() == std::io::ErrorKind::NotFound => {
-            if args.write_config {
-                log::warn!("Config file not found, but `--write-config` given, therefore assuming defaults");
-
-                Config::default()
-            } else {
-                let err = concat!(
-                    "Config file not found, re-run with `--write-config` to generate default configuration\n\t",
-                    "Or specify a config file path with `--config ./somewhere/config.toml`"
-                );
-
-                log::error!("{}", err);
-                return Err(anyhow::format_err!("{}", err));
-            }
-        }
-        Err(e) => return Err(e.into()),
-    };
-
-    log::info!("Applying environment overrides to configuration");
-    config.apply_overrides();
-
-    config.configure();
-
-    Ok(config)
-}
-
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
-    println!("Build time: {}", server::built::BUILT_TIME_UTC);
 
-    dotenv::dotenv().ok();
 
     let args = CliOptions::parse()?;
 

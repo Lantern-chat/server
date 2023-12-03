@@ -119,6 +119,80 @@ CREATE SEQUENCE lantern.event_id AS bigint;
 -------------- TABLES ------------------
 ----------------------------------------
 
+CREATE TABLE lantern.config (
+    config_id           uuid        NOT NULL DEFAULT gen_random_uuid(),
+    config_name         text        NOT NULL,
+    last_updated        timestamptz NOT NULL DEFAULT now(),
+
+    -- General settings
+    server_name         text        NOT NULL DEFAULT 'Lantern Chat',
+    service_uuid        uuid        NOT NULL DEFAULT gen_random_uuid(), -- v4
+
+    -- Web settings
+    cdn_domain          text        NOT NULL DEFAULT 'cdn.lanternchat.net',
+    strict_cdn          boolean     NOT NULL DEFAULT TRUE,
+    base_domain         text        NOT NULL DEFAULT 'lantern.chat',
+    secure_web          boolean     NOT NULL DEFAULT TRUE,
+    camo_enable         boolean     NOT NULL DEFAULT TRUE,
+    fs_cache_interval   interval    NOT NULL DEFAULT '2 Minutes',
+    fs_cache_max_age    interval    NOT NULL DEFAULT '1 Day',
+
+    -- Account settings
+    session_duration    interval    NOT NULL DEFAULT '90 Days',
+    minimum_age         int2        NOT NULL DEFAULT 13,
+    password_length     int4range   NOT NULL DEFAULT int4range(8, 9999),
+    username_length     int4range   NOT NULL DEFAULT int4range(3, 96),
+    mfa_backup_count    int2        NOT NULL DEFAULT 8,
+    mfa_pending_time    interval    NOT NULL DEFAULT '30 Minutes',
+
+    -- User settings
+    reltime_rnd_factor  float4      NOT NULL DEFAULT 0.1,
+    max_status_len      int2        NOT NULL DEFAULT 128,
+    max_bio_len         int2        NOT NULL DEFAULT 1024,
+
+    -- Party settings
+    party_name_len      int4range   NOT NULL DEFAULT int4range(3, 96),
+    party_desc_len      int4range   NOT NULL DEFAULT int4range(1, 1024),
+    room_name_len       int4range   NOT NULL DEFAULT int4range(3, 64),
+    room_topic_len      int4range   NOT NULL DEFAULT int4range(1, 512),
+    role_name_len       int4range   NOT NULL DEFAULT int4range(1, 64),
+    max_active_rooms    int2        NOT NULL DEFAULT 128,
+    max_total_rooms     int2        NOT NULL DEFAULT 1024,
+
+    -- Message settings
+    max_newlines        int2        NOT NULL DEFAULT 80,
+    message_length      int4range   NOT NULL DEFAULT int4range(1, 2500),
+    max_embeds          int2        NOT NULL DEFAULT 8,
+    regex_search_len    int2        NOT NULL DEFAULT 128,
+
+    -- Upload settings
+    max_upload_size     int8        NOT NULL DEFAULT MAX_INT4, -- 2 GiB
+    max_upload_chunk    int4        NOT NULL DEFAULT (MIBIBYTE * 8), -- 8 MiB
+    orphan_cleanup      interval    NOT NULL DEFAULT '1 Day',
+
+    max_avatar_size     int4        NOT NULL DEFAULT (MIBIBYTE * 8),  -- 8 MiB
+    max_banner_size     int4        NOT NULL DEFAULT (MIBIBYTE * 16), -- 16 MiB
+    avatar_width        int4        NOT NULL DEFAULT 256,
+    banner_width        int4        NOT NULL DEFAULT (16 * 40),
+    banner_height       int4        NOT NULL DEFAULT (9 * 40),
+    -- 4-byte/32-bit color * 1024^2 = 4 MiB RAM usage
+    max_avatar_pixels   int4        NOT NULL DEFAULT (1024 * 1024),
+    -- 4-byte/32-bit color * 2073600 = 14.0625 MiB RAM usage
+    max_banner_pixels   int4        NOT NULL DEFAULT (2560 * 1440),
+
+    -- Service settings
+    hcaptcha_secret     char(42)    NOT NULL DEFAULT '0x0000000000000000000000000000000000000000',
+    hcaptcha_sitekey    char(32)    NOT NULL DEFAULT '10000000-ffff-ffff-ffff-000000000001',
+    b2_app              text, -- optional
+    b2_key              text, -- optional
+    embed_worker_uris   text[], -- uris will be chosen at random for use
+
+    CONSTRAINT config_pk PRIMARY KEY(config_id)
+);
+
+INSERT INTO lantern.config (config_name) VALUES ('default');
+
+
 -- NOTE: Keep this under 8 columns
 CREATE TABLE lantern.event_log (
     counter     bigint      NOT NULL DEFAULT nextval('lantern.event_id'),
