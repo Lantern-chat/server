@@ -101,7 +101,61 @@ pub trait Configuration: serde::de::DeserializeOwned {
     fn configure(&mut self);
 }
 
-// #[derive(Default, serde::Deserialize)]
-// pub struct Config<C: Configuration> {
-//     value: C,
-// }
+use futures::{Stream, StreamExt};
+use std::sync::Arc;
+use tokio::sync::Notify;
+
+pub struct Config<C: Configuration> {
+    config: arc_swap::ArcSwap<C>,
+    /// Triggered when the config is reloaded
+    pub config_change: Notify,
+    /// when triggered, should reload the config file
+    pub config_reload: Notify,
+}
+
+impl<C: Configuration> Config<C> {
+    pub fn trigger_reload(&self) {
+        self.config_reload.notify_waiters();
+    }
+
+    pub fn set(&self, config: Arc<C>) {
+        self.config.store(config);
+        self.config_change.notify_waiters();
+    }
+
+    #[inline]
+    pub fn load(&self) -> arc_swap::Guard<Arc<C>> {
+        self.config.load()
+    }
+}
+
+pub trait HasConfig<C: Configuration> {
+    fn raw(&self) -> &Config<C>;
+
+    fn config(&self) -> arc_swap::Guard<Arc<C>> {
+        self.raw().load()
+    }
+}
+
+/// Returns an infinite stream that yields a reference to the config only when it changes
+///
+/// The first value returns immediately
+pub fn config_stream<C, I>(state: &C) -> impl Stream<Item = arc_swap::Guard<Arc<I>>>
+where
+    C: Clone + HasConfig<I>,
+    I: Configuration + 'static,
+{
+    use futures::stream::{iter, repeat};
+
+    // NOTE: `iter` has less overhead than `once`
+    let first = iter([state.raw().config.load()]);
+
+    // TODO: Figure out how to avoid cloning on every item, maybe convert to stream::poll_fn
+    let rest = repeat(state.clone()).then(|state| async move {
+        let raw = state.raw();
+        raw.config_change.notified().await;
+        raw.load()
+    });
+
+    first.chain(rest)
+}

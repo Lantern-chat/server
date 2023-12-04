@@ -52,7 +52,6 @@ impl EncodedFile for CachedFile {
 }
 
 impl AsyncRead for CachedFile {
-    #[inline]
     fn poll_read(mut self: Pin<&mut Self>, _cx: &mut Context<'_>, buf: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
         let pos = self.pos as usize;
         let end = (pos + buf.remaining()).min(self.buf.len());
@@ -66,7 +65,6 @@ impl AsyncRead for CachedFile {
 }
 
 impl AsyncSeek for CachedFile {
-    #[inline]
     fn start_seek(mut self: Pin<&mut Self>, position: SeekFrom) -> io::Result<()> {
         self.pos = match position {
             SeekFrom::Current(offset) => (self.pos as i64).saturating_add(offset) as u64,
@@ -131,7 +129,7 @@ impl MainFileCache {
 
 use headers::AcceptEncoding;
 
-use crate::ServerState;
+use crate::prelude::*;
 
 #[async_trait::async_trait]
 impl FileCache<ServerState> for MainFileCache {
@@ -155,7 +153,7 @@ impl FileCache<ServerState> for MainFileCache {
 
             match dur {
                 Err(_) => log::warn!("Duration calculation failed, time reversed?"),
-                Ok(dur) if dur > Duration::from_secs(state.config().web.file_cache_check_secs) => {
+                Ok(dur) if dur > Duration::from_secs(/*state.config().web.file_cache_check_secs*/ 20) => {
                     last_modified = Some(file.last_modified);
                 }
                 Ok(_) => {
@@ -411,7 +409,7 @@ impl MainFileCache {
     pub fn do_process(&self, state: &ServerState, mut file: Vec<u8>) -> Vec<u8> {
         let mut new_file = Vec::new();
 
-        let c = state.config();
+        //let c = state.config();
 
         let mut last_index = 0;
         for m in VARIABLE_PATTERNS.find_iter(&file) {
@@ -419,35 +417,35 @@ impl MainFileCache {
 
             last_index = m.end();
 
-            match m.pattern().as_u32() {
-                0 => {
-                    serde_json::to_writer(
-                        &mut new_file,
-                        &sdk::models::ServerConfig {
-                            hcaptcha_sitekey: c.services.hcaptcha_sitekey.clone(),
-                            cdn: c.web.cdn_domain.clone(),
-                            min_age: c.account.min_age,
-                            secure: c.web.secure,
-                            camo: c.web.camo,
-                            limits: sdk::models::ServerLimits {
-                                max_upload_size: c.upload.max_upload_size,
-                                max_avatar_size: c.upload.max_avatar_size as u32,
-                                max_banner_size: c.upload.max_banner_size as u32,
-                                max_avatar_pixels: c.upload.max_avatar_pixels,
-                                max_banner_pixels: c.upload.max_banner_pixels,
-                                avatar_width: c.upload.avatar_width,
-                                banner_width: c.upload.banner_width,
-                                banner_height: c.upload.banner_height,
-                            },
-                        },
-                    )
-                    .unwrap();
-                }
-                1 => new_file.extend_from_slice(c.web.base_url().as_bytes()),
-                2 => new_file.extend_from_slice(c.general.server_name.as_bytes()),
-                3 => new_file.extend_from_slice(c.web.cdn_domain.as_bytes()),
-                _ => log::error!("Unreachable replacement"),
-            }
+            // match m.pattern().as_u32() {
+            //     0 => {
+            //         serde_json::to_writer(
+            //             &mut new_file,
+            //             &sdk::models::ServerConfig {
+            //                 hcaptcha_sitekey: c.services.hcaptcha_sitekey.clone(),
+            //                 cdn: c.web.cdn_domain.clone(),
+            //                 min_age: c.account.min_age,
+            //                 secure: c.web.secure,
+            //                 camo: c.web.camo,
+            //                 limits: sdk::models::ServerLimits {
+            //                     max_upload_size: c.upload.max_upload_size,
+            //                     max_avatar_size: c.upload.max_avatar_size as u32,
+            //                     max_banner_size: c.upload.max_banner_size as u32,
+            //                     max_avatar_pixels: c.upload.max_avatar_pixels,
+            //                     max_banner_pixels: c.upload.max_banner_pixels,
+            //                     avatar_width: c.upload.avatar_width,
+            //                     banner_width: c.upload.banner_width,
+            //                     banner_height: c.upload.banner_height,
+            //                 },
+            //             },
+            //         )
+            //         .unwrap();
+            //     }
+            //     1 => new_file.extend_from_slice(c.web.base_url().as_bytes()),
+            //     2 => new_file.extend_from_slice(c.general.server_name.as_bytes()),
+            //     3 => new_file.extend_from_slice(c.web.cdn_domain.as_bytes()),
+            //     _ => log::error!("Unreachable replacement"),
+            // }
         }
 
         if last_index > 0 {

@@ -11,7 +11,7 @@ pub struct RateLimitTable {
     limiter: FtlRateLimiter<u64, nohash_hasher::BuildNoHashHasher<u64>>,
 }
 
-use crate::ServerState;
+use crate::prelude::*;
 
 impl RateLimitTable {
     pub async fn req(&self, route: &Route<ServerState>) -> bool {

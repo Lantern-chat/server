@@ -1,10 +1,6 @@
-use arc_swap::ArcSwap;
-use std::{ops::Deref, sync::Arc};
-
 use crate::config::Config;
-use futures::{Stream, StreamExt};
 use sdk::Snowflake;
-use tokio::sync::{Notify, Semaphore};
+use tokio::sync::Semaphore;
 
 pub mod permission_cache;
 use permission_cache::PermissionCache;
@@ -13,12 +9,7 @@ use common::{emoji::EmojiMap, id_lock::IdLockMap};
 
 pub struct ServerStateInner {
     pub db: db::DatabasePools,
-    pub config: ArcSwap<Config>,
-    /// Triggered when the config is reloaded
-    pub config_change: Notify,
-
-    /// when triggered, should reload the config file
-    pub config_reload: Notify,
+    pub config: config::Config<Config>,
 
     /// Generic lock for anything with a Snowflake ID
     pub id_lock: IdLockMap,
@@ -52,7 +43,7 @@ pub struct ServerStateInner {
 #[repr(transparent)]
 pub struct ServerState(triomphe::Arc<ServerStateInner>);
 
-impl Deref for ServerState {
+impl std::ops::Deref for ServerState {
     type Target = ServerStateInner;
 
     #[inline(always)]
@@ -61,53 +52,25 @@ impl Deref for ServerState {
     }
 }
 
+impl config::HasConfig<Config> for ServerState {
+    #[inline(always)]
+    fn raw(&self) -> &config::Config<Config> {
+        &self.config
+    }
+}
+
 impl ServerState {
-    pub fn new(config: Config, db: db::DatabasePools) -> Self {
-        ServerState(triomphe::Arc::new(ServerStateInner {
-            db,
-            id_lock: Default::default(),
-            mem_semaphore: Semaphore::new(config.general.memory_limit as usize),
-            cpu_semaphore: Semaphore::new(config.general.cpu_limit as usize),
-            perm_cache: PermissionCache::default(),
-            emoji: Default::default(),
-            hasher: ahash::RandomState::new(),
-            config: ArcSwap::from_pointee(config),
-            config_change: Notify::new(),
-            config_reload: Notify::new(),
-            mfa_last: Default::default(),
-        }))
-    }
+    // pub fn new(config: Config, db: db::DatabasePools) -> Self {
+    //     ServerState(triomphe::Arc::new(ServerStateInner {
+    //         db,
+    //         id_lock: Default::default(),
+    //         mem_semaphore: Semaphore::new(config.general.memory_limit as usize),
+    //         cpu_semaphore: Semaphore::new(config.general.cpu_limit as usize),
+    //         perm_cache: PermissionCache::default(),
+    //         emoji: Default::default(),
+    //         hasher: ahash::RandomState::new(),
 
-    pub fn trigger_config_reload(&self) {
-        self.config_reload.notify_waiters();
-    }
-
-    pub fn set_config(&self, config: Arc<Config>) {
-        // TODO: Modify resource semaphores to reflect changed config limits
-        self.config.store(config);
-        self.config_change.notify_waiters();
-    }
-
-    #[inline]
-    pub fn config(&self) -> arc_swap::Guard<Arc<Config>, arc_swap::DefaultStrategy> {
-        self.config.load()
-    }
-
-    /// Returns an infinite stream that yields a reference to the config only when it changes
-    ///
-    /// The first value returns immediately
-    pub fn config_stream(&self) -> impl Stream<Item = arc_swap::Guard<Arc<Config>, arc_swap::DefaultStrategy>> {
-        use futures::stream::{iter, repeat};
-
-        // NOTE: `iter` has less overhead than `once`
-        let first = iter([self.config()]);
-
-        // TODO: Figure out how to avoid cloning on every item, maybe convert to stream::poll_fn
-        let rest = repeat(self.clone()).then(|state| async move {
-            state.config_change.notified().await;
-            state.config()
-        });
-
-        first.chain(rest)
-    }
+    //         mfa_last: Default::default(),
+    //     }))
+    // }
 }

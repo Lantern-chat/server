@@ -7,6 +7,7 @@ publish = false
 
 [features]
 memory_metrics = []
+brotli = ["sdk/brotli", "reqwest/brotli", "async-compression/brotli", "ftl/brotli"]
 default = ["memory_metrics"]
 
 [build-dependencies]
@@ -41,6 +42,7 @@ argh.workspace = true
 
 hashbrown.workspace = true
 triomphe = "0.1.8"
+aho-corasick = "1"
 scc = "2"
 ahash = "0.8.0"
 arc-swap = "1.2.0"
@@ -50,6 +52,17 @@ sha1 = "0.10.5"
 hmac = "0.12.1"
 thiserror = "1"
 uuid = { version = "1.1.2", features = ["v4", "serde"] }
+lazy_static = "1"
+nohash-hasher = "0.2.0"
+async-trait = "0.1"
+
+ftl.workspace = true
+async-compression = { version = "0.4", features = ["deflate", "gzip", "tokio"] }
+reqwest = { version = "0.11", default-features = false, features = ["gzip", "deflate", "rustls-tls", "json"] }
+hyper = { version = "0.14.4", features = ["http1", "http2", "server", "stream", "runtime"] }
+tokio-tungstenite = { version = "0.20", default-features = false, features = ["connect"] }
+http = "0.2.3"
+headers = "0.3"
 
 [target.'cfg(all(unix, any(target_arch = "x86", target_arch = "x86_64")))'.dependencies]
 tikv-jemallocator = { version = "0.5" }

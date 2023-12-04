@@ -30,7 +30,6 @@ util.workspace = true
 process_utils.workspace = true
 tracking_allocator.workspace = true
 
-futures.workspace = true
 tracing.workspace = true
 tracing-futures.workspace = true
 tracing-subscriber.workspace = true
@@ -39,6 +38,7 @@ dotenv.workspace = true
 anyhow.workspace = true
 argh.workspace = true
 
+futures = "0.3"
 hashbrown.workspace = true
 triomphe = "0.1.8"
 scc = "2"

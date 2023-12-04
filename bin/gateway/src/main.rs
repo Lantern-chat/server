@@ -9,6 +9,12 @@ extern crate tracing as log;
 
 pub mod config;
 pub mod state;
+pub mod web;
+
+pub mod prelude {
+    pub use crate::state::ServerState;
+    pub use config::HasConfig;
+}
 
 pub mod built {
     include!(concat!(env!("OUT_DIR"), "/built.rs"));

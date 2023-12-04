@@ -5,7 +5,7 @@ use schema::{
     Snowflake,
 };
 
-use crate::backend::api::auth::Authorization;
+use rpc::auth::Authorization;
 
 #[derive(Debug, Clone, Copy)]
 struct PartialUserAuthorization {
