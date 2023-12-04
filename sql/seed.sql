@@ -192,6 +192,13 @@ CREATE TABLE lantern.config (
 
 INSERT INTO lantern.config (config_name) VALUES ('default');
 
+CREATE TABLE lantern.factions (
+    id          uuid        NOT NULL DEFAULT gen_random_uuid(), -- v4
+    addr        inet        NOT NULL,
+    nickname    text,
+
+    CONSTRAINT factions_pk PRIMARY KEY(id)
+);
 
 -- NOTE: Keep this under 8 columns
 CREATE TABLE lantern.event_log (
@@ -344,6 +351,13 @@ CREATE TABLE lantern.party (
 );
 
 CREATE VIEW lantern.live_parties AS SELECT * FROM lantern.party WHERE deleted_at IS NULL;
+
+CREATE TABLE lantern.faction_parties (
+    faction_id      uuid        NOT NULL,
+    party_id        bigint      NOT NULL,
+
+    CONSTRAINT faction_parties_pk PRIMARY KEY(faction_id, party_id)
+);
 
 -- Association map between parties and users
 CREATE TABLE lantern.party_members (
