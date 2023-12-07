@@ -25,13 +25,6 @@ crate::section! {
 
     impl Extra {
         fn configure(&mut self) {
-            use schema::sf;
-
-            unsafe {
-                sf::INST = self.instance_id;
-                sf::WORK = self.worker_id;
-            }
-
             if self.cpu_limit == 0 {
                 self.cpu_limit = num_cpus::get() as u64;
 

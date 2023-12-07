@@ -9,12 +9,13 @@ edition = "2021"
 util.workspace = true
 auth.workspace = true
 thorn.workspace = true
+serde.workspace = true
+snowflake.workspace = true
 
 sdk = { workspace = true, features = ["pg", "api", "framework_utils"] }
 
-smol_str = "0.2"
-serde = { workspace = true }
-postgres-types = { version = "0.2.1", features = ["array-impls"] }
+smol_str = { workspace = true, features = ["pg"] }
+postgres-types = { version = "0.2.1", features = ["array-impls", "with-uuid-1"] }
 # enum_primitive = "0.1.1"
 # enum-primitive-derive = "0.2.2"
 # num-traits = "0.2"

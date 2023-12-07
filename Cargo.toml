@@ -47,7 +47,9 @@ auth = { path = "components/auth" }
 rpc = { path = "components/rpc" }
 schema = { path = "components/schema" }
 
+snowflake = { git = "https://github.com/Lantern-chat/snowflake", features = ["timestamp"] }
 sdk = { git = "https://github.com/Lantern-chat/client-sdk-rs", default-features = false, package = "client-sdk" }
+smol_str = "0.2"
 
 hashbrown = { version = "0.14", features = ["inline-more", "ahash"] }
 rkyv = { version = "0.7", features = ["strict", "validation", "arbitrary_enum_discriminant"] }
