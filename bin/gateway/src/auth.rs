@@ -1,4 +1,4 @@
-use std::time::SystemTime;
+use crate::prelude::*;
 
 use futures::FutureExt;
 use schema::auth::{RawAuthToken, SplitBotToken, UserToken};
@@ -13,55 +13,14 @@ impl AuthTokenExt for RawAuthToken {
     }
 }
 
-use schema::Snowflake;
 use sdk::models::{Timestamp, UserFlags};
-
-use crate::ServerState;
-
-/// User and Bot authorization structure, optimized for branchless user_id lookup
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(C)]
-pub enum Authorization {
-    User {
-        user_id: Snowflake,
-        expires: Timestamp,
-        token: UserToken,
-        flags: UserFlags,
-    },
-    Bot {
-        bot_id: Snowflake,
-        issued: Timestamp,
-    },
-}
-
-impl Authorization {
-    #[inline(always)]
-    pub const fn is_bot(&self) -> bool {
-        matches!(self, Authorization::Bot { .. })
-    }
-
-    #[inline(always)]
-    pub const fn user_id(&self) -> Snowflake {
-        *self.user_id_ref()
-    }
-
-    #[inline(always)]
-    pub const fn user_id_ref(&self) -> &Snowflake {
-        match self {
-            Authorization::User { user_id, .. } => user_id,
-            Authorization::Bot { bot_id, .. } => bot_id,
-        }
-    }
-}
-
-use crate::Error;
 
 pub async fn do_auth(state: &ServerState, token: RawAuthToken) -> Result<Authorization, Error> {
     let auth = match state.session_cache.get(&token) {
         Some(auth) => Some(auth),
         None => match token {
             RawAuthToken::Bearer(token) => do_user_auth(state, token).boxed().await?,
-            RawAuthToken::Bot(token) => match token.verify(&state.config().keys.bt_key) {
+            RawAuthToken::Bot(token) => match token.verify(&state.config().local.keys.bt_key) {
                 true => return do_bot_auth(state, token).boxed().await,
                 false => return Err(Error::Unauthorized),
             },
