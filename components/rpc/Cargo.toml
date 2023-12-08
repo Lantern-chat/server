@@ -9,3 +9,4 @@ rkyv = { workspace = true }
 bytecheck = { workspace = true }
 sdk = { workspace = true, features = ["api", "rkyv"] }
 auth = { path = "../auth" }
+paste = "1"

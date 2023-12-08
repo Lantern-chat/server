@@ -9,9 +9,9 @@ pub struct Message {
 }
 
 macro_rules! decl_procs {
-    ($($code:literal = $cmd:ident),*$(,)?) => {
-        #[derive(Debug, rkyv::Archive, rkyv::Serialize)]
-        #[repr(u32)]
+    (#[repr($repr:ty)] { $($code:literal = $cmd:ident),*$(,)? }) => {
+        #[derive(Debug)]
+        #[repr($repr)]
         pub enum Procedure {
             $($cmd(Box<$cmd>) = $code,)*
         }
@@ -31,10 +31,107 @@ macro_rules! decl_procs {
                 }
             }
         )*
+
+        #[repr($repr)]
+        pub enum ArchivedProcedure {
+            $($cmd(rkyv::Archived<Box<$cmd>>) = $code,)*
+        }
+
+        #[repr($repr)]
+        pub enum ProcedureResolver {
+            $($cmd(rkyv::Resolver<Box<$cmd>>) = $code,)*
+        }
+
+        const _: () = {paste::paste! {
+            use core::marker::PhantomData;
+            use rkyv::{Archive, Archived, Serialize, Fallible};
+
+            #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+            #[repr($repr)]
+            enum Tag {
+                $($cmd = $code,)*
+            }
+
+            $(
+                #[repr(C)]
+                struct [<Archived $cmd Variant>] {
+                    tag: Tag,
+                    cmd: Archived<Box<$cmd>>,
+                    mkr: PhantomData<Procedure>,
+                }
+            )*
+
+            impl Archive for Procedure {
+                type Archived = ArchivedProcedure;
+                type Resolver = ProcedureResolver;
+
+                unsafe fn resolve(&self, pos: usize, resolver: ProcedureResolver, out: *mut ArchivedProcedure) {
+                    match resolver {$(
+                        ProcedureResolver::$cmd(resolver_0) => match self {
+                            Procedure::$cmd(self_0) => {
+                                let out = out.cast::<[<Archived $cmd Variant>]>();
+                                core::ptr::addr_of_mut!((*out).tag).write(Tag::$cmd);
+                                let (fp, fo) = rkyv::out_field!(out.cmd);
+                                rkyv::Archive::resolve(self_0, pos + fp, resolver_0, fo);
+                            },
+                            _ => core::hint::unreachable_unchecked(),
+                        },
+                    )*}
+                }
+            }
+
+            impl<S: Fallible + ?Sized> Serialize<S> for Procedure
+                where $(Box<$cmd>: Serialize<S>,)*
+            {
+                fn serialize(&self, serializer: &mut S) -> Result<ProcedureResolver, S::Error> {
+                    Ok(match self {
+                        $(Procedure::$cmd(cmd) => ProcedureResolver::$cmd(Serialize::<S>::serialize(cmd, serializer)?),)*
+                    })
+                }
+            }
+
+            use rkyv::bytecheck::{CheckBytes, EnumCheckError, ErrorBox, TupleStructCheckError};
+
+            #[allow(non_upper_case_globals)]
+            mod discriminant {
+                $(pub const $cmd: $repr = $code;)*
+            }
+
+            impl<C: ?Sized> CheckBytes<C> for ArchivedProcedure
+            where $(Archived<Box<$cmd>>: CheckBytes<C>,)*
+            {
+                type Error = EnumCheckError<$repr>;
+
+                unsafe fn check_bytes<'a>(value: *const Self, context: &mut C) -> Result<&'a Self, EnumCheckError<$repr>> {
+                    let tag = *value.cast::<$repr>();
+
+                    match tag {
+                    $(
+                        discriminant::$cmd => {
+                            let value = value.cast::<[<Archived $cmd Variant>]>();
+
+                            if let Err(e) = <Archived<Box<$cmd>> as CheckBytes<C>>::check_bytes(core::ptr::addr_of!((*value).cmd), context) {
+                                return Err(EnumCheckError::InvalidTuple {
+                                    variant_name: stringify!($cmd),
+                                    inner: TupleStructCheckError {
+                                        field_index: 0,
+                                        inner: ErrorBox::new(e),
+                                    }
+                                });
+                            }
+                        }
+                    )*
+                        _ => return Err(EnumCheckError::InvalidTag(tag)),
+                    }
+
+                    Ok(&*value)
+                }
+            }
+        }};
     };
 }
 
-decl_procs! {
+decl_procs! { #[repr(u16)] {
     0   = GetServerConfig,
 
     101 = UserRegister,
@@ -91,4 +188,14 @@ decl_procs! {
     513 = DeleteAllReactions,
     514 = GetReactions,
     515 = PatchRoom,
+}}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rkyv() {
+        _ = rkyv::check_archived_root::<Procedure>(&[]);
+    }
 }
