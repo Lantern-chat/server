@@ -1,6 +1,6 @@
 use tokio::sync::Semaphore;
 
-use crate::Error;
+use crate::prelude::*;
 
 /// https://docs.hcaptcha.com/
 pub struct HCaptchaClient {
@@ -27,6 +27,9 @@ pub enum HCaptchaError {
     NotUsingDummyPasscode,
     #[error("Sitekey Secret Mismatch")]
     SitekeySecretMismatch,
+
+    #[error("JSON Response Parse Error")]
+    JsonParseError,
 
     #[serde(other)]
     #[error("Unknown hCaptcha Error")]
@@ -92,7 +95,8 @@ impl HCaptchaClient {
             }
         }
 
-        let response: RawHCaptchaResponse = serde_json::from_slice(&full)?;
+        let response: RawHCaptchaResponse =
+            serde_json::from_slice(&full).map_err(|_| HCaptchaError::JsonParseError)?;
 
         drop(_guard);
 

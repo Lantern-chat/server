@@ -1,10 +1,8 @@
 use db::pool::Client;
 
-use crate::ServerState;
+use crate::prelude::*;
 
 use sdk::models::*;
-
-use crate::Error;
 
 pub async fn get_cached_room_permissions_with_conn(
     state: &ServerState,
@@ -41,11 +39,11 @@ pub async fn get_room_permissions(
     #[rustfmt::skip]
     let row = db.query_opt2(schema::sql! {
         SELECT
-            AggRoomPerms.Permissions1 AS @Permissions1,
-            AggRoomPerms.Permissions2 AS @Permissions2
+             AggRoomPerms.Permissions1 AS @Permissions1,
+             AggRoomPerms.Permissions2 AS @Permissions2
         FROM AggRoomPerms WHERE
-            AggRoomPerms.UserId = #{&user_id as AggRoomPerms::UserId}
-        AND AggRoomPerms.Id     = #{&room_id as AggRoomPerms::Id}
+             AggRoomPerms.UserId = #{&user_id as AggRoomPerms::UserId}
+         AND AggRoomPerms.Id     = #{&room_id as AggRoomPerms::Id}
     }).await?;
 
     let mut perm = Permissions::empty();

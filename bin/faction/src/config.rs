@@ -58,7 +58,7 @@ pub mod sections {
 }
 
 config::config! {
-    pub struct Config {
+    pub struct LocalConfig {
         /// Overall server configuration
         general: config::general::General,
         /// Filesystem paths
@@ -70,4 +70,9 @@ config::config! {
         /// Web/HTTP Configuration
         web: sections::Web,
     }
+}
+
+pub struct Config {
+    pub shared: schema::config::SharedConfig,
+    pub local: LocalConfig,
 }

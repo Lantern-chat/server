@@ -6,6 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+db.workspace = true
 util.workspace = true
 auth.workspace = true
 thorn.workspace = true
@@ -36,6 +37,8 @@ rustrict = "0.7.7"
 vec-collections = "0.4.3"
 indexmap = "2.0.0"
 fxhash = "0.2.1"
+uuid = "1.6.1"
+postgres_range = "0.11"
 
 [dev-dependencies]
 serde_json = "1.0.64"

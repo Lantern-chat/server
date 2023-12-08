@@ -1,3 +1,5 @@
+use crate::prelude::*;
+
 use reqwest::{Client, Error as ReqwestError};
 
 pub fn create_service_client() -> Result<Client, ReqwestError> {
@@ -29,7 +31,7 @@ pub struct Services {
 }
 
 impl Services {
-    pub fn start() -> Result<Services, crate::Error> {
+    pub fn start() -> Result<Services, Error> {
         Ok(Services {
             hcaptcha: hcaptcha::HCaptchaClient::new()?,
             embed: embed::EmbedClient::new()?,

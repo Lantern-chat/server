@@ -92,11 +92,11 @@ macro_rules! config {
     };
 }
 
-pub trait ConfigExtra: Configuration {
+pub trait ConfigExtra {
     fn configure(&mut self) {}
 }
 
-pub trait Configuration: serde::de::DeserializeOwned {
+pub trait Configuration {
     /// Applies any environmental overrides and adjustments
     fn configure(&mut self);
 }
@@ -105,15 +105,17 @@ use futures::{Stream, StreamExt};
 use std::sync::Arc;
 use tokio::sync::Notify;
 
-pub struct Config<C: Configuration> {
+pub struct Config<C> {
     config: arc_swap::ArcSwap<C>,
+
     /// Triggered when the config is reloaded
     pub config_change: Notify,
+
     /// when triggered, should reload the config file
     pub config_reload: Notify,
 }
 
-impl<C: Configuration> Config<C> {
+impl<C> Config<C> {
     pub fn trigger_reload(&self) {
         self.config_reload.notify_waiters();
     }
@@ -129,7 +131,7 @@ impl<C: Configuration> Config<C> {
     }
 }
 
-pub trait HasConfig<C: Configuration> {
+pub trait HasConfig<C> {
     fn raw(&self) -> &Config<C>;
 
     fn config(&self) -> arc_swap::Guard<Arc<C>> {

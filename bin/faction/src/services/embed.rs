@@ -1,4 +1,4 @@
-use crate::{Error, ServerState};
+use crate::prelude::*;
 
 use headers::{HeaderName, HeaderValue};
 use sdk::models::{Embed, Timestamp};
@@ -20,15 +20,25 @@ impl EmbedClient {
         url: String,
         language: Option<&str>,
     ) -> Result<Option<(Timestamp, Embed)>, Error> {
-        let uri = &state.config().services.embed_worker_uri;
+        use rand::seq::SliceRandom;
+        use std::borrow::Cow;
+
+        let config = state.config().clone();
+
+        let Some(uri) = config.shared.embed_worker_uris.choose(&mut rand::thread_rng()) else {
+            log::warn!("No Embed Worker URIs configured!");
+
+            return Ok(None);
+        };
+
         let uri = match language {
-            Some(l) => format!("{uri}?l={l}"),
-            None => uri.clone(),
+            Some(l) => Cow::Owned(format!("{uri}?l={l}")),
+            None => Cow::Borrowed(uri.as_str()),
         };
 
         let resp = self
             .client
-            .post(uri)
+            .post(uri.as_ref())
             .body(url)
             .header(
                 HeaderName::from_static("content-type"),

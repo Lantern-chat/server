@@ -14,9 +14,16 @@ pub mod built {
 pub mod allocator;
 pub mod api;
 pub mod config;
+pub mod error;
+pub mod services;
 pub mod state;
 
-pub use crate::state::ServerState;
+pub mod prelude {
+    pub use crate::error::Error;
+    pub use crate::state::ServerState;
+
+    pub use config::HasConfig;
+}
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
@@ -24,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
 
     dotenv::dotenv()?;
 
-    let mut config = config::Config::default();
+    let mut config = config::LocalConfig::default();
     ::config::Configuration::configure(&mut config);
 
     Ok(())

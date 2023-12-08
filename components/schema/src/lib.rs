@@ -5,6 +5,7 @@
 extern crate serde;
 
 pub extern crate auth;
+pub extern crate db;
 pub extern crate thorn;
 
 pub mod codes;
@@ -25,6 +26,7 @@ pub mod sf;
 pub use sf::{Snowflake, SnowflakeExt};
 
 pub mod asset;
+pub mod config;
 pub mod email;
 pub mod flags;
 pub mod names;
@@ -44,5 +46,5 @@ pub fn has_all_permission_bits(
 /// Wrapper around [`thorn::sql!`] which injects `use schema::*` ahead of the declaration
 #[macro_export]
 macro_rules! sql {
-    ($($tt:tt)*) => { $crate::thorn::sql! { use $crate::*; $($tt)* } };
+    ($($tt:tt)*) => {{ #![allow(unused_imports)] $crate::thorn::sql! { use $crate::*; $($tt)* } }};
 }

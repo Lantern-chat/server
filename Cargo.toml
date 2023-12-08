@@ -59,6 +59,9 @@ bitflags = "1.2.1"
 ahash = "0.8"
 scc = "2"
 
+headers = "0.3"
+reqwest = { version = "0.11", default-features = false, features = ["gzip", "deflate", "rustls-tls", "json"] }
+
 ftl = { git = "https://github.com/Lantern-chat/ftl", features = ["json", "cbor"] }
 mime_db = { git = "https://github.com/Lantern-chat/mime_db" }
 thorn = { git = "https://github.com/Lantern-chat/thorn" }
