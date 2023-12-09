@@ -44,7 +44,7 @@ macro_rules! decl_procs {
 
         const _: () = {paste::paste! {
             use core::marker::PhantomData;
-            use rkyv::{Archive, Archived, Serialize, Fallible};
+            use rkyv::{Archive, Archived, Serialize, Fallible, Deserialize};
 
             #[derive(Debug, Clone, Copy, PartialEq, Eq)]
             #[repr($repr)]
@@ -85,8 +85,18 @@ macro_rules! decl_procs {
             {
                 fn serialize(&self, serializer: &mut S) -> Result<ProcedureResolver, S::Error> {
                     Ok(match self {
-                        $(Procedure::$cmd(cmd) => ProcedureResolver::$cmd(Serialize::<S>::serialize(cmd, serializer)?),)*
+                        $(Procedure::$cmd(cmd) => ProcedureResolver::$cmd(Serialize::serialize(cmd, serializer)?),)*
                     })
+                }
+            }
+
+            impl<D: Fallible + ?Sized> Deserialize<Procedure, D> for ArchivedProcedure
+                where $(Archived<Box<$cmd>>: Deserialize<Box<$cmd>, D>,)*
+            {
+                fn deserialize(&self, deserializer: &mut D) -> Result<Procedure, D::Error> {
+                    Ok(match self {$(
+                        ArchivedProcedure::$cmd(cmd) => Procedure::$cmd(Deserialize::deserialize(cmd, deserializer)?),
+                    )*})
                 }
             }
 
@@ -98,7 +108,7 @@ macro_rules! decl_procs {
             }
 
             impl<C: ?Sized> CheckBytes<C> for ArchivedProcedure
-            where $(Archived<Box<$cmd>>: CheckBytes<C>,)*
+                where $(Archived<Box<$cmd>>: CheckBytes<C>,)*
             {
                 type Error = EnumCheckError<$repr>;
 
@@ -192,10 +202,14 @@ decl_procs! { #[repr(u16)] {
 
 #[cfg(test)]
 mod tests {
+    use rkyv::Deserialize;
+
     use super::*;
 
     #[test]
     fn test_rkyv() {
-        _ = rkyv::check_archived_root::<Procedure>(&[]);
+        let p = rkyv::to_bytes::<_, 256>(&Procedure::from(GetServerConfig::new())).unwrap();
+        let a = rkyv::check_archived_root::<Procedure>(&p).unwrap();
+        let _: Procedure = a.deserialize(&mut rkyv::Infallible).unwrap();
     }
 }
