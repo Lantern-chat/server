@@ -2,8 +2,7 @@ use std::{net::SocketAddr, time::SystemTime};
 
 use schema::{auth::RawAuthToken, Snowflake};
 
-use crate::backend::{api::auth::AuthTokenExt, util::validation::validate_email};
-use crate::{Error, ServerState};
+use crate::{prelude::*, util::validation::validate_email};
 
 use sdk::{
     api::commands::user::UserLoginForm,
@@ -95,13 +94,13 @@ pub async fn do_login(
     user_id: Snowflake,
     now: std::time::SystemTime,
 ) -> Result<Session, Error> {
-    let token = RawAuthToken::random_bearer();
+    let token = RawAuthToken::bearer(util::rng::crypto_thread_rng());
     let bytes = match token {
         RawAuthToken::Bearer(ref bytes) => &bytes[..],
         _ => unreachable!(),
     };
 
-    let expires = now + state.config().account.session_duration;
+    let expires = now + state.config().shared.session_duration;
     let ip = addr.ip();
 
     let db = state.db.write.get().await?;
@@ -127,15 +126,14 @@ pub async fn do_login(
 pub async fn verify_password(state: &ServerState, passhash: &str, password: &str) -> Result<bool, Error> {
     // NOTE: Given how expensive it can be to compute an argon2 hash,
     // this only allows a given number to process at once.
-    let _permit =
-        state.mem_semaphore.acquire_many(crate::backend::api::user::register::hash_memory_cost()).await?;
+    let _permit = state.mem_semaphore.acquire_many(crate::api::user::register::hash_memory_cost()).await?;
 
     // SAFETY: These are only used within the following spawn_blocking block
     let passhash: &'static str = unsafe { std::mem::transmute(passhash) };
     let password: &'static str = unsafe { std::mem::transmute(password) };
 
     let verified = tokio::task::spawn_blocking(|| {
-        let config = crate::backend::api::user::register::hash_config();
+        let config = crate::api::user::register::hash_config();
         argon2::verify_encoded_ext(passhash, password.as_bytes(), config.secret, config.ad)
     })
     .await??;
@@ -203,7 +201,7 @@ pub async fn process_2fa<'a>(
     password: &str,
     token: &str,
 ) -> Result<bool, Error> {
-    use crate::backend::util::encrypt::nonce_from_user_id;
+    use crate::util::encrypt::nonce_from_user_id;
     use mfa_totp::{totp::TOTP6, MFA};
     use rand::Rng;
 
@@ -212,7 +210,7 @@ pub async fn process_2fa<'a>(
 
     let token = MfaAttempt::parse(token)?;
 
-    let mfa_key = state.config().keys.mfa_key;
+    let mfa_key = state.config().local.keys.mfa_key;
 
     let nonce = nonce_from_user_id(user_id);
 

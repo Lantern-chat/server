@@ -2,9 +2,8 @@ use schema::Snowflake;
 use sdk::models::*;
 
 use crate::backend::gateway::Event;
-use crate::backend::util::encrypted_asset::encrypt_snowflake_opt;
-use crate::{Authorization, Error, ServerState};
-
+use crate::prelude::*;
+use crate::util::encrypted_asset::encrypt_snowflake_opt;
 use sdk::models::gateway::message::ServerMsg;
 
 pub async fn trigger_typing(

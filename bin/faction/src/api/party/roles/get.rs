@@ -2,10 +2,7 @@ use futures::{Stream, StreamExt};
 
 use db::pool::Client;
 
-use crate::{
-    backend::{api::SearchMode, util::encrypted_asset::encrypt_snowflake_opt},
-    Error, ServerState,
-};
+use crate::{api::SearchMode, prelude::*, util::encrypted_asset::encrypt_snowflake_opt};
 
 use sdk::models::*;
 
@@ -39,6 +36,7 @@ pub async fn get_roles_raw<'a, 'b>(
             id: row.roles_id()?,
             party_id: row.roles_party_id()?,
             name: row.roles_name()?,
+            desc: None, // TODO
             permissions: Permissions::from_i64(row.roles_permissions1()?, row.roles_permissions2()?),
             color: row.roles_color::<Option<i32>>()?.map(|c| c as u32),
             position: row.roles_position()?,

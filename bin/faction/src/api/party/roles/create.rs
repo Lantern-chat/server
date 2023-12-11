@@ -1,9 +1,6 @@
-use schema::SnowflakeExt;
-
 use sdk::{api::commands::party::CreateRoleForm, models::*};
 
-use crate::{Authorization, Error, ServerState};
-
+use crate::prelude::*;
 pub async fn create_role(
     state: ServerState,
     auth: Authorization,
@@ -13,12 +10,12 @@ pub async fn create_role(
     {
         let config = state.config();
 
-        if !config.party.role_name_len.contains(&form.name.len()) {
+        if !config.shared.role_name_length.contains(&form.name.len()) {
             return Err(Error::InvalidName);
         }
     }
 
-    let role_id = Snowflake::now();
+    let role_id = state.sf.gen();
 
     let mut db = state.db.write.get().await?;
     let t = db.transaction().await?;
@@ -86,6 +83,7 @@ pub async fn create_role(
         id: role_id,
         party_id,
         avatar: None,
+        desc: None,
         name: form.name,
         permissions: Permissions::empty(),
         color: None,

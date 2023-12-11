@@ -1,7 +1,7 @@
 use futures::{Stream, StreamExt};
 use schema::SnowflakeExt;
 
-use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Authorization, Error, ServerState};
+use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, prelude::*};
 
 use sdk::models::*;
 
@@ -75,28 +75,27 @@ mod q {
     }
 
     pub fn query() -> impl AnyQuery {
-        let select_users = SelectUsers::as_query(
-            Query::select()
-                .from(
-                    Users::left_join_table::<UserBlocks>().on(UserBlocks::UserId
-                        .equals(Users::Id)
-                        .and(UserBlocks::BlockId.equals(Params::from_id()))),
-                )
-                .exprs([
-                    Params::user_a_id().alias_to(SelectUsers::UserAId),
-                    Params::user_b_id().alias_to(SelectUsers::UserBId),
-                    Params::flags().alias_to(SelectUsers::Flags),
-                ])
-                .expr(
-                    Users::Flags
-                        .bitand(UserFlags::ELEVATION.bits().lit())
-                        .equals(0.lit())
-                        .alias_to(SelectUsers::IsRegularUser),
-                )
-                .expr(UserBlocks::BlockedAt.is_null().alias_to(SelectUsers::IsNotBlocked))
-                .and_where(Users::Id.equals(Params::to_id()))
-                .and_where(Users::DeletedAt.is_null()),
-        );
+        let select_users =
+            SelectUsers::as_query(
+                Query::select()
+                    .from(Users::left_join_table::<UserBlocks>().on(
+                        UserBlocks::UserId.equals(Users::Id).and(UserBlocks::BlockId.equals(Params::from_id())),
+                    ))
+                    .exprs([
+                        Params::user_a_id().alias_to(SelectUsers::UserAId),
+                        Params::user_b_id().alias_to(SelectUsers::UserBId),
+                        Params::flags().alias_to(SelectUsers::Flags),
+                    ])
+                    .expr(
+                        Users::Flags
+                            .bitand(UserFlags::ELEVATION.bits().lit())
+                            .equals(0.lit())
+                            .alias_to(SelectUsers::IsRegularUser),
+                    )
+                    .expr(UserBlocks::BlockedAt.is_null().alias_to(SelectUsers::IsNotBlocked))
+                    .and_where(Users::Id.equals(Params::to_id()))
+                    .and_where(Users::DeletedAt.is_null()),
+            );
 
         let add_friend = AddFriend::as_query(
             Query::insert()
@@ -116,9 +115,7 @@ mod q {
                         .set_default(Friends::UpdatedAt)
                         .and_where(
                             // and where not accepted
-                            Friends::Flags
-                                .bitand(FriendFlags::ACCEPTED.bits().lit())
-                                .equals(0.lit()),
+                            Friends::Flags.bitand(FriendFlags::ACCEPTED.bits().lit()).equals(0.lit()),
                         )
                         .and_where(
                             // and where the confirmation is from the other user, see note below

@@ -1,8 +1,7 @@
 use rand::distributions::{Alphanumeric, DistString};
 use sdk::Snowflake;
 
-use crate::{Authorization, Error, ServerState};
-
+use crate::prelude::*;
 // NOTE: It's assumed that the calling user has permission to do this
 pub async fn delete_user(state: ServerState, user_id: Snowflake) -> Result<(), Error> {
     // generate 10 alphanumeric characters for the new username

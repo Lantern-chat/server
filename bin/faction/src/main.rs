@@ -17,11 +17,14 @@ pub mod config;
 pub mod error;
 pub mod services;
 pub mod state;
+pub mod util;
 
 pub mod prelude {
     pub use crate::error::Error;
     pub use crate::state::ServerState;
+    pub use rpc::auth::Authorization;
 
+    pub use crate::config::Config;
     pub use config::HasConfig;
 }
 
@@ -152,18 +155,10 @@ async fn main() -> anyhow::Result<()> {
 
     runner.wait().await?;
 
-    drop(LogDropWrapper(Some(_log_guard)));
+    println!("Flushing logs to file...");
+    drop(_log_guard);
+    println!("Goodbye.");
 
     Ok(())
-}
-
-struct LogDropWrapper<T>(Option<T>);
-
-impl<T> Drop for LogDropWrapper<T> {
-    fn drop(&mut self) {
-        println!("Flushing logs to file...");
-        drop(self.0.take());
-        println!("Goodbye.");
-    }
 }
 */

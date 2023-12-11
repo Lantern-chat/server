@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use aho_corasick::{AhoCorasick, MatchKind, StartKind};
 
-use crate::Error;
+use crate::prelude::*;
 
 lazy_static::lazy_static! {
     static ref SLASH_PATTERNS: AhoCorasick = aho_corasick::AhoCorasickBuilder::new()

@@ -30,7 +30,7 @@ pub async fn ready(state: ServerState, conn_id: Snowflake, auth: Authorization) 
 
     let db = state.db.read.get().await?;
 
-    let user = crate::backend::api::user::me::get::get_full_self_inner(&state, user_id, &db).await?;
+    let user = crate::api::user::me::get::get_full_self_inner(&state, user_id, &db).await?;
 
     let perms_future = async {
         state.perm_cache.add_reference(user_id).await;
@@ -148,13 +148,13 @@ pub async fn ready(state: ServerState, conn_id: Snowflake, auth: Authorization) 
 
         let (roles, emotes) = tokio::try_join!(
             async {
-                crate::backend::api::party::roles::get::get_roles_raw(&db, &state, SearchMode::Many(&ids))
+                crate::api::party::roles::get::get_roles_raw(&db, &state, SearchMode::Many(&ids))
                     .await?
                     .try_collect::<Vec<_>>()
                     .await
             },
             async {
-                crate::backend::api::party::emotes::get_custom_emotes_raw(&*db, SearchMode::Many(&ids))
+                crate::api::party::emotes::get_custom_emotes_raw(&*db, SearchMode::Many(&ids))
                     .await?
                     .try_collect::<Vec<_>>()
                     .await

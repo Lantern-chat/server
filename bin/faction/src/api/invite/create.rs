@@ -1,6 +1,5 @@
-use crate::{Authorization, Error, ServerState};
-
-use schema::{Snowflake, SnowflakeExt};
+use crate::prelude::*;
+use schema::Snowflake;
 use timestamp::Duration;
 
 use sdk::api::commands::party::CreatePartyInviteBody;
@@ -21,8 +20,8 @@ pub async fn create_invite(
         _ => return Err(Error::BadRequest),
     };
 
-    let id = Snowflake::now();
-    let expires = duration.map(|dur| id.timestamp().saturating_add(dur));
+    let id = state.sf.gen();
+    let expires = duration.map(|dur| state.sf.resolve_timestamp(id).saturating_add(dur));
     let uses = body.max_uses.map(|u| u as i32);
 
     #[rustfmt::skip]
@@ -76,7 +75,7 @@ pub async fn create_invite(
     }
 
     Ok(Invite {
-        code: crate::backend::util::encrypted_asset::encrypt_snowflake(&state, id),
+        code: crate::util::encrypted_asset::encrypt_snowflake(&state, id),
         party: PartialParty {
             id: party_id,
             name: row.party_name()?,

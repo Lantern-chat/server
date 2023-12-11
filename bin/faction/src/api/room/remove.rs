@@ -1,7 +1,6 @@
 use schema::Snowflake;
 
-use crate::{Authorization, Error, ServerState};
-
+use crate::prelude::*;
 use sdk::models::*;
 
 pub async fn remove_room(state: ServerState, auth: Authorization, room_id: Snowflake) -> Result<(), Error> {

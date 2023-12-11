@@ -1,7 +1,7 @@
 use futures::FutureExt;
-use schema::{Snowflake, SnowflakeExt};
+use schema::Snowflake;
 
-use crate::{backend::cache::permission_cache::PermMute, Authorization, Error, ServerState};
+use crate::{prelude::*, state::permission_cache::PermMute};
 
 use sdk::models::*;
 
@@ -43,8 +43,8 @@ pub async fn create_message(
         md_utils::trim_message(
             trimmed_content,
             Some(md_utils::TrimLimits {
-                len: config.message.message_len.clone(),
-                max_newlines: config.message.max_newlines,
+                len: config.shared.message_length.clone(),
+                max_newlines: config.shared.max_newlines as usize,
             }),
         )
     }) else {
@@ -60,7 +60,7 @@ pub async fn create_message(
         None => {
             let db = state.db.write.get().await?;
 
-            let perms = crate::backend::api::perm::get_room_permissions(&db, auth.user_id(), room_id).await?;
+            let perms = crate::api::perm::get_room_permissions(&db, auth.user_id(), room_id).await?;
 
             if !perms.contains(Permissions::SEND_MESSAGES) {
                 return Err(Error::Unauthorized);
@@ -90,7 +90,7 @@ pub async fn create_message(
     // TODO: Set flags
     let flags = MessageFlags::empty();
 
-    let msg_id = Snowflake::now();
+    let msg_id = state.sf.gen();
 
     // if we avoided getting a database connection until now, do it now
     let mut db = match maybe_db {

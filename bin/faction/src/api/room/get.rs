@@ -2,8 +2,8 @@ use futures::StreamExt;
 
 use schema::Snowflake;
 
-use crate::backend::api::party::rooms::get::{get_rooms, RoomScope};
-use crate::{Authorization, Error, ServerState};
+use crate::api::party::rooms::get::{get_rooms, RoomScope};
+use crate::prelude::*;
 
 use sdk::models::*;
 

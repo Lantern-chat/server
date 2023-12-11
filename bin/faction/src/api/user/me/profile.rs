@@ -1,11 +1,9 @@
 use sdk::{api::commands::user::UpdateUserProfileBody, models::*};
 
 use crate::{
-    backend::{
-        asset::{maybe_add_asset, AssetMode},
-        util::encrypted_asset::encrypt_snowflake,
-    },
-    Authorization, Error, ServerState,
+    asset::{maybe_add_asset, AssetMode},
+    prelude::*,
+    util::encrypted_asset::encrypt_snowflake,
 };
 
 pub async fn patch_profile(
@@ -17,12 +15,11 @@ pub async fn patch_profile(
     {
         // TODO: Better errors here
         let config = state.config();
-        if matches!(profile.status, Nullable::Some(ref status) if status.len() > config.user.max_custom_status_len)
-        {
+        if matches!(profile.status, Nullable::Some(ref status) if status.len() > config.shared.max_status_length) {
             return Err(Error::BadRequest);
         }
 
-        if matches!(profile.bio, Nullable::Some(ref bio) if bio.len() > config.user.max_biography_len) {
+        if matches!(profile.bio, Nullable::Some(ref bio) if bio.len() > config.shared.max_bio_length) {
             return Err(Error::BadRequest);
         }
     }

@@ -1,6 +1,6 @@
 use futures::{Stream, StreamExt};
 
-use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Authorization, Error, ServerState};
+use crate::{util::encrypted_asset::encrypt_snowflake_opt, prelude::*};
 
 use sdk::models::*;
 
@@ -42,7 +42,7 @@ pub async fn get_relationships(
                         // still can't view their presence until it's accepted or a party is shared
                         false => None,
                         true => Some({
-                            let last_active = crate::backend::util::relative::approximate_relative_time(
+                            let last_active = crate::util::relative::approximate_relative_time(
                                 &state,
                                 user_id,
                                 row.try_get(UserColumns::last_active())?,

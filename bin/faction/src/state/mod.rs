@@ -1,4 +1,5 @@
-use crate::config::Config;
+use crate::{config::Config, services::Services};
+use schema::sf::SnowflakeGenerator;
 use sdk::Snowflake;
 use tokio::sync::Semaphore;
 
@@ -8,6 +9,8 @@ use permission_cache::PermissionCache;
 use common::{emoji::EmojiMap, id_lock::IdLockMap};
 
 pub struct ServerStateInner {
+    pub sf: SnowflakeGenerator,
+
     pub db: db::DatabasePools,
     pub config: config::Config<Config>,
 
@@ -25,7 +28,7 @@ pub struct ServerStateInner {
     pub perm_cache: PermissionCache,
 
     // TODO
-    // pub services: Services,
+    pub services: Services,
     // pub queues: Queues,
 
     // /// Generic lock for anything with a Snowflake ID

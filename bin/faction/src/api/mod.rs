@@ -10,13 +10,6 @@ pub enum SearchMode<'a> {
     Many(&'a [schema::Snowflake]),
 }
 
-/*
-pub mod gateway {
-    pub mod presence;
-    pub mod ready;
-    pub mod refresh;
-}
-
 pub mod user {
     pub mod get;
     pub mod register;
@@ -91,6 +84,14 @@ pub mod invite {
     pub mod redeem;
     pub mod revoke;
 }
+
+/*
+pub mod gateway {
+    pub mod presence;
+    pub mod ready;
+    pub mod refresh;
+}
+
 
 pub mod file {
     pub mod delete;

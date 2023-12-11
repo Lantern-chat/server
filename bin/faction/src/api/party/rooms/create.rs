@@ -1,7 +1,6 @@
-use schema::{Snowflake, SnowflakeExt};
+use schema::Snowflake;
 
-use crate::{Authorization, Error, ServerState};
-
+use crate::prelude::*;
 use sdk::api::commands::party::{CreateRoomForm, CreateRoomKind};
 use sdk::models::*;
 
@@ -14,7 +13,7 @@ pub async fn create_room(
     let config = state.config().clone();
 
     match form.topic {
-        Some(ref topic) if !config.party.room_topic_len.contains(&topic.len()) => {
+        Some(ref topic) if !config.shared.room_topic_length.contains(&topic.len()) => {
             return Err(Error::InvalidTopic);
         }
         _ => {}
@@ -22,7 +21,7 @@ pub async fn create_room(
 
     let name = schema::names::slug_name(&form.name);
 
-    if !config.party.room_name_len.contains(&name.len()) {
+    if !config.shared.room_name_length.contains(&name.len()) {
         return Err(Error::InvalidName);
     }
 
@@ -47,7 +46,7 @@ pub async fn create_room(
     let total_rooms: i32 = row.total_rooms()?;
     let live_rooms: i32 = row.live_rooms()?;
 
-    if total_rooms >= config.party.max_rooms as i32 || live_rooms >= config.party.max_active_rooms as i32 {
+    if total_rooms >= config.shared.max_total_rooms as i32 || live_rooms >= config.shared.max_active_rooms as i32 {
         // TODO: Better error message here
         return Err(Error::Unauthorized);
     }
@@ -60,7 +59,7 @@ pub async fn create_room(
     };
 
     let raw = RawOverwrites::new(form.overwrites);
-    let room_id = Snowflake::now();
+    let room_id = state.sf.gen();
 
     let mut db = state.db.write.get().await?;
 
@@ -122,7 +121,7 @@ pub async fn create_room(
     t.commit().await?;
 
     // should really reuse the db conn, but this api is called so infrequently that I don't care
-    crate::backend::api::room::get::get_room(state, auth, room_id).await
+    crate::api::room::get::get_room(state, auth, room_id).await
 }
 
 #[derive(Default)]

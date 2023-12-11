@@ -5,11 +5,9 @@ use sdk::api::commands::user::ChangePasswordForm;
 use super::login::ProvidedMfa;
 
 use crate::{
-    backend::{
-        api::user::register::{hash_config, hash_memory_cost},
-        util::{encrypt::nonce_from_user_id, validation::validate_password},
-    },
-    Authorization, Error, ServerState,
+    api::user::register::{hash_config, hash_memory_cost},
+    prelude::*,
+    util::{encrypt::nonce_from_user_id, validation::validate_password},
 };
 
 pub async fn change_password(
@@ -17,9 +15,9 @@ pub async fn change_password(
     auth: Authorization,
     form: ChangePasswordForm,
 ) -> Result<(), Error> {
-    let config = state.config();
+    let config = state.config().clone();
 
-    if !config.account.password_len.contains(&form.current.len()) {
+    if !config.shared.password_length.contains(&form.current.len()) {
         return Err(Error::InvalidCredentials);
     };
 
@@ -49,7 +47,7 @@ pub async fn change_password(
 
     // if MFA is enabled, it needs to be verified and re-encrypted with the new password
     if let (Some(token), Some(mfa)) = (form.totp, encrypted_mfa) {
-        let mfa_key = config.keys.mfa_key;
+        let mfa_key = config.local.keys.mfa_key;
         let nonce = nonce_from_user_id(auth.user_id());
 
         let Ok(mfa) = MFA::decrypt(&mfa_key, &nonce, &form.current, mfa) else {

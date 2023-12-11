@@ -1,6 +1,6 @@
 use schema::Snowflake;
 
-use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Authorization, Error, ServerState};
+use crate::{prelude::*, util::encrypted_asset::encrypt_snowflake_opt};
 
 use futures::{Stream, StreamExt};
 
@@ -117,7 +117,7 @@ pub async fn get_members_inner(
                         true => Some({
                             let last_active = match mode == MemberMode::Full {
                                 false => None,
-                                true => crate::backend::util::relative::approximate_relative_time(
+                                true => crate::util::relative::approximate_relative_time(
                                     &state,
                                     user_id,
                                     row.last_active()?,
@@ -136,7 +136,7 @@ pub async fn get_members_inner(
                                     last_active,
                                     updated_at: Some(updated_at),
                                     flags: UserPresenceFlags::from_bits_truncate_public(row.presence_flags()?),
-                                    activity: row.presence_activity::<Option<_>>()?.map(AnyActivity::Any),
+                                    activity: None, // row.presence_activity::<Option<_>>()?.map(AnyActivity::Any),
                                 },
                             }
                         }),

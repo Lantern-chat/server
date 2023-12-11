@@ -1,10 +1,9 @@
 use hashbrown::HashSet;
 use schema::Snowflake;
 
-use crate::backend::api::party::rooms::create::RawOverwrites;
+use crate::api::party::rooms::create::RawOverwrites;
 use crate::backend::asset::{maybe_add_asset, AssetMode};
-use crate::{Authorization, Error, ServerState};
-
+use crate::prelude::*;
 use sdk::api::commands::room::PatchRoomForm;
 use sdk::models::*;
 
@@ -182,5 +181,5 @@ pub async fn modify_room(
 
     t.commit().await?;
 
-    crate::backend::api::room::get::get_room(state, auth, room_id).await
+    crate::api::room::get::get_room(state, auth, room_id).await
 }

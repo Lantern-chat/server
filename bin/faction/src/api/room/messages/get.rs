@@ -4,7 +4,7 @@ use schema::{flags::AttachmentFlags, Snowflake, SnowflakeExt};
 use sdk::models::*;
 use thorn::pg::Json;
 
-use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Authorization, Error, ServerState};
+use crate::{prelude::*, util::encrypted_asset::encrypt_snowflake_opt};
 
 use sdk::api::commands::room::GetMessagesQuery;
 
@@ -34,7 +34,7 @@ pub async fn get_many(
         user_id: auth.user_id(),
         room_id,
         needs_perms,
-        cursor: form.query.unwrap_or_else(|| Cursor::Before(Snowflake::max_value())),
+        cursor: form.query.unwrap_or_else(|| Cursor::Before(Snowflake::max_safe_value())),
         parent: form.parent,
         limit,
         pins: form.pinned,

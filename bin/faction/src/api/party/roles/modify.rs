@@ -2,11 +2,9 @@ use futures::TryFutureExt;
 use sdk::{api::commands::party::PatchRoleForm, models::*};
 
 use crate::{
-    backend::{
-        asset::{maybe_add_asset, AssetMode},
-        util::encrypted_asset::encrypt_snowflake_opt,
-    },
-    Authorization, Error, ServerState,
+    asset::{maybe_add_asset, AssetMode},
+    prelude::*,
+    util::encrypted_asset::encrypt_snowflake_opt,
 };
 
 pub async fn modify_role(
@@ -164,6 +162,7 @@ pub async fn modify_role(
         party_id,
         avatar: encrypt_snowflake_opt(&state, row.avatar_id()?),
         name: row.name()?,
+        desc: None, // TODO
         permissions: Permissions::from_i64(row.permissions1()?, row.permissions2()?),
         color: row.color::<Option<i32>>()?.map(|c| c as u32),
         position: row.position()?,

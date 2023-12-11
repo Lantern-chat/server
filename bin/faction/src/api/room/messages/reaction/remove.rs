@@ -1,4 +1,5 @@
-use crate::{backend::gateway::Event, state::emoji::EmoteOrEmojiId, Authorization, Error, ServerState};
+use crate::{backend::gateway::Event, prelude::*};
+use common::emoji::EmoteOrEmojiId;
 use sdk::models::{events::UserReactionEvent, gateway::message::ServerMsg, *};
 
 pub async fn remove_own_reaction(

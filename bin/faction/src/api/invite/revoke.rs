@@ -1,14 +1,11 @@
-use db::pg::error::SqlState;
-use futures::{future::Either, FutureExt, TryFutureExt};
-
 use schema::{Snowflake, SnowflakeExt};
 use smol_str::SmolStr;
 
-use crate::{Authorization, Error, ServerState};
+use crate::prelude::*;
 use sdk::models::Permissions;
 
 pub async fn revoke_invite(state: ServerState, auth: Authorization, code: SmolStr) -> Result<(), Error> {
-    let maybe_id = crate::backend::util::encrypted_asset::decrypt_snowflake(&state, &code);
+    let maybe_id = crate::util::encrypted_asset::decrypt_snowflake(&state, &code);
 
     #[rustfmt::skip]
     state.db.write.get().await?.execute2(schema::sql! {

@@ -3,13 +3,13 @@ use hashbrown::HashSet;
 use schema::SnowflakeExt;
 use sdk::models::*;
 
-use crate::{Error, ServerState};
+use crate::prelude::*;
 
 use md_utils::{Span, SpanType};
 
 pub fn process_embeds(state: ServerState, msg_id: Snowflake, msg: &str, spans: &[Span]) {
     let mut position = 0;
-    let max_embeds = state.config().message.max_embeds as i16;
+    let max_embeds = state.config().shared.max_embeds as i16;
 
     // for checking duplicates
     let mut urls = HashSet::new();
@@ -122,7 +122,7 @@ pub async fn run_embed(
 
     drop(db); // free connection early. Need to reacquire a write connection anyway after fetching.
 
-    let mut embed_id = embed_id.unwrap_or_else(Snowflake::now);
+    let mut embed_id = embed_id.unwrap_or_else(|| state.sf.gen());
     let flags = spoilered.then_some(EmbedFlags::SPOILER);
 
     // if we happen to get a db object after fetching, keep it around to reuse it

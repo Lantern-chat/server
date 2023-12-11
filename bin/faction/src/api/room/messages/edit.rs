@@ -2,7 +2,7 @@ use hashbrown::HashSet;
 
 use sdk::models::*;
 
-use crate::{backend::cache::permission_cache::PermMute, Authorization, Error, ServerState};
+use crate::{prelude::*, state::permission_cache::PermMute};
 
 use sdk::api::commands::room::EditMessageBody;
 
@@ -39,7 +39,7 @@ pub async fn edit_message(
     let perms = match perms {
         Some(perm) => perm,
         None => {
-            let perms = crate::backend::api::perm::get_room_permissions(&db, auth.user_id(), room_id).await?;
+            let perms = crate::api::perm::get_room_permissions(&db, auth.user_id(), room_id).await?;
 
             if !perms.contains(Permissions::SEND_MESSAGES) {
                 return Err(Error::Unauthorized);
@@ -72,8 +72,8 @@ pub async fn edit_message(
         md_utils::trim_message(
             trimmed_content,
             Some(md_utils::TrimLimits {
-                len: config.message.message_len.clone(),
-                max_newlines: config.message.max_newlines,
+                len: config.shared.message_length.clone(),
+                max_newlines: config.shared.max_newlines as usize,
             }),
         )
     }) else {

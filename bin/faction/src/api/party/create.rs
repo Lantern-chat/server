@@ -3,20 +3,20 @@ use schema::SnowflakeExt;
 use sdk::{api::commands::party::CreatePartyForm, models::*};
 use smol_str::SmolStr;
 
-use crate::{Authorization, Error, ServerState};
-
+use crate::prelude::*;
 pub async fn create_party(state: ServerState, auth: Authorization, form: CreatePartyForm) -> Result<Party, Error> {
-    if !state.config().party.party_name_len.contains(&form.name.len()) {
+    if !state.config().shared.party_name_length.contains(&form.name.len()) {
         return Err(Error::InvalidName);
     }
 
-    let party_id = Snowflake::now();
-    let room_id = Snowflake::now();
+    let party_id = state.sf.gen();
+    let room_id = state.sf.gen();
 
     let default_role = Role {
         id: party_id,
         party_id,
         avatar: None,
+        desc: None,
         name: SmolStr::new_inline("@everyone"),
         permissions: Permissions::default(),
         color: None,

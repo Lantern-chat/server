@@ -4,24 +4,24 @@ use mfa_totp::{totp::TOTP6, MFA};
 use sdk::api::commands::user::{Added2FA, Confirm2FAForm, Enable2FAForm, Remove2FAForm};
 use sdk::models::{ElevationLevel, Snowflake, UserFlags};
 
-use crate::backend::util::encrypt::nonce_from_user_id;
-use crate::{Error, ServerState};
+use crate::prelude::*;
+use crate::util::encrypt::nonce_from_user_id;
 
 use super::login::ProvidedMfa;
 
 pub async fn enable_2fa(state: ServerState, user_id: Snowflake, form: Enable2FAForm) -> Result<Added2FA, Error> {
-    let config = state.config.load_full();
+    let config = state.config().clone();
 
-    if !config.account.password_len.contains(&form.password.len()) {
+    if !config.shared.password_length.contains(&form.password.len()) {
         return Err(Error::InvalidCredentials);
     }
 
     let _verified = state
         .services
         .hcaptcha
-        .verify(crate::backend::services::hcaptcha::HCaptchaParameters {
-            secret: &config.services.hcaptcha_secret,
-            sitekey: Some(&config.services.hcaptcha_sitekey),
+        .verify(crate::services::hcaptcha::HCaptchaParameters {
+            secret: &config.shared.hcaptcha_secret,
+            sitekey: Some(&config.shared.hcaptcha_sitekey),
             response: &form.token,
             remoteip: None, // TODO
         })
@@ -49,12 +49,13 @@ pub async fn enable_2fa(state: ServerState, user_id: Snowflake, form: Enable2FAF
 
     let mfa = MFA::generate(util::rng::crypto_thread_rng());
 
-    let Ok(ref encrypted_mfa) = mfa.encrypt(&config.keys.mfa_key, &nonce_from_user_id(user_id), &form.password)
+    let Ok(ref encrypted_mfa) =
+        mfa.encrypt(&config.local.keys.mfa_key, &nonce_from_user_id(user_id), &form.password)
     else {
         return Err(Error::InternalErrorStatic("Encryption Error"));
     };
 
-    let expires = SystemTime::now() + Duration::from_secs(config.account.mfa_pending_time.max(1) as u64);
+    let expires = SystemTime::now() + config.shared.mfa_pending_time.max(Duration::from_secs(1));
 
     // Upsert pending MFA
     #[rustfmt::skip]
@@ -71,7 +72,7 @@ pub async fn enable_2fa(state: ServerState, user_id: Snowflake, form: Enable2FAF
 
     Ok(Added2FA {
         // create URL for addition to an authenticator app
-        url: TOTP6::new(&mfa.key).url(email, &config.general.server_name),
+        url: TOTP6::new(&mfa.key).url(email, &config.shared.server_name),
         // encode each 64-bit backup code
         backup: Vec::from_iter(mfa.backups.iter().map(|code| {
             // NOTE: Little-Endian is used intentionally here
@@ -137,7 +138,7 @@ pub async fn confirm_2fa(state: ServerState, user_id: Snowflake, form: Confirm2F
 }
 
 pub async fn remove_2fa(state: ServerState, user_id: Snowflake, form: Remove2FAForm) -> Result<(), Error> {
-    if !state.config().account.password_len.contains(&form.password.len()) {
+    if !state.config().shared.password_length.contains(&form.password.len()) {
         return Err(Error::InvalidCredentials);
     }
 

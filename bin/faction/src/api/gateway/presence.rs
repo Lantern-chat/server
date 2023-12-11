@@ -1,6 +1,6 @@
 use sdk::models::{Snowflake, UserPresence};
 
-use crate::{Error, ServerState};
+use crate::prelude::*;
 
 pub async fn set_presence(
     state: ServerState,

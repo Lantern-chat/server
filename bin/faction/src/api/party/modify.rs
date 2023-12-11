@@ -1,8 +1,7 @@
 use schema::Snowflake;
 
 use crate::backend::asset::{maybe_add_asset, AssetMode};
-use crate::{Authorization, Error, ServerState};
-
+use crate::prelude::*;
 use sdk::api::commands::party::PatchPartyForm;
 use sdk::models::*;
 
@@ -118,5 +117,5 @@ pub async fn modify_party(
 
     t.commit().await?;
 
-    crate::backend::api::party::get::get_party(state, auth, party_id).await
+    crate::api::party::get::get_party(state, auth, party_id).await
 }

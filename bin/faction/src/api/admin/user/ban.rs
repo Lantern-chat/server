@@ -1,7 +1,6 @@
 use sdk::{models::UserFlags, Snowflake};
 
-use crate::{Authorization, Error, ServerState};
-
+use crate::prelude::*;
 pub async fn ban_user(state: ServerState, user_id: Snowflake) -> Result<(), Error> {
     let mut db = state.db.write.get().await?;
 

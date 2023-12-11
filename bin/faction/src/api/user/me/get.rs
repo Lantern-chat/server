@@ -1,7 +1,7 @@
 use sdk::models::*;
 use thorn::pg::Json;
 
-use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Error, ServerState};
+use crate::{prelude::*, util::encrypted_asset::encrypt_snowflake_opt};
 
 pub async fn get_full_self(state: &ServerState, user_id: Snowflake) -> Result<User, Error> {
     let db = state.db.read.get().await?;
@@ -44,12 +44,8 @@ pub async fn get_full_self_inner(
         flags: UserFlags::from_bits_truncate(row.flags()?),
         email: Some(row.email()?),
         presence: Some({
-            let last_active = crate::backend::util::relative::approximate_relative_time(
-                state,
-                user_id,
-                row.last_active()?,
-                None,
-            );
+            let last_active =
+                crate::util::relative::approximate_relative_time(state, user_id, row.last_active()?, None);
 
             match row.updated_at()? {
                 Some(updated_at) => UserPresence {

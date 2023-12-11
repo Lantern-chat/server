@@ -1,6 +1,6 @@
 use futures::{Stream, StreamExt};
 
-use crate::{backend::api::SearchMode, Error};
+use crate::{api::SearchMode, prelude::*};
 
 use sdk::models::*;
 

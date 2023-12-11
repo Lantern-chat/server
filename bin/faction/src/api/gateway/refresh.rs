@@ -4,7 +4,7 @@ use schema::flags::RoomMemberFlags;
 use sdk::models::{Permissions, Snowflake};
 
 use crate::backend::cache::permission_cache::PermMute;
-use crate::{Error, ServerState};
+use crate::prelude::*;
 
 pub async fn refresh_room_perms(
     state: &ServerState,

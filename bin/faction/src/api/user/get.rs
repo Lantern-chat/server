@@ -1,4 +1,4 @@
-use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, Authorization, Error, ServerState};
+use crate::{prelude::*, util::encrypted_asset::encrypt_snowflake_opt};
 
 use sdk::models::*;
 
@@ -39,7 +39,7 @@ pub async fn get_full_user(state: ServerState, auth: Authorization, user_id: Sno
             // only show last_active to associated users
             let last_active = match associated && row.try_get(AllowLastActiveColumns::allowed())? {
                 false => None,
-                true => crate::backend::util::relative::approximate_relative_time(
+                true => crate::util::relative::approximate_relative_time(
                     &state,
                     user_id,
                     row.try_get(UserColumns::last_active())?,

@@ -4,8 +4,7 @@ use futures::{future::Either, FutureExt, TryFutureExt};
 use schema::{Snowflake, SnowflakeExt};
 use smol_str::SmolStr;
 
-use crate::{Authorization, Error, ServerState};
-
+use crate::prelude::*;
 use sdk::{api::commands::invite::RedeemInviteBody, models::*};
 
 /*
@@ -21,7 +20,7 @@ pub async fn redeem_invite(
     code: SmolStr,
     body: RedeemInviteBody,
 ) -> Result<(), Error> {
-    let maybe_id = crate::backend::util::encrypted_asset::decrypt_snowflake(&state, &code);
+    let maybe_id = crate::util::encrypted_asset::decrypt_snowflake(&state, &code);
 
     let mut db = state.db.write.get().await?;
 
@@ -63,7 +62,7 @@ pub async fn redeem_invite(
 
     let update_member = async {
         if let Some(nickname) = body.nickname {
-            crate::backend::api::user::me::profile::patch_profile(
+            crate::api::user::me::profile::patch_profile(
                 state.clone(),
                 auth,
                 sdk::api::commands::user::UpdateUserProfileBody {
@@ -81,7 +80,7 @@ pub async fn redeem_invite(
     };
 
     let welcome_message = async {
-        let msg_id = Snowflake::now();
+        let msg_id = state.sf.gen();
 
         t.execute2(schema::sql! {
             INSERT INTO Messages (Id, UserId, RoomId, Kind) (

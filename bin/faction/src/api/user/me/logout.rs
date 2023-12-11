@@ -1,5 +1,4 @@
-use crate::{Authorization, Error, ServerState};
-
+use crate::prelude::*;
 pub async fn logout_user(state: &ServerState, auth: Authorization) -> Result<(), Error> {
     let Authorization::User { token, user_id, .. } = auth else {
         return Err(Error::BadRequest);

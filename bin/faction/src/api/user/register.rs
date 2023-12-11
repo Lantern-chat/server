@@ -1,9 +1,8 @@
 use std::{net::SocketAddr, time::SystemTime};
 
-use schema::{Snowflake, SnowflakeExt};
+use schema::Snowflake;
 
-use crate::backend::{services::hcaptcha::HCaptchaParameters, util::validation::*};
-use crate::{Error, ServerState};
+use crate::{prelude::*, services::hcaptcha::HCaptchaParameters, util::validation::*};
 
 use sdk::{api::commands::user::UserRegisterForm, models::Session};
 
@@ -26,7 +25,7 @@ pub async fn register_user(
 
     let now = SystemTime::now();
 
-    if !util::time::is_of_age(config.account.min_age as i32, now, dob) {
+    if !util::time::is_of_age(config.shared.minimum_age as i32, now, dob) {
         return Err(Error::InsufficientAge);
     }
 
@@ -34,8 +33,8 @@ pub async fn register_user(
         .services
         .hcaptcha
         .verify(HCaptchaParameters {
-            secret: &config.services.hcaptcha_secret,
-            sitekey: Some(&config.services.hcaptcha_sitekey),
+            secret: &config.shared.hcaptcha_secret,
+            sitekey: Some(&config.shared.hcaptcha_sitekey),
             response: &form.token,
             remoteip: None, // TODO
         })
@@ -45,7 +44,7 @@ pub async fn register_user(
 
     #[rustfmt::skip]
     let existing = read_db.query_opt2(schema::sql! {
-        SELECT 1 FROM Users WHERE Users.Email = #{&form.email as Users::Email}
+        SELECT FROM Users WHERE Users.Email = #{&form.email as Users::Email}
     }).await?;
 
     if existing.is_some() {
@@ -67,7 +66,7 @@ pub async fn register_user(
         res
     });
 
-    let id = Snowflake::now();
+    let id = state.sf.gen();
     let username = USERNAME_SANITIZE_REGEX.replace_all(&form.username, " ");
 
     let passhash = password_hash_task.await??;
