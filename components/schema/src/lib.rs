@@ -32,6 +32,7 @@ pub mod flags;
 pub mod names;
 pub mod roles;
 pub mod search;
+pub mod validation;
 
 pub fn has_all_permission_bits(
     perms: sdk::models::Permissions,

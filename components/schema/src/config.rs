@@ -1,7 +1,4 @@
-use std::{
-    ops::{Range, RangeInclusive},
-    time::Duration,
-};
+use std::{ops::RangeInclusive, time::Duration};
 
 use sdk::models::Timestamp;
 use smol_str::SmolStr;

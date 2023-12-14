@@ -18,12 +18,13 @@ pub async fn modify_party(
     {
         // TODO: Better errors
         let config = state.config();
-        if matches!(form.description, Nullable::Some(ref desc) if !config.party.party_description_len.contains(&desc.len()))
+        if matches!(form.description, Nullable::Some(ref desc) if !config.shared.party_description_length.contains(&desc.len()))
         {
             return Err(Error::BadRequest);
         }
 
-        if matches!(form.name, Some(ref name) if !config.party.party_name_len.contains(&name.len())) {
+        if matches!(form.name, Some(ref name) if !schema::validation::validation_name(name, config.shared.party_name_length))
+        {
             return Err(Error::InvalidName);
         }
     }

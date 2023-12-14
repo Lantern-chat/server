@@ -177,8 +177,8 @@ pub fn parse_search_terms(q: &str) -> Result<SearchTerms, SearchError> {
 
         let maybe_category_value = if arg.is_quoted() {
             if arg.is_quoted_with(('`', '`')) {
-                term.kind = SearchTermKind::Regex(normalize_regex_syntax(inner)?.into());
-                terms.insert(term);
+                //term.kind = SearchTermKind::Regex(normalize_regex_syntax(inner)?.into());
+                //terms.insert(term);
                 continue;
             }
 
@@ -385,7 +385,7 @@ fn normalize_similar(mut s: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{normalize_regex_syntax, normalize_similar, parse_search_terms};
+    use super::{normalize_similar, parse_search_terms};
 
     #[test]
     fn test_similar() {
@@ -393,10 +393,11 @@ mod tests {
 
         println!("{:?}", parse_search_terms("-prefix:\"!echo \""));
 
-        println!("{:?}", normalize_regex_syntax("(tes[ts])"));
+        //println!("{:?}", normalize_regex_syntax("(tes[ts])"));
     }
 }
 
+/*
 fn normalize_regex_syntax(re: &str) -> Result<String, SearchError> {
     use regex_syntax::ast::{parse::ParserBuilder, visit, Ast, Visitor};
 
@@ -430,3 +431,4 @@ fn normalize_regex_syntax(re: &str) -> Result<String, SearchError> {
 
     Ok(re.to_owned())
 }
+*/

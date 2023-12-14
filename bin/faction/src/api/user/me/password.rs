@@ -7,7 +7,7 @@ use super::login::ProvidedMfa;
 use crate::{
     api::user::register::{hash_config, hash_memory_cost},
     prelude::*,
-    util::{encrypt::nonce_from_user_id, validation::validate_password},
+    util::encrypt::nonce_from_user_id,
 };
 
 pub async fn change_password(
@@ -21,7 +21,9 @@ pub async fn change_password(
         return Err(Error::InvalidCredentials);
     };
 
-    validate_password(&config, &form.new)?;
+    if !schema::validation::validate_password(&form.new, config.shared.password_length.clone()) {
+        return Err(Error::InvalidPassword);
+    }
 
     #[rustfmt::skip]
     let user = state.db.read.get().await?.query_one2(schema::sql! {

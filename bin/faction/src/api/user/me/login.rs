@@ -2,7 +2,7 @@ use std::{net::SocketAddr, time::SystemTime};
 
 use schema::{auth::RawAuthToken, Snowflake};
 
-use crate::{prelude::*, util::validation::validate_email};
+use crate::prelude::*;
 
 use sdk::{
     api::commands::user::UserLoginForm,
@@ -14,6 +14,10 @@ pub async fn login(state: ServerState, addr: SocketAddr, mut form: UserLoginForm
         return Err(Error::InvalidCredentials);
     }
 
+    if !schema::validation::validate_email(&form.email) {
+        return Err(Error::InvalidEmail);
+    }
+
     // early validation
     if let Some(ref token) = form.totp {
         if token.is_empty() {
@@ -22,8 +26,6 @@ pub async fn login(state: ServerState, addr: SocketAddr, mut form: UserLoginForm
             validate_2fa_token(token)?;
         }
     }
-
-    validate_email(&form.email)?; // NOTE: Uses a regex, so it goes last.
 
     #[rustfmt::skip]
     let user = state.db.read.get().await?.query_opt2(schema::sql! {

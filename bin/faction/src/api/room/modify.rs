@@ -21,13 +21,15 @@ pub async fn modify_room(
     let name;
     {
         let config = state.config();
-        if matches!(form.topic, Nullable::Some(ref topic) if !config.party.room_topic_len.contains(&topic.len())) {
+        if matches!(form.topic, Nullable::Some(ref topic) if !config.shared.room_topic_length.contains(&topic.len()))
+        {
             return Err(Error::InvalidTopic);
         }
 
         name = form.name.as_ref().map(|name| schema::names::slug_name(name));
 
-        if matches!(name, Some(ref name) if !config.party.room_name_len.contains(&name.len())) {
+        if matches!(name, Some(ref name) if !schema::validation::validate_name(name, config.shared.room_name_length.clone()))
+        {
             return Err(Error::InvalidName);
         }
     }

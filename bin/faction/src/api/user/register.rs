@@ -1,8 +1,6 @@
 use std::{net::SocketAddr, time::SystemTime};
 
-use schema::Snowflake;
-
-use crate::{prelude::*, services::hcaptcha::HCaptchaParameters, util::validation::*};
+use crate::{prelude::*, services::hcaptcha::HCaptchaParameters};
 
 use sdk::{api::commands::user::UserRegisterForm, models::Session};
 
@@ -17,9 +15,15 @@ pub async fn register_user(
 
     let config = state.config();
 
-    validate_username(&config, &form.username)?;
-    validate_password(&config, &form.password)?;
-    validate_email(&form.email)?;
+    if !schema::validation::validate_email(&form.email) {
+        return Err(Error::InvalidEmail);
+    }
+    if !schema::validation::validate_username(&form.username, config.shared.username_length.clone()) {
+        return Err(Error::InvalidUsername);
+    }
+    if !schema::validation::validate_password(&form.password, config.shared.password_length.clone()) {
+        return Err(Error::InvalidPassword);
+    }
 
     let dob = form.dob.try_into()?;
 
@@ -67,8 +71,6 @@ pub async fn register_user(
     });
 
     let id = state.sf.gen();
-    let username = USERNAME_SANITIZE_REGEX.replace_all(&form.username, " ");
-
     let passhash = password_hash_task.await??;
 
     drop(_permit);
@@ -76,11 +78,11 @@ pub async fn register_user(
     #[rustfmt::skip]
     state.db.write.get().await?.execute2(schema::sql! {
         CALL .register_user(
-            #{&id           as Users::Id},
-            #{&username     as Users::Username},
-            #{&form.email   as Users::Email},
-            #{&passhash     as Users::Passhash},
-            #{&dob          as Users::Dob}
+            #{&id               as Users::Id},
+            #{&form.username    as Users::Username},
+            #{&form.email       as Users::Email},
+            #{&passhash         as Users::Passhash},
+            #{&dob              as Users::Dob}
         )
     }).await?;
 

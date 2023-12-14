@@ -19,7 +19,8 @@ pub async fn modify_role(
         return Err(Error::BadRequest);
     }
 
-    if matches!(form.name, Some(ref name) if !state.config().party.role_name_len.contains(&name.len())) {
+    if matches!(form.name, Some(ref name) if !schema::validation::validate_name(name, state.config().shared.role_name_length.clone()))
+    {
         return Err(Error::InvalidName);
     }
 
