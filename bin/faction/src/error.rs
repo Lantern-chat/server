@@ -81,6 +81,9 @@ pub enum Error {
     #[error("Insufficient Age")]
     InsufficientAge,
 
+    #[error("Invalid Date: {0}")]
+    InvalidDate(#[from] time::error::ComponentRange),
+
     #[error("Invalid Message Content")]
     InvalidContent,
 
@@ -207,6 +210,7 @@ impl Error {
             Error::InvalidPassword          => ApiErrorCode::InvalidPassword,
             Error::InvalidCredentials       => ApiErrorCode::InvalidCredentials,
             Error::InsufficientAge          => ApiErrorCode::InsufficientAge,
+            Error::InvalidDate(_)           => ApiErrorCode::InvalidDate,
             Error::InvalidContent           => ApiErrorCode::InvalidContent,
             Error::InvalidName              => ApiErrorCode::InvalidName,
             Error::InvalidTopic             => ApiErrorCode::InvalidTopic,

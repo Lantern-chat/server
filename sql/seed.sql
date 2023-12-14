@@ -126,24 +126,24 @@ CREATE TABLE lantern.config (
 
     -- General settings
     server_name         text        NOT NULL DEFAULT 'Lantern Chat',
-    service_uuid        uuid        NOT NULL DEFAULT gen_random_uuid(), -- v4
 
     -- Web settings
+    base_domain         text        NOT NULL DEFAULT 'lantern.chat',
     cdn_domain          text        NOT NULL DEFAULT 'cdn.lanternchat.net',
     strict_cdn          boolean     NOT NULL DEFAULT TRUE,
-    base_domain         text        NOT NULL DEFAULT 'lantern.chat',
     secure_web          boolean     NOT NULL DEFAULT TRUE,
     camo_enable         boolean     NOT NULL DEFAULT TRUE,
-    fs_cache_interval   interval    NOT NULL DEFAULT '2 Minutes',
-    fs_cache_max_age    interval    NOT NULL DEFAULT '1 Day',
+    fs_cache_interval   int8        NOT NULL DEFAULT (2 * MS_MINUTE),
+    fs_cache_max_age    int8        NOT NULL DEFAULT MS_DAY,
 
     -- Account settings
-    session_duration    interval    NOT NULL DEFAULT '90 Days',
+    session_duration    int8        NOT NULL DEFAULT (90 * MS_DAY),
     minimum_age         int2        NOT NULL DEFAULT 13,
     password_length     int4range   NOT NULL DEFAULT int4range(8, 9999),
     username_length     int4range   NOT NULL DEFAULT int4range(3, 96),
     mfa_backup_count    int2        NOT NULL DEFAULT 8,
-    mfa_pending_time    interval    NOT NULL DEFAULT '30 Minutes',
+    mfa_pending_time    int8        NOT NULL DEFAULT (30 * MS_MINUTE),
+    registration_token  text,
 
     -- User settings
     reltime_rnd_factor  float4      NOT NULL DEFAULT 0.1,
@@ -156,6 +156,7 @@ CREATE TABLE lantern.config (
     room_name_len       int4range   NOT NULL DEFAULT int4range(3, 64),
     room_topic_len      int4range   NOT NULL DEFAULT int4range(1, 512),
     role_name_len       int4range   NOT NULL DEFAULT int4range(1, 64),
+    role_desc_len       int4range   NOT NULL DEFAULT int4range(1, 256),
     max_active_rooms    int2        NOT NULL DEFAULT 128,
     max_total_rooms     int2        NOT NULL DEFAULT 1024,
 
@@ -168,7 +169,7 @@ CREATE TABLE lantern.config (
     -- Upload settings
     max_upload_size     int8        NOT NULL DEFAULT MAX_INT4, -- 2 GiB
     max_upload_chunk    int4        NOT NULL DEFAULT (MIBIBYTE * 8), -- 8 MiB
-    orphan_cleanup      interval    NOT NULL DEFAULT '1 Day',
+    orphan_cleanup      int8        NOT NULL DEFAULT MS_DAY,
 
     max_avatar_size     int4        NOT NULL DEFAULT (MIBIBYTE * 8),  -- 8 MiB
     max_banner_size     int4        NOT NULL DEFAULT (MIBIBYTE * 16), -- 16 MiB

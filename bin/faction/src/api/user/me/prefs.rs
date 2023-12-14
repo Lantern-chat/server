@@ -7,11 +7,7 @@ pub async fn update_prefs(
     auth: Authorization,
     mut prefs: UserPreferences,
 ) -> Result<(), Error> {
-    if let Err(e) = prefs.validate() {
-        return Err(Error::InvalidUserPreferences(e));
-    }
-
-    prefs.nullify_defaults();
+    prefs.clean();
 
     let db = state.db.write.get().await?;
     let prefs = Json(prefs);

@@ -1,6 +1,6 @@
 use schema::Snowflake;
 
-use crate::backend::asset::{maybe_add_asset, AssetMode};
+use crate::asset::{maybe_add_asset, AssetMode};
 use crate::prelude::*;
 use sdk::api::commands::party::PatchPartyForm;
 use sdk::models::*;
@@ -23,7 +23,7 @@ pub async fn modify_party(
             return Err(Error::BadRequest);
         }
 
-        if matches!(form.name, Some(ref name) if !schema::validation::validation_name(name, config.shared.party_name_length))
+        if matches!(form.name, Some(ref name) if !schema::validation::validate_name(name, config.shared.party_name_length.clone()))
         {
             return Err(Error::InvalidName);
         }

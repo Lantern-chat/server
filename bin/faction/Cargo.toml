@@ -46,6 +46,7 @@ dotenv.workspace = true
 anyhow.workspace = true
 argh.workspace = true
 
+time = "0.3"
 rand = "0.8"
 futures = "0.3"
 hashbrown.workspace = true

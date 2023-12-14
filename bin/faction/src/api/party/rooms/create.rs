@@ -10,7 +10,7 @@ pub async fn create_room(
     party_id: Snowflake,
     form: CreateRoomForm,
 ) -> Result<FullRoom, Error> {
-    let config = state.config().clone();
+    let config = state.config_full();
 
     match form.topic {
         Some(ref topic) if !config.shared.room_topic_length.contains(&topic.len()) => {

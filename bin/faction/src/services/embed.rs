@@ -23,7 +23,7 @@ impl EmbedClient {
         use rand::seq::SliceRandom;
         use std::borrow::Cow;
 
-        let config = state.config().clone();
+        let config = state.config_full();
 
         let Some(uri) = config.shared.embed_worker_uris.choose(&mut rand::thread_rng()) else {
             log::warn!("No Embed Worker URIs configured!");

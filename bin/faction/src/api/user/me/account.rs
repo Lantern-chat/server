@@ -1,10 +1,7 @@
 use sdk::models::Snowflake;
 use smol_str::SmolStr;
 
-use crate::{
-    prelude::*,
-    util::validation::{validate_email, validate_password, validate_username, USERNAME_SANITIZE_REGEX},
-};
+use crate::prelude::*;
 
 use super::login::ProvidedMfa;
 
@@ -27,15 +24,19 @@ pub async fn modify_account(
 ) -> Result<(), Error> {
     let mut num_fields = 0;
 
-    let config = state.config();
+    let config = state.config_full();
 
     if let Some(ref username) = form.new_username {
-        validate_username(&config, username)?;
+        if !schema::validation::validate_username(username, config.shared.username_length.clone()) {
+            return Err(Error::InvalidUsername);
+        }
         num_fields += 1;
     }
 
     if let Some(ref email) = form.new_email {
-        validate_email(email)?;
+        if !schema::validation::validate_email(email) {
+            return Err(Error::InvalidEmail);
+        }
         num_fields += 1;
     }
 
@@ -85,14 +86,12 @@ pub async fn modify_account(
     let e = form.new_email;
 
     if let Some(ref username) = form.new_username {
-        let new_username = USERNAME_SANITIZE_REGEX.replace_all(username, " ");
-
-        if old_username == new_username && num_fields == 1 {
+        if old_username == username && num_fields == 1 {
             // TODO: Move this up?
             return Ok(()); // stop here, even though time was wasted
         }
 
-        u = Some(new_username);
+        u = Some(username);
     }
 
     drop(user); // referenced data from `user` row no longer needed, last used borrow of username above.

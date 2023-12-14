@@ -129,6 +129,11 @@ impl<C> Config<C> {
     pub fn load(&self) -> arc_swap::Guard<Arc<C>> {
         self.config.load()
     }
+
+    #[inline]
+    pub fn load_full(&self) -> Arc<C> {
+        self.config.load_full()
+    }
 }
 
 pub trait HasConfig<C> {
@@ -136,6 +141,10 @@ pub trait HasConfig<C> {
 
     fn config(&self) -> arc_swap::Guard<Arc<C>> {
         self.raw().load()
+    }
+
+    fn config_full(&self) -> Arc<C> {
+        self.raw().load_full()
     }
 }
 

@@ -1,6 +1,5 @@
 use futures::stream::{FuturesUnordered, StreamExt};
 use hashbrown::HashSet;
-use schema::SnowflakeExt;
 use sdk::models::*;
 
 use crate::prelude::*;

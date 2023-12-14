@@ -10,7 +10,7 @@ use crate::util::encrypt::nonce_from_user_id;
 use super::login::ProvidedMfa;
 
 pub async fn enable_2fa(state: ServerState, user_id: Snowflake, form: Enable2FAForm) -> Result<Added2FA, Error> {
-    let config = state.config().clone();
+    let config = state.config_full();
 
     if !config.shared.password_length.contains(&form.password.len()) {
         return Err(Error::InvalidCredentials);

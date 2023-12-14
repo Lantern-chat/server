@@ -15,7 +15,7 @@ pub async fn change_password(
     auth: Authorization,
     form: ChangePasswordForm,
 ) -> Result<(), Error> {
-    let config = state.config().clone();
+    let config = state.config_full();
 
     if !config.shared.password_length.contains(&form.current.len()) {
         return Err(Error::InvalidCredentials);

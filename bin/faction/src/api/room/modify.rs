@@ -2,7 +2,7 @@ use hashbrown::HashSet;
 use schema::Snowflake;
 
 use crate::api::party::rooms::create::RawOverwrites;
-use crate::backend::asset::{maybe_add_asset, AssetMode};
+use crate::asset::{maybe_add_asset, AssetMode};
 use crate::prelude::*;
 use sdk::api::commands::room::PatchRoomForm;
 use sdk::models::*;

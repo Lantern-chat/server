@@ -13,6 +13,7 @@ pub mod built {
 
 pub mod allocator;
 pub mod api;
+pub mod asset;
 pub mod config;
 pub mod error;
 pub mod services;
