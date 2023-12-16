@@ -87,9 +87,6 @@ pub async fn modify_party(
     let mut db = state.db.write.get().await?;
     let t = db.transaction().await?;
 
-    let party_name = form.name.as_deref();
-    let party_flags = form.flags.as_ref().copied();
-
     #[rustfmt::skip]
     let res = t.execute2(schema::sql! {
         tables! {
@@ -107,13 +104,13 @@ pub async fn modify_party(
         }
 
         UPDATE Party SET
-            if form.name.is_some()              { Party./Name        = #{&party_name as Party::Name}, }
+            if form.name.is_some()              { Party./Name        = #{&form.name as Party::Name}, }
             if !form.description.is_undefined() { Party./Description = #{&form.description as Party::Description}, }
             if !avatar_id.is_undefined()        { Party./AvatarId    = #{&avatar_id as Party::AvatarId}, }
             if !banner_id.is_undefined()        { Party./BannerId    = #{&avatar_id as Party::BannerId}, }
             if set_room                         { Party./DefaultRoom = TempDefaultRoom.Id, }
 
-            Party./Flags = COALESCE(#{&party_flags as Party::Flags}, Party./Flags)
+            Party./Flags = COALESCE(#{&form.flags as Party::Flags}, Party./Flags)
         if set_room { FROM TempDefaultRoom }
         WHERE Party.Id = #{&party_id as Party::Id}
     }).await?;

@@ -9,8 +9,8 @@ use crate::{
 pub async fn patch_profile(
     state: ServerState,
     auth: Authorization,
-    mut profile: UpdateUserProfileBody,
     party_id: Option<Snowflake>,
+    profile: &Archived<UpdateUserProfileBody>,
 ) -> Result<UserProfile, Error> {
     {
         // TODO: Better errors here
@@ -72,25 +72,30 @@ pub async fn patch_profile(
         }
     }
 
-    if has_assets {
-        // No change, don't change
-        if Nullable::from(old_avatar_id) == profile.avatar {
-            profile.avatar = Nullable::Undefined;
-        }
-
-        if Nullable::from(old_banner_id) == profile.banner {
-            profile.banner = Nullable::Undefined;
-        }
-    }
-
     if !perms.contains(Permissions::CHANGE_NICKNAME) && profile.nick.is_some() {
         return Err(Error::Unauthorized);
     }
 
-    let (avatar_id, banner_id) = tokio::try_join!(
-        maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), profile.avatar),
-        maybe_add_asset(&state, AssetMode::Banner, auth.user_id(), profile.banner),
-    )?;
+    let (avatar_id, banner_id) = {
+        let mut new_avatar = profile.avatar;
+        let mut new_banner = profile.banner;
+
+        if has_assets {
+            // No change, don't change
+            if Nullable::<Snowflake>::from(old_avatar_id) == profile.avatar {
+                new_avatar = Nullable::Undefined;
+            }
+
+            if Nullable::<Snowflake>::from(old_banner_id) == profile.banner {
+                new_banner = Nullable::Undefined;
+            }
+        }
+
+        tokio::try_join!(
+            maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), new_avatar),
+            maybe_add_asset(&state, AssetMode::Banner, auth.user_id(), new_banner),
+        )?
+    };
 
     #[rustfmt::skip]
     let res = state.db.write.get().await?.execute2(schema::sql! {
@@ -121,9 +126,9 @@ pub async fn patch_profile(
     Ok(UserProfile {
         bits: profile.bits,
         extra: Default::default(),
-        nick: profile.nick,
-        status: profile.status,
-        bio: profile.bio,
+        nick: simple_de(&profile.nick),
+        status: simple_de(&profile.status),
+        bio: simple_de(&profile.bio),
         avatar: avatar_id.map(|id| encrypt_snowflake(&state, id)),
         banner: banner_id.map(|id| encrypt_snowflake(&state, id)),
     })

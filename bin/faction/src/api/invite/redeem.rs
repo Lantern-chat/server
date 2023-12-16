@@ -65,11 +65,11 @@ pub async fn redeem_invite(
             crate::api::user::me::profile::patch_profile(
                 state.clone(),
                 auth,
-                sdk::api::commands::user::UpdateUserProfileBody {
-                    nick: Nullable::Some(nickname),
-                    ..Default::default()
-                },
                 Some(party_id),
+                todo!(), //sdk::api::commands::user::UpdateUserProfileBody {
+                         //    nick: Nullable::Some(nickname),
+                         //    ..Default::default()
+                         //},
             )
             // avoid inlining this future
             .boxed()
