@@ -1,11 +1,14 @@
-use schema::SnowflakeExt;
-
 use sdk::{api::commands::party::CreatePartyForm, models::*};
 use smol_str::SmolStr;
 
 use crate::prelude::*;
-pub async fn create_party(state: ServerState, auth: Authorization, form: CreatePartyForm) -> Result<Party, Error> {
-    if !state.config().shared.party_name_length.contains(&form.name.len()) {
+
+pub async fn create_party(
+    state: ServerState,
+    auth: Authorization,
+    form: &Archived<CreatePartyForm>,
+) -> Result<Party, Error> {
+    if !schema::validation::validate_name(&form.name, state.config().shared.party_name_length.clone()) {
         return Err(Error::InvalidName);
     }
 
@@ -27,8 +30,8 @@ pub async fn create_party(state: ServerState, auth: Authorization, form: CreateP
     let mut party = Party {
         partial: PartialParty {
             id: party_id,
-            name: form.name,
-            description: form.description,
+            name: SmolStr::from(&*form.name),
+            description: form.description.as_deref().map(SmolStr::from),
         },
         flags: form.flags,
         avatar: None,

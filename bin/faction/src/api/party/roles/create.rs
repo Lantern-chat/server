@@ -1,16 +1,17 @@
 use sdk::{api::commands::party::CreateRoleForm, models::*};
 
 use crate::prelude::*;
+
 pub async fn create_role(
     state: ServerState,
     auth: Authorization,
     party_id: Snowflake,
-    form: CreateRoleForm,
+    form: &Archived<CreateRoleForm>,
 ) -> Result<Role, Error> {
     {
         let config = state.config();
 
-        if !config.shared.role_name_length.contains(&form.name.len()) {
+        if !schema::validation::validate_name(&form.name, config.shared.role_name_length.clone()) {
             return Err(Error::InvalidName);
         }
     }
@@ -84,7 +85,7 @@ pub async fn create_role(
         party_id,
         avatar: None,
         desc: None,
-        name: form.name,
+        name: SmolStr::from(&*form.name),
         permissions: Permissions::empty(),
         color: None,
         position,

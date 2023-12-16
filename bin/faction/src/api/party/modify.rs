@@ -9,9 +9,9 @@ pub async fn modify_party(
     state: ServerState,
     auth: Authorization,
     party_id: Snowflake,
-    mut form: PatchPartyForm,
+    form: &Archived<PatchPartyForm>,
 ) -> Result<Party, Error> {
-    if form == PatchPartyForm::default() {
+    if *form == PatchPartyForm::default() {
         return Err(Error::BadRequest);
     }
 
@@ -23,7 +23,7 @@ pub async fn modify_party(
             return Err(Error::BadRequest);
         }
 
-        if matches!(form.name, Some(ref name) if !schema::validation::validate_name(name, config.shared.party_name_length.clone()))
+        if matches!(form.name.as_ref(), Some(name) if !schema::validation::validate_name(name, config.shared.party_name_length.clone()))
         {
             return Err(Error::InvalidName);
         }
@@ -59,28 +59,36 @@ pub async fn modify_party(
         return Err(Error::Unauthorized);
     }
 
-    if has_assets {
-        let old_avatar_id: Nullable<Snowflake> = row.avatar_file_id()?;
-        let old_banner_id: Nullable<Snowflake> = row.banner_file_id()?;
+    let (avatar_id, banner_id) = {
+        let mut new_avatar = form.avatar;
+        let mut new_banner = form.banner;
 
-        if old_avatar_id == form.avatar {
-            form.avatar = Nullable::Undefined;
+        if has_assets {
+            let old_avatar_id: Nullable<Snowflake> = row.avatar_file_id()?;
+            let old_banner_id: Nullable<Snowflake> = row.banner_file_id()?;
+
+            if old_avatar_id == form.avatar {
+                new_avatar = Nullable::Undefined;
+            }
+
+            if old_banner_id == form.banner {
+                new_banner = Nullable::Undefined;
+            }
         }
 
-        if old_banner_id == form.banner {
-            form.banner = Nullable::Undefined;
-        }
-    }
-
-    let (avatar_id, banner_id) = tokio::try_join!(
-        maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), form.avatar),
-        maybe_add_asset(&state, AssetMode::Banner, auth.user_id(), form.banner),
-    )?;
+        tokio::try_join!(
+            maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), new_avatar),
+            maybe_add_asset(&state, AssetMode::Banner, auth.user_id(), new_banner),
+        )?
+    };
 
     let set_room = form.default_room.is_some();
 
     let mut db = state.db.write.get().await?;
     let t = db.transaction().await?;
+
+    let party_name = form.name.as_deref();
+    let party_flags = form.flags.as_ref().copied();
 
     #[rustfmt::skip]
     let res = t.execute2(schema::sql! {
@@ -99,13 +107,13 @@ pub async fn modify_party(
         }
 
         UPDATE Party SET
-            if form.name.is_some()              { Party./Name        = #{&form.name as Party::Name}, }
+            if form.name.is_some()              { Party./Name        = #{&party_name as Party::Name}, }
             if !form.description.is_undefined() { Party./Description = #{&form.description as Party::Description}, }
             if !avatar_id.is_undefined()        { Party./AvatarId    = #{&avatar_id as Party::AvatarId}, }
             if !banner_id.is_undefined()        { Party./BannerId    = #{&avatar_id as Party::BannerId}, }
             if set_room                         { Party./DefaultRoom = TempDefaultRoom.Id, }
 
-            Party./Flags = COALESCE(#{&form.flags as Party::Flags}, Party./Flags)
+            Party./Flags = COALESCE(#{&party_flags as Party::Flags}, Party./Flags)
         if set_room { FROM TempDefaultRoom }
         WHERE Party.Id = #{&party_id as Party::Id}
     }).await?;

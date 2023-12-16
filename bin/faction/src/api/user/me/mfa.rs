@@ -81,7 +81,11 @@ pub async fn enable_2fa(state: ServerState, user_id: Snowflake, form: Enable2FAF
     })
 }
 
-pub async fn confirm_2fa(state: ServerState, user_id: Snowflake, form: Confirm2FAForm) -> Result<(), Error> {
+pub async fn confirm_2fa(
+    state: ServerState,
+    user_id: Snowflake,
+    form: &Archived<Confirm2FAForm>,
+) -> Result<(), Error> {
     if form.totp.len() != 6 {
         return Err(Error::TOTPRequired);
     }

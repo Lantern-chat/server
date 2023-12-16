@@ -7,7 +7,7 @@ use sdk::{api::commands::user::UserRegisterForm, models::Session};
 pub async fn register_user(
     state: ServerState,
     addr: SocketAddr,
-    mut form: UserRegisterForm,
+    form: &Archived<UserRegisterForm>,
 ) -> Result<Session, Error> {
     //if cfg!(debug_assertions) {
     //    return Err(Error::TemporarilyDisabled);
@@ -25,7 +25,7 @@ pub async fn register_user(
         return Err(Error::InvalidPassword);
     }
 
-    let dob = form.dob.try_into()?;
+    let dob = simple_de::<Timestamp>(&form.dob).date();
 
     let now = SystemTime::now();
 
@@ -55,7 +55,8 @@ pub async fn register_user(
         return Err(Error::AlreadyExists);
     }
 
-    let password = std::mem::take(&mut form.password);
+    // SAFETY: This value is only used in the below blocking future
+    let password: &'static str = unsafe { std::mem::transmute(form.password.as_str()) };
 
     let _permit = state.mem_semaphore.acquire_many(hash_memory_cost()).await?;
 
@@ -74,6 +75,7 @@ pub async fn register_user(
     let passhash = password_hash_task.await??;
 
     drop(_permit);
+    drop(password);
 
     #[rustfmt::skip]
     state.db.write.get().await?.execute2(schema::sql! {

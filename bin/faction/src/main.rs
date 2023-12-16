@@ -16,6 +16,7 @@ pub mod api;
 pub mod asset;
 pub mod config;
 pub mod error;
+pub mod rpc;
 pub mod services;
 pub mod state;
 pub mod util;
@@ -24,9 +25,20 @@ pub mod prelude {
     pub use crate::error::Error;
     pub use crate::state::ServerState;
     pub use rpc::auth::Authorization;
+    pub use sdk::models::{Nullable, SmolStr, Timestamp};
 
     pub use crate::config::Config;
     pub use config::HasConfig;
+
+    pub use rkyv::Archived;
+
+    pub fn simple_de<T>(value: &Archived<T>) -> T
+    where
+        T: rkyv::Archive,
+        Archived<T>: rkyv::Deserialize<T, rkyv::Infallible>,
+    {
+        rkyv::Deserialize::deserialize(value, &mut rkyv::Infallible).unwrap()
+    }
 }
 
 #[tokio::main(flavor = "multi_thread")]

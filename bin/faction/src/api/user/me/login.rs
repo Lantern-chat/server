@@ -9,7 +9,11 @@ use sdk::{
     models::{ElevationLevel, Session, UserFlags},
 };
 
-pub async fn login(state: ServerState, addr: SocketAddr, mut form: UserLoginForm) -> Result<Session, Error> {
+pub async fn login(
+    state: ServerState,
+    addr: SocketAddr,
+    form: &Archived<UserLoginForm>,
+) -> Result<Session, Error> {
     if form.password.len() < 8 {
         return Err(Error::InvalidCredentials);
     }
@@ -18,12 +22,16 @@ pub async fn login(state: ServerState, addr: SocketAddr, mut form: UserLoginForm
         return Err(Error::InvalidEmail);
     }
 
+    let mut totp = None;
+
     // early validation
-    if let Some(ref token) = form.totp {
+    if let Some(token) = form.totp.as_ref() {
         if token.is_empty() {
-            form.totp = None;
+            totp = None;
         } else {
             validate_2fa_token(token)?;
+
+            totp = Some(token);
         }
     }
 
@@ -79,7 +87,7 @@ pub async fn login(state: ServerState, addr: SocketAddr, mut form: UserLoginForm
             user_id,
             ProvidedMfa::Encrypted(mfa),
             &form.password,
-            &form.totp.unwrap(),
+            &totp.unwrap(),
         )
         .await?
         {

@@ -1,8 +1,12 @@
+use std::net::SocketAddr;
+
 use sdk::api::commands::all::*;
 
 #[derive(Debug, rkyv::Archive, rkyv::Serialize)]
 pub struct Message {
     pub proc: Procedure,
+
+    pub addr: SocketAddr,
 
     #[with(rkyv::with::Niche)]
     pub auth: Option<Box<crate::auth::Authorization>>,
@@ -167,21 +171,22 @@ decl_procs! { #[repr(u16)] {
     303 = RedeemInvite,
 
     401 = GetParty,
-    402 = PatchParty,
-    403 = DeleteParty,
-    404 = TransferOwnership,
-    405 = CreateRole,
-    406 = PatchRole,
-    407 = DeleteRole,
-    408 = GetPartyMembers,
-    409 = GetPartyRooms,
-    410 = GetPartyInvites,
-    411 = GetMemberProfile,
-    412 = UpdateMemberProfile,
-    413 = CreatePartyInvite,
-    414 = CreatePinFolder,
-    415 = CreateRoom,
-    416 = SearchParty,
+    402 = CreateParty,
+    403 = PatchParty,
+    404 = DeleteParty,
+    405 = TransferOwnership,
+    406 = CreateRole,
+    407 = PatchRole,
+    408 = DeleteRole,
+    409 = GetPartyMembers,
+    410 = GetPartyRooms,
+    411 = GetPartyInvites,
+    412 = GetMemberProfile,
+    413 = UpdateMemberProfile,
+    414 = CreatePartyInvite,
+    415 = CreatePinFolder,
+    416 = CreateRoom,
+    417 = SearchParty,
 
     501 = CreateMessage,
     502 = EditMessage,

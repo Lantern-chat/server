@@ -17,7 +17,7 @@ pub async fn add_reaction(
         return Err(Error::Unauthorized);
     }
 
-    let reaction_id = Snowflake::now();
+    let reaction_id = state.sf.gen();
 
     #[rustfmt::skip]
     let row = state.db.write.get().await?.query_opt2(schema::sql! {

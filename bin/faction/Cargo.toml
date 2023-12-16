@@ -16,7 +16,9 @@ built.workspace = true
 sdk = { workspace = true }
 rpc.workspace = true
 smol_str = { version = "0.2", features = ["serde", "pg"] }
+rkyv = { workspace = true, features = ["pg"] }
 
+quinn.workspace = true
 reqwest.workspace = true
 headers.workspace = true
 tokio = { workspace = true, features = ["full"] }

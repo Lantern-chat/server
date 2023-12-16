@@ -5,8 +5,10 @@ use thorn::pg::Json;
 pub async fn update_prefs(
     state: ServerState,
     auth: Authorization,
-    mut prefs: UserPreferences,
+    prefs: &Archived<UserPreferences>,
 ) -> Result<(), Error> {
+    let mut prefs = simple_de::<UserPreferences>(prefs);
+
     prefs.clean();
 
     let db = state.db.write.get().await?;
