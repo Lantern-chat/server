@@ -12,10 +12,16 @@ pub struct Message {
     pub auth: Option<Box<crate::auth::Authorization>>,
 }
 
+const fn mirror_tag(t: u16) -> u32 {
+    let le = t.to_le_bytes();
+    let be = t.to_be_bytes();
+    u32::from_le_bytes([le[0], le[1], be[0], be[1]])
+}
+
 macro_rules! decl_procs {
-    (#[repr($repr:ty)] { $($code:literal = $cmd:ident),*$(,)? }) => {
+    ($($code:literal = $cmd:ident),*$(,)?) => {
         #[derive(Debug)]
-        #[repr($repr)]
+        #[repr(u16)]
         pub enum Procedure {
             $($cmd(Box<$cmd>) = $code,)*
         }
@@ -36,30 +42,45 @@ macro_rules! decl_procs {
             }
         )*
 
-        #[repr($repr)]
-        pub enum ArchivedProcedure {
-            $($cmd(rkyv::Archived<Box<$cmd>>) = $code,)*
+        #[cfg(test)]
+        mod decl_procs_tests {
+            use super::*;
+
+            #[test]
+            fn test_mirror_tag() {$(
+                println!("0x{:04X} -> 0x{:08X} <-> 0x{:08X}", $code, mirror_tag($code), mirror_tag($code).swap_bytes());
+                assert_eq!(mirror_tag($code), mirror_tag($code).swap_bytes());
+            )*}
         }
 
-        #[repr($repr)]
-        pub enum ProcedureResolver {
-            $($cmd(rkyv::Resolver<Box<$cmd>>) = $code,)*
-        }
+        pub use proc_impl::{ArchivedProcedure, ProcedureResolver};
 
-        const _: () = {paste::paste! {
-            use core::marker::PhantomData;
-            use rkyv::{Archive, Archived, Serialize, Fallible, Deserialize};
+        mod proc_impl {paste::paste! {
+            use super::*;
 
             #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-            #[repr($repr)]
-            enum Tag {
-                $($cmd = $code,)*
+            #[repr(u32)]
+            enum ArchivedTag {
+                $($cmd = mirror_tag($code),)*
             }
+
+            #[repr(u32)]
+            pub enum ArchivedProcedure {
+                $($cmd(rkyv::Archived<Box<$cmd>>) = ArchivedTag::$cmd as u32,)*
+            }
+
+            #[repr(u16)]
+            pub enum ProcedureResolver {
+                $($cmd(rkyv::Resolver<Box<$cmd>>) = $code,)*
+            }
+
+            use core::marker::PhantomData;
+            use rkyv::{Archive, Archived, Serialize, Fallible, Deserialize};
 
             $(
                 #[repr(C)]
                 struct [<Archived $cmd Variant>] {
-                    tag: Tag,
+                    tag: ArchivedTag,
                     cmd: Archived<Box<$cmd>>,
                     mkr: PhantomData<Procedure>,
                 }
@@ -74,7 +95,7 @@ macro_rules! decl_procs {
                         ProcedureResolver::$cmd(resolver_0) => match self {
                             Procedure::$cmd(self_0) => {
                                 let out = out.cast::<[<Archived $cmd Variant>]>();
-                                core::ptr::addr_of_mut!((*out).tag).write(Tag::$cmd);
+                                core::ptr::addr_of_mut!((*out).tag).write(ArchivedTag::$cmd);
                                 let (fp, fo) = rkyv::out_field!(out.cmd);
                                 rkyv::Archive::resolve(self_0, pos + fp, resolver_0, fo);
                             },
@@ -106,31 +127,30 @@ macro_rules! decl_procs {
 
             use rkyv::bytecheck::{CheckBytes, EnumCheckError, ErrorBox, TupleStructCheckError};
 
-            #[allow(non_upper_case_globals)]
-            mod discriminant {
-                $(pub const $cmd: $repr = $code;)*
-            }
-
             impl<C: ?Sized> CheckBytes<C> for ArchivedProcedure
                 where $(Archived<Box<$cmd>>: CheckBytes<C>,)*
             {
-                type Error = EnumCheckError<$repr>;
+                type Error = EnumCheckError<u32>;
 
-                unsafe fn check_bytes<'a>(value: *const Self, context: &mut C) -> Result<&'a Self, EnumCheckError<$repr>> {
-                    let tag = *value.cast::<$repr>();
+                unsafe fn check_bytes<'a>(value: *const Self, context: &mut C) -> Result<&'a Self, Self::Error> {
+                    let tag = *value.cast::<u32>();
+
+                    struct Discriminant;
+
+                    #[allow(non_upper_case_globals)]
+                    impl Discriminant {
+                        $(pub const $cmd: u32 = ArchivedTag::$cmd as u32;)*
+                    }
 
                     match tag {
                     $(
-                        discriminant::$cmd => {
+                        Discriminant::$cmd => {
                             let value = value.cast::<[<Archived $cmd Variant>]>();
 
                             if let Err(e) = <Archived<Box<$cmd>> as CheckBytes<C>>::check_bytes(core::ptr::addr_of!((*value).cmd), context) {
                                 return Err(EnumCheckError::InvalidTuple {
                                     variant_name: stringify!($cmd),
-                                    inner: TupleStructCheckError {
-                                        field_index: 0,
-                                        inner: ErrorBox::new(e),
-                                    }
+                                    inner: TupleStructCheckError { field_index: 0, inner: ErrorBox::new(e) }
                                 });
                             }
                         }
@@ -141,11 +161,11 @@ macro_rules! decl_procs {
                     Ok(&*value)
                 }
             }
-        }};
+        }}
     };
 }
 
-decl_procs! { #[repr(u16)] {
+decl_procs! {
     0   = GetServerConfig,
 
     101 = UserRegister,
@@ -203,7 +223,7 @@ decl_procs! { #[repr(u16)] {
     513 = DeleteAllReactions,
     514 = GetReactions,
     515 = PatchRoom,
-}}
+}
 
 #[cfg(test)]
 mod tests {
@@ -215,6 +235,8 @@ mod tests {
     fn test_rkyv() {
         let p = rkyv::to_bytes::<_, 256>(&Procedure::from(GetServerConfig::new())).unwrap();
         let a = rkyv::check_archived_root::<Procedure>(&p).unwrap();
-        let _: Procedure = a.deserialize(&mut rkyv::Infallible).unwrap();
+        let Procedure::GetServerConfig(_) = a.deserialize(&mut rkyv::Infallible).unwrap() else {
+            panic!("Wrong variant");
+        };
     }
 }
