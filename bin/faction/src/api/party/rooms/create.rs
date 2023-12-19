@@ -8,15 +8,13 @@ pub async fn create_room(
     state: ServerState,
     auth: Authorization,
     party_id: Snowflake,
-    form: CreateRoomForm,
+    form: &Archived<CreateRoomForm>,
 ) -> Result<FullRoom, Error> {
     let config = state.config_full();
 
-    match form.topic {
-        Some(ref topic) if !config.shared.room_topic_length.contains(&topic.len()) => {
-            return Err(Error::InvalidTopic);
-        }
-        _ => {}
+    if matches!(form.topic.as_deref(), Some(ref topic) if !config.shared.room_topic_length.contains(&topic.len()))
+    {
+        return Err(Error::InvalidTopic);
     }
 
     let name = schema::names::slug_name(&form.name);
@@ -58,7 +56,7 @@ pub async fn create_room(
         CreateRoomKind::UserForum => RoomFlags::from(RoomKind::UserForum),
     };
 
-    let raw = RawOverwrites::new(form.overwrites);
+    let raw = RawOverwrites::new(simple_de(&form.overwrites));
     let room_id = state.sf.gen();
 
     let mut db = state.db.write.get().await?;

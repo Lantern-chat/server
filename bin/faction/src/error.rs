@@ -143,6 +143,9 @@ pub enum Error {
 
     #[error("Search Error: {0}")]
     SearchError(#[from] schema::search::SearchError),
+
+    #[error("Rkyv Encoding Error")]
+    RkyvEncodingError,
 }
 
 impl From<db::pg::Error> for Error {
@@ -165,6 +168,7 @@ impl Error {
             //| Error::EventEncodingError(_)
             | Error::IOError(_)
             | Error::RequestError(_)
+            | Error::RkyvEncodingError
             | Error::Unimplemented
         )
     }
@@ -197,6 +201,7 @@ impl Error {
             Error::SemaphoreError(_)        => ApiErrorCode::SemaphoreError,
             Error::HashError(_)             => ApiErrorCode::HashError,
             //Error::EventEncodingError(_)    => ApiErrorCode::EventEncodingError,
+            Error::RkyvEncodingError        => ApiErrorCode::RkyvEncodingError,
             | Error::Utf8ParseError(_)
             | Error::Utf8CheckError(_)      => ApiErrorCode::Utf8ParseError,
             Error::IOError(_)               => ApiErrorCode::IOError,

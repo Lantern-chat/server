@@ -4,6 +4,7 @@ use schema::Snowflake;
 use crate::api::party::rooms::create::RawOverwrites;
 use crate::asset::{maybe_add_asset, AssetMode};
 use crate::prelude::*;
+
 use sdk::api::commands::room::PatchRoomForm;
 use sdk::models::*;
 
@@ -11,10 +12,10 @@ pub async fn modify_room(
     state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
-    mut form: PatchRoomForm,
+    form: &Archived<PatchRoomForm>,
 ) -> Result<FullRoom, Error> {
     // TODO: Maybe change this?
-    if form == PatchRoomForm::default() {
+    if *form == PatchRoomForm::default() {
         return Err(Error::BadRequest);
     }
 
@@ -70,25 +71,28 @@ pub async fn modify_room(
         old_avatar_id = row.avatar_file_id()?;
     }
 
-    if has_assets && old_avatar_id == form.avatar {
-        form.avatar = Nullable::Undefined;
-    }
+    let position = form.position.as_ref().map(|p| *p as i16);
 
-    let avatar_id = maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), form.avatar).await?;
-    let position = form.position.map(|p| p as i16);
+    let avatar_id = 'avatar: {
+        // no change needed
+        if has_assets && old_avatar_id == form.avatar {
+            break 'avatar Nullable::Undefined;
+        }
+
+        maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), form.avatar).await?
+    };
+
+    let mut remove_overwrites: HashSet<Snowflake> =
+        HashSet::from_iter(form.remove_overwrites.as_slice().into_iter().copied());
 
     // unique + avoiding conflicts
     if !form.remove_overwrites.is_empty() {
-        let mut to_remove: HashSet<Snowflake> = HashSet::from_iter(form.remove_overwrites);
-
-        for ow in &form.overwrites {
-            to_remove.remove(&ow.id);
+        for ow in form.overwrites.as_slice() {
+            remove_overwrites.remove(&ow.id);
         }
-
-        form.remove_overwrites = to_remove.into_iter().collect();
     }
 
-    let raw = RawOverwrites::new(form.overwrites);
+    let raw = RawOverwrites::new(simple_de(&form.overwrites));
 
     let mut db = state.db.write.get().await?;
     let t = db.transaction().await?;
@@ -167,7 +171,7 @@ pub async fn modify_room(
             if position.is_some()         { Rooms./Position = #{&position   as Rooms::Position}, }
             if !form.topic.is_undefined() { Rooms./Topic    = #{&form.topic as Rooms::Topic}, }
             if !avatar_id.is_undefined()  { Rooms./AvatarId = #{&avatar_id  as Rooms::AvatarId}, }
-            Rooms./Flags = match form.nsfw {
+            Rooms./Flags = match form.nsfw.as_ref().copied() {
                 Some(true)  => { Rooms./Flags |  {RoomFlags::NSFW.bits()} },
                 Some(false) => { Rooms./Flags & ~{RoomFlags::NSFW.bits()} },
                 None        => { Rooms./Flags }

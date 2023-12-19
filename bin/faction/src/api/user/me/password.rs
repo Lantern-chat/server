@@ -13,7 +13,7 @@ use crate::{
 pub async fn change_password(
     state: ServerState,
     auth: Authorization,
-    form: ChangePasswordForm,
+    form: &Archived<ChangePasswordForm>,
 ) -> Result<(), Error> {
     let config = state.config_full();
 
@@ -48,7 +48,7 @@ pub async fn change_password(
     let mut new_mfa = None;
 
     // if MFA is enabled, it needs to be verified and re-encrypted with the new password
-    if let (Some(token), Some(mfa)) = (form.totp, encrypted_mfa) {
+    if let (Some(token), Some(mfa)) = (form.totp.as_deref(), encrypted_mfa) {
         let mfa_key = config.local.keys.mfa_key;
         let nonce = nonce_from_user_id(auth.user_id());
 
@@ -70,12 +70,15 @@ pub async fn change_password(
 
     let _permit = state.mem_semaphore.acquire_many(hash_memory_cost()).await?;
 
+    // SAFETY: Only used for the duration of the below spawn_blocking
+    let new_password: &'static str = unsafe { core::mem::transmute(form.new.as_str()) };
+
     let password_hash_task = tokio::task::spawn_blocking(move || {
         use rand::Rng;
 
         let config = hash_config();
         let salt: [u8; 16] = util::rng::crypto_thread_rng().gen();
-        let res = argon2::hash_encoded(form.new.as_bytes(), &salt, &config);
+        let res = argon2::hash_encoded(new_password.as_bytes(), &salt, &config);
 
         res
     });
@@ -83,6 +86,7 @@ pub async fn change_password(
     let passhash = password_hash_task.await??;
 
     drop(_permit);
+    drop(form); // SAFETY: Make sure form lives through the hash task
 
     #[rustfmt::skip]
     state.db.write.get().await?.execute2(schema::sql! {

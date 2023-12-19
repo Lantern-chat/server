@@ -16,7 +16,7 @@ pub async fn create_message(
     state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
-    body: CreateMessageBody,
+    body: &Archived<CreateMessageBody>,
 ) -> Result<Option<Message>, Error> {
     // fast-path for if the perm_cache does contain a value, otherwise defer until content is checked
     let perms = match state.perm_cache.get(auth.user_id(), room_id).await {
@@ -30,7 +30,7 @@ pub async fn create_message(
         None => None,
     };
 
-    let trimmed_content = body.content.trim();
+    let trimmed_content = body.content.as_str().trim();
 
     // if empty but not containing attachments
     if trimmed_content.is_empty() && body.attachments.is_empty() && body.embeds.is_empty() {
@@ -105,7 +105,7 @@ pub async fn create_message(
     // Do not assume spans are valid after this call
     let modified_content = verify::verify(&t, &state, auth, room_id, perms, modified_content).await?;
 
-    let msg = insert_message(t, state.clone(), auth, room_id, msg_id, &body, &modified_content, flags)
+    let msg = insert_message(t, state.clone(), auth, room_id, msg_id, body, &modified_content, flags)
         .boxed()
         .await?;
 
@@ -124,7 +124,7 @@ pub(crate) async fn insert_message(
     auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,
-    body: &CreateMessageBody,
+    body: &Archived<CreateMessageBody>,
     content: &str,
     flags: MessageFlags,
 ) -> Result<Message, Error> {

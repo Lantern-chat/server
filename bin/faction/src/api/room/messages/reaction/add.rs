@@ -1,7 +1,6 @@
-use crate::{
-    gateway::Event, prelude::*, state::emoji::EmoteOrEmojiId, util::encrypted_asset::encrypt_snowflake_opt,
-};
-use schema::SnowflakeExt;
+use crate::{gateway::Event, prelude::*, util::encrypted_asset::encrypt_snowflake_opt};
+use common::emoji::EmoteOrEmojiId;
+
 use sdk::models::{events::UserReactionEvent, gateway::message::ServerMsg, *};
 
 pub async fn add_reaction(
@@ -9,8 +8,12 @@ pub async fn add_reaction(
     auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,
-    emote: EmoteOrEmojiId,
+    emote: &Archived<EmoteOrEmoji>,
 ) -> Result<(), Error> {
+    let Some(emote) = state.emoji.resolve(simple_de(emote)) else {
+        return Err(Error::BadRequest);
+    };
+
     let perms = state.perm_cache.get(auth.user_id(), room_id).await;
 
     if matches!(perms, Some(perms) if !perms.contains(Permissions::ADD_REACTIONS)) {

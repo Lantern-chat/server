@@ -7,6 +7,8 @@ use thorn::pg::Json;
 
 use crate::prelude::*;
 use crate::util::encrypted_asset::encrypt_snowflake_opt;
+
+#[derive(Debug, Clone, Copy)]
 pub enum RoomScope {
     Party(Snowflake),
     Room(Snowflake),

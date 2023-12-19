@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-use std::ops::Range;
+use std::ops::{Range, RangeInclusive};
 
 use smallvec::SmallVec;
 
@@ -303,7 +303,7 @@ fn scan_substr_inner(
 
 #[derive(Debug, Clone)]
 pub struct TrimLimits {
-    pub len: Range<usize>,
+    pub len: RangeInclusive<usize>,
     pub max_newlines: usize,
 }
 

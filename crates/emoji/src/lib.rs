@@ -62,16 +62,19 @@ pub struct Match<'a> {
 }
 
 impl<'a> Match<'a> {
+    #[inline]
     pub fn as_str(&self) -> &'a str {
         // SAFETY: This range was created from regex-automata's `find_iter`,
         // which ensures it was within the input string
         unsafe { self.input.get_unchecked(self.start..self.end) }
     }
 
+    #[inline]
     pub const fn start(&self) -> usize {
         self.start
     }
 
+    #[inline]
     pub const fn end(&self) -> usize {
         self.end
     }

@@ -7,13 +7,16 @@ pub async fn remove_own_reaction(
     auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,
-    emote: EmoteOrEmojiId,
+    emote: &Archived<EmoteOrEmoji>,
 ) -> Result<(), Error> {
+    let Some(emote) = state.emoji.resolve(simple_de(emote)) else {
+        return Err(Error::BadRequest);
+    };
+
     let perms = state.perm_cache.get(auth.user_id(), room_id).await;
 
-    match perms {
-        Some(perms) if !perms.contains(Permissions::READ_MESSAGE_HISTORY) => return Err(Error::Unauthorized),
-        _ => {}
+    if matches!(perms, Some(perms) if !perms.contains(Permissions::READ_MESSAGE_HISTORY)) {
+        return Err(Error::Unauthorized);
     }
 
     #[rustfmt::skip]

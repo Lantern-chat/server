@@ -11,7 +11,7 @@ pub async fn edit_message(
     auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,
-    body: EditMessageBody,
+    body: &Archived<EditMessageBody>,
 ) -> Result<Option<Message>, Error> {
     // fast-path for if the perm_cache does contain a value
     let perms = match state.perm_cache.get(auth.user_id(), room_id).await {
@@ -104,7 +104,7 @@ pub async fn edit_message(
     if prev_files.is_some() || !body.attachments.is_empty() {
         // attachments may be unordered, so a Set is required
         let pre_set: HashSet<Snowflake> = HashSet::from_iter(prev_files.unwrap_or_default());
-        let new_set: HashSet<Snowflake> = HashSet::from_iter(body.attachments);
+        let new_set: HashSet<Snowflake> = HashSet::from_iter(body.attachments.as_slice().iter().copied());
 
         if pre_set != new_set {
             let added = new_set.difference(&pre_set).copied().collect::<Vec<_>>();

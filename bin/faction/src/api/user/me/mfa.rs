@@ -9,7 +9,11 @@ use crate::util::encrypt::nonce_from_user_id;
 
 use super::login::ProvidedMfa;
 
-pub async fn enable_2fa(state: ServerState, user_id: Snowflake, form: Enable2FAForm) -> Result<Added2FA, Error> {
+pub async fn enable_2fa(
+    state: ServerState,
+    user_id: Snowflake,
+    form: &Archived<Enable2FAForm>,
+) -> Result<Added2FA, Error> {
     let config = state.config_full();
 
     if !config.shared.password_length.contains(&form.password.len()) {
@@ -141,7 +145,11 @@ pub async fn confirm_2fa(
     Ok(())
 }
 
-pub async fn remove_2fa(state: ServerState, user_id: Snowflake, form: Remove2FAForm) -> Result<(), Error> {
+pub async fn remove_2fa(
+    state: ServerState,
+    user_id: Snowflake,
+    form: &Archived<Remove2FAForm>,
+) -> Result<(), Error> {
     if !state.config().shared.password_length.contains(&form.password.len()) {
         return Err(Error::InvalidCredentials);
     }

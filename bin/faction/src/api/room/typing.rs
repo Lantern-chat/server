@@ -4,13 +4,15 @@ use sdk::models::*;
 use crate::backend::gateway::Event;
 use crate::prelude::*;
 use crate::util::encrypted_asset::encrypt_snowflake_opt;
+
+use sdk::api::commands::room::StartTypingBody;
 use sdk::models::gateway::message::ServerMsg;
 
 pub async fn trigger_typing(
     state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
-    body: sdk::api::commands::room::StartTypingBody,
+    body: &Archived<StartTypingBody>,
 ) -> Result<(), Error> {
     let has_perms = match state.perm_cache.get(auth.user_id(), room_id).await {
         Some(perms) => {
@@ -123,7 +125,7 @@ pub async fn trigger_typing(
                 user_id: auth.user_id(),
                 party_id: Some(party_id),
                 member: Some(member),
-                parent: body.parent,
+                parent: body.parent.as_ref().copied(),
             });
 
             state.gateway.broadcast_event(Event::new(event, Some(room_id))?, party_id);

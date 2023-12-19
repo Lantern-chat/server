@@ -29,6 +29,7 @@ schema.workspace = true
 
 common.workspace = true
 config.workspace = true
+framed = { workspace = true, features = ["tokio"] }
 task_runner.workspace = true
 db.workspace = true
 util.workspace = true

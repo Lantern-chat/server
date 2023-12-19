@@ -1,6 +1,6 @@
 use futures::{Stream, StreamExt};
 
-use schema::{flags::AttachmentFlags, Snowflake, SnowflakeExt};
+use schema::{flags::AttachmentFlags, Snowflake};
 use sdk::models::*;
 use thorn::pg::Json;
 
@@ -8,12 +8,12 @@ use crate::{prelude::*, util::encrypted_asset::encrypt_snowflake_opt};
 
 use sdk::api::commands::room::GetMessagesQuery;
 
-pub async fn get_many(
+pub async fn get_many<'a>(
     state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
-    form: GetMessagesQuery,
-) -> Result<impl Stream<Item = Result<Message, Error>>, Error> {
+    form: &'a Archived<GetMessagesQuery>,
+) -> Result<impl Stream<Item = Result<Message, Error>> + 'a, Error> {
     let needs_perms = match state.perm_cache.get(auth.user_id(), room_id).await {
         Some(perms) => {
             if !perms.contains(Permissions::READ_MESSAGE_HISTORY) {
@@ -25,8 +25,8 @@ pub async fn get_many(
         None => true,
     };
 
-    let limit = match form.limit {
-        Some(limit) if limit < 100 => limit as i16,
+    let limit = match form.limit.as_ref() {
+        Some(&limit) if limit < 100 => limit as i16,
         _ => 100,
     };
 
@@ -34,10 +34,10 @@ pub async fn get_many(
         user_id: auth.user_id(),
         room_id,
         needs_perms,
-        cursor: form.query.unwrap_or_else(|| Cursor::Before(Snowflake::max_safe_value())),
-        parent: form.parent,
+        cursor: simple_de::<Option<_>>(&form.query).unwrap_or_else(|| Cursor::Before(Snowflake::max_safe_value())),
+        parent: form.parent.as_ref().copied(),
         limit,
-        pins: form.pinned,
+        pins: form.pinned.as_slice(),
         starred: form.starred,
         recurse: form.recurse.min(5) as i16,
     };
@@ -60,7 +60,7 @@ where
     }
 }
 
-pub enum GetMsgRequest {
+pub enum GetMsgRequest<'a> {
     /// Single unauthorized message
     Single { msg_id: Snowflake },
     Many {
@@ -70,17 +70,17 @@ pub enum GetMsgRequest {
         cursor: Cursor,
         parent: Option<Snowflake>,
         limit: i16,
-        pins: ThinVec<Snowflake>,
+        pins: &'a [Snowflake],
         starred: bool,
         recurse: i16,
     },
 }
 
-pub async fn do_get<DB>(
+pub async fn do_get<'a, DB>(
     state: ServerState,
     db: &DB,
-    req: GetMsgRequest,
-) -> Result<impl Stream<Item = Result<Message, Error>>, Error>
+    req: GetMsgRequest<'a>,
+) -> Result<impl Stream<Item = Result<Message, Error>> + 'a, Error>
 where
     DB: db::pool::AnyClient,
 {
