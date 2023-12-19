@@ -56,6 +56,8 @@ pub async fn dispatch<W>(state: ServerState, out: W, msg: &rpc::msg::ArchivedMes
 where
     W: AsyncWrite + Unpin,
 {
+    use crate::api::party::{members::MemberMode, rooms::get::RoomScope};
+
     // avoid inlining every async state machine by boxing them inside a lazy future/async block
     macro_rules! c {
         ($first:ident$(::$frag:ident)+($($args:expr),*)) => {
@@ -82,7 +84,7 @@ where
         Proc::Confirm2FA(form) => c!(user::me::mfa::confirm_2fa(state, auth?.user_id(), &form.body)),
         Proc::Remove2FA(form) => c!(user::me::mfa::remove_2fa(state, auth?.user_id(), &form.body)),
         Proc::ChangePassword(form) => todo!("ChangePassword"),
-        Proc::GetSessions(form) => todo!("GetSessions"), //c!(user::me::sessions::list_sessions(state, auth?)),
+        Proc::GetSessions(form) => s!(user::me::sessions::list_sessions(state, auth?)),
         Proc::ClearSessions(form) => c!(user::me::sessions::clear_other_sessions(state, auth?)),
         Proc::GetRelationships(form) => todo!("GetRelationships"),
         Proc::PatchRelationship(form) => todo!("PatchRelationship"),
@@ -103,8 +105,9 @@ where
         Proc::CreateRole(form) => c!(party::roles::create::create_role(state, auth?, form.party_id, &form.body)),
         Proc::PatchRole(form) => todo!("PatchRole"),
         Proc::DeleteRole(form) => todo!("DeleteRole"),
-        Proc::GetPartyMembers(form) => todo!("GetPartyMembers"),
-        Proc::GetPartyRooms(form) => todo!("GetPartyRooms"),
+        Proc::GetPartyMembers(form) => s!(party::members::get_many(state, auth?, form.party_id)),
+        Proc::GetPartyMember(form) => c!(party::members::get_one(state, auth?.user_id(), form.party_id, form.member_id, MemberMode::Full)),
+        Proc::GetPartyRooms(form) => s!(party::rooms::get::get_rooms(state, auth?, RoomScope::Party(form.party_id))),
         Proc::GetPartyInvites(form) => todo!("GetPartyInvites"),
         Proc::GetMemberProfile(form) => todo!("GetMemberProfile"),
         Proc::UpdateMemberProfile(form) => c!(user::me::profile::patch_profile(state, auth?, Some(form.party_id), &form.body.profile)),
@@ -128,5 +131,7 @@ where
         Proc::DeleteAllReactions(form) => todo!("DeleteAllReactions"),
         Proc::GetReactions(form) => todo!("GetReactions"),
         Proc::PatchRoom(form) => c!(room::modify::modify_room(state, auth?, form.room_id, &form.body)),
+        Proc::DeleteRoom(form) => c!(room::remove::remove_room(state, auth?, form.room_id)),
+        Proc::GetRoom(form) => c!(room::get::get_room(state, auth?, form.room_id)),
     }
 }
