@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 use sdk::api::commands::all::*;
 
 #[derive(Debug, rkyv::Archive, rkyv::Serialize)]
+#[archive(check_bytes)]
 pub struct Message {
     pub proc: Procedure,
 

@@ -23,7 +23,7 @@ pub struct AsyncFramedWriter<W> {
 // }
 
 impl<W: AsyncWrite + Unpin> AsyncFramedWriter<W> {
-    pub fn new(inner: W) -> Self {
+    pub const fn new(inner: W) -> Self {
         AsyncFramedWriter { inner }
     }
 
@@ -189,13 +189,21 @@ pub struct AsyncFramedReader<R: AsyncRead> {
 }
 
 impl<R: AsyncRead + Unpin> AsyncFramedReader<R> {
-    pub fn new(inner: R) -> Self {
+    pub const fn new(inner: R) -> Self {
         AsyncFramedReader {
             inner,
             len: 0,
             header: [0; 8],
             pos: 0,
         }
+    }
+
+    pub const fn len(&self) -> u64 {
+        self.len
+    }
+
+    pub const fn is_empty(&self) -> bool {
+        self.len == 0
     }
 
     pub async fn next_msg(&mut self) -> io::Result<Option<&mut Self>> {

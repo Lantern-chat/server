@@ -5,7 +5,8 @@ use auth::UserToken;
 /// User and Bot authorization structure, optimized for branchless user_id lookup
 ///
 /// These are typically cached in the gateway for faster reauth
-#[derive(Debug, Clone, Copy, PartialEq, Eq, bytecheck::CheckBytes)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[archive(check_bytes)]
 #[repr(u64, C)] // make sure things are tidy
 pub enum Authorization {
     User {
@@ -19,8 +20,6 @@ pub enum Authorization {
         issued: Timestamp,
     },
 }
-
-sdk::common::impl_rkyv_for_pod!(Authorization);
 
 impl Authorization {
     #[inline(always)]

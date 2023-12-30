@@ -16,16 +16,19 @@ pub mod api;
 pub mod asset;
 pub mod config;
 pub mod error;
-pub mod rpc;
+pub mod gateway;
+pub mod queues;
 pub mod services;
 pub mod state;
+pub mod tasks;
 pub mod util;
 
 pub mod prelude {
     pub use crate::error::Error;
     pub use crate::state::ServerState;
+
     pub use rpc::auth::Authorization;
-    pub use sdk::models::{Nullable, SmolStr, Timestamp};
+    pub use sdk::models::{Nullable, SmolStr, Snowflake, Timestamp};
 
     pub use crate::config::Config;
     pub use config::HasConfig;
