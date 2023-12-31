@@ -120,8 +120,8 @@ impl MainFileCache {
         self.map
             .retain_async(|_, file| match now.duration_since(file.last_checked) {
                 Ok(dur) => dur < max_age,
-                // if checked since `now`, then don't retain (or time travel, but whatever)
-                Err(_) => false,
+                // if the file has been checked since now, then it's likely valid
+                Err(_) => true,
             })
             .await;
     }
@@ -131,7 +131,6 @@ use headers::AcceptEncoding;
 
 use crate::prelude::*;
 
-#[async_trait::async_trait]
 impl FileCache<ServerState> for MainFileCache {
     type File = CachedFile;
     type Meta = Metadata;
@@ -146,87 +145,87 @@ impl FileCache<ServerState> for MainFileCache {
         accepts: Option<AcceptEncoding>,
         state: &ServerState,
     ) -> io::Result<Self::File> {
-        let mut last_modified = None;
+        loop {
+            let mut last_modified = None;
 
-        if let Some(file) = self.map.read_async(path, |_, file| file.clone()).await {
-            let dur = SystemTime::now().duration_since(file.last_checked);
+            if let Some(file) = self.map.read_async(path, |_, file| file.clone()).await {
+                match file.last_checked.elapsed() {
+                    Err(_) => log::warn!("Duration calculation failed, time reversed?"),
+                    Ok(dur) if dur > state.config().shared.fs_cache_interval => {
+                        last_modified = Some(file.last_modified);
+                    }
+                    Ok(_) => {
+                        let encoding = match accepts.and_then(|a| {
+                            // prefer best
+                            #[cfg(feature = "brotli")]
+                            let mut encodings = a.sorted_encodings();
 
-            match dur {
-                Err(_) => log::warn!("Duration calculation failed, time reversed?"),
-                Ok(dur) if dur > Duration::from_secs(/*state.config().web.file_cache_check_secs*/ 20) => {
-                    last_modified = Some(file.last_modified);
-                }
-                Ok(_) => {
-                    let encoding = match accepts.and_then(|a| {
-                        // prefer best
-                        #[cfg(feature = "brotli")]
-                        let mut encodings = a.sorted_encodings();
-                        // TODO: make this filtering on feature cleaner
-                        #[cfg(not(feature = "brotli"))]
-                        let mut encodings = a.sorted_encodings().filter(|c| *c != ContentCoding::BROTLI);
+                            // TODO: make this filtering on feature cleaner
+                            #[cfg(not(feature = "brotli"))]
+                            let mut encodings = a.sorted_encodings().filter(|c| *c != ContentCoding::BROTLI);
 
-                        let preferred = encodings.next();
-                        encodings.find(|e| *e == file.best).or(preferred)
-                    }) {
-                        None | Some(ContentCoding::COMPRESS | ContentCoding::IDENTITY) => ContentCoding::IDENTITY,
-                        Some(encoding) => encoding,
-                    };
+                            let preferred = encodings.next();
+                            encodings.find(|e| *e == file.best).or(preferred)
+                        }) {
+                            None | Some(ContentCoding::COMPRESS | ContentCoding::IDENTITY) => {
+                                ContentCoding::IDENTITY
+                            }
+                            Some(encoding) => encoding,
+                        };
 
-                    let f = CachedFile {
-                        pos: 0,
-                        last_modified: file.last_modified,
-                        encoding,
-                        buf: match encoding {
-                            ContentCoding::BROTLI => file.brotli,
-                            ContentCoding::DEFLATE => file.deflate,
-                            ContentCoding::GZIP => file.gzip,
-                            ContentCoding::IDENTITY => file.identity,
-                            ContentCoding::COMPRESS => unreachable!(),
-                        },
-                    };
+                        let f = CachedFile {
+                            pos: 0,
+                            last_modified: file.last_modified,
+                            encoding,
+                            buf: match encoding {
+                                ContentCoding::BROTLI => file.brotli,
+                                ContentCoding::DEFLATE => file.deflate,
+                                ContentCoding::GZIP => file.gzip,
+                                ContentCoding::IDENTITY => file.identity,
+                                ContentCoding::COMPRESS => unreachable!(),
+                            },
+                        };
 
-                    log::trace!(
-                        "Serving cached {encoding:?} ({}) (best {:?}) encoded file: {}",
-                        f.buf.len(),
-                        file.best,
-                        path.display()
-                    );
+                        log::trace!(
+                            "Serving cached {encoding:?} ({}) (best {:?}) encoded file: {}",
+                            f.buf.len(),
+                            file.best,
+                            path.display()
+                        );
 
-                    return Ok(f);
-                }
-            }
-        }
-
-        use tokio::io::AsyncReadExt;
-
-        let mut entry = self.map.entry_async(path.to_owned()).await;
-
-        let mut file = tokio::fs::File::open(path).await?;
-
-        // get `now` time after opening as we last checked since opening it
-        let now = SystemTime::now();
-
-        let meta = file.metadata().await?;
-
-        if !meta.is_file() {
-            return Err(io::Error::new(io::ErrorKind::NotFound, "Not found"));
-        }
-
-        let mut do_read = true;
-
-        if let Some(last_modified) = last_modified {
-            if last_modified == meta.modified()? {
-                use scc::hash_map::Entry;
-
-                if let Entry::Occupied(ref mut entry) = entry {
-                    entry.get_mut().last_checked = SystemTime::now();
-                    do_read = false;
+                        return Ok(f);
+                    }
                 }
             }
-        }
 
-        if do_read {
-            log::trace!("Loading in file to cache: {}", path.display());
+            use tokio::io::AsyncReadExt;
+
+            // lock entry
+            let mut entry = self.map.entry_async(path.to_owned()).await;
+
+            let mut file = tokio::fs::File::open(path).await?;
+
+            // get `now` time after opening as we last checked since opening it
+            let now = SystemTime::now();
+
+            let meta = file.metadata().await?;
+
+            if !meta.is_file() {
+                return Err(io::Error::new(io::ErrorKind::NotFound, "Not found"));
+            }
+
+            if let Some(last_modified) = last_modified {
+                if last_modified == meta.modified()? {
+                    use scc::hash_map::Entry;
+
+                    if let Entry::Occupied(ref mut entry) = entry {
+                        entry.get_mut().last_checked = now;
+                        continue; // try again, file is up to date
+                    }
+                }
+            }
+
+            log::trace!("Loading file into cache: {}", path.display());
 
             let len = meta.len();
 
@@ -270,21 +269,19 @@ impl FileCache<ServerState> for MainFileCache {
                     Ok::<_, std::io::Error>(gzip_buffer)
                 };
 
+                #[cfg(feature = "brotli")]
                 let brotli_task = async {
-                    #[cfg(feature = "brotli")]
-                    {
-                        use async_compression::tokio::bufread::BrotliEncoder;
+                    use async_compression::tokio::bufread::BrotliEncoder;
 
-                        log::trace!("Compressing with Brotli");
-                        let mut brotli_buffer: Vec<u8> = Vec::with_capacity(128);
-                        let mut brotli = BrotliEncoder::with_quality(&content[..], level);
-                        brotli.read_to_end(&mut brotli_buffer).await?;
-                        Ok::<_, std::io::Error>(brotli_buffer)
-                    }
-
-                    #[cfg(not(feature = "brotli"))]
-                    Ok::<_, std::io::Error>(Vec::new())
+                    log::trace!("Compressing with Brotli");
+                    let mut brotli_buffer: Vec<u8> = Vec::with_capacity(128);
+                    let mut brotli = BrotliEncoder::with_quality(&content[..], level);
+                    brotli.read_to_end(&mut brotli_buffer).await?;
+                    Ok::<_, std::io::Error>(brotli_buffer)
                 };
+
+                #[cfg(not(feature = "brotli"))]
+                let brotli_task = async { Ok::<_, std::io::Error>(Vec::new()) };
 
                 let (brotli, deflate, gzip) = tokio::try_join!(brotli_task, deflate_task, gzip_task)?;
 
@@ -339,12 +336,7 @@ impl FileCache<ServerState> for MainFileCache {
                 gzip: Arc::from(compressed.gzip),
                 best: compressed.best,
             });
-        } else {
-            // must be dropped before recursion, otherwise deadlock
-            drop(entry);
         }
-
-        self.open(path, accepts, state).await
     }
 
     async fn metadata(&self, path: &Path, _state: &ServerState) -> io::Result<Self::Meta> {
