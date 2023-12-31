@@ -8,7 +8,6 @@
 //! - Cannot ban/kick/rename users with roles at or above their own
 //! - Admins are exempt from the assign/remove safety restrictions. Can freely give or remove for any role below them.
 
-use sdk::api::commands::party::PatchRoleForm;
 use sdk::models::{Permissions, Snowflake};
 
 use fxhash::FxBuildHasher;
@@ -51,6 +50,11 @@ pub enum UserAction {
     Kick,
     Ban,
     Rename,
+}
+
+pub struct RoleChange {
+    pub permissions: Option<Permissions>,
+    pub position: Option<u8>,
 }
 
 impl RoleChecker {
@@ -129,7 +133,7 @@ impl RoleChecker {
         &self,
         user_roles: &[Snowflake],
         role_id: Snowflake,
-        form: Option<&PatchRoleForm>,
+        form: Option<RoleChange>,
     ) -> CheckStatus<PartialRole> {
         let Some(target_role_idx) = self.roles.get_index_of(&role_id) else {
             return CheckStatus::NotFound;
@@ -162,7 +166,7 @@ impl RoleChecker {
         }
 
         if let Some(new_permissions) = match form {
-            Some(form) => form.permissions,
+            Some(ref form) => form.permissions,
             None => Some(Permissions::empty()),
         } {
             // cannot assign permissions you don't have

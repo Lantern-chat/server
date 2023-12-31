@@ -27,7 +27,7 @@ pub mod prelude {
     pub use crate::error::Error;
     pub use crate::state::ServerState;
 
-    pub use rpc::auth::Authorization;
+    pub use rpc::{auth::Authorization, event::ServerEvent};
     pub use sdk::models::{Nullable, SmolStr, Snowflake, Timestamp};
 
     pub use crate::config::Config;

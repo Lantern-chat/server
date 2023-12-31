@@ -1,4 +1,4 @@
-use crate::{config::Config, services::Services};
+use crate::{config::Config, gateway::Gateway, services::Services};
 use schema::sf::SnowflakeGenerator;
 use sdk::Snowflake;
 use tokio::sync::Semaphore;
@@ -26,6 +26,8 @@ pub struct ServerStateInner {
     pub cpu_semaphore: Semaphore,
 
     pub perm_cache: PermissionCache,
+
+    pub gateway: Gateway,
 
     // TODO
     pub services: Services,

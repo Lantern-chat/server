@@ -61,13 +61,13 @@ where
 
     // avoid inlining every async state machine by boxing them inside a lazy future/async block
     macro_rules! c {
-        ($first:ident$(::$frag:ident)+($($args:expr),*)) => {
-            Box::pin(async move { encode_item(out, crate::api::$first$(::$frag)+($($args),*).await?).await })
+        ($([$size:literal])? $first:ident$(::$frag:ident)+($($args:expr),*)) => {
+            Box::pin(async move { encode_item::<_, _, 512 $(* 0 + $size)?>(out, crate::api::$first$(::$frag)+($($args),*).await?).await })
         };
     }
     macro_rules! s {
-        ($first:ident$(::$frag:ident)+($($args:expr),*)) => {
-            Box::pin(async move { encode_stream(out, crate::api::$first$(::$frag)+($($args),*).await?).await })
+        ($([$size:literal])? $first:ident$(::$frag:ident)+($($args:expr),*)) => {
+            Box::pin(async move { encode_stream::<_, _, 512 $(* 0 + $size)?>(out, crate::api::$first$(::$frag)+($($args),*).await?).await })
         };
     }
 

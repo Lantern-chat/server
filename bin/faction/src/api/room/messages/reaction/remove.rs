@@ -1,4 +1,5 @@
-use crate::{backend::gateway::Event, prelude::*};
+use crate::prelude::*;
+
 use common::emoji::EmoteOrEmojiId;
 use sdk::models::{events::UserReactionEvent, gateway::message::ServerMsg, *};
 
@@ -96,7 +97,7 @@ pub async fn remove_own_reaction(
 
     match party_id {
         Some(party_id) => {
-            state.gateway.broadcast_event(Event::new(event, Some(room_id))?, party_id);
+            state.gateway.send_simple(&ServerEvent::new(event, Some(party_id), Some(room_id))).await;
         }
         None => unimplemented!(),
     }

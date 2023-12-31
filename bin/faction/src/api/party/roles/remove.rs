@@ -1,6 +1,6 @@
 use sdk::models::*;
 
-use crate::{prelude::*, util::encrypted_asset::encrypt_snowflake_opt};
+use crate::prelude::*;
 
 pub async fn remove_role(
     state: ServerState,

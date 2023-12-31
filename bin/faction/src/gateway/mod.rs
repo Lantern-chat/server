@@ -1,11 +1,12 @@
+#![allow(unused_labels)]
+
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use crate::prelude::*;
 
 pub type ConnectionId = Snowflake;
 
-use tokio::{
-    io::AsyncReadExt,
-    sync::broadcast::{self, error::RecvError},
-};
+use tokio::{io::AsyncReadExt, sync::Notify};
 use triomphe::Arc;
 
 use framed::tokio::{AsyncFramedReader, AsyncFramedWriter};
@@ -18,50 +19,80 @@ use quinn::{Connection, ConnectionError, RecvStream, SendStream, VarInt};
 
 pub mod rpc;
 
-#[derive(Clone)]
-pub struct GatewayConnection {
+const EVENT_BATCH_SIZE: usize = 64;
+
+struct GatewayConnectionInner {
     pub id: ConnectionId,
     pub conn: Connection,
+    pub last_event: AtomicU64,
+    pub notify: Arc<Notify>,
+}
+
+#[derive(Clone)]
+pub struct GatewayConnection(Arc<GatewayConnectionInner>);
+
+impl core::ops::Deref for GatewayConnection {
+    type Target = GatewayConnectionInner;
+
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 pub struct Gateway {
-    /// All gateway connections will listen to this in their own task and forward the bytes
-    /// along their own unidirectional stream for the gateway server to receive.
-    pub tx: broadcast::Sender<Arc<AlignedVec>>,
-    pub conns: scc::HashIndex<ConnectionId, GatewayConnection>,
+    pub counter: AtomicU64,
+    pub notify: Arc<Notify>,
+    pub events: scc::TreeIndex<u64, Arc<AlignedVec>>,
+    pub conns: scc::HashMap<ConnectionId, GatewayConnection>,
 }
 
 impl Gateway {
-    pub async fn insert_connection(&self, state: ServerState, conn: Connection) -> ConnectionId {
-        let id = state.sf.gen();
-        let conn = GatewayConnection { id, conn };
-
-        tokio::spawn(conn.clone().run_rpc(state));
-        tokio::spawn(conn.clone().run_gateway(self.tx.subscribe()));
-
-        self.conns.insert_async(id, conn).await;
-
-        id
+    pub fn new() -> Self {
+        Gateway {
+            counter: AtomicU64::new(0),
+            notify: Arc::default(),
+            events: Default::default(),
+            conns: Default::default(),
+        }
     }
 
-    pub async fn send<T, const N: usize>(&self, event: &T) -> Result<(), Error>
+    pub async fn insert_connection(&self, state: ServerState, conn: Connection) {
+        let conn = GatewayConnection(Arc::new(GatewayConnectionInner {
+            id: state.sf.gen(),
+            conn,
+            last_event: AtomicU64::new(0),
+            notify: self.notify.clone(),
+        }));
+
+        tokio::spawn(conn.clone().run_rpc(state.clone()));
+        tokio::spawn(conn.clone().run_gateway(state));
+
+        self.conns.insert_async(conn.id, conn).await;
+    }
+
+    pub async fn send_simple<T>(&self, event: &T)
+    where
+        T: Archive + Serialize<AllocSerializer<512>>,
+    {
+        self.send::<T, 512>(event).await
+    }
+
+    pub async fn send<T, const N: usize>(&self, event: &T)
     where
         T: Archive + Serialize<AllocSerializer<N>>,
     {
         let mut serializer = AllocSerializer::<N>::default();
 
         if let Err(e) = serializer.serialize_value(event) {
-            log::error!("Rkyv Error: {e}");
-            return Err(Error::RkyvEncodingError);
+            log::error!("Rkyv Encoding Error: {e}");
         }
 
         let archived = serializer.into_serializer().into_inner();
-        if let Err(e) = self.tx.send(Arc::new(archived)) {
-            //crate::metrics::API_METRICS.load().errs.add(1);
-            log::error!("Could not broadcast event: {e}");
-        }
 
-        Ok(())
+        // TODO: Compression?
+        self.events.insert_async(self.counter.fetch_add(1, Ordering::SeqCst), Arc::new(archived)).await;
+        self.notify.notify_waiters();
     }
 }
 
@@ -80,12 +111,12 @@ impl GatewayConnection {
         buffer.resize(msg.len() as usize, 0);
         msg.read_exact(&mut buffer[..]).await?;
 
-        let msg = rkyv::check_archived_root::<rpc::msg::Message>(&buffer).map_err(|e| {
+        let msg = rkyv::check_archived_root::<::rpc::msg::Message>(&buffer).map_err(|e| {
             log::error!("Error getting archived RPC message: {e}");
             Error::RkyvEncodingError
         })?;
 
-        rpc::dispatch(state, AsyncFramedWriter::new(send), msg).await
+        self::rpc::dispatch(state, AsyncFramedWriter::new(send), msg).await
     }
 
     /// Listen for incoming bidirectional streams and treat them as RPC messages
@@ -122,6 +153,7 @@ impl GatewayConnection {
             let state = state.clone();
             tokio::spawn(async move {
                 if let Err(e) = GatewayConnection::handle_rpc(send, recv, state).await {
+                    // TODO: Add to metrics
                     log::error!("Error handling RPC request: {e}");
                 }
             });
@@ -130,11 +162,11 @@ impl GatewayConnection {
 
     /// While the connection is open, connect a unidirectional stream back to the gateway and send
     /// gateway events along it.
-    pub async fn run_gateway(self, mut rx: broadcast::Receiver<Arc<AlignedVec>>) {
+    pub async fn run_gateway(self, state: ServerState) {
         let cb = CircuitBreaker::new().build();
         let mut tries = 0;
 
-        loop {
+        'connect: loop {
             #[rustfmt::skip]
             let stream = match cb.call(self.conn.open_uni()).await {
                 Ok(stream) => {
@@ -163,22 +195,33 @@ impl GatewayConnection {
             let mut stream = AsyncFramedWriter::new(stream);
             let mut closed = std::pin::pin!(self.conn.closed());
 
+            // this is organized such that upon reconnecting the connection will immediately send
+            // any delayed or buffered events without having to wait for a new event to start the loop
             'recv: loop {
-                let event = tokio::select! {
-                    _ = &mut closed => return, // if the connection closes, we're done here
-                    event = rx.recv() => match event {
-                        Ok(event) => event,
-                        Err(RecvError::Closed) => return, // also done if the event stream ends
-                        Err(_) => {
-                            self.conn.close(VarInt::from_u32(200), b"Event stream lagged");
+                'batch: loop {
+                    // we can't access the event btree for long, so quickly collect events before streaming
+                    #[rustfmt::skip]
+                    let batched_events: Vec<_> = state.gateway.events
+                        .range(self.last_event.load(Ordering::Relaxed).., &scc::ebr::Guard::new())
+                        .take(EVENT_BATCH_SIZE).map(|(&k, v)| (k, v.clone())).collect();
+
+                    if batched_events.is_empty() {
+                        break 'batch;
+                    }
+
+                    for (cnt, event) in batched_events {
+                        if let Err(e) = stream.write_msg(event.as_slice()).await {
+                            log::error!("Error writing event to uni gateway stream: {e}");
                             break 'recv;
                         }
-                    }
-                };
 
-                if let Err(e) = stream.write_msg(event.as_slice()).await {
-                    log::error!("Error writing event to uni gateway stream: {e}");
-                    break 'recv;
+                        self.last_event.store(cnt, Ordering::Relaxed);
+                    }
+                }
+
+                tokio::select! { // wait for any new events or for the stream to close
+                    _ = &mut closed => return, // if the connection closes, we're done here
+                    _ = self.notify.notified() => continue 'recv,
                 }
             }
         }

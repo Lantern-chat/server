@@ -1,4 +1,5 @@
 use futures::TryFutureExt;
+use schema::roles::RoleChange;
 use sdk::{api::commands::party::PatchRoleForm, models::*};
 
 use crate::{
@@ -12,14 +13,14 @@ pub async fn modify_role(
     auth: Authorization,
     party_id: Snowflake,
     role_id: Snowflake,
-    mut form: PatchRoleForm,
+    form: &Archived<PatchRoleForm>,
 ) -> Result<Role, Error> {
     // TODO: Maybe change this?
-    if form == PatchRoleForm::default() {
+    if *form == PatchRoleForm::default() {
         return Err(Error::BadRequest);
     }
 
-    if matches!(form.name, Some(ref name) if !schema::validation::validate_name(name, state.config().shared.role_name_length.clone()))
+    if matches!(form.name.as_deref(), Some(ref name) if !schema::validation::validate_name(name, state.config().shared.role_name_length.clone()))
     {
         return Err(Error::InvalidName);
     }
@@ -82,7 +83,12 @@ pub async fn modify_role(
 
     let checker = RoleChecker::new(party_id, roles);
 
-    let target_role = match checker.check_modify(&user_roles, role_id, Some(&form)) {
+    let role_change = RoleChange {
+        permissions: form.permissions.as_ref().copied(),
+        position: form.position.as_ref().copied(),
+    };
+
+    let target_role = match checker.check_modify(&user_roles, role_id, Some(role_change)) {
         CheckStatus::Allowed(target_role) => target_role,
         _ => {
             // TODO: improve errors from CheckStatus
@@ -90,30 +96,34 @@ pub async fn modify_role(
         }
     };
 
+    let mut new_avatar = form.avatar;
+
     // no change, don't reprocess avatar
-    if matches!((form.avatar, existing_avatar_file_id), (Nullable::Some(a), Some(b)) if a == b) {
-        form.avatar = Nullable::Undefined;
+    if matches!((new_avatar, existing_avatar_file_id), (Nullable::Some(a), Some(b)) if a == b) {
+        new_avatar = Nullable::Undefined;
     }
 
-    let new_position = match form.position {
+    // TODO
+    let new_position = match form.position.as_ref().copied() {
         Some(position) => {
-            if position == target_role.position {
-                form.position = None;
-            }
+            //if position == target_role.position {
+            //    form.position = None;
+            //}
 
             position as i16
         }
         _ => target_role.position as i16,
     };
 
-    if form == PatchRoleForm::default() {
-        // TODO: return success instead since it passes but it's a no-op?
-        return Err(Error::BadRequest);
-    }
+    // TODO
+    // if form == PatchRoleForm::default() {
+    //     // TODO: return success instead since it passes but it's a no-op?
+    //     return Err(Error::BadRequest);
+    // }
 
-    let color = form.color.map(|c| c as i32);
-    let avatar_id = maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), form.avatar).await?;
-    let [perms1, perms2] = match form.permissions {
+    let color = form.color.as_ref().map(|c| *c as i32);
+    let avatar_id = maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), new_avatar).await?;
+    let [perms1, perms2] = match form.permissions.as_ref() {
         Some(perms) => perms.to_i64(),
         None => [0, 0], // unused
     };

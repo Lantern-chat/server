@@ -1,7 +1,6 @@
 use schema::Snowflake;
 use sdk::models::*;
 
-use crate::backend::gateway::Event;
 use crate::prelude::*;
 use crate::util::encrypted_asset::encrypt_snowflake_opt;
 
@@ -128,7 +127,7 @@ pub async fn trigger_typing(
                 parent: body.parent.as_ref().copied(),
             });
 
-            state.gateway.broadcast_event(Event::new(event, Some(room_id))?, party_id);
+            state.gateway.send_simple(&ServerEvent::new(event, Some(party_id), Some(room_id))).await;
         }
         None => todo!("Typing in non-party rooms"),
     }
