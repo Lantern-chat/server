@@ -39,7 +39,12 @@ where
 
     let mut stream = std::pin::pin!(stream);
     while let Some(item) = stream.next().await {
-        serializer.serialize_value(&item?);
+        if let Err(e) = serializer.serialize_value(&item?) {
+            log::error!("Error serializing streamed item: {e}");
+            serializer.reset();
+            continue;
+        }
+
         let mut msg = out.new_message();
         msg.write_all(serializer.serializer().inner().as_slice()).await?;
         serializer.reset(); // immediately free buffers before flushing
@@ -55,19 +60,19 @@ pub async fn dispatch<W>(
     msg: &rpc::msg::ArchivedMessage,
 ) -> Result<(), Error>
 where
-    W: AsyncWrite + Unpin,
+    W: AsyncWrite + Unpin + Send,
 {
     use crate::api::party::{members::MemberMode, rooms::get::RoomScope};
 
     // avoid inlining every async state machine by boxing them inside a lazy future/async block
     macro_rules! c {
         ($([$size:literal])? $first:ident$(::$frag:ident)+($($args:expr),*)) => {
-            Box::pin(async move { encode_item::<_, _, 512 $(* 0 + $size)?>(out, crate::api::$first$(::$frag)+($($args),*).await?).await })
+            Box::pin(async move { encode_item::<_, _, {512 $(* 0 + $size)?}>(out, crate::api::$first$(::$frag)+($($args),*).await?).await })
         };
     }
     macro_rules! s {
         ($([$size:literal])? $first:ident$(::$frag:ident)+($($args:expr),*)) => {
-            Box::pin(async move { encode_stream::<_, _, 512 $(* 0 + $size)?>(out, crate::api::$first$(::$frag)+($($args),*).await?).await })
+            Box::pin(async move { encode_stream::<_, _, {512 $(* 0 + $size)?}>(out, crate::api::$first$(::$frag)+($($args),*).await?).await })
         };
     }
 
@@ -81,8 +86,9 @@ where
     use core::{future::Future, pin::Pin};
     use rpc::msg::ArchivedProcedure as Proc;
 
+    #[allow(unused_variables)]
     #[rustfmt::skip]
-    let running: Pin<Box<dyn Future<Output = Result<(), Error>>>> = match &msg.proc {
+    let running: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> = match &msg.proc {
         Proc::GetServerConfig(form) => todo!("GetServerConfig"),
         Proc::UserRegister(form) => c!(user::register::register_user(state, addr, &form.body)),
         Proc::UserLogin(form) => c!(user::me::login::login(state, addr, &form.body)),
@@ -126,7 +132,7 @@ where
         Proc::GetMessage(form) => todo!("GetMessage"),
         Proc::DeleteMessage(form) => c!(room::messages::delete::delete_msg(state, auth()?, form.room_id, form.msg_id)),
         Proc::StartTyping(form) => c!(room::typing::trigger_typing(state, auth()?, form.room_id, &form.body)),
-        Proc::GetMessages(form) => s!(room::messages::get::get_many(state, auth()?, form.room_id, &form.body)),
+        Proc::GetMessages(form) => s!([1024] room::messages::get::get_many(state, auth()?, form.room_id, &form.body)),
         Proc::PinMessage(form) => todo!("PinMessage"),
         Proc::UnpinMessage(form) => todo!("UnpinMessage"),
         Proc::StarMessage(form) => todo!("StarMessage"),

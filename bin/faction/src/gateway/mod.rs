@@ -21,7 +21,7 @@ pub mod rpc;
 
 const EVENT_BATCH_SIZE: usize = 64;
 
-struct GatewayConnectionInner {
+pub struct GatewayConnectionInner {
     pub id: ConnectionId,
     pub conn: Connection,
     pub last_event: AtomicU64,
@@ -47,8 +47,8 @@ pub struct Gateway {
     pub conns: scc::HashMap<ConnectionId, GatewayConnection>,
 }
 
-impl Gateway {
-    pub fn new() -> Self {
+impl Default for Gateway {
+    fn default() -> Self {
         Gateway {
             counter: AtomicU64::new(0),
             notify: Arc::default(),
@@ -56,7 +56,9 @@ impl Gateway {
             conns: Default::default(),
         }
     }
+}
 
+impl Gateway {
     pub async fn insert_connection(&self, state: ServerState, conn: Connection) {
         let conn = GatewayConnection(Arc::new(GatewayConnectionInner {
             id: state.sf.gen(),
@@ -68,7 +70,8 @@ impl Gateway {
         tokio::spawn(conn.clone().run_rpc(state.clone()));
         tokio::spawn(conn.clone().run_gateway(state));
 
-        self.conns.insert_async(conn.id, conn).await;
+        // effectively impossible for this to fail
+        _ = self.conns.insert_async(conn.id, conn).await;
     }
 
     pub async fn send_simple<T>(&self, event: &T)
@@ -91,7 +94,8 @@ impl Gateway {
         let archived = serializer.into_serializer().into_inner();
 
         // TODO: Compression?
-        self.events.insert_async(self.counter.fetch_add(1, Ordering::SeqCst), Arc::new(archived)).await;
+        _ = self.events.insert_async(self.counter.fetch_add(1, Ordering::SeqCst), Arc::new(archived)).await;
+
         self.notify.notify_waiters();
     }
 }
