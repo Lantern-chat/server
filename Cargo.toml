@@ -60,7 +60,8 @@ bitflags = "1.2.1"
 ahash = "0.8"
 scc = "2"
 
-headers = "0.3"
+http = "1"
+headers = "0.4"
 reqwest = { version = "0.11", default-features = false, features = ["gzip", "deflate", "rustls-tls", "json"] }
 quinn = "0.10"
 
