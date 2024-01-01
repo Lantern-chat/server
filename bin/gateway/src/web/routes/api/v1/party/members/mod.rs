@@ -8,7 +8,7 @@ pub fn members(mut route: Route<ServerState>, auth: Authorization, party_id: Sno
         // GET /api/v1/party/1234/members
         (&Method::GET, End) => Ok(get::get_members(route, auth, party_id)),
 
-        // GET /api/v1/party/1234/members/5678/profile
+        // GET /api/v1/party/1234/members/5678
         (&Method::GET, Exact(segment)) => {
             let Ok(member_id) = segment.parse::<Snowflake>() else {
                 return Err(Error::BadRequest);
