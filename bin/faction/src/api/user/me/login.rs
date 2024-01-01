@@ -87,7 +87,7 @@ pub async fn login(
             user_id,
             ProvidedMfa::Encrypted(mfa),
             &form.password,
-            &totp.unwrap(),
+            totp.unwrap(),
         )
         .await?
         {

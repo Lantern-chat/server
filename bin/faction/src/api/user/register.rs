@@ -75,7 +75,6 @@ pub async fn register_user(
     let passhash = password_hash_task.await??;
 
     drop(_permit);
-    drop(password);
 
     #[rustfmt::skip]
     state.db.write.get().await?.execute2(schema::sql! {

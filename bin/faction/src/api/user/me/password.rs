@@ -56,7 +56,7 @@ pub async fn change_password(
             return Err(Error::InternalErrorStatic("Decrypt Error"));
         };
 
-        if !super::login::process_2fa(&state, auth.user_id(), ProvidedMfa::Plain(&mfa), &form.current, &token)
+        if !super::login::process_2fa(&state, auth.user_id(), ProvidedMfa::Plain(&mfa), &form.current, token)
             .await?
         {
             return Err(Error::InvalidCredentials);
@@ -86,7 +86,6 @@ pub async fn change_password(
     let passhash = password_hash_task.await??;
 
     drop(_permit);
-    drop(form); // SAFETY: Make sure form lives through the hash task
 
     #[rustfmt::skip]
     state.db.write.get().await?.execute2(schema::sql! {

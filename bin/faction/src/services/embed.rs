@@ -1,6 +1,5 @@
 use crate::prelude::*;
 
-use headers::{HeaderName, HeaderValue};
 use sdk::models::{Embed, Timestamp};
 
 pub struct EmbedClient {
@@ -21,6 +20,7 @@ impl EmbedClient {
         language: Option<&str>,
     ) -> Result<Option<(Timestamp, Embed)>, Error> {
         use rand::seq::SliceRandom;
+        use reqwest::header::{HeaderName, HeaderValue};
         use std::borrow::Cow;
 
         let config = state.config_full();
