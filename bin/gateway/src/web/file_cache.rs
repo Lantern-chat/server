@@ -385,13 +385,9 @@ lazy_static::lazy_static! {
 
 impl MainFileCache {
     pub async fn process(&self, state: &ServerState, path: &Path, mut file: Vec<u8>) -> Vec<u8> {
-        let do_process = match (path.extension(), path.file_stem()) {
-            // if HTML file *or* manifest.json
-            (Some(ext), Some(stem)) => ext == "html" || (ext == "json" && stem == "manifest"),
-            _ => false,
-        };
-
-        if do_process {
+        // if HTML file *or* manifest.json
+        if matches!((path.extension(), path.file_stem()), (Some(ext), Some(stem)) if ext == "html" || (ext == "json" && stem == "manifest"))
+        {
             file = self.do_process(state, file);
         }
 
@@ -401,7 +397,7 @@ impl MainFileCache {
     pub fn do_process(&self, state: &ServerState, mut file: Vec<u8>) -> Vec<u8> {
         let mut new_file = Vec::new();
 
-        //let c = state.config();
+        let c = state.config_full();
 
         let mut last_index = 0;
         for m in VARIABLE_PATTERNS.find_iter(&file) {
@@ -409,35 +405,40 @@ impl MainFileCache {
 
             last_index = m.end();
 
-            // match m.pattern().as_u32() {
-            //     0 => {
-            //         serde_json::to_writer(
-            //             &mut new_file,
-            //             &sdk::models::ServerConfig {
-            //                 hcaptcha_sitekey: c.services.hcaptcha_sitekey.clone(),
-            //                 cdn: c.web.cdn_domain.clone(),
-            //                 min_age: c.account.min_age,
-            //                 secure: c.web.secure,
-            //                 camo: c.web.camo,
-            //                 limits: sdk::models::ServerLimits {
-            //                     max_upload_size: c.upload.max_upload_size,
-            //                     max_avatar_size: c.upload.max_avatar_size as u32,
-            //                     max_banner_size: c.upload.max_banner_size as u32,
-            //                     max_avatar_pixels: c.upload.max_avatar_pixels,
-            //                     max_banner_pixels: c.upload.max_banner_pixels,
-            //                     avatar_width: c.upload.avatar_width,
-            //                     banner_width: c.upload.banner_width,
-            //                     banner_height: c.upload.banner_height,
-            //                 },
-            //             },
-            //         )
-            //         .unwrap();
-            //     }
-            //     1 => new_file.extend_from_slice(c.web.base_url().as_bytes()),
-            //     2 => new_file.extend_from_slice(c.general.server_name.as_bytes()),
-            //     3 => new_file.extend_from_slice(c.web.cdn_domain.as_bytes()),
-            //     _ => log::error!("Unreachable replacement"),
-            // }
+            match m.pattern().as_u32() {
+                0 => {
+                    serde_json::to_writer(
+                        &mut new_file,
+                        &sdk::models::ServerConfig {
+                            hcaptcha_sitekey: c.shared.hcaptcha_sitekey.as_str().to_owned(),
+                            cdn: c.shared.cdn_domain.as_str().to_owned(),
+                            min_age: c.shared.minimum_age,
+                            secure: c.shared.secure_web,
+                            camo: c.shared.camo_enable,
+                            limits: sdk::models::ServerLimits {
+                                max_upload_size: c.shared.max_upload_size,
+                                max_avatar_size: c.shared.max_avatar_size,
+                                max_banner_size: c.shared.max_banner_size,
+                                max_avatar_pixels: c.shared.max_avatar_pixels,
+                                max_banner_pixels: c.shared.max_banner_pixels,
+                                avatar_width: c.shared.avatar_width,
+                                banner_width: c.shared.banner_width,
+                                banner_height: c.shared.banner_height,
+                            },
+                        },
+                    )
+                    .unwrap();
+                }
+
+                1 => new_file.extend_from_slice(String::as_bytes(&format!(
+                    "http{}://{}",
+                    if c.shared.secure_web { "s" } else { "" },
+                    c.shared.base_domain
+                ))),
+                2 => new_file.extend_from_slice(c.shared.server_name.as_bytes()),
+                3 => new_file.extend_from_slice(c.shared.cdn_domain.as_bytes()),
+                _ => log::error!("Unreachable replacement"),
+            }
         }
 
         if last_index > 0 {
