@@ -105,22 +105,19 @@ use failsafe::{futures::CircuitBreaker as _, Config as CircuitBreaker, Error as 
 impl GatewayConnection {
     /// For a single RPC request, read the message, process it, then reply
     async fn handle_rpc(send: SendStream, recv: RecvStream, state: ServerState) -> Result<(), Error> {
-        let mut recv = AsyncFramedReader::new(recv);
+        use rkyv::result::ArchivedResult;
 
-        let Some(msg) = recv.next_msg().await? else {
-            return err(CommonError::NotFound);
-        };
+        let mut stream = ::rpc::stream::RecvStream::<::rpc::msg::Message, _>::new(recv);
 
-        let mut buffer = AlignedVec::new();
-        buffer.resize(msg.len() as usize, 0);
-        msg.read_exact(&mut buffer[..]).await?;
+        match stream.recv().await? {
+            Some(ArchivedResult::Ok(msg)) => {
+                return self::rpc::dispatch(state, AsyncFramedWriter::new(send), msg).await;
+            }
+            Some(ArchivedResult::Err(e)) => log::warn!("Received error from gateway via RPC: {:?}", e.code()),
+            None => log::warn!("Empty message from gateway"),
+        }
 
-        let msg = rkyv::check_archived_root::<::rpc::msg::Message>(&buffer).map_err(|e| {
-            log::error!("Error getting archived RPC message: {e}");
-            CommonError::RkyvEncodingError
-        })?;
-
-        self::rpc::dispatch(state, AsyncFramedWriter::new(send), msg).await
+        Ok(())
     }
 
     /// Listen for incoming bidirectional streams and treat them as RPC messages

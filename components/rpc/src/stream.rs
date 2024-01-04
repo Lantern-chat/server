@@ -5,6 +5,8 @@ use futures::future::Either;
 use futures::{Stream, StreamExt};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
+use std::io::{self, ErrorKind};
+
 use framed::tokio::{AsyncFramedReader, AsyncFramedWriter};
 
 use rkyv::ser::serializers::AllocSerializer;
@@ -78,16 +80,31 @@ impl<T, R: AsyncRead + Unpin> RecvStream<T, R> {
             _ty: PhantomData,
         }
     }
+}
 
-    pub async fn recv(&mut self) -> Result<Option<&Result<T, ApiError>>, std::io::Error> {
-        self.buffer.clear();
-
+impl<T, R: AsyncRead + Unpin> RecvStream<T, R>
+where
+    T: rkyv::Archive,
+    rkyv::Archived<T>: for<'a> rkyv::CheckBytes<rkyv::validation::validators::DefaultValidator<'a>>,
+{
+    pub async fn recv(&mut self) -> Result<Option<&rkyv::Archived<Result<T, ApiError>>>, io::Error> {
         let Some(msg) = self.stream.next_msg().await? else {
             return Ok(None);
         };
 
-        //msg.read_buffered_object()
+        self.buffer.resize(msg.len() as usize, 0);
+        msg.read_exact(&mut self.buffer[..]).await?;
 
-        unimplemented!()
+        let msg = match rkyv::check_archived_root::<Result<T, ApiError>>(&self.buffer) {
+            Ok(msg) => msg,
+            Err(e) => {
+                return Err(io::Error::new(
+                    ErrorKind::InvalidData,
+                    format!("Error reading archived value: {e}"),
+                ));
+            }
+        };
+
+        Ok(Some(msg))
     }
 }
