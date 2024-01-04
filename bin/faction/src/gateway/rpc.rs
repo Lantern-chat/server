@@ -1,63 +1,7 @@
 use crate::prelude::*;
 
-use futures::future::Either;
-use futures::{Stream, StreamExt};
-use rpc::error::ApiError;
-use tokio::io::{AsyncWrite, AsyncWriteExt};
-
 use framed::tokio::AsyncFramedWriter;
-
-use rkyv::ser::serializers::AllocSerializer;
-use rkyv::{ser::Serializer, Serialize};
-
-async fn encode_item<T, W, const N: usize>(out: AsyncFramedWriter<W>, item: Result<T, Error>) -> Result<(), Error>
-where
-    W: AsyncWrite + Unpin,
-    T: Serialize<AllocSerializer<N>>,
-{
-    // stream::iter is more efficient
-    encode_stream(out, Ok(futures::stream::iter([item]))).await
-}
-
-async fn encode_stream<T, W, const N: usize>(
-    mut out: AsyncFramedWriter<W>,
-    stream: Result<impl Stream<Item = Result<T, Error>>, Error>,
-) -> Result<(), Error>
-where
-    W: AsyncWrite + Unpin,
-    T: Serialize<AllocSerializer<N>>,
-{
-    let mut serializer = AllocSerializer::default();
-
-    let mut stream = std::pin::pin!(match stream {
-        Ok(stream) => Either::Left(stream),
-        Err(err) => Either::Right(futures::stream::iter([Err(err)])),
-    });
-
-    while let Some(item) = stream.next().await {
-        let item: Result<T, ApiError> = match item {
-            Ok(item) => Ok(item),
-            Err(e) => Err(ApiError::from(e)),
-        };
-
-        if let Err(e) = serializer.serialize_value(&item) {
-            log::error!("Error serializing streamed item: {e}");
-            serializer.reset();
-            continue;
-        }
-
-        let mut msg = out.new_message();
-        msg.write_all(serializer.serializer().inner().as_slice()).await?;
-        serializer.reset(); // immediately free buffers before flushing
-        AsyncFramedWriter::dispose_msg(msg).await?;
-
-        if item.is_err() {
-            break; // only send one trailing error for logging
-        }
-    }
-
-    Ok(())
-}
+use tokio::io::AsyncWrite;
 
 pub async fn dispatch<W>(
     state: ServerState,
@@ -72,12 +16,14 @@ where
     // avoid inlining every async state machine by boxing them inside a lazy future/async block
     macro_rules! c {
         ($([$size:literal])? $first:ident$(::$frag:ident)+($($args:expr),*)) => {
-            Box::pin(async move { encode_item::<_, _, {512 $(* 0 + $size)?}>(out, crate::api::$first$(::$frag)+($($args),*).await).await })
+            Box::pin(async move { ::rpc::stream::encode_item::<_, Error, _, {512 $(* 0 + $size)?}>(
+                out, crate::api::$first$(::$frag)+($($args),*).await).await.map_err(Error::from) })
         };
     }
     macro_rules! s {
         ($([$size:literal])? $first:ident$(::$frag:ident)+($($args:expr),*)) => {
-            Box::pin(async move { encode_stream::<_, _, {512 $(* 0 + $size)?}>(out, crate::api::$first$(::$frag)+($($args),*).await).await })
+            Box::pin(async move { ::rpc::stream::encode_stream::<_, Error, _, {512 $(* 0 + $size)?}>(
+                out, crate::api::$first$(::$frag)+($($args),*).await).await.map_err(Error::from) })
         };
     }
 
