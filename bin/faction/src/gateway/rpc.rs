@@ -1,6 +1,8 @@
 use crate::prelude::*;
 
+use futures::future::Either;
 use futures::{Stream, StreamExt};
+use rpc::error::ApiError;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
 use framed::tokio::AsyncFramedWriter;
@@ -8,28 +10,18 @@ use framed::tokio::AsyncFramedWriter;
 use rkyv::ser::serializers::AllocSerializer;
 use rkyv::{ser::Serializer, Serialize};
 
-async fn encode_item<T, W, const N: usize>(mut out: AsyncFramedWriter<W>, item: T) -> Result<(), Error>
+async fn encode_item<T, W, const N: usize>(out: AsyncFramedWriter<W>, item: Result<T, Error>) -> Result<(), Error>
 where
     W: AsyncWrite + Unpin,
     T: Serialize<AllocSerializer<N>>,
 {
-    let mut serializer = AllocSerializer::<N>::default();
-
-    if let Err(e) = serializer.serialize_value(&item) {
-        log::error!("Rkyv Error: {e}");
-        return Err(Error::RkyvEncodingError);
-    }
-
-    let archived = serializer.into_serializer().into_inner();
-
-    out.write_msg(archived.as_slice()).await?;
-
-    Ok(())
+    // stream::iter is more efficient
+    encode_stream(out, Ok(futures::stream::iter([item]))).await
 }
 
 async fn encode_stream<T, W, const N: usize>(
     mut out: AsyncFramedWriter<W>,
-    stream: impl Stream<Item = Result<T, Error>>,
+    stream: Result<impl Stream<Item = Result<T, Error>>, Error>,
 ) -> Result<(), Error>
 where
     W: AsyncWrite + Unpin,
@@ -37,9 +29,18 @@ where
 {
     let mut serializer = AllocSerializer::default();
 
-    let mut stream = std::pin::pin!(stream);
+    let mut stream = std::pin::pin!(match stream {
+        Ok(stream) => Either::Left(stream),
+        Err(err) => Either::Right(futures::stream::iter([Err(err)])),
+    });
+
     while let Some(item) = stream.next().await {
-        if let Err(e) = serializer.serialize_value(&item?) {
+        let item: Result<T, ApiError> = match item {
+            Ok(item) => Ok(item),
+            Err(e) => Err(ApiError::from(e)),
+        };
+
+        if let Err(e) = serializer.serialize_value(&item) {
             log::error!("Error serializing streamed item: {e}");
             serializer.reset();
             continue;
@@ -49,6 +50,10 @@ where
         msg.write_all(serializer.serializer().inner().as_slice()).await?;
         serializer.reset(); // immediately free buffers before flushing
         AsyncFramedWriter::dispose_msg(msg).await?;
+
+        if item.is_err() {
+            break; // only send one trailing error for logging
+        }
     }
 
     Ok(())
@@ -67,12 +72,12 @@ where
     // avoid inlining every async state machine by boxing them inside a lazy future/async block
     macro_rules! c {
         ($([$size:literal])? $first:ident$(::$frag:ident)+($($args:expr),*)) => {
-            Box::pin(async move { encode_item::<_, _, {512 $(* 0 + $size)?}>(out, crate::api::$first$(::$frag)+($($args),*).await?).await })
+            Box::pin(async move { encode_item::<_, _, {512 $(* 0 + $size)?}>(out, crate::api::$first$(::$frag)+($($args),*).await).await })
         };
     }
     macro_rules! s {
         ($([$size:literal])? $first:ident$(::$frag:ident)+($($args:expr),*)) => {
-            Box::pin(async move { encode_stream::<_, _, {512 $(* 0 + $size)?}>(out, crate::api::$first$(::$frag)+($($args),*).await?).await })
+            Box::pin(async move { encode_stream::<_, _, {512 $(* 0 + $size)?}>(out, crate::api::$first$(::$frag)+($($args),*).await).await })
         };
     }
 
@@ -80,7 +85,7 @@ where
     let addr = msg.addr.as_socket_addr();
     let auth = || match msg.auth.as_deref() {
         Some(auth) => Ok(simple_de::<Authorization>(auth)),
-        None => Err(Error::Unauthorized),
+        None => Err(CommonError::Unauthorized),
     };
 
     use core::{future::Future, pin::Pin};

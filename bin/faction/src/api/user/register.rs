@@ -16,13 +16,13 @@ pub async fn register_user(
     let config = state.config();
 
     if !schema::validation::validate_email(&form.email) {
-        return Err(Error::InvalidEmail);
+        return err(CommonError::InvalidEmail);
     }
     if !schema::validation::validate_username(&form.username, config.shared.username_length.clone()) {
-        return Err(Error::InvalidUsername);
+        return err(CommonError::InvalidUsername);
     }
     if !schema::validation::validate_password(&form.password, config.shared.password_length.clone()) {
-        return Err(Error::InvalidPassword);
+        return err(CommonError::InvalidPassword);
     }
 
     let dob = simple_de::<Timestamp>(&form.dob).date();
@@ -30,7 +30,7 @@ pub async fn register_user(
     let now = SystemTime::now();
 
     if !util::time::is_of_age(config.shared.minimum_age as i32, now, dob) {
-        return Err(Error::InsufficientAge);
+        return err(CommonError::InsufficientAge);
     }
 
     let _verified = state
@@ -52,7 +52,7 @@ pub async fn register_user(
     }).await?;
 
     if existing.is_some() {
-        return Err(Error::AlreadyExists);
+        return err(CommonError::AlreadyExists);
     }
 
     // SAFETY: This value is only used in the below blocking future

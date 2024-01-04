@@ -12,6 +12,6 @@ pub async fn get_room(state: ServerState, auth: Authorization, room_id: Snowflak
 
     match std::pin::pin!(stream).next().await {
         Some(res) => res,
-        None => Err(Error::NotFound),
+        None => err(CommonError::NotFound),
     }
 }

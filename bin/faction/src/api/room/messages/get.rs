@@ -17,7 +17,7 @@ pub async fn get_many<'a>(
     let needs_perms = match state.perm_cache.get(auth.user_id(), room_id).await {
         Some(perms) => {
             if !perms.contains(Permissions::READ_MESSAGE_HISTORY) {
-                return Err(Error::NotFound);
+                return err(CommonError::NotFound);
             }
 
             false
@@ -56,7 +56,7 @@ where
     match stream.next().await {
         Some(Ok(msg)) => Ok(msg),
         Some(Err(e)) => Err(e),
-        None => Err(Error::NotFound),
+        None => err(CommonError::NotFound),
     }
 }
 

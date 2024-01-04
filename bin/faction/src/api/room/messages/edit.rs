@@ -18,7 +18,7 @@ pub async fn edit_message(
         Some(PermMute { perms, .. }) => {
             // Mostly same rules as creating messages, as they are sending new content
             if !perms.contains(Permissions::SEND_MESSAGES) {
-                return Err(Error::Unauthorized);
+                return err(CommonError::Unauthorized);
             }
 
             Some(perms)
@@ -31,7 +31,7 @@ pub async fn edit_message(
     // early reject if empty but not containing attachments
     if trimmed_content.is_empty() && body.attachments.is_empty() {
         // TODO: Edit a mesage to have zero anything, should it be deleted instead?
-        return Err(Error::BadRequest);
+        return err(CommonError::BadRequest);
     }
 
     let mut db = state.db.write.get().await?;
@@ -42,7 +42,7 @@ pub async fn edit_message(
             let perms = crate::api::perm::get_room_permissions(&db, auth.user_id(), room_id).await?;
 
             if !perms.contains(Permissions::SEND_MESSAGES) {
-                return Err(Error::Unauthorized);
+                return err(CommonError::Unauthorized);
             }
 
             perms
@@ -53,13 +53,13 @@ pub async fn edit_message(
     let prev = db.query_opt_cached_typed(|| query_existing_message(), &[&msg_id, &room_id]).await?;
 
     let Some(row) = prev else {
-        return Err(Error::NotFound);
+        return err(CommonError::NotFound);
     };
 
     let author_id: Snowflake = row.try_get(0)?;
 
     if author_id != auth.user_id() {
-        return Err(Error::Unauthorized);
+        return err(CommonError::Unauthorized);
     }
 
     let _prev_flags = MessageFlags::from_bits_truncate_public(row.try_get(1)?);
@@ -77,7 +77,7 @@ pub async fn edit_message(
             }),
         )
     }) else {
-        return Err(Error::BadRequest);
+        return err(CommonError::BadRequest);
     };
 
     // edits cannot perform actions, but are subject to replacements
@@ -110,7 +110,7 @@ pub async fn edit_message(
             let added = new_set.difference(&pre_set).copied().collect::<Vec<_>>();
 
             if !added.is_empty() && !perms.contains(Permissions::EDIT_NEW_ATTACHMENT) {
-                return Err(Error::Unauthorized);
+                return err(CommonError::Unauthorized);
             }
 
             let removed = pre_set.difference(&new_set).copied().collect::<Vec<_>>();

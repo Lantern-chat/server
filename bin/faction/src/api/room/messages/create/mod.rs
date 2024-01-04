@@ -22,7 +22,7 @@ pub async fn create_message(
     let perms = match state.perm_cache.get(auth.user_id(), room_id).await {
         Some(PermMute { perms, .. }) => {
             if !perms.contains(Permissions::SEND_MESSAGES) {
-                return Err(Error::Unauthorized);
+                return err(CommonError::Unauthorized);
             }
 
             Some(perms)
@@ -34,7 +34,7 @@ pub async fn create_message(
 
     // if empty but not containing attachments
     if trimmed_content.is_empty() && body.attachments.is_empty() && body.embeds.is_empty() {
-        return Err(Error::BadRequest);
+        return err(CommonError::BadRequest);
     }
 
     // do full trimming
@@ -48,7 +48,7 @@ pub async fn create_message(
             }),
         )
     }) else {
-        return Err(Error::BadRequest);
+        return err(CommonError::BadRequest);
     };
 
     // since acquiring the database connection may be expensive,
@@ -63,7 +63,7 @@ pub async fn create_message(
             let perms = crate::api::perm::get_room_permissions(&db, auth.user_id(), room_id).await?;
 
             if !perms.contains(Permissions::SEND_MESSAGES) {
-                return Err(Error::Unauthorized);
+                return err(CommonError::Unauthorized);
             }
 
             maybe_db = Some(db);
@@ -74,7 +74,7 @@ pub async fn create_message(
 
     // check this before acquiring database connection
     if !body.attachments.is_empty() && !perms.contains(Permissions::ATTACH_FILES) {
-        return Err(Error::Unauthorized);
+        return err(CommonError::Unauthorized);
     }
 
     // modify content before inserting it into the database

@@ -4,9 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-serde = { workspace = true }
-rkyv = { workspace = true }
-bytecheck = { workspace = true }
 sdk = { workspace = true, features = ["api", "rkyv"] }
-auth = { path = "../auth" }
+
+smol_str.workspace = true
+serde.workspace = true
+rkyv.workspace = true
+bytecheck.workspace = true
+auth.workspace = true
+thiserror = "1"
 paste = "1"

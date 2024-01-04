@@ -37,23 +37,23 @@ pub async fn redeem_invite(
 
     let row = match row.await {
         Ok(row) => row,
-        Err(err) => {
-            if let Some(db) = err.as_db_error() {
+        Err(e) => {
+            if let Some(db) = e.as_db_error() {
                 match *db.code() {
                     SqlState::RAISE_EXCEPTION => match db.message() {
-                        "user_banned" => return Err(Error::Unauthorized),
-                        "invalid_invite" => return Err(Error::NotFound),
+                        "user_banned" => return err(CommonError::Unauthorized),
+                        "invalid_invite" => return err(CommonError::NotFound),
                         _ => {}
                     },
                     SqlState::UNIQUE_VIOLATION => match db.constraint() {
-                        Some("party_members_pk") => return Err(Error::Conflict),
+                        Some("party_members_pk") => return err(CommonError::Conflict),
                         _ => todo!("Other constraints"),
                     },
                     _ => {}
                 }
             }
 
-            return Err(err.into());
+            return Err(e.into());
         }
     };
 
@@ -66,7 +66,7 @@ pub async fn redeem_invite(
                 state.clone(),
                 auth,
                 Some(party_id),
-                todo!(), //sdk::api::commands::user::UpdateUserProfileBody {
+                todo!(), //TODO: sdk::api::commands::user::UpdateUserProfileBody {
                          //    nick: Nullable::Some(nickname),
                          //    ..Default::default()
                          //},

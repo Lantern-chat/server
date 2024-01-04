@@ -43,7 +43,7 @@ pub async fn get_party_inner(
     let row = db
         .query_opt_cached_typed(
             || {
-                use party_query::*;
+                use party_query::{Party, *};
 
                 Query::select()
                     .cols(PartyColumns::default())
@@ -60,7 +60,7 @@ pub async fn get_party_inner(
     use party_query::{PartyColumns, PartyMemberColumns};
 
     let Some(row) = row else {
-        return Err(Error::NotFound);
+        return err(CommonError::NotFound);
     };
 
     let mut party = Party {

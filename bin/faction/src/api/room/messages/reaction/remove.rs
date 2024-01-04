@@ -11,13 +11,13 @@ pub async fn remove_own_reaction(
     emote: &Archived<EmoteOrEmoji>,
 ) -> Result<(), Error> {
     let Some(emote) = state.emoji.resolve(simple_de(emote)) else {
-        return Err(Error::BadRequest);
+        return err(CommonError::BadRequest);
     };
 
     let perms = state.perm_cache.get(auth.user_id(), room_id).await;
 
     if matches!(perms, Some(perms) if !perms.contains(Permissions::READ_MESSAGE_HISTORY)) {
-        return Err(Error::Unauthorized);
+        return err(CommonError::Unauthorized);
     }
 
     #[rustfmt::skip]

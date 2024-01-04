@@ -14,13 +14,13 @@ pub async fn create_room(
 
     if matches!(form.topic.as_deref(), Some(ref topic) if !config.shared.room_topic_length.contains(&topic.len()))
     {
-        return Err(Error::InvalidTopic);
+        return err(CommonError::InvalidTopic);
     }
 
     let name = schema::names::slug_name(&form.name);
 
     if !config.shared.room_name_length.contains(&name.len()) {
-        return Err(Error::InvalidName);
+        return err(CommonError::InvalidName);
     }
 
     // check permissions AND check for the room limit at the same time.
@@ -38,7 +38,7 @@ pub async fn create_room(
 
         AND PartyMembers.Permissions1 & {perms[0]} = {perms[0]}
     }).await? else {
-        return Err(Error::Unauthorized);
+        return err(CommonError::Unauthorized);
     };
 
     let total_rooms: i32 = row.total_rooms()?;
@@ -46,7 +46,7 @@ pub async fn create_room(
 
     if total_rooms >= config.shared.max_total_rooms as i32 || live_rooms >= config.shared.max_active_rooms as i32 {
         // TODO: Better error message here
-        return Err(Error::Unauthorized);
+        return err(CommonError::Unauthorized);
     }
 
     #[rustfmt::skip]
@@ -101,7 +101,7 @@ pub async fn create_room(
         t.rollback().await?;
 
         // TODO: Better error here
-        return Err(Error::BadRequest);
+        return err(CommonError::BadRequest);
     }
 
     t.execute2(schema::sql! {

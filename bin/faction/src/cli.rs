@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+//use std::path::PathBuf;
 
 /// Lantern server
 #[derive(Debug, argh::FromArgs)]
@@ -17,7 +17,7 @@ impl CliOptions {
         let mut args: CliOptions = argh::from_env();
 
         if args.version {
-            println!("Lantern Faction {}", server::built::PKG_VERSION);
+            println!("Lantern Faction {}", crate::built::PKG_VERSION);
             std::process::exit(0);
         }
 

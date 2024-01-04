@@ -12,7 +12,7 @@ pub async fn modify_party(
     form: &Archived<PatchPartyForm>,
 ) -> Result<Party, Error> {
     if *form == PatchPartyForm::default() {
-        return Err(Error::BadRequest);
+        return err(CommonError::BadRequest);
     }
 
     {
@@ -20,12 +20,12 @@ pub async fn modify_party(
         let config = state.config();
         if matches!(form.description, Nullable::Some(ref desc) if !config.shared.party_description_length.contains(&desc.len()))
         {
-            return Err(Error::BadRequest);
+            return err(CommonError::BadRequest);
         }
 
         if matches!(form.name.as_ref(), Some(name) if !schema::validation::validate_name(name, config.shared.party_name_length.clone()))
         {
-            return Err(Error::InvalidName);
+            return err(CommonError::InvalidName);
         }
     }
 
@@ -50,13 +50,13 @@ pub async fn modify_party(
         WHERE Party.Id = #{&party_id as Party::Id}
           AND PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
     }).await? else {
-        return Err(Error::Unauthorized);
+        return err(CommonError::Unauthorized);
     };
 
     let perms = Permissions::from_i64(row.permissions1()?, row.permissions2()?);
 
     if !perms.contains(Permissions::MANAGE_PARTY) {
-        return Err(Error::Unauthorized);
+        return err(CommonError::Unauthorized);
     }
 
     let (avatar_id, banner_id) = {

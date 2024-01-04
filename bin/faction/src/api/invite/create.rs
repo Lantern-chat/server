@@ -17,7 +17,7 @@ pub async fn create_invite(
     let duration = match body.duration {
         Some(ms) if ms < MAX_DURATION => Some(Duration::milliseconds(ms as i64)),
         None => None,
-        _ => return Err(Error::BadRequest),
+        _ => return err(CommonError::BadRequest),
     };
 
     let id = state.sf.gen();
@@ -71,7 +71,7 @@ pub async fn create_invite(
     }).await?;
 
     if row.invite_id::<Option<Snowflake>>()?.is_none() {
-        return Err(Error::Unauthorized);
+        return err(CommonError::Unauthorized);
     }
 
     Ok(Invite {

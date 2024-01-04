@@ -28,7 +28,7 @@ pub async fn remove_room(state: ServerState, auth: Authorization, room_id: Snowf
     if res != 1 {
         t.rollback().await?;
 
-        return Err(Error::Unauthorized);
+        return err(CommonError::Unauthorized);
     }
 
     t.commit().await?;

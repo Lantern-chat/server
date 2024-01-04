@@ -5,6 +5,7 @@ thin-vec = { git = "https://github.com/Lantern-chat/thin-vec" }
 failsafe = { git = "https://github.com/Lantern-chat/failsafe-rs" }
 iso8601-timestamp = { git = "https://github.com/Lantern-chat/iso8601-timestamp" }
 rkyv = { git = "https://github.com/Lantern-chat/rkyv", branch = "0.7" }
+rend = { git = "https://github.com/Lantern-chat/rend", branch = "0.4" }
 
 # Contains fixes for nightly
 # rand = { git = "https://github.com/rust-random/rand" }
@@ -56,6 +57,7 @@ hashbrown = { version = "0.14", features = ["inline-more", "ahash"] }
 rkyv = { version = "0.7", features = ["strict", "validation"] }
 bytecheck = { version = "0.6" }                                       # 0.6 is used with rkyv 0.7
 serde = { version = "1", features = ["derive"] }
+serde_derive = "1"
 bitflags = "1.2.1"
 ahash = "0.8"
 scc = "2"

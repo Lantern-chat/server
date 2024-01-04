@@ -108,7 +108,7 @@ impl GatewayConnection {
         let mut recv = AsyncFramedReader::new(recv);
 
         let Some(msg) = recv.next_msg().await? else {
-            return Err(Error::NotFound);
+            return err(CommonError::NotFound);
         };
 
         let mut buffer = AlignedVec::new();
@@ -117,7 +117,7 @@ impl GatewayConnection {
 
         let msg = rkyv::check_archived_root::<::rpc::msg::Message>(&buffer).map_err(|e| {
             log::error!("Error getting archived RPC message: {e}");
-            Error::RkyvEncodingError
+            CommonError::RkyvEncodingError
         })?;
 
         self::rpc::dispatch(state, AsyncFramedWriter::new(send), msg).await

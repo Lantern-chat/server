@@ -1,7 +1,7 @@
 use crate::prelude::*;
 pub async fn logout_user(state: &ServerState, auth: Authorization) -> Result<(), Error> {
     let Authorization::User { token, user_id, .. } = auth else {
-        return Err(Error::BadRequest);
+        return err(CommonError::BadRequest);
     };
 
     let db = state.db.write.get().await?;

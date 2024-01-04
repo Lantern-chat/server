@@ -190,7 +190,7 @@ pub async fn get_one_anonymous(
 
     match stream.next().await {
         Some(first) => first,
-        None => Err(Error::NotFound),
+        None => err(CommonError::NotFound),
     }
 }
 
@@ -205,7 +205,7 @@ pub async fn get_one(
 
     match stream.next().await {
         Some(first) => first,
-        None => Err(Error::NotFound),
+        None => err(CommonError::NotFound),
     }
 }
 

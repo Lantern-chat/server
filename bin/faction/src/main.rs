@@ -14,6 +14,7 @@ pub mod built {
 pub mod allocator;
 pub mod api;
 pub mod asset;
+pub mod cli;
 pub mod config;
 pub mod error;
 pub mod gateway;
@@ -27,7 +28,7 @@ pub mod prelude {
     pub use crate::error::Error;
     pub use crate::state::ServerState;
 
-    pub use rpc::{auth::Authorization, event::ServerEvent};
+    pub use rpc::{auth::Authorization, error::Error as CommonError, event::ServerEvent};
     pub use sdk::models::{Nullable, SmolStr, Snowflake, Timestamp};
 
     pub use crate::config::Config;
@@ -41,6 +42,11 @@ pub mod prelude {
         Archived<T>: rkyv::Deserialize<T, rkyv::Infallible>,
     {
         rkyv::Deserialize::deserialize(value, &mut rkyv::Infallible).unwrap()
+    }
+
+    #[inline(always)]
+    pub fn err<T, E>(err: impl Into<E>) -> Result<T, E> {
+        Err(err.into())
     }
 }
 

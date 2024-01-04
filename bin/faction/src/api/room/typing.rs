@@ -16,7 +16,7 @@ pub async fn trigger_typing(
     let has_perms = match state.perm_cache.get(auth.user_id(), room_id).await {
         Some(perms) => {
             if !perms.contains(Permissions::SEND_MESSAGES) {
-                return Err(Error::NotFound);
+                return err(CommonError::NotFound);
             }
 
             true

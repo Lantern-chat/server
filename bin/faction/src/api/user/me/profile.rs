@@ -16,11 +16,11 @@ pub async fn patch_profile(
         // TODO: Better errors here
         let config = state.config();
         if matches!(profile.status, Nullable::Some(ref status) if status.len() > config.shared.max_status_length) {
-            return Err(Error::BadRequest);
+            return err(CommonError::BadRequest);
         }
 
         if matches!(profile.bio, Nullable::Some(ref bio) if bio.len() > config.shared.max_bio_length) {
-            return Err(Error::BadRequest);
+            return err(CommonError::BadRequest);
         }
     }
 
@@ -48,7 +48,7 @@ pub async fn patch_profile(
             WHERE PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
               AND PartyMembers.PartyId = #{&party_id as Party::Id}
         }).await? else {
-            return Err(Error::Unauthorized);
+            return err(CommonError::Unauthorized);
         };
 
         perms = Permissions::from_i64(row.permissions1()?, row.permissions2()?);
@@ -73,7 +73,7 @@ pub async fn patch_profile(
     }
 
     if !perms.contains(Permissions::CHANGE_NICKNAME) && profile.nick.is_some() {
-        return Err(Error::Unauthorized);
+        return err(CommonError::Unauthorized);
     }
 
     let (avatar_id, banner_id) = {

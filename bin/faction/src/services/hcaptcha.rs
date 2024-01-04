@@ -104,8 +104,8 @@ impl HCaptchaClient {
 
         match (response.success, response.error_codes.first()) {
             (true, _) => Ok(true),
-            (false, Some(&err)) => Err(err.into()),
-            (false, None) => Err(HCaptchaError::Unknown.into()),
+            (false, Some(&e)) => err(e),
+            (false, None) => err(HCaptchaError::Unknown),
         }
     }
 }
