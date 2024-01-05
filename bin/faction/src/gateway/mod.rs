@@ -6,10 +6,10 @@ use crate::prelude::*;
 
 pub type ConnectionId = Snowflake;
 
-use tokio::{io::AsyncReadExt, sync::Notify};
+use tokio::sync::Notify;
 use triomphe::Arc;
 
-use framed::tokio::{AsyncFramedReader, AsyncFramedWriter};
+use framed::tokio::AsyncFramedWriter;
 use rkyv::{
     ser::{serializers::AllocSerializer, Serializer},
     AlignedVec, Archive, Serialize,
@@ -20,6 +20,12 @@ use quinn::{Connection, ConnectionError, RecvStream, SendStream, VarInt};
 pub mod rpc;
 
 const EVENT_BATCH_SIZE: usize = 64;
+
+#[derive(Clone)]
+pub struct RpcConnection {
+    pub id: ConnectionId,
+    pub conn: Connection,
+}
 
 pub struct GatewayConnectionInner {
     pub id: ConnectionId,
@@ -44,22 +50,35 @@ pub struct Gateway {
     pub counter: AtomicU64,
     pub notify: Arc<Notify>,
     pub events: scc::TreeIndex<u64, Arc<AlignedVec>>,
-    pub conns: scc::HashMap<ConnectionId, GatewayConnection>,
+    pub rpcs: scc::HashIndex<ConnectionId, RpcConnection>,
+    pub gateways: scc::HashIndex<ConnectionId, GatewayConnection>,
 }
 
 impl Default for Gateway {
     fn default() -> Self {
         Gateway {
-            counter: AtomicU64::new(0),
+            counter: AtomicU64::new(1), // zero index might cause issues with some logic
             notify: Arc::default(),
             events: Default::default(),
-            conns: Default::default(),
+            rpcs: Default::default(),
+            gateways: Default::default(),
         }
     }
 }
 
 impl Gateway {
-    pub async fn insert_connection(&self, state: ServerState, conn: Connection) {
+    pub async fn insert_rpc_connection(&self, state: ServerState, conn: Connection) {
+        let conn = RpcConnection {
+            id: state.sf.gen(),
+            conn,
+        };
+
+        tokio::spawn(conn.clone().run_rpc(state));
+
+        _ = self.rpcs.insert_async(conn.id, conn).await;
+    }
+
+    pub async fn insert_gateway_connection(&self, state: ServerState, conn: Connection) {
         let conn = GatewayConnection(Arc::new(GatewayConnectionInner {
             id: state.sf.gen(),
             conn,
@@ -67,11 +86,9 @@ impl Gateway {
             notify: self.notify.clone(),
         }));
 
-        tokio::spawn(conn.clone().run_rpc(state.clone()));
         tokio::spawn(conn.clone().run_gateway(state));
 
-        // effectively impossible for this to fail
-        _ = self.conns.insert_async(conn.id, conn).await;
+        _ = self.gateways.insert_async(conn.id, conn).await;
     }
 
     pub async fn send_simple<T>(&self, event: &T)
@@ -102,14 +119,14 @@ impl Gateway {
 
 use failsafe::{futures::CircuitBreaker as _, Config as CircuitBreaker, Error as Break};
 
-impl GatewayConnection {
+impl RpcConnection {
     /// For a single RPC request, read the message, process it, then reply
     async fn handle_rpc(send: SendStream, recv: RecvStream, state: ServerState) -> Result<(), Error> {
         use rkyv::result::ArchivedResult;
 
-        let mut stream = ::rpc::stream::RecvStream::<::rpc::msg::Message, _>::new(recv);
+        let mut stream = ::rpc::stream::RpcRecvStream::new(recv);
 
-        match stream.recv().await? {
+        match stream.recv::<::rpc::msg::Message>().await? {
             Some(ArchivedResult::Ok(msg)) => {
                 return self::rpc::dispatch(state, AsyncFramedWriter::new(send), msg).await;
             }
@@ -141,7 +158,7 @@ impl GatewayConnection {
                     tries += 1;
 
                     if tries > 10 {
-                        self.conn.close(VarInt::from_u32(405), b"Could Not Accept Stream");
+                        self.conn.close(VarInt::from_u32(405), b"Could Not Accept RPC Stream");
                     } else if matches!(e, Break::Rejected) {
                         // wait a second in case of something overloading
                         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -153,14 +170,16 @@ impl GatewayConnection {
 
             let state = state.clone();
             tokio::spawn(async move {
-                if let Err(e) = GatewayConnection::handle_rpc(send, recv, state).await {
+                if let Err(e) = Self::handle_rpc(send, recv, state).await {
                     // TODO: Add to metrics
                     log::error!("Error handling RPC request: {e}");
                 }
             });
         }
     }
+}
 
+impl GatewayConnection {
     /// While the connection is open, connect a unidirectional stream back to the gateway and send
     /// gateway events along it.
     pub async fn run_gateway(self, state: ServerState) {
@@ -168,14 +187,14 @@ impl GatewayConnection {
         let mut tries = 0;
 
         'connect: loop {
-            #[rustfmt::skip]
             let stream = match cb.call(self.conn.open_uni()).await {
                 Ok(stream) => {
                     tries = 0;
                     stream
                 }
+                #[rustfmt::skip]
                 Err(Break::Inner(ConnectionError::LocallyClosed | ConnectionError::ApplicationClosed(_) | ConnectionError::ConnectionClosed(_))) => {
-                    log::error!("RPC Connection closed");
+                    log::error!("Gateway Connection closed");
                     return; // connection is closed, end task
                 }
                 Err(e) => {
@@ -212,7 +231,7 @@ impl GatewayConnection {
 
                     for (cnt, event) in batched_events {
                         if let Err(e) = stream.write_msg(event.as_slice()).await {
-                            log::error!("Error writing event to uni gateway stream: {e}");
+                            log::error!("Error writing event to gateway stream: {e}");
                             break 'recv;
                         }
 

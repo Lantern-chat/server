@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use crate::error::ApiError;
 use futures::future::Either;
 use futures::{Stream, StreamExt};
@@ -66,28 +64,26 @@ where
     Ok(())
 }
 
-pub struct RecvStream<T, R: AsyncRead + Unpin> {
+pub struct RpcRecvStream<R: AsyncRead + Unpin> {
     stream: AsyncFramedReader<R>,
     buffer: rkyv::AlignedVec,
-    _ty: PhantomData<T>,
 }
 
-impl<T, R: AsyncRead + Unpin> RecvStream<T, R> {
+impl<R: AsyncRead + Unpin> RpcRecvStream<R> {
     pub fn new(stream: R) -> Self {
-        RecvStream {
+        RpcRecvStream {
             stream: AsyncFramedReader::new(stream),
             buffer: rkyv::AlignedVec::new(),
-            _ty: PhantomData,
         }
     }
 }
 
-impl<T, R: AsyncRead + Unpin> RecvStream<T, R>
-where
-    T: rkyv::Archive,
-    rkyv::Archived<T>: for<'a> rkyv::CheckBytes<rkyv::validation::validators::DefaultValidator<'a>>,
-{
-    pub async fn recv(&mut self) -> Result<Option<&rkyv::Archived<Result<T, ApiError>>>, io::Error> {
+impl<R: AsyncRead + Unpin> RpcRecvStream<R> {
+    pub async fn recv<T>(&mut self) -> Result<Option<&rkyv::Archived<Result<T, ApiError>>>, io::Error>
+    where
+        T: rkyv::Archive,
+        rkyv::Archived<T>: for<'a> rkyv::CheckBytes<rkyv::validation::validators::DefaultValidator<'a>>,
+    {
         let Some(msg) = self.stream.next_msg().await? else {
             return Ok(None);
         };
