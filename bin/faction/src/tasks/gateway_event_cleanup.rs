@@ -14,7 +14,7 @@ pub fn add_gateway_event_cleanup_task(state: &ServerState, runner: &TaskRunner) 
             }
 
             // TODO: Replace with https://github.com/wvwwvwwv/scalable-concurrent-containers/issues/120 if added
-            while lre > 0 && state.gateway.events.remove_async(&lre).await {
+            while lre > 0 && state.gateway.events.queue.remove_async(&lre).await {
                 lre -= 1;
             }
         },

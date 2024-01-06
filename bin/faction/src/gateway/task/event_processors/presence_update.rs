@@ -64,7 +64,12 @@ pub async fn presence_updated(
             };
 
             if let Some(party_id) = party_id {
-                state.gateway.broadcast_event(Event::new(ServerMsg::new_presence_update(inner), None)?, party_id);
+                #[rustfmt::skip]
+                state.gateway.events.send_simple(&ServerEvent::party(
+                    ServerMsg::new_presence_update(inner),
+                    party_id,
+                    None,
+                )).await;
             }
         }
 

@@ -1,6 +1,6 @@
 use schema::EventCode;
 
-use crate::backend::util::encrypted_asset::encrypt_snowflake_opt;
+use crate::util::encrypted_asset::encrypt_snowflake_opt;
 
 use super::prelude::*;
 
@@ -21,13 +21,12 @@ pub async fn role_event(
             }
         };
 
-        state.gateway.broadcast_event(
-            Event::new(
-                ServerMsg::new_role_delete(RoleDeleteEvent { id: role_id, party_id }),
-                None,
-            )?,
+        #[rustfmt::skip]
+        state.gateway.events.send_simple(&ServerEvent::party(
+            ServerMsg::new_role_delete(RoleDeleteEvent { id: role_id, party_id }),
             party_id,
-        );
+            None,
+        )).await;
 
         return Ok(());
     }
@@ -54,6 +53,7 @@ pub async fn role_event(
         party_id,
         avatar: encrypt_snowflake_opt(state, row.avatar_id()?),
         name: row.name()?,
+        desc: None, // TODO
         permissions: Permissions::from_i64(row.permissions1()?, row.permissions2()?),
         color: row.color::<Option<i32>>()?.map(|c| c as u32),
         position: row.position()?,
@@ -66,7 +66,7 @@ pub async fn role_event(
         _ => unreachable!(),
     };
 
-    state.gateway.broadcast_event(Event::new(event, None)?, party_id);
+    state.gateway.events.send_simple(&ServerEvent::party(event, party_id, None)).await;
 
     Ok(())
 }

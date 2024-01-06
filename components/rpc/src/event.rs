@@ -3,24 +3,53 @@ use sdk::{
     models::sf::{NicheSnowflake, Snowflake},
 };
 
+use smallvec::{smallvec, SmallVec};
+
+pub type SmallSnowflakeVec = SmallVec<[Snowflake; 1]>;
+
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 #[archive(check_bytes)]
-pub struct ServerEvent {
-    #[with(NicheSnowflake)]
-    pub party_id: Option<Snowflake>,
+pub enum ServerEvent {
+    Regular {
+        msg: ServerMsg,
 
-    #[with(NicheSnowflake)]
-    pub room_id: Option<Snowflake>,
+        #[with(NicheSnowflake)]
+        room_id: Option<Snowflake>,
 
-    pub msg: ServerMsg,
+        user_ids: SmallSnowflakeVec,
+        party_ids: SmallSnowflakeVec,
+    },
+    BulkUserBlockedRefresh {
+        blocked: Vec<Snowflake>,
+    },
+    UserBlockedAdd {
+        user_id: Snowflake,
+    },
+    UserBlockedRemove {
+        user_id: Snowflake,
+    },
 }
 
 impl ServerEvent {
-    pub fn new(event: impl Into<ServerMsg>, party_id: Option<Snowflake>, room_id: Option<Snowflake>) -> Self {
-        ServerEvent {
-            party_id,
-            room_id,
+    pub fn new(
+        event: impl Into<ServerMsg>,
+        user_ids: SmallSnowflakeVec,
+        party_ids: SmallSnowflakeVec,
+        room_id: Option<Snowflake>,
+    ) -> Self {
+        ServerEvent::Regular {
             msg: event.into(),
+            room_id,
+            user_ids,
+            party_ids,
         }
+    }
+
+    pub fn party(event: impl Into<ServerMsg>, party_id: Snowflake, room_id: Option<Snowflake>) -> Self {
+        ServerEvent::new(event, SmallVec::new(), smallvec![party_id], room_id)
+    }
+
+    pub fn user(event: impl Into<ServerMsg>, user_id: Snowflake, room_id: Option<Snowflake>) -> Self {
+        ServerEvent::new(event, smallvec![user_id], SmallVec::new(), room_id)
     }
 }

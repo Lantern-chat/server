@@ -97,7 +97,7 @@ pub async fn remove_own_reaction(
 
     match party_id {
         Some(party_id) => {
-            state.gateway.send_simple(&ServerEvent::new(event, Some(party_id), Some(room_id))).await;
+            state.gateway.events.send_simple(&ServerEvent::party(event, party_id, Some(room_id))).await;
         }
         None => unimplemented!(),
     }

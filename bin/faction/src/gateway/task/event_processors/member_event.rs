@@ -1,7 +1,7 @@
 use futures::{future::Either, TryFutureExt};
 use schema::EventCode;
 
-use crate::backend::util::encrypted_asset::encrypt_snowflake_opt;
+use crate::util::encrypted_asset::encrypt_snowflake_opt;
 
 use super::prelude::*;
 
@@ -12,13 +12,10 @@ pub async fn member_event(
     user_id: Snowflake,
     party_id: Option<Snowflake>,
 ) -> Result<(), Error> {
-    let party_id = match party_id {
-        Some(party_id) => party_id,
-        None => {
-            return Err(Error::InternalError(format!(
-                "Member Event without a party id!: {event:?} - {user_id}"
-            )));
-        }
+    let Some(party_id) = party_id else {
+        return Err(Error::InternalError(format!(
+            "Member Event without a party id!: {event:?} - {user_id}"
+        )));
     };
 
     let member_future = match event {
@@ -61,19 +58,19 @@ pub async fn member_event(
                     preferences: None,
                 },
                 partial: PartialPartyMember {
-                    roles: None,
+                    roles: ThinVec::new(),
                     flags: None,
                     joined_at: None,
                 },
             }))
         }),
         EventCode::MemberJoined | EventCode::MemberUpdated => Either::Right(
-            crate::backend::api::party::members::get_one_anonymous(
+            crate::api::party::members::get_one_anonymous(
                 state,
                 db,
                 party_id,
                 user_id,
-                crate::backend::api::party::members::MemberMode::Simple,
+                crate::api::party::members::MemberMode::Simple,
             )
             .map_ok(Some),
         ),
@@ -86,9 +83,7 @@ pub async fn member_event(
             return Ok(None);
         }
 
-        crate::backend::api::party::get::get_party_inner(state.clone(), db, user_id, party_id)
-            .await
-            .map(Some)
+        crate::api::party::get::get_party_inner(state.clone(), db, user_id, party_id).await.map(Some)
     };
 
     let (member, party): (Option<PartyMember>, _) = tokio::try_join!(member_future, party_future)?;
@@ -100,6 +95,7 @@ pub async fn member_event(
         None => return Ok(()),
     };
 
+    #[rustfmt::skip]
     let msg = match event {
         EventCode::MemberUpdated => ServerMsg::new_member_update(inner),
         EventCode::MemberJoined => {
@@ -108,25 +104,25 @@ pub async fn member_event(
             };
 
             // Send user the party information
-            state
-                .gateway
-                .broadcast_user_event(Event::new(ServerMsg::new_party_create(party), None)?, user_id)
-                .await;
+            state.gateway.events.send_simple(
+                &ServerEvent::user(ServerMsg::new_party_create(party), user_id, None)
+            ).await;
 
             ServerMsg::new_member_add(inner)
         }
         EventCode::MemberLeft | EventCode::MemberBan => {
             let inner: Arc<PartyMemberEvent> = Arc::new(inner);
 
-            state
-                .gateway
-                .broadcast_user_event(Event::new(ServerMsg::new_party_delete(party_id), None)?, user_id)
-                .await;
+            state.gateway.events.send_simple(
+                &ServerEvent::user(ServerMsg::new_party_delete(party_id), user_id, None)
+            ).await;
 
             if event == EventCode::MemberBan {
-                state
-                    .gateway
-                    .broadcast_event(Event::new(ServerMsg::new_member_ban(inner.clone()), None)?, party_id);
+                state.gateway.events.send_simple(&ServerEvent::party(
+                    ServerMsg::new_member_ban(inner.clone()),
+                    party_id,
+                    None,
+                )).await;
             }
 
             ServerMsg::new_member_remove(inner)
@@ -135,7 +131,7 @@ pub async fn member_event(
         _ => unreachable!(),
     };
 
-    state.gateway.broadcast_event(Event::new(msg, None)?, party_id);
+    state.gateway.events.send_simple(&ServerEvent::party(msg, party_id, None)).await;
 
     Ok(())
 }

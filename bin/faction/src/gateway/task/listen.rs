@@ -2,7 +2,7 @@ use db::{pg::AsyncMessage, pool::Object};
 use futures::StreamExt;
 use task_runner::{RetryAsyncFnTask, TaskRunner};
 
-use crate::{Error, ServerState};
+use crate::prelude::*;
 
 pub fn add_gateway_listener(state: ServerState, runner: &TaskRunner) {
     runner.add(RetryAsyncFnTask::new(state, |mut alive, state| async move {

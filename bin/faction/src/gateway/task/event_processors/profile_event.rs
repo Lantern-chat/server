@@ -1,7 +1,7 @@
 use futures::{future::Either, StreamExt};
 use smol_str::SmolStr;
 
-use crate::backend::util::encrypted_asset::encrypt_snowflake;
+use crate::util::encrypted_asset::encrypt_snowflake;
 
 use super::prelude::*;
 
@@ -87,13 +87,12 @@ pub async fn profile_updated(
                 },
             };
 
-            let event = Event::new(
-                ServerMsg::new_profile_update(ProfileUpdateEvent { party_id, user }),
-                None,
-            )?;
+            let event = ServerMsg::new_profile_update(ProfileUpdateEvent { party_id, user });
 
             match party_id {
-                Some(party_id) => state.gateway.broadcast_event(event, party_id),
+                Some(party_id) => {
+                    state.gateway.events.send_simple(&ServerEvent::party(event, party_id, None)).await
+                }
                 None => log::error!("Unimplemented profile event"),
             }
         }

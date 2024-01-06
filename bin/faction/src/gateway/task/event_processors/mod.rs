@@ -1,18 +1,15 @@
 use db::pool::Client;
 use schema::Snowflake;
 
-use crate::{Error, ServerState};
+use crate::prelude::*;
 
 pub mod prelude {
+    pub use crate::prelude::*;
     pub use schema::Snowflake;
     pub use sdk::models::{
         gateway::{events::*, message::ServerMsg, Intent},
         *,
     };
-    pub use thorn::*;
-
-    pub use crate::backend::gateway::Event;
-    pub use crate::{Error, ServerState};
 }
 
 pub mod member_event;
@@ -58,6 +55,6 @@ pub async fn process(
         EventCode::SelfUpdated => user_event::self_update(state, db, id, party_id).await,
         EventCode::UserUpdated => user_event::user_update(state, db, id).await,
         EventCode::ProfileUpdated => profile_event::profile_updated(state, db, id, party_id).await,
-        _ => Err(Error::Unimplemented),
+        _ => err(CommonError::Unimplemented),
     }
 }
