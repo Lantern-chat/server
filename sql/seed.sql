@@ -380,7 +380,7 @@ COMMENT ON TABLE lantern.party_members IS 'Association map between parties and u
 
 CREATE TABLE lantern.rooms (
     id              bigint      NOT NULL,
-    party_id        bigint,
+    party_id        bigint      NOT NULL,
     avatar_id       bigint,
     parent_id       bigint,
     deleted_at      timestamptz,
@@ -2511,7 +2511,11 @@ $$
 BEGIN
     -- new users just start out with @everyone permissions
     WITH p AS (
-        SELECT r.permissions1, r.permissions2 FROM lantern.roles r WHERE r.id = _party_id
+        SELECT
+            COALESCE(r.permissions1, d.permissions1) AS permissions1,
+            COALESCE(r.permissions2, d.permissions2) AS permissions2
+        FROM (SELECT PERMISSIONS1_DEFAULT_ONLY AS permissions1, 0 AS permissions2) AS d
+        LEFT JOIN lantern.roles r ON r.id = _party_id
     )
     -- insert new one at the top
     -- NOTE: Using -1 and doing this insert first avoids extra rollback work on failure

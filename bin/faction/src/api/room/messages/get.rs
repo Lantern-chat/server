@@ -344,12 +344,12 @@ where
             ) AS TempAttachments ON TRUE
     }).await?;
 
-    let mut last_user: Option<User> = None;
+    let mut last_author: Option<PartyMember> = None;
 
     Ok(stream.map(move |row| match row {
         Err(e) => Err(e.into()),
         Ok(row) => {
-            let party_id: Option<Snowflake> = row.party_id()?;
+            let party_id: Snowflake = row.party_id()?;
             let msg_id: Snowflake = row.msg_id()?;
 
             // many fields here are empty, easy to construct, and are filled in below
@@ -361,8 +361,21 @@ where
                 kind: MessageKind::Normal,
                 edited_at: None,
                 content: None,
-                author: make_system_user(),
-                member: None,
+                author: PartyMember {
+                    user: User {
+                        id: Snowflake(unsafe { std::num::NonZeroU64::new_unchecked(1) }),
+                        discriminator: 0,
+                        username: SmolStr::new_inline("SYSTEM"),
+                        flags: UserFlags::SYSTEM_USER,
+                        presence: None,
+                        profile: Nullable::Undefined,
+                        email: None,
+                        preferences: None,
+                    },
+                    joined_at: None,
+                    flags: PartyMemberFlags::empty(),
+                    roles: ThinVec::new(),
+                },
                 parent: row.parent_id()?,
                 user_mentions: ThinVec::new(),
                 role_mentions: ThinVec::new(),
@@ -387,7 +400,7 @@ where
             msg.author = {
                 let id = row.user_id()?;
 
-                match last_user {
+                match last_author {
                     Some(ref last_user) if last_user.id == id => last_user.clone(),
                     _ => {
                         let user = User {
@@ -412,9 +425,16 @@ where
                             },
                         };
 
-                        last_user = Some(user.clone());
+                        let author = PartyMember {
+                            user,
+                            roles: row.role_ids()?,
+                            joined_at: row.joined_at()?,
+                            flags: PartyMemberFlags::empty(),
+                        };
 
-                        user
+                        last_author = Some(author.clone());
+
+                        author
                     }
                 }
             };
@@ -424,15 +444,6 @@ where
 
                 return Ok(msg);
             }
-
-            msg.member = match party_id {
-                None => None,
-                Some(_) => Some(PartialPartyMember {
-                    roles: row.role_ids()?,
-                    joined_at: row.joined_at()?,
-                    flags: None,
-                }),
-            };
 
             msg.content = row.content()?;
             msg.edited_at = row.edited_at()?;
@@ -560,19 +571,6 @@ where
             Ok(msg)
         }
     }))
-}
-
-pub const fn make_system_user() -> User {
-    User {
-        id: Snowflake(unsafe { std::num::NonZeroU64::new_unchecked(1) }),
-        discriminator: 0,
-        username: SmolStr::new_inline("SYSTEM"),
-        flags: UserFlags::SYSTEM_USER,
-        presence: None,
-        profile: Nullable::Undefined,
-        email: None,
-        preferences: None,
-    }
 }
 
 #[derive(Default, Debug, Clone, Deserialize)]

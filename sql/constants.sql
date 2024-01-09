@@ -40,7 +40,13 @@
 ------------ MEMBER FLAGS --------------
 ----------------------------------------
 
-#define MEMBER_BANNED (1 << 0)
+#define MEMBER_BANNED           (1 << 0)
+
+----------------------------------------
+------------ PARTY FLAGS ---------------
+----------------------------------------
+
+#define PARTY_FLAGS_CLOSED      (1 << 6)
 
 ----------------------------------------
 ------------ PROFILE FLAGS -------------
@@ -86,45 +92,47 @@
 ---------- PERMISSIONS FLAGS -----------
 ----------------------------------------
 
-#define PERMISSIONS1_ADMINISTRATOR        (1 << 0)
-#define PERMISSIONS1_CREATE_INVITE        (1 << 1)
-#define PERMISSIONS1_KICK_MEMBERS         (1 << 2)
-#define PERMISSIONS1_BAN_MEMBERS          (1 << 3)
-#define PERMISSIONS1_VIEW_AUDIT_LOG       (1 << 4)
-#define PERMISSIONS1_VIEW_STATISTICS      (1 << 5)
-#define PERMISSIONS1_MANAGE_PARTY         (1 << 6)
-#define PERMISSIONS1_MANAGE_ROOMS         (1 << 7)
-#define PERMISSIONS1_MANAGE_NICKNAMES     (1 << 8)
-#define PERMISSIONS1_MANAGE_ROLES         (1 << 9)
-#define PERMISSIONS1_MANAGE_WEBHOOKS      (1 << 10)
+#define PERMISSIONS1_ADMINISTRATOR          (1 << 0)
+#define PERMISSIONS1_CREATE_INVITE          (1 << 1)
+#define PERMISSIONS1_KICK_MEMBERS           (1 << 2)
+#define PERMISSIONS1_BAN_MEMBERS            (1 << 3)
+#define PERMISSIONS1_VIEW_AUDIT_LOG         (1 << 4)
+#define PERMISSIONS1_VIEW_STATISTICS        (1 << 5)
+#define PERMISSIONS1_MANAGE_PARTY           (1 << 6)
+#define PERMISSIONS1_MANAGE_ROOMS           (1 << 7)
+#define PERMISSIONS1_MANAGE_NICKNAMES       (1 << 8)
+#define PERMISSIONS1_MANAGE_ROLES           (1 << 9)
+#define PERMISSIONS1_MANAGE_WEBHOOKS        (1 << 10)
 -- Allows members to add or remove custom emoji, stickers or sounds.
-#define PERMISSIONS1_MANAGE_EXPRESSIONS   (1 << 11)
-#define PERMISSIONS1_MOVE_MEMBERS         (1 << 12)
-#define PERMISSIONS1_CHANGE_NICKNAME      (1 << 13)
-#define PERMISSIONS1_MANAGE_PERMS         (1 << 14)
+#define PERMISSIONS1_MANAGE_EXPRESSIONS     (1 << 11)
+#define PERMISSIONS1_MOVE_MEMBERS           (1 << 12)
+#define PERMISSIONS1_CHANGE_NICKNAME        (1 << 13)
+#define PERMISSIONS1_MANAGE_PERMS           (1 << 14)
 
-#define PERMISSIONS1_VIEW_ROOM            (1 << 30)
-#define PERMISSIONS1_READ_MESSAGE_HISTORY ((1 << 31) | PERMISSIONS1_VIEW_ROOM);
-#define PERMISSIONS1_SEND_MESSAGES        ((1 << 32) | PERMISSIONS1_VIEW_ROOM);
-#define PERMISSIONS1_MANAGE_MESSAGES      (1 << 33)
-#define PERMISSIONS1_MUTE_MEMBERS         (1 << 34)
-#define PERMISSIONS1_DEAFEN_MEMBERS       (1 << 35)
-#define PERMISSIONS1_MENTION_EVERYONE     (1 << 36)
-#define PERMISSIONS1_USE_EXTERNAL_EMOTES  (1 << 37)
-#define PERMISSIONS1_ADD_REACTIONS        (1 << 38)
-#define PERMISSIONS1_EMBED_LINKS          (1 << 39)
-#define PERMISSIONS1_ATTACH_FILES         (1 << 40)
-#define PERMISSIONS1_USE_SLASH_COMMANDS   (1 << 41)
-#define PERMISSIONS1_SEND_TTS_MESSAGES    (1 << 42)
+#define PERMISSIONS1_DEFAULT_ONLY           (1 << 20)
+
+#define PERMISSIONS1_VIEW_ROOM              (1 << 30)
+#define PERMISSIONS1_READ_MESSAGE_HISTORY   ((1 << 31) | PERMISSIONS1_VIEW_ROOM);
+#define PERMISSIONS1_SEND_MESSAGES          ((1 << 32) | PERMISSIONS1_VIEW_ROOM);
+#define PERMISSIONS1_MANAGE_MESSAGES        (1 << 33)
+#define PERMISSIONS1_MUTE_MEMBERS           (1 << 34)
+#define PERMISSIONS1_DEAFEN_MEMBERS         (1 << 35)
+#define PERMISSIONS1_MENTION_EVERYONE       (1 << 36)
+#define PERMISSIONS1_USE_EXTERNAL_EMOTES    (1 << 37)
+#define PERMISSIONS1_ADD_REACTIONS          (1 << 38)
+#define PERMISSIONS1_EMBED_LINKS            (1 << 39)
+#define PERMISSIONS1_ATTACH_FILES           (1 << 40)
+#define PERMISSIONS1_USE_SLASH_COMMANDS     (1 << 41)
+#define PERMISSIONS1_SEND_TTS_MESSAGES      (1 << 42)
 -- Allows a user to add new attachments to
 -- existing messages using the "edit" API
-#define PERMISSIONS1_EDIT_NEW_ATTACHMENT  (1 << 43)
+#define PERMISSIONS1_EDIT_NEW_ATTACHMENT    (1 << 43)
 
 -- Allows a user to broadcast a stream to this room
-#define PERMISSIONS1_STREAM               (1 << 60)
+#define PERMISSIONS1_STREAM                 (1 << 60)
 -- Allows a user to connect and watch/listen to streams in a room
-#define PERMISSIONS1_CONNECT              (1 << 61)
+#define PERMISSIONS1_CONNECT                (1 << 61)
 -- Allows a user to speak in a room without broadcasting a stream
-#define PERMISSIONS1_SPEAK                (1 << 62)
+#define PERMISSIONS1_SPEAK                  (1 << 62)
 -- Allows a user to acquire priority speaker
-#define PERMISSIONS1_PRIORITY_SPEAKER     (1 << 63)
+#define PERMISSIONS1_PRIORITY_SPEAKER       (1 << 63)

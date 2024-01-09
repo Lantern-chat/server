@@ -63,14 +63,13 @@ pub async fn presence_updated(
                 },
             };
 
-            if let Some(party_id) = party_id {
-                #[rustfmt::skip]
-                state.gateway.events.send_simple(&ServerEvent::party(
-                    ServerMsg::new_presence_update(inner),
-                    party_id,
-                    None,
-                )).await;
-            }
+            #[rustfmt::skip]
+            state.gateway.events.send_simple(&ServerEvent::new_iter(
+                [], // TODO: Also send to friends
+                party_id,
+                None,
+                ServerMsg::new_presence_update(inner),
+            )).await;
         }
 
         Ok(())

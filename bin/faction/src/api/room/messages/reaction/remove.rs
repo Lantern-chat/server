@@ -86,21 +86,15 @@ pub async fn remove_own_reaction(
         }
     };
 
-    let event = ServerMsg::new_message_reaction_remove(UserReactionEvent {
+    #[rustfmt::skip]
+    state.gateway.events.send_simple(&ServerEvent::party(party_id, Some(room_id), ServerMsg::new_message_reaction_remove(UserReactionEvent {
         emote,
         msg_id,
         room_id,
         party_id,
         user_id: auth.user_id(),
         member: None,
-    });
-
-    match party_id {
-        Some(party_id) => {
-            state.gateway.events.send_simple(&ServerEvent::party(event, party_id, Some(room_id))).await;
-        }
-        None => unimplemented!(),
-    }
+    }))).await;
 
     Ok(())
 }

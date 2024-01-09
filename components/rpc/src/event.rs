@@ -32,10 +32,10 @@ pub enum ServerEvent {
 
 impl ServerEvent {
     pub fn new(
-        event: impl Into<ServerMsg>,
         user_ids: SmallSnowflakeVec,
         party_ids: SmallSnowflakeVec,
         room_id: Option<Snowflake>,
+        event: impl Into<ServerMsg>,
     ) -> Self {
         ServerEvent::Regular {
             msg: event.into(),
@@ -45,11 +45,25 @@ impl ServerEvent {
         }
     }
 
-    pub fn party(event: impl Into<ServerMsg>, party_id: Snowflake, room_id: Option<Snowflake>) -> Self {
-        ServerEvent::new(event, SmallVec::new(), smallvec![party_id], room_id)
+    pub fn new_iter(
+        user_ids: impl IntoIterator<Item = Snowflake>,
+        party_ids: impl IntoIterator<Item = Snowflake>,
+        room_id: Option<Snowflake>,
+        event: impl Into<ServerMsg>,
+    ) -> Self {
+        ServerEvent::new(
+            SmallSnowflakeVec::from_iter(user_ids),
+            SmallSnowflakeVec::from_iter(party_ids),
+            room_id,
+            event,
+        )
     }
 
-    pub fn user(event: impl Into<ServerMsg>, user_id: Snowflake, room_id: Option<Snowflake>) -> Self {
-        ServerEvent::new(event, smallvec![user_id], SmallVec::new(), room_id)
+    pub fn party(party_id: Snowflake, room_id: Option<Snowflake>, event: impl Into<ServerMsg>) -> Self {
+        ServerEvent::new(SmallVec::new(), smallvec![party_id], room_id, event)
+    }
+
+    pub fn user(user_id: Snowflake, room_id: Option<Snowflake>, event: impl Into<ServerMsg>) -> Self {
+        ServerEvent::new(smallvec![user_id], SmallVec::new(), room_id, event)
     }
 }

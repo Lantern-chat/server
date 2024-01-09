@@ -57,11 +57,9 @@ pub async fn member_event(
                     email: None,
                     preferences: None,
                 },
-                partial: PartialPartyMember {
-                    roles: ThinVec::new(),
-                    flags: None,
-                    joined_at: None,
-                },
+                roles: ThinVec::new(),
+                joined_at: None,
+                flags: PartyMemberFlags::empty(),
             }))
         }),
         EventCode::MemberJoined | EventCode::MemberUpdated => Either::Right(
@@ -104,24 +102,20 @@ pub async fn member_event(
             };
 
             // Send user the party information
-            state.gateway.events.send_simple(
-                &ServerEvent::user(ServerMsg::new_party_create(party), user_id, None)
-            ).await;
+            state.gateway.events.send_simple(&ServerEvent::user(user_id, None, ServerMsg::new_party_create(party))).await;
 
             ServerMsg::new_member_add(inner)
         }
         EventCode::MemberLeft | EventCode::MemberBan => {
             let inner: Arc<PartyMemberEvent> = Arc::new(inner);
 
-            state.gateway.events.send_simple(
-                &ServerEvent::user(ServerMsg::new_party_delete(party_id), user_id, None)
-            ).await;
+            state.gateway.events.send_simple(&ServerEvent::user(user_id, None, ServerMsg::new_party_delete(party_id))).await;
 
             if event == EventCode::MemberBan {
                 state.gateway.events.send_simple(&ServerEvent::party(
-                    ServerMsg::new_member_ban(inner.clone()),
                     party_id,
                     None,
+                    ServerMsg::new_member_ban(inner.clone()),
                 )).await;
             }
 
@@ -131,7 +125,7 @@ pub async fn member_event(
         _ => unreachable!(),
     };
 
-    state.gateway.events.send_simple(&ServerEvent::party(msg, party_id, None)).await;
+    state.gateway.events.send_simple(&ServerEvent::party(party_id, None, msg)).await;
 
     Ok(())
 }

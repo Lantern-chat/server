@@ -18,63 +18,35 @@ pub async fn get_party_inner(
     user_id: Snowflake,
     party_id: Snowflake,
 ) -> Result<Party, Error> {
-    mod party_query {
-        pub use schema::*;
-        use thorn::indexed_columns;
-        pub use thorn::*;
-
-        indexed_columns! {
-            pub enum PartyColumns {
-                Party::Name,
-                Party::Flags,
-                Party::OwnerId,
-                Party::AvatarId,
-                Party::BannerId,
-                Party::Description,
-                Party::DefaultRoom,
-            }
-
-            pub enum PartyMemberColumns continue PartyColumns {
-                PartyMembers::Position,
-            }
-        }
-    }
-
-    let row = db
-        .query_opt_cached_typed(
-            || {
-                use party_query::{Party, *};
-
-                Query::select()
-                    .cols(PartyColumns::default())
-                    .cols(PartyMemberColumns::default())
-                    .and_where(Party::Id.equals(Var::of(Party::Id)))
-                    .from(Party::left_join_table::<PartyMembers>().on(PartyMembers::PartyId.equals(Party::Id)))
-                    .and_where(PartyMembers::UserId.equals(Var::of(Users::Id)))
-                    .and_where(Party::DeletedAt.is_null())
-            },
-            &[&party_id, &user_id],
-        )
-        .await?;
-
-    use party_query::{PartyColumns, PartyMemberColumns};
-
-    let Some(row) = row else {
-        return err(CommonError::NotFound);
-    };
+    #[rustfmt::skip]
+    let row = db.query_one2(schema::sql! {
+        SELECT
+            Party.Name AS @_,
+            Party.Flags AS @_,
+            Party.OwnerId AS @_,
+            Party.AvatarId AS @_,
+            Party.BannerId AS @_,
+            Party.Description AS @_,
+            Party.DefaultRoom AS @_,
+            PartyMembers.Position AS @_
+        FROM Party LEFT JOIN PartyMembers ON PartyMembers.PartyId = Party.Id
+        WHERE Party.Id = #{&party_id as Party::Id}
+        AND PartyMembers.UserId = #{&user_id as Users::Id}
+        AND Party.DeletedAt IS NULL
+    }).await?;
 
     let mut party = Party {
         partial: PartialParty {
             id: party_id,
-            name: row.try_get(PartyColumns::name())?,
-            description: row.try_get(PartyColumns::description())?,
+            name: row.party_name()?,
+            description: row.party_description()?,
         },
-        flags: row.try_get(PartyColumns::flags())?,
-        avatar: encrypt_snowflake_opt(&state, row.try_get(PartyColumns::avatar_id())?),
+        flags: row.party_flags()?,
+        avatar: encrypt_snowflake_opt(&state, row.party_avatar_id()?),
         banner: Nullable::Undefined,
-        default_room: row.try_get(PartyColumns::default_room())?,
-        position: row.try_get(PartyMemberColumns::position())?,
-        owner: row.try_get(PartyColumns::owner_id())?,
+        default_room: row.party_default_room()?,
+        position: row.party_members_position()?,
+        owner: row.party_owner_id()?,
         roles: ThinVec::new(),
         emotes: ThinVec::new(),
         pin_folders: ThinVec::new(),
@@ -82,7 +54,7 @@ pub async fn get_party_inner(
 
     // these fields are only provided to joined members
     if party.position.is_some() {
-        party.banner = encrypt_snowflake_opt(&state, row.try_get(PartyColumns::banner_id())?).into();
+        party.banner = encrypt_snowflake_opt(&state, row.party_banner_id()?).into();
 
         (party.roles, party.emotes) = tokio::try_join!(
             async {

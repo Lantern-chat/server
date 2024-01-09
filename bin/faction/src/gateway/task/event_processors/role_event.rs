@@ -12,20 +12,17 @@ pub async fn role_event(
     party_id: Option<Snowflake>,
 ) -> Result<(), Error> {
     if event == EventCode::RoleDeleted {
-        let party_id = match party_id {
-            Some(party_id) => party_id,
-            None => {
-                return Err(Error::InternalError(format!(
-                    "Role event without a party id!: {event:?} - {role_id}"
-                )));
-            }
+        let Some(party_id) = party_id else {
+            return Err(Error::InternalError(format!(
+                "Role event without a party id!: {event:?} - {role_id}"
+            )));
         };
 
         #[rustfmt::skip]
         state.gateway.events.send_simple(&ServerEvent::party(
-            ServerMsg::new_role_delete(RoleDeleteEvent { id: role_id, party_id }),
             party_id,
             None,
+            ServerMsg::new_role_delete(RoleDeleteEvent { id: role_id, party_id }),
         )).await;
 
         return Ok(());
@@ -66,7 +63,7 @@ pub async fn role_event(
         _ => unreachable!(),
     };
 
-    state.gateway.events.send_simple(&ServerEvent::party(event, party_id, None)).await;
+    state.gateway.events.send_simple(&ServerEvent::party(party_id, None, event)).await;
 
     Ok(())
 }

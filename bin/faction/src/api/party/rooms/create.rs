@@ -12,8 +12,7 @@ pub async fn create_room(
 ) -> Result<FullRoom, Error> {
     let config = state.config_full();
 
-    if matches!(form.topic.as_deref(), Some(ref topic) if !config.shared.room_topic_length.contains(&topic.len()))
-    {
+    if matches!(form.topic.as_deref(), Some(topic) if !config.shared.room_topic_length.contains(&topic.len())) {
         return err(CommonError::InvalidTopic);
     }
 

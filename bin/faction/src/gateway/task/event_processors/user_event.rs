@@ -76,10 +76,10 @@ pub async fn user_update(state: &ServerState, db: &db::pool::Client, user_id: Sn
         .gateway
         .events
         .send::<_, 1024>(&ServerEvent::new(
-            ServerMsg::new_user_update(user),
             friend_ids.into(),
             party_ids.into(),
             None,
+            ServerMsg::new_user_update(user),
         ))
         .await;
 
@@ -101,11 +101,8 @@ pub async fn self_update(
 
     let user = crate::api::user::me::get::get_full_self(state, user_id).await?;
 
-    state
-        .gateway
-        .events
-        .send_simple(&ServerEvent::user(ServerMsg::new_user_update(user), user_id, None))
-        .await;
+    #[rustfmt::skip]
+    state.gateway.events.send_simple(&ServerEvent::user(user_id, None, ServerMsg::new_user_update(user))).await;
 
     Ok(())
 }
@@ -131,7 +128,7 @@ async fn party_position_update(
         id: party_id,
     }));
 
-    state.gateway.events.send_simple(&ServerEvent::user(event, user_id, None)).await;
+    state.gateway.events.send_simple(&ServerEvent::user(user_id, None, event)).await;
 
     Ok(())
 }

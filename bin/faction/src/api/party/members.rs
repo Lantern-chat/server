@@ -107,6 +107,9 @@ pub async fn get_members_inner(
             let user_id = row.user_id()?;
 
             PartyMember {
+                joined_at: row.joined_at()?,
+                roles: row.role_ids()?,
+                flags: PartyMemberFlags::empty(),
                 user: User {
                     id: user_id,
                     username: row.username()?,
@@ -167,11 +170,6 @@ pub async fn get_members_inner(
                             },
                         })),
                     },
-                },
-                partial: PartialPartyMember {
-                    joined_at: row.joined_at()?,
-                    roles: row.role_ids()?,
-                    flags: None,
                 },
             }
         }),

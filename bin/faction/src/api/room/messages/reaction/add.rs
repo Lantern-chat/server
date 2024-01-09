@@ -271,20 +271,13 @@ pub async fn add_reaction(
                         })),
                     },
                 },
-                partial: PartialPartyMember {
-                    roles: row.role_ids()?,
-                    joined_at: row.joined_at()?,
-                    flags: None,
-                },
+                roles: row.role_ids()?,
+                joined_at: row.joined_at()?,
+                flags: PartyMemberFlags::empty(),
             })),
         });
 
-        match party_id {
-            Some(party_id) => {
-                state.gateway.events.send_simple(&ServerEvent::party(event, party_id, Some(room_id))).await;
-            }
-            None => unimplemented!(),
-        }
+        state.gateway.events.send_simple(&ServerEvent::party(party_id, Some(room_id), event)).await;
     }
 
     Ok(())

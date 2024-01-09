@@ -84,53 +84,44 @@ pub async fn trigger_typing(
 
     let Some(row) = row else { return Ok(()) };
 
-    let party_id: Option<Snowflake> = row.party_id()?;
-
-    let user = User {
-        id: auth.user_id(),
-        username: row.username()?,
-        discriminator: row.discriminator()?,
-        flags: UserFlags::from_bits_truncate_public(row.user_flags()?),
-        presence: None,
-        email: None,
-        preferences: None,
-        profile: match row.profile_bits()? {
-            None => Nullable::Null,
-            Some(bits) => Nullable::Some(Arc::new(UserProfile {
-                bits,
-                extra: Default::default(),
-                nick: row.nickname()?,
-                avatar: encrypt_snowflake_opt(&state, row.avatar_id()?).into(),
-                banner: Nullable::Undefined,
-                status: Nullable::Undefined,
-                bio: Nullable::Undefined,
-            })),
+    let member = PartyMember {
+        user: User {
+            id: auth.user_id(),
+            username: row.username()?,
+            discriminator: row.discriminator()?,
+            flags: UserFlags::from_bits_truncate_public(row.user_flags()?),
+            presence: None,
+            email: None,
+            preferences: None,
+            profile: match row.profile_bits()? {
+                None => Nullable::Null,
+                Some(bits) => Nullable::Some(Arc::new(UserProfile {
+                    bits,
+                    extra: Default::default(),
+                    nick: row.nickname()?,
+                    avatar: encrypt_snowflake_opt(&state, row.avatar_id()?).into(),
+                    banner: Nullable::Undefined,
+                    status: Nullable::Undefined,
+                    bio: Nullable::Undefined,
+                })),
+            },
         },
+        roles: row.role_ids()?,
+        joined_at: row.joined_at()?,
+        flags: PartyMemberFlags::empty(),
     };
 
-    match party_id {
-        Some(party_id) => {
-            let member = PartyMember {
-                user,
-                partial: PartialPartyMember {
-                    roles: row.role_ids()?,
-                    joined_at: row.joined_at()?,
-                    flags: None,
-                },
-            };
+    let party_id = row.party_id()?;
 
-            let event = ServerMsg::new_typing_start(events::TypingStart {
-                room_id,
-                user_id: auth.user_id(),
-                party_id: Some(party_id),
-                member: Some(member),
-                parent: body.parent.as_ref().copied(),
-            });
+    let event = ServerMsg::new_typing_start(events::TypingStart {
+        party_id,
+        room_id,
+        user_id: auth.user_id(),
+        member,
+        parent: body.parent.as_ref().copied(),
+    });
 
-            state.gateway.events.send_simple(&ServerEvent::party(event, party_id, Some(room_id))).await;
-        }
-        None => todo!("Typing in non-party rooms"),
-    }
+    state.gateway.events.send_simple(&ServerEvent::party(party_id, Some(room_id), event)).await;
 
     Ok(())
 }

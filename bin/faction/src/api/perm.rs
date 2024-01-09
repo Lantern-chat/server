@@ -49,11 +49,7 @@ pub async fn get_room_permissions(
     let mut perm = Permissions::empty();
 
     if let Some(row) = row {
-        perm = Permissions::from_i64(row.permissions1()?, row.permissions2()?);
-
-        if perm.contains(Permissions::ADMINISTRATOR) {
-            perm = Permissions::all();
-        }
+        perm = Permissions::from_i64(row.permissions1()?, row.permissions2()?).normalize();
     }
 
     Ok(perm)
