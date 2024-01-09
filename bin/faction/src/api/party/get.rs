@@ -49,7 +49,7 @@ pub async fn get_party_inner(
         owner: row.party_owner_id()?,
         roles: ThinVec::new(),
         emotes: ThinVec::new(),
-        pin_folders: ThinVec::new(),
+        folders: ThinVec::new(),
     };
 
     // these fields are only provided to joined members

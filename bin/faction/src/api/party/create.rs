@@ -1,3 +1,4 @@
+use futures::future::Either;
 use sdk::{api::commands::party::CreatePartyForm, models::*};
 use smol_str::SmolStr;
 
@@ -41,7 +42,7 @@ pub async fn create_party(
         owner: auth.user_id(),
         roles: ThinVec::new(),
         emotes: ThinVec::new(),
-        pin_folders: ThinVec::new(),
+        folders: ThinVec::new(),
     };
 
     let mut db = state.db.write.get().await?;
@@ -86,15 +87,19 @@ pub async fn create_party(
                 #{&position          as PartyMembers::Position }
             )
         }),
-        t.execute2(schema::sql! {
-            INSERT INTO Roles (Id, Name, PartyId, Permissions1, Permissions2) VALUES (
-                #{&default_role.id   as Roles::Id           },
-                #{&default_role.name as Roles::Name         },
-                #{&party.id          as Roles::PartyId      },
-                #{&perm1             as Roles::Permissions1 },
-                #{&perm2             as Roles::Permissions2 }
-            )
-        }),
+        match form.flags.contains(PartyFlags::CLOSED) {
+            // closed parties don't have roles, so skip the insert
+            true => Either::Right(futures::future::ok(0)),
+            false => Either::Left(t.execute2(schema::sql! {
+                INSERT INTO Roles (Id, Name, PartyId, Permissions1, Permissions2) VALUES (
+                    #{&default_role.id   as Roles::Id           },
+                    #{&default_role.name as Roles::Name         },
+                    #{&party.id          as Roles::PartyId      },
+                    #{&perm1             as Roles::Permissions1 },
+                    #{&perm2             as Roles::Permissions2 }
+                )
+            })),
+        },
         t.execute2(schema::sql! {
             INSERT INTO Rooms (Id, PartyId, Name, Position, Flags) VALUES (
                 #{&room_id              as Rooms::Id       },

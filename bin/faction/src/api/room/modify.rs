@@ -83,7 +83,7 @@ pub async fn modify_room(
     };
 
     let mut remove_overwrites: HashSet<Snowflake> =
-        HashSet::from_iter(form.remove_overwrites.as_slice().into_iter().copied());
+        HashSet::from_iter(form.remove_overwrites.as_slice().iter().copied());
 
     // unique + avoiding conflicts
     if !form.remove_overwrites.is_empty() {

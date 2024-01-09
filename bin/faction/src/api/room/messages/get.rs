@@ -8,13 +8,14 @@ use crate::{prelude::*, util::encrypted_asset::encrypt_snowflake_opt};
 
 use sdk::api::commands::room::GetMessagesQuery;
 
-pub async fn get_many<'a>(
+pub async fn get_many(
     state: ServerState,
     auth: Authorization,
     room_id: Snowflake,
-    form: &'a Archived<GetMessagesQuery>,
-) -> Result<impl Stream<Item = Result<Message, Error>> + 'a, Error> {
+    form: &Archived<GetMessagesQuery>,
+) -> Result<impl Stream<Item = Result<Message, Error>> + '_, Error> {
     let needs_perms = match state.perm_cache.get(auth.user_id(), room_id).await {
+        None => true,
         Some(perms) => {
             if !perms.contains(Permissions::READ_MESSAGE_HISTORY) {
                 return err(CommonError::NotFound);
@@ -22,7 +23,6 @@ pub async fn get_many<'a>(
 
             false
         }
-        None => true,
     };
 
     let limit = match form.limit.as_ref() {
@@ -266,7 +266,7 @@ where
             AggMentions.Kinds               AS @MentionKinds,
             AggMentions.Ids                 AS @MentionIds,
             (
-                SELECT ARRAY_AGG(RoleMembers.RoleId)
+                SELECT COALESCE(ARRAY_AGG(RoleMembers.RoleId), "{}")
                 FROM RoleMembers INNER JOIN Roles ON Roles.Id = RoleMembers.RoleId
                 WHERE RoleMembers.UserId = Messages.UserId
                   AND Roles.PartyId = SelectedMessages.PartyId

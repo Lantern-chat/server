@@ -20,7 +20,7 @@ pub async fn modify_role(
         return err(CommonError::BadRequest);
     }
 
-    if matches!(form.name.as_deref(), Some(ref name) if !schema::validation::validate_name(name, state.config().shared.role_name_length.clone()))
+    if matches!(form.name.as_deref(), Some(name) if !schema::validation::validate_name(name, state.config().shared.role_name_length.clone()))
     {
         return err(CommonError::InvalidName);
     }
