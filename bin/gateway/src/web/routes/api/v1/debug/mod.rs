@@ -3,12 +3,12 @@ use super::*;
 pub fn debug(mut route: Route<ServerState>) -> RouteResult {
     match route.next().segment() {
         Exact("exception") => Ok(test_exception(route.state)),
-        _ => Err(Error::NotFound),
+        _ => err(CommonError::NotFound),
     }
 }
 
 #[async_recursion]
-async fn test_exception(state: ServerState) -> WebResult {
+async fn test_exception(state: ServerState) -> ApiResult {
     let db = state.db.read.get().await.unwrap();
 
     if let Err(e) = db.execute("CALL lantern.do_thing()", &[]).await {
@@ -17,5 +17,5 @@ async fn test_exception(state: ServerState) -> WebResult {
         }
     }
 
-    Ok(().into())
+    err(CommonError::Unimplemented)
 }

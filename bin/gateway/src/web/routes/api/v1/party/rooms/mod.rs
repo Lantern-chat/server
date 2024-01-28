@@ -1,3 +1,5 @@
+use sdk::api::commands::party::{CreateRoom, GetPartyRooms};
+
 use super::*;
 
 pub fn party_rooms(mut route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> RouteResult {
@@ -18,24 +20,16 @@ pub fn party_rooms(mut route: Route<ServerState>, auth: Authorization, party_id:
         //     },
         //     _ => Err(Error::NotFound),
         // },
-        _ => Err(Error::NotFound),
+        _ => err(CommonError::NotFound),
     }
 }
 
 #[async_recursion]
-pub async fn get(route: Route<crate::ServerState>, auth: Authorization, party_id: Snowflake) -> WebResult {
-    use crate::backend::api::party::rooms::get::{get_rooms, RoomScope};
-
-    Ok(WebResponse::stream(
-        get_rooms(route.state, auth, RoomScope::Party(party_id)).await?,
-    ))
+pub async fn get(route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> ApiResult {
+    Ok(RawMessage::authorized(auth, GetPartyRooms { party_id }))
 }
 
-#[async_recursion]
-pub async fn post(mut route: Route<crate::ServerState>, auth: Authorization, party_id: Snowflake) -> WebResult {
-    let form = body::any(&mut route).await?;
-
-    Ok(WebResponse::new(
-        crate::backend::api::party::rooms::create::create_room(route.state, auth, party_id, form).await?,
-    ))
+#[async_recursion] #[rustfmt::skip]
+pub async fn post(mut route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> ApiResult {
+    Ok(RawMessage::authorized(auth, CreateRoom { party_id, body: body::any(&mut route).await? }))
 }

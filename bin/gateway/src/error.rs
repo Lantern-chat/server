@@ -1,20 +1,28 @@
 use std::{borrow::Cow, str::Utf8Error, string::FromUtf8Error};
 
+use crate::prelude::*;
+
 use db::pool::Error as DbError;
-use ftl::{body::BodyDeserializeError, ws::WsError, *};
+use ftl::{body::BodyDeserializeError, reply::WithStatus, ws::WsError, *};
 use http::header::InvalidHeaderValue;
+use rpc::error::ApiError;
 use sdk::{api::error::ApiErrorCode, driver::Encoding};
-use smol_str::SmolStr;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("{0}")]
+    Common(#[from] CommonError),
+
     // FATAL ERRORS
     #[error("Internal Error: {0}")]
     InternalError(String),
     #[error("Internal Error: {0}")]
-    InternalErrorSmol(SmolStr),
+    InternalErrorSmol(smol_str::SmolStr),
     #[error("Internal Error: {0}")]
     InternalErrorStatic(&'static str),
+
+    #[error("IO Error: {0}")]
+    IOError(#[from] std::io::Error),
 
     #[error("Database Error {0}")]
     DbError(DbError),
@@ -30,8 +38,6 @@ pub enum Error {
     CborDecodingError(#[from] ciborium::de::Error<std::io::Error>),
     #[error("XML Error {0}")]
     XMLError(#[from] quick_xml::Error),
-    #[error("IO Error: {0}")]
-    IOError(#[from] std::io::Error),
     #[error("Request Error: {0}")]
     RequestError(#[from] reqwest::Error),
 
@@ -42,21 +48,9 @@ pub enum Error {
     #[error("UTF8 Error: {0}")]
     Utf8CheckError(#[from] Utf8Error),
 
-    #[error("Unimplemented")]
-    Unimplemented,
-
     // NON-FATAL ERRORS
     #[error("Invalid Header Value: {0}")]
     InvalidHeaderValue(#[from] InvalidHeaderValue),
-
-    #[error("Missing Upload-Metadata Header")]
-    MissingUploadMetadataHeader,
-
-    #[error("Missing Authorization Header")]
-    MissingAuthorizationHeader,
-
-    #[error("Missing Content Type Header")]
-    MissingContentTypeHeader,
 
     #[error("Header Parse Error")]
     HeaderParseError(#[from] http::header::ToStrError),
@@ -67,78 +61,6 @@ pub enum Error {
     #[error("Query Parse Error: {0}")]
     QueryParseError(#[from] serde_urlencoded::de::Error),
 
-    #[error("Method Not Allowed")]
-    MethodNotAllowed,
-
-    #[error("Already Exists")]
-    AlreadyExists,
-
-    #[error("Blocked")]
-    Blocked,
-
-    #[error("Banned")]
-    Banned,
-
-    #[error("Username Unavailable")]
-    UsernameUnavailable,
-
-    #[error("Invalid Email Address")]
-    InvalidEmail,
-
-    #[error("Invalid Username")]
-    InvalidUsername,
-
-    #[error("Invalid Password")]
-    InvalidPassword,
-
-    #[error("Invalid Credentials")]
-    InvalidCredentials,
-
-    #[error("TOTP Required")]
-    TOTPRequired,
-
-    #[error("Insufficient Age")]
-    InsufficientAge,
-
-    #[error("Invalid Message Content")]
-    InvalidContent,
-
-    #[error("Invalid Name")]
-    InvalidName,
-
-    #[error("Invalid Room Topic")]
-    InvalidTopic,
-
-    #[error("Invalid file preview")]
-    InvalidPreview,
-
-    #[error("Invalid Image Format")]
-    InvalidImageFormat,
-
-    #[error("No Session")]
-    NoSession,
-
-    #[error("Invalid Auth Format")]
-    InvalidAuthFormat,
-
-    #[error("Missing filename")]
-    MissingFilename,
-
-    #[error("Missing mime")]
-    MissingMime,
-
-    #[error("Not Found")]
-    NotFound,
-
-    #[error("Bad Request")]
-    BadRequest,
-
-    #[error("Upload Error")]
-    UploadError,
-
-    #[error("Conflict/Already Exists")]
-    Conflict,
-
     #[error("Auth Token Error: {0}")]
     AuthTokenError(#[from] schema::auth::AuthTokenError),
 
@@ -147,18 +69,6 @@ pub enum Error {
 
     #[error("Base-85 Decode Error: {0}")]
     Base85DecodeError(#[from] z85::FromZ85Error),
-
-    #[error("Request Entity Too Large")]
-    RequestEntityTooLarge,
-
-    #[error("Temporarily Disabled")]
-    TemporarilyDisabled,
-
-    #[error("Unauthorized")]
-    Unauthorized,
-
-    #[error("Checksum Mismatch")]
-    ChecksumMismatch,
 
     #[error("Unsupported Media Type: {0}")]
     UnsupportedMediaType(headers::ContentType),
@@ -190,156 +100,83 @@ lazy_static::lazy_static! {
 impl Error {
     #[rustfmt::skip]
     pub fn is_fatal(&self) -> bool {
-        matches!(self,
-            | Error::InternalError(_)
-            | Error::InternalErrorSmol(_)
-            | Error::InternalErrorStatic(_)
-            | Error::DbError(_)
-            | Error::JoinError(_)
-            | Error::SemaphoreError(_)
-            | Error::JsonError(_)
-            | Error::CborDecodingError(_)
-            | Error::CborEncodingError(_)
-
-            | Error::XMLError(_)
-            //| Error::EventEncodingError(_)
-            | Error::IOError(_)
-            | Error::RequestError(_)
-            | Error::Unimplemented
-        )
-    }
-
-    #[rustfmt::skip]
-    pub fn http_status(&self) -> StatusCode {
         match self {
-            _ if self.is_fatal() => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::Common(err) => err.is_fatal(),
+            _ => matches!(self,
+                | Error::DbError(_)
+                | Error::JoinError(_)
+                | Error::SemaphoreError(_)
+                | Error::JsonError(_)
+                | Error::CborDecodingError(_)
+                | Error::CborEncodingError(_)
 
-            | Error::NoSession
-            | Error::InvalidCredentials
-            | Error::TOTPRequired
-            | Error::Unauthorized => StatusCode::UNAUTHORIZED,
-
-            Error::TemporarilyDisabled => StatusCode::FORBIDDEN,
-            Error::NotFound => StatusCode::NOT_FOUND,
-            Error::BadRequest => StatusCode::BAD_REQUEST,
-            Error::AlreadyExists => StatusCode::CONFLICT,
-            Error::MethodNotAllowed => StatusCode::METHOD_NOT_ALLOWED,
-            Error::UnsupportedMediaType(_) | Error::MissingContentTypeHeader => StatusCode::UNSUPPORTED_MEDIA_TYPE,
-
-            | Error::AuthTokenError(_)
-            | Error::Base64DecodeError(_)
-            | Error::Base85DecodeError(_)
-            | Error::CborDecodingError(_)
-            | Error::CborEncodingError(_)
-            | Error::JsonError(_) => StatusCode::UNPROCESSABLE_ENTITY,
-
-            Error::ChecksumMismatch => *CHECKSUM_MISMATCH,
-            Error::RequestEntityTooLarge => *REQUEST_ENTITY_TOO_LARGE,
-            Error::Conflict => StatusCode::CONFLICT,
-
-            | Error::MissingAuthorizationHeader
-            | Error::MissingUploadMetadataHeader
-            | Error::HeaderParseError(_)
-            | Error::BodyDeserializeError(_) => StatusCode::UNPROCESSABLE_ENTITY,
-
-            Error::WsError(WsError::MethodNotAllowed) => StatusCode::METHOD_NOT_ALLOWED,
-
-            _ => StatusCode::BAD_REQUEST,
-        }
-    }
-
-    #[inline]
-    pub fn code(&self) -> u16 {
-        self.to_apierror() as u16
-    }
-
-    pub fn format(&self) -> Cow<'static, str> {
-        Cow::Borrowed(match self {
-            _ if self.is_fatal() => "Internal Server Error",
-            // TODO: at least say if it's a database error, for now
-            Error::DbError(_) => "Database Error",
-            Error::AuthTokenError(_) => "Auth Token Parse Error",
-            Error::Base64DecodeError(_) => "Base64 Decode Error",
-            Error::Base85DecodeError(_) => "Base85 Decode Error",
-            Error::IOError(_) => "IO Error",
-            Error::InvalidHeaderValue(_) => "Invalid Header Value",
-            _ => return self.to_string().into(),
-        })
-    }
-
-    #[rustfmt::skip]
-    pub fn to_apierror(&self) -> ApiErrorCode {
-        match self {
-            | Error::InternalError(_)
-            | Error::InternalErrorStatic(_)
-            | Error::InternalErrorSmol(_)   => ApiErrorCode::InternalError,
-
-            Error::DbError(_)               => ApiErrorCode::DbError,
-            Error::JoinError(_)             => ApiErrorCode::JoinError,
-            Error::SemaphoreError(_)        => ApiErrorCode::SemaphoreError,
-            Error::JsonError(_)             => ApiErrorCode::JsonError,
-            | Error::Utf8ParseError(_)
-            | Error::Utf8CheckError(_)      => ApiErrorCode::Utf8ParseError,
-            Error::IOError(_)               => ApiErrorCode::IOError,
-            Error::InvalidHeaderValue(_)    => ApiErrorCode::InvalidHeaderValue,
-            Error::XMLError(_)              => ApiErrorCode::XMLError,
-            Error::RequestError(_)          => ApiErrorCode::RequestError,
-            Error::Unimplemented            => ApiErrorCode::Unimplemented,
-
-            | Error::CborDecodingError(_)
-            | Error::CborEncodingError(_)   => ApiErrorCode::CborError,
-
-            Error::AlreadyExists            => ApiErrorCode::AlreadyExists,
-            Error::UsernameUnavailable      => ApiErrorCode::UsernameUnavailable,
-            Error::InvalidEmail             => ApiErrorCode::InvalidEmail,
-            Error::InvalidUsername          => ApiErrorCode::InvalidUsername,
-            Error::InvalidPassword          => ApiErrorCode::InvalidPassword,
-            Error::InvalidCredentials       => ApiErrorCode::InvalidCredentials,
-            Error::InsufficientAge          => ApiErrorCode::InsufficientAge,
-            Error::InvalidContent           => ApiErrorCode::InvalidContent,
-            Error::InvalidName              => ApiErrorCode::InvalidName,
-            Error::InvalidTopic             => ApiErrorCode::InvalidTopic,
-            Error::MissingUploadMetadataHeader  => ApiErrorCode::MissingUploadMetadataHeader,
-            Error::MissingAuthorizationHeader   => ApiErrorCode::MissingAuthorizationHeader,
-            Error::MissingContentTypeHeader => ApiErrorCode::MissingContentTypeHeader,
-            Error::NoSession                => ApiErrorCode::NoSession,
-            Error::InvalidAuthFormat        => ApiErrorCode::InvalidAuthFormat,
-            Error::HeaderParseError(_)      => ApiErrorCode::HeaderParseError,
-            Error::MissingFilename          => ApiErrorCode::MissingFilename,
-            Error::MissingMime              => ApiErrorCode::MissingMime,
-            Error::AuthTokenError(_)        => ApiErrorCode::AuthTokenError,
-            Error::Base64DecodeError(_)     => ApiErrorCode::Base64DecodeError,
-            Error::BodyDeserializeError(_)  => ApiErrorCode::BodyDeserializeError,
-            Error::QueryParseError(_)       => ApiErrorCode::QueryParseError,
-            Error::UploadError              => ApiErrorCode::UploadError,
-            Error::InvalidPreview           => ApiErrorCode::InvalidPreview,
-            Error::MimeParseError(_)        => ApiErrorCode::MimeParseError,
-            Error::InvalidImageFormat       => ApiErrorCode::InvalidImageFormat,
-            Error::TOTPRequired             => ApiErrorCode::TOTPRequired,
-            Error::TemporarilyDisabled      => ApiErrorCode::TemporarilyDisabled,
-            Error::Base85DecodeError(_)     => ApiErrorCode::Base85DecodeError,
-            Error::WsError(_)               => ApiErrorCode::WebsocketError,
-            Error::Blocked                  => ApiErrorCode::Blocked,
-            Error::Banned                   => ApiErrorCode::Banned,
-            Error::SearchError(_)           => ApiErrorCode::SearchError,
-
-            // HTTP-like error codes
-            Error::BadRequest               => ApiErrorCode::BadRequest,
-            Error::Unauthorized             => ApiErrorCode::Unauthorized,
-            Error::NotFound                 => ApiErrorCode::NotFound,
-            Error::MethodNotAllowed         => ApiErrorCode::MethodNotAllowed,
-            Error::Conflict                 => ApiErrorCode::Conflict,
-            Error::RequestEntityTooLarge    => ApiErrorCode::RequestEntityTooLarge,
-            Error::UnsupportedMediaType(_)  => ApiErrorCode::UnsupportedMediaType,
-            Error::ChecksumMismatch         => ApiErrorCode::ChecksumMismatch,
+                | Error::XMLError(_)
+                | Error::IOError(_)
+                | Error::RequestError(_)
+            )
         }
     }
 }
 
-#[derive(Serialize)]
-struct ApiError {
-    pub code: ApiErrorCode,
-    pub message: Cow<'static, str>,
+impl From<Error> for sdk::api::error::ApiError {
+    fn from(value: Error) -> Self {
+        if let Error::Common(err) = value {
+            return err.into();
+        }
+
+        let message = 'msg: {
+            Cow::Borrowed(match value {
+                _ if value.is_fatal() => "Internal Server Error",
+
+                // TODO: at least say if it's a database error, for now
+                Error::DbError(_) => "Database Error",
+                Error::AuthTokenError(_) => "Auth Token Parse Error",
+                Error::Base64DecodeError(_) => "Base64 Decode Error",
+                Error::Base85DecodeError(_) => "Base85 Decode Error",
+                Error::IOError(_) => "IO Error",
+                Error::InvalidHeaderValue(_) => "Invalid Header Value",
+                _ => break 'msg value.to_string().into(),
+            })
+        };
+
+        #[rustfmt::skip]
+        let code = match value {
+            | Error::InternalError(_)
+            | Error::InternalErrorStatic(_)
+            | Error::InternalErrorSmol(_)   => ApiErrorCode::InternalError,
+
+            Error::IOError(_) => ApiErrorCode::IOError,
+            Error::DbError(_) => ApiErrorCode::DbError,
+            Error::JoinError(_) => ApiErrorCode::JoinError,
+            Error::SemaphoreError(_) => ApiErrorCode::SemaphoreError,
+            Error::XMLError(_) => ApiErrorCode::XMLError,
+            Error::RequestError(_) => ApiErrorCode::RequestError,
+            Error::Utf8ParseError(_) => ApiErrorCode::Utf8ParseError,
+            Error::Utf8CheckError(_) => ApiErrorCode::Utf8ParseError, // revisit
+            Error::InvalidHeaderValue(_) => ApiErrorCode::InvalidHeaderValue,
+            Error::QueryParseError(_) => ApiErrorCode::QueryParseError,
+            Error::MimeParseError(_) => ApiErrorCode::MimeParseError,
+            Error::SearchError(_) => ApiErrorCode::SearchError,
+
+            Error::UnsupportedMediaType(_) => ApiErrorCode::UnsupportedMediaType,
+
+            Error::AuthTokenError(_) => ApiErrorCode::AuthTokenError,
+            Error::Base64DecodeError(_) => ApiErrorCode::Base64DecodeError,
+            Error::Base85DecodeError(_) => ApiErrorCode::Base85DecodeError,
+            Error::CborDecodingError(_) | Error::CborEncodingError(_) => ApiErrorCode::CborError,
+            Error::JsonError(_) => ApiErrorCode::JsonError,
+
+            Error::HeaderParseError(_) => ApiErrorCode::HeaderParseError,
+            Error::BodyDeserializeError(_) => ApiErrorCode::BodyDeserializeError,
+
+            Error::WsError(WsError::MethodNotAllowed) => ApiErrorCode::MethodNotAllowed,
+            Error::WsError(_) => ApiErrorCode::WebsocketError,
+
+            Error::Common(_) => unreachable!(),
+        };
+
+        Self { code, message }
+    }
 }
 
 impl Error {
@@ -351,32 +188,28 @@ impl Error {
         }
     }
 
-    fn into_json(self) -> reply::Json {
-        reply::json(ApiError {
-            code: self.to_apierror(),
-            message: self.format(),
-        })
+    fn into_json(self) -> WithStatus<reply::Json> {
+        let err = ApiError::from(self);
+        reply::json(&err).with_status(err.code.http_status())
     }
 
-    fn into_cbor(self) -> reply::cbor::Cbor {
-        reply::cbor::cbor(ApiError {
-            code: self.to_apierror(),
-            message: self.format(),
-        })
+    fn into_cbor(self) -> WithStatus<reply::cbor::Cbor> {
+        let err = ApiError::from(self);
+        reply::cbor::cbor(&err).with_status(err.code.http_status())
     }
 
     #[allow(non_upper_case_globals)]
-    fn into_cached_json(self) -> reply::Json {
+    fn into_cached_json(self) -> WithStatus<reply::Json> {
         use reply::Json;
 
         macro_rules! impl_cached {
             ($($name:ident),*) => {{
                 lazy_static::lazy_static! {$(
-                    static ref $name: Json = Error::$name.into_json();
+                    static ref $name: WithStatus<Json> = Error::Common(CommonError::$name).into_json();
                 )*}
 
                 match self {
-                    $(Error::$name => $name.clone(),)*
+                    $(Self::Common(CommonError::$name) => $name.clone(),)*
                     _ => self.into_json(),
                 }
             }}
@@ -399,11 +232,9 @@ impl Error {
     pub(crate) fn into_encoding(self, encoding: Encoding) -> Response {
         self.log();
 
-        let status = self.http_status();
-
         match encoding {
-            Encoding::JSON => self.into_cached_json().with_status(status).into_response(),
-            Encoding::CBOR => self.into_cbor().with_status(status).into_response(),
+            Encoding::JSON => self.into_cached_json().into_response(),
+            Encoding::CBOR => self.into_cbor().into_response(),
         }
     }
 }
@@ -417,9 +248,9 @@ impl From<DbError> for Error {
 
             // TODO: Improve this with names of specific constraints
             match *e.code() {
-                SqlState::FOREIGN_KEY_VIOLATION => return Error::NotFound,
-                SqlState::CHECK_VIOLATION => return Error::BadRequest,
-                SqlState::UNIQUE_VIOLATION => return Error::BadRequest,
+                SqlState::FOREIGN_KEY_VIOLATION => return CommonError::NotFound.into(),
+                SqlState::CHECK_VIOLATION => return CommonError::BadRequest.into(),
+                SqlState::UNIQUE_VIOLATION => return CommonError::BadRequest.into(),
                 _ => {}
             }
         }

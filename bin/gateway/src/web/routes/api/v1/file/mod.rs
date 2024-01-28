@@ -39,7 +39,7 @@ pub mod options;
 pub mod patch;
 pub mod post;
 
-pub fn file(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
+pub fn file(mut route: Route<ServerState>, auth: MaybeAuth) -> ApiResult {
     let auth = auth.unwrap()?;
 
     match route.next().method_segment() {

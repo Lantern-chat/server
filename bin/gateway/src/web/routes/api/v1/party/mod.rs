@@ -1,3 +1,5 @@
+use sdk::api::commands::party::{CreateParty, GetParty, PatchParty};
+
 use super::*;
 
 pub mod invites;
@@ -36,35 +38,25 @@ pub fn party(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
                     Ok(search::search(route, auth, party_id))
                 }
 
-                _ => Err(Error::NotFound),
+                _ => err(CommonError::NotFound),
             },
-            _ => Err(Error::BadRequest),
+            _ => err(CommonError::BadRequest),
         },
-        _ => Err(Error::NotFound),
+        _ => err(CommonError::NotFound),
     }
 }
 
 #[async_recursion]
-pub async fn get(route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> WebResult {
-    Ok(WebResponse::new(
-        crate::backend::api::party::get::get_party(route.state, auth, party_id).await?,
-    ))
+pub async fn get(route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> ApiResult {
+    Ok(RawMessage::authorized(auth, GetParty { party_id }))
 }
 
-#[async_recursion]
-pub async fn patch(mut route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> WebResult {
-    let form = body::any(&mut route).await?;
-
-    Ok(WebResponse::new(
-        crate::backend::api::party::modify::modify_party(route.state, auth, party_id, form).await?,
-    ))
+#[async_recursion] #[rustfmt::skip]
+pub async fn patch(mut route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> ApiResult {
+    Ok(RawMessage::authorized(auth, PatchParty { party_id, body: body::any(&mut route).await? }))
 }
 
-#[async_recursion]
-pub async fn post(mut route: Route<ServerState>, auth: Authorization) -> WebResult {
-    let form = body::any(&mut route).await?;
-
-    Ok(WebResponse::new(
-        crate::backend::api::party::create::create_party(route.state, auth, form).await?,
-    ))
+#[async_recursion] #[rustfmt::skip]
+pub async fn post(mut route: Route<ServerState>, auth: Authorization) -> ApiResult {
+    Ok(RawMessage::authorized(auth, CreateParty { body: body::any(&mut route).await? }))
 }

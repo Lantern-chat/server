@@ -6,6 +6,7 @@ use crate::prelude::*;
 
 pub type ConnectionId = Snowflake;
 
+use ::rpc::error::ApiError;
 use tokio::sync::Notify;
 use triomphe::Arc;
 
@@ -168,12 +169,10 @@ impl RpcConnection {
     async fn handle_rpc(send: SendStream, recv: RecvStream, state: ServerState) -> Result<(), Error> {
         use rkyv::result::ArchivedResult;
 
-        let mut stream = ::rpc::stream::RpcRecvStream::new(recv);
+        let mut stream = ::rpc::stream::RpcRecvReader::new(recv);
 
-        match stream.recv::<::rpc::msg::Message>().await? {
-            Some(ArchivedResult::Ok(msg)) => {
-                return self::rpc::dispatch(state, AsyncFramedWriter::new(send), msg).await;
-            }
+        match stream.recv::<Result<::rpc::msg::Message, ApiError>>().await? {
+            Some(ArchivedResult::Ok(msg)) => return self::rpc::dispatch(state, send, msg).await,
             Some(ArchivedResult::Err(e)) => log::warn!("Received error from gateway via RPC: {:?}", e.code()),
             None => log::warn!("Empty message from gateway"),
         }

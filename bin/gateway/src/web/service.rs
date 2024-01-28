@@ -4,14 +4,17 @@ use std::{
 };
 
 use headers::{HeaderName, HeaderValue};
-use hyper::{Body, Request, Response};
+use hyper::{body::Incoming, Request, Response};
 
-use crate::{metrics::API_METRICS, web::routes, ServerState};
 use ftl::*;
+
+use crate::prelude::*;
+
+//use crate::{metrics::API_METRICS, web::routes, ServerState};
 
 pub async fn service(
     addr: SocketAddr,
-    req: Request<Body>,
+    req: Request<Incoming>,
     state: ServerState,
 ) -> Result<Response<Body>, Infallible> {
     let route = Route::new(addr, req, state);
@@ -21,18 +24,18 @@ pub async fn service(
         info = format!(
             "{:?}: {} http://{}{}",
             route.real_addr.ip(),
-            route.req.method(),
+            route.method(),
             match route.host() {
                 Some(ref h) => h.as_str(),
                 None => "unknown",
             },
-            route.req.uri()
+            route.uri()
         );
     }
 
     let start = route.start;
 
-    let mut resp = routes::entry(route).await;
+    let mut resp = crate::web::routes::entry(route).await;
 
     let elapsed = start.elapsed();
     let elapsedf = elapsed.as_secs_f64() * 1_000.0;
@@ -62,7 +65,7 @@ pub async fn service(
         headers.insert(HeaderName::from_static("server-timing"), value);
     }
 
-    API_METRICS.load().add_req(resp.status().as_u16(), elapsed);
+    //API_METRICS.load().add_req(resp.status().as_u16(), elapsed);
 
     Ok(resp)
 }

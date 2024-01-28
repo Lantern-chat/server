@@ -1,7 +1,9 @@
+use sdk::api::commands::room::{DeleteRoom, GetRoom, PatchRoom};
+
 use super::*;
 
 pub mod messages;
-pub mod threads;
+//pub mod threads;
 pub mod typing;
 
 pub fn room(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
@@ -17,32 +19,27 @@ pub fn room(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
             (&Method::POST, Exact("typing")) => Ok(typing::trigger_typing(route, auth, room_id)),
 
             (_, Exact("messages")) => messages::messages(route, auth, room_id),
-            (_, Exact("threads")) => threads::threads(route, auth, room_id),
-            _ => Err(Error::NotFound),
+            //(_, Exact("threads")) => threads::threads(route, auth, room_id),
+            _ => err(CommonError::NotFound),
         },
-        _ => Err(Error::BadRequest),
+        _ => err(CommonError::BadRequest),
     }
 }
 
 #[async_recursion]
-pub async fn get(route: Route<ServerState>, auth: Authorization, room_id: Snowflake) -> WebResult {
-    Ok(WebResponse::new(
-        crate::backend::api::room::get::get_room(route.state, auth, room_id).await?,
-    ))
+pub async fn get(route: Route<ServerState>, auth: Authorization, room_id: Snowflake) -> ApiResult {
+    Ok(RawMessage::authorized(auth, GetRoom { room_id }))
 }
 
 #[async_recursion]
-pub async fn delete(route: Route<crate::ServerState>, auth: Authorization, room_id: Snowflake) -> WebResult {
-    Ok(WebResponse::new(
-        crate::backend::api::room::remove::remove_room(route.state, auth, room_id).await?,
-    ))
+pub async fn delete(route: Route<ServerState>, auth: Authorization, room_id: Snowflake) -> ApiResult {
+    Ok(RawMessage::authorized(auth, DeleteRoom { room_id }))
 }
 
-#[async_recursion]
-pub async fn patch(mut route: Route<crate::ServerState>, auth: Authorization, room_id: Snowflake) -> WebResult {
-    let form = body::any(&mut route).await?;
-
-    Ok(WebResponse::new(
-        crate::backend::api::room::modify::modify_room(route.state, auth, room_id, form).await?,
-    ))
+#[async_recursion] #[rustfmt::skip]
+pub async fn patch(mut route: Route<ServerState>, auth: Authorization, room_id: Snowflake) -> ApiResult {
+    Ok(RawMessage::authorized(auth, PatchRoom {
+        room_id,
+        body: body::any(&mut route).await?,
+    }))
 }

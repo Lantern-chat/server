@@ -17,7 +17,7 @@ pub fn user(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
         // ANY /api/v1/user/1234
         (_, Exact(segment)) => {
             let Ok(user_id) = segment.parse::<Snowflake>() else {
-                return Err(Error::BadRequest);
+                return err(CommonError::BadRequest);
             };
 
             let auth = auth.unwrap()?;
@@ -25,9 +25,9 @@ pub fn user(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
             match route.next().method_segment() {
                 // GET /api/v1/user/1234
                 (&Method::GET, End) => Ok(get::get(route, auth, user_id)),
-                _ => Err(Error::Unimplemented),
+                _ => err(CommonError::Unimplemented),
             }
         }
-        _ => Err(Error::NotFound),
+        _ => err(CommonError::NotFound),
     }
 }

@@ -1,7 +1,6 @@
 use super::*;
 
-#[async_recursion]
-pub async fn options(route: Route<ServerState>, auth: Authorization) -> WebResult {
+pub async fn options(route: Route<ServerState>, auth: Authorization) -> ApiResult {
     let options = crate::backend::api::file::options::file_options(&route.state, auth).await?;
 
     // want the body formatted based on query, but we need the response back to fill out headers...

@@ -1,10 +1,10 @@
+use sdk::api::commands::party::{GetPartyMember, GetPartyMembers};
+
 use super::*;
 
 #[async_recursion]
-pub async fn get_members(route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> WebResult {
-    Ok(WebResponse::stream(
-        crate::backend::api::party::members::get_many(route.state, auth, party_id).await?,
-    ))
+pub async fn get_members(route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> ApiResult {
+    Ok(RawMessage::authorized(auth, GetPartyMembers { party_id }))
 }
 
 #[async_recursion]
@@ -13,15 +13,6 @@ pub async fn get_member(
     auth: Authorization,
     party_id: Snowflake,
     member_id: Snowflake,
-) -> WebResult {
-    Ok(WebResponse::new(
-        crate::backend::api::party::members::get_one(
-            route.state,
-            auth.user_id(),
-            party_id,
-            member_id,
-            crate::backend::api::party::members::MemberMode::Full,
-        )
-        .await?,
-    ))
+) -> ApiResult {
+    Ok(RawMessage::authorized(auth, GetPartyMember { party_id, member_id }))
 }

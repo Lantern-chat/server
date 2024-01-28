@@ -16,11 +16,11 @@ pub fn invite(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
                 (&Method::POST, Exact("redeem")) => Ok(redeem::redeem(route, auth, code)),
                 (&Method::DELETE, Exact("revoke")) => Ok(revoke::revoke(route, auth, code)),
 
-                _ => Err(Error::NotFound),
+                _ => err(CommonError::NotFound),
             },
-            Some(Err(_)) => Err(Error::BadRequest),
-            None => Err(Error::NotFound),
+            Some(Err(_)) => err(CommonError::BadRequest),
+            None => err(CommonError::NotFound),
         },
-        _ => Err(Error::NotFound),
+        _ => err(CommonError::NotFound),
     }
 }

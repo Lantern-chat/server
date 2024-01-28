@@ -1,13 +1,8 @@
 use crate::prelude::*;
 
-use framed::tokio::AsyncFramedWriter;
 use tokio::io::AsyncWrite;
 
-pub async fn dispatch<W>(
-    state: ServerState,
-    out: AsyncFramedWriter<W>,
-    msg: &rpc::msg::ArchivedMessage,
-) -> Result<(), Error>
+pub async fn dispatch<W>(state: ServerState, out: W, msg: &rpc::msg::ArchivedMessage) -> Result<(), Error>
 where
     W: AsyncWrite + Unpin + Send,
 {
@@ -43,6 +38,7 @@ where
         Proc::GetServerConfig(form) => todo!("GetServerConfig"),
         Proc::UserRegister(form) => c!(user::register::register_user(state, addr, &form.body)),
         Proc::UserLogin(form) => c!(user::me::login::login(state, addr, &form.body)),
+        Proc::UserLogout(_) => c!(user::me::logout::logout_user(state, auth()?)),
         Proc::Enable2FA(form) => c!(user::me::mfa::enable_2fa(state, auth()?.user_id(), &form.body)),
         Proc::Confirm2FA(form) => c!(user::me::mfa::confirm_2fa(state, auth()?.user_id(), &form.body)),
         Proc::Remove2FA(form) => c!(user::me::mfa::remove_2fa(state, auth()?.user_id(), &form.body)),

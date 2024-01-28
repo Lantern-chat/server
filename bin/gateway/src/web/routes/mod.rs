@@ -4,10 +4,10 @@ use ftl::*;
 
 use headers::{ContentType, HeaderName, HeaderValue};
 
-use crate::ServerState;
+use crate::prelude::*;
 
 pub mod api;
-pub mod cdn;
+//pub mod cdn;
 
 pub async fn entry(mut route: Route<ServerState>) -> Response {
     if route.path().len() > 255 || route.raw_query().map(|q| q.len() > 255) == Some(true) {
@@ -27,35 +27,34 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
 
     match route.method_segment() {
         // ANY /api
-        (_, Exact("api")) => {
-            compression::wrap_route(true, route, |route| {
-                crate::web::response::wrap_response(route, api::api)
-            })
-            .await
-        }
-
+        (_, Exact("api")) => api::api(route).await,
+        //(_, Exact("api")) => {
+        //    compression::wrap_route(true, route, |route| {
+        //        crate::web::response::wrap_response(route, api::api)
+        //    })
+        //    .await
+        //}
         (&Method::GET, Exact("robots.txt")) => {
             include_str!("robots.txt").with_header(ContentType::text()).into_response()
         }
 
         (&Method::GET | &Method::HEAD, Exact("favicon.ico")) => fs::file(
             &route,
-            &route.state.config().paths.web_path.join("assets/favicon.ico"),
+            &route.state.config().local.paths.web_path.join("assets/favicon.ico"),
             &route.state.file_cache,
         )
         .boxed()
         .await
         .into_response(),
 
-        (&Method::GET | &Method::HEAD, Exact("cdn")) => cdn::cdn(route).await,
-
+        //(&Method::GET | &Method::HEAD, Exact("cdn")) => cdn::cdn(route).await,
         _ if BAD_PATTERNS.is_match(route.path()) || route.path().ends_with(".php") => {
             StatusCode::IM_A_TEAPOT.into_response()
         }
 
         (&Method::GET | &Method::HEAD, Exact("static")) => fs::dir(
             &route,
-            &route.state.config().paths.web_path.join("dist"),
+            &route.state.config().local.paths.web_path.join("dist"),
             &route.state.file_cache,
         )
         .boxed()
@@ -75,7 +74,7 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
 
             let mut resp = fs::file(
                 &route,
-                &route.state.config().paths.web_path.join("dist/index.html"),
+                &route.state.config().local.paths.web_path.join("dist/index.html"),
                 &route.state.file_cache,
             )
             .boxed()

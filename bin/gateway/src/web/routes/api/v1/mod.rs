@@ -1,9 +1,5 @@
 pub mod admin;
-pub mod build;
-pub mod file;
-pub mod gateway;
 pub mod invite;
-pub mod metrics;
 pub mod oembed;
 pub mod party;
 pub mod room;
@@ -14,17 +10,48 @@ pub mod debug;
 
 use super::*;
 
-pub async fn api_v1(mut route: Route<ServerState>) -> WebResult {
+use futures::{future::BoxFuture, Future};
+use rpc::msg::Procedure;
+
+pub struct RawMessage {
+    pub proc: Procedure,
+    pub auth: Option<Authorization>,
+}
+
+impl RawMessage {
+    #[inline]
+    pub const fn authorized(auth: Authorization, proc: impl Into<Procedure>) -> Self {
+        RawMessage {
+            proc: proc.into(),
+            auth: Some(auth),
+        }
+    }
+
+    #[inline]
+    pub const fn unauthorized(proc: impl Into<Procedure>) -> Self {
+        RawMessage {
+            proc: proc.into(),
+            auth: None,
+        }
+    }
+}
+
+pub type ApiResult = Result<RawMessage, crate::error::Error>;
+pub type RouteResult = Result<BoxFuture<'static, ApiResult>, crate::error::Error>;
+
+async fn api_v1_inner(mut route: Route<ServerState>) -> ApiResult {
     route.next();
 
     // only `PATCH api/v1/file` is allowed to exceed this value
     if !(*route.method() == Method::PATCH && route.segment() == Exact("file")) {
-        use hyper::body::HttpBody;
+        use hyper::body::Body;
 
-        // API Requests are limited to a body size of 1MiB
-        // TODO: Reduce this eventually?
-        if !matches!(route.body().size_hint().upper(), Some(len) if len <= (1024 * 1024)) {
-            return Err(Error::RequestEntityTooLarge);
+        if let Some(body) = route.body() {
+            // API Requests are limited to a body size of 1MiB
+            // TODO: Reduce this eventually?
+            if matches!(body.size_hint().upper(), Some(len) if len >= (1024 * 1024)) {
+                return err(CommonError::RequestEntityTooLarge);
+            }
         }
     }
 
@@ -34,22 +61,23 @@ pub async fn api_v1(mut route: Route<ServerState>) -> WebResult {
         (_, Exact("room")) => room::room(route, auth),
         (_, Exact("user")) => user::user(route, auth),
         (_, Exact("party")) => party::party(route, auth),
-        (_, Exact("file")) => file::file(route, auth),
         (_, Exact("invite")) => invite::invite(route, auth),
-        (_, Exact("gateway")) => return gateway::gateway(route),
-        (&Method::GET, Exact("build")) => return build::build(route),
-        (&Method::GET, Exact("metrics")) => Ok(metrics::metrics(route)),
         (&Method::GET, Exact("oembed")) => Ok(oembed::oembed(route)),
         (_, Exact("admin")) => admin::admin(route, auth),
 
         #[cfg(debug_assertions)]
         (_, Exact("debug")) => debug::debug(route),
 
-        _ => Err(Error::NotFound),
+        _ => return err(CommonError::NotFound),
     };
 
-    match route_res {
-        Ok(fut) => fut.await,
-        Err(e) => Err(e),
-    }
+    route_res?.await
+}
+
+pub async fn api_v1(mut route: Route<ServerState>) -> Response {
+    let addr = route.real_addr;
+
+    let raw = api_v1_inner(route).await;
+
+    unimplemented!()
 }

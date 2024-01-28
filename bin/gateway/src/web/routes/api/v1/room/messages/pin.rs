@@ -6,7 +6,7 @@ pub async fn pin_message(
     auth: Authorization,
     msg_id: Snowflake,
     pin_id: Snowflake,
-) -> WebResult {
+) -> ApiResult {
     unimplemented!()
 }
 
@@ -16,16 +16,16 @@ pub async fn unpin_message(
     auth: Authorization,
     msg_id: Snowflake,
     pin_id: Snowflake,
-) -> WebResult {
+) -> ApiResult {
     unimplemented!()
 }
 
 #[async_recursion]
-pub async fn star_message(route: Route<ServerState>, auth: Authorization, msg_id: Snowflake) -> WebResult {
+pub async fn star_message(route: Route<ServerState>, auth: Authorization, msg_id: Snowflake) -> ApiResult {
     unimplemented!()
 }
 
 #[async_recursion]
-pub async fn unstar_message(route: Route<ServerState>, auth: Authorization, msg_id: Snowflake) -> WebResult {
+pub async fn unstar_message(route: Route<ServerState>, auth: Authorization, msg_id: Snowflake) -> ApiResult {
     unimplemented!()
 }

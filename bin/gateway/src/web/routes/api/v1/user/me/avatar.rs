@@ -2,11 +2,10 @@ use ftl::*;
 
 use sdk::models::Snowflake;
 
-use super::WebResult;
+use super::ApiResult;
 use crate::{Authorization, Error, ServerState};
 
-#[async_recursion]
-pub async fn post_avatar(mut route: Route<ServerState>, auth: Authorization) -> WebResult {
+pub async fn post_avatar(mut route: Route<ServerState>, auth: Authorization) -> ApiResult {
     let file_id = match route.next().param::<Snowflake>() {
         Some(Ok(file_id)) => file_id,
         _ => return Err(Error::BadRequest),
@@ -17,8 +16,7 @@ pub async fn post_avatar(mut route: Route<ServerState>, auth: Authorization) -> 
     Ok(StatusCode::NO_CONTENT.into_response())
 }
 
-#[async_recursion]
-pub async fn delete_avatar(route: Route<ServerState>, auth: Authorization) -> WebResult {
+pub async fn delete_avatar(route: Route<ServerState>, auth: Authorization) -> ApiResult {
     crate::backend::api::user::me::avatar::delete_avatar(route.state, auth.user_id).await?;
 
     Ok(StatusCode::NO_CONTENT.into_response())

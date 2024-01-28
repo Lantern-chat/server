@@ -3,8 +3,7 @@ use headers::{CacheControl, HeaderMapExt, HeaderName, HeaderValue};
 use super::*;
 use crate::{backend::api::file::head::UploadHead, util::TupleClone};
 
-#[async_recursion]
-pub async fn head(route: Route<ServerState>, auth: Authorization, file_id: Snowflake) -> WebResult {
+pub async fn head(route: Route<ServerState>, auth: Authorization, file_id: Snowflake) -> ApiResult {
     let head = crate::backend::api::file::head::head(route.state, auth, file_id).await?;
 
     let mut res = Response::default();

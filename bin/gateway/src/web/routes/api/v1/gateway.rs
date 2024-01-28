@@ -1,7 +1,7 @@
 use super::*;
 
 #[allow(clippy::field_reassign_with_default)]
-pub fn gateway(route: Route<crate::ServerState>) -> WebResult {
+pub fn gateway(route: Route<crate::ServerState>) -> ApiResult {
     let Ok(addr) = real_ip::get_real_ip(&route) else {
         return Err(Error::BadRequest);
     };

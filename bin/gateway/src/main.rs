@@ -7,19 +7,31 @@ extern crate serde;
 
 extern crate tracing as log;
 
+pub mod allocator;
 pub mod auth;
+pub mod backend;
+pub mod cli;
 pub mod config;
 pub mod error;
 pub mod state;
 pub mod web;
 
 pub mod prelude {
-    pub use crate::config::Config;
     pub use crate::error::Error;
     pub use crate::state::ServerState;
-    pub use rpc::auth::Authorization;
 
+    pub use rpc::{auth::Authorization, error::Error as CommonError, event::ServerEvent, simple_de};
+    pub use sdk::models::{Nullable, SmolStr, Snowflake, Timestamp};
+
+    pub use crate::config::Config;
     pub use config::HasConfig;
+
+    pub use rkyv::Archived;
+
+    #[inline(always)]
+    pub fn err<T, E>(err: impl Into<E>) -> Result<T, E> {
+        Err(err.into())
+    }
 }
 
 pub mod built {

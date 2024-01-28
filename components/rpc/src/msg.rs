@@ -182,6 +182,7 @@ decl_procs! {
     111 = UpdateUserProfile,
     112 = GetUser,
     113 = UpdateUserPrefs,
+    114 = UserLogout,
 
     201 = CreateFile,
     202 = GetFilesystemStatus,

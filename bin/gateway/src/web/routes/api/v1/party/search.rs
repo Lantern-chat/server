@@ -3,16 +3,16 @@ use http::{HeaderName, HeaderValue};
 use super::*;
 
 #[async_recursion]
-pub async fn search(mut route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> WebResult {
-    match route.content_length() {
-        None => return Err(Error::BadRequest),
-        Some(len) if len > (1024 * 1024) => return Err(Error::RequestEntityTooLarge),
-        _ => {}
-    }
+pub async fn search(mut route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> ApiResult {
+    // match route.content_length() {
+    //     None => return Err(Error::BadRequest),
+    //     Some(len) if len > (1024 * 1024) => return Err(Error::RequestEntityTooLarge),
+    //     _ => {}
+    // }
 
-    let body = route.bytes().await.map_err(body::BodyDeserializeError::from)?;
+    // let body = route.bytes().await.map_err(body::BodyDeserializeError::from)?;
 
-    let terms = schema::search::parse_search_terms(std::str::from_utf8(&body)?)?;
+    // let terms = schema::search::parse_search_terms(std::str::from_utf8(&body)?)?;
 
     unimplemented!()
 

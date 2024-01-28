@@ -1,8 +1,8 @@
+use sdk::api::commands::user::GetUser;
+
 use super::*;
 
 #[async_recursion]
-pub async fn get(route: Route<ServerState>, auth: Authorization, user_id: Snowflake) -> WebResult {
-    Ok(WebResponse::new(
-        crate::backend::api::user::get::get_full_user(route.state, auth, user_id).await?,
-    ))
+pub async fn get(route: Route<ServerState>, auth: Authorization, user_id: Snowflake) -> ApiResult {
+    Ok(RawMessage::authorized(auth, GetUser { user_id }))
 }

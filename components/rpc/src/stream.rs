@@ -1,6 +1,7 @@
 use crate::error::ApiError;
 use futures::future::Either;
 use futures::{Stream, StreamExt};
+
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use std::io::{self, ErrorKind};
@@ -10,13 +11,11 @@ use framed::tokio::{AsyncFramedReader, AsyncFramedWriter};
 use rkyv::ser::serializers::AllocSerializer;
 use rkyv::{ser::Serializer, Serialize};
 
-pub async fn encode_item<T, E, W, const N: usize>(
-    out: AsyncFramedWriter<W>,
-    item: Result<T, E>,
-) -> std::io::Result<()>
+pub async fn encode_item<T, E, W, const N: usize>(out: W, item: Result<T, E>) -> std::io::Result<()>
 where
     W: AsyncWrite + Unpin,
     T: Serialize<AllocSerializer<N>>,
+    E: std::error::Error,
     ApiError: From<E>,
 {
     // stream::iter is more efficient
@@ -24,14 +23,16 @@ where
 }
 
 pub async fn encode_stream<T, E, W, const N: usize>(
-    mut out: AsyncFramedWriter<W>,
+    out: W,
     stream: Result<impl Stream<Item = Result<T, E>>, E>,
 ) -> std::io::Result<()>
 where
     W: AsyncWrite + Unpin,
     T: Serialize<AllocSerializer<N>>,
+    E: std::error::Error,
     ApiError: From<E>,
 {
+    let mut out = AsyncFramedWriter::new(out);
     let mut serializer = AllocSerializer::default();
 
     let mut stream = std::pin::pin!(match stream {
@@ -40,10 +41,11 @@ where
     });
 
     while let Some(item) = stream.next().await {
-        let item: Result<T, ApiError> = match item {
-            Ok(item) => Ok(item),
-            Err(e) => Err(ApiError::from(e)),
-        };
+        let item = item.map_err(|err| {
+            log::error!("Error in RPC encode stream: {err}");
+
+            ApiError::from(err)
+        });
 
         if let Err(e) = serializer.serialize_value(&item) {
             log::error!("Error serializing streamed item: {e}");
@@ -64,22 +66,22 @@ where
     Ok(())
 }
 
-pub struct RpcRecvStream<R: AsyncRead + Unpin> {
+pub struct RpcRecvReader<R: AsyncRead + Unpin> {
     stream: AsyncFramedReader<R>,
     buffer: rkyv::AlignedVec,
 }
 
-impl<R: AsyncRead + Unpin> RpcRecvStream<R> {
+impl<R: AsyncRead + Unpin> RpcRecvReader<R> {
     pub fn new(stream: R) -> Self {
-        RpcRecvStream {
+        RpcRecvReader {
             stream: AsyncFramedReader::new(stream),
             buffer: rkyv::AlignedVec::new(),
         }
     }
 }
 
-impl<R: AsyncRead + Unpin> RpcRecvStream<R> {
-    pub async fn recv<T>(&mut self) -> Result<Option<&rkyv::Archived<Result<T, ApiError>>>, io::Error>
+impl<R: AsyncRead + Unpin> RpcRecvReader<R> {
+    pub async fn recv<T>(&mut self) -> Result<Option<&rkyv::Archived<T>>, io::Error>
     where
         T: rkyv::Archive,
         rkyv::Archived<T>: for<'a> rkyv::CheckBytes<rkyv::validation::validators::DefaultValidator<'a>>,
@@ -91,16 +93,12 @@ impl<R: AsyncRead + Unpin> RpcRecvStream<R> {
         self.buffer.resize(msg.len() as usize, 0);
         msg.read_exact(&mut self.buffer[..]).await?;
 
-        let msg = match rkyv::check_archived_root::<Result<T, ApiError>>(&self.buffer) {
-            Ok(msg) => msg,
-            Err(e) => {
-                return Err(io::Error::new(
-                    ErrorKind::InvalidData,
-                    format!("Error reading archived value: {e}"),
-                ));
-            }
-        };
-
-        Ok(Some(msg))
+        match rkyv::check_archived_root::<T>(&self.buffer) {
+            Ok(msg) => Ok(Some(msg)),
+            Err(e) => Err(io::Error::new(
+                ErrorKind::InvalidData,
+                format!("Error reading archived value: {e}"),
+            )),
+        }
     }
 }

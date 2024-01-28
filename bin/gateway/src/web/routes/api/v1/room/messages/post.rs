@@ -1,14 +1,11 @@
+use sdk::api::commands::room::CreateMessage;
+
 use super::*;
 
-#[async_recursion]
-pub async fn post(mut route: Route<ServerState>, auth: Authorization, room_id: Snowflake) -> WebResult {
-    let form = body::any(&mut route).await?;
-
-    let msg =
-        crate::backend::api::room::messages::create::create_message(route.state, auth, room_id, form).await?;
-
-    Ok(match msg {
-        Some(msg) => WebResponse::new(msg),
-        None => StatusCode::OK.into(),
-    })
+#[async_recursion] #[rustfmt::skip]
+pub async fn post(mut route: Route<ServerState>, auth: Authorization, room_id: Snowflake) -> ApiResult {
+    Ok(RawMessage::authorized(auth, CreateMessage {
+        room_id,
+        body: body::any(&mut route).await?,
+    }))
 }

@@ -24,7 +24,9 @@ use crate::web::encoding::EncodingQuery;
 
 use super::*;
 
-pub fn build(route: Route<ServerState>) -> WebResult {
+pub fn build(route: Route<ServerState>) -> ApiResult {
+
+
     // TODO: Come up with a way to cache serde stuff
     Ok(WebResponse::new(BUILD_INFO))
 

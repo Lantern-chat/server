@@ -22,7 +22,7 @@ pub async fn do_auth(state: &ServerState, token: RawAuthToken) -> Result<Authori
             RawAuthToken::Bearer(token) => do_user_auth(state, token).boxed().await?,
             RawAuthToken::Bot(token) => match token.verify(&state.config().local.keys.bt_key) {
                 true => return do_bot_auth(state, token).boxed().await,
-                false => return Err(Error::Unauthorized),
+                false => return err(CommonError::Unauthorized),
             },
         },
     };
@@ -30,7 +30,7 @@ pub async fn do_auth(state: &ServerState, token: RawAuthToken) -> Result<Authori
     match auth {
         Some(auth @ Authorization::Bot { .. }) => Ok(auth),
         Some(auth @ Authorization::User { expires, .. }) if expires > Timestamp::now_utc() => Ok(auth),
-        _ => Err(Error::NoSession),
+        _ => err(CommonError::NoSession),
     }
 }
 
@@ -78,7 +78,7 @@ pub async fn do_bot_auth(state: &ServerState, token: SplitBotToken) -> Result<Au
     }).await?;
 
     let Some(row) = row else {
-        return Err(Error::NoSession);
+        return err(CommonError::NoSession);
     };
 
     let issued: u64 = row.issued::<i64>()? as u64;

@@ -9,8 +9,7 @@ lazy_static::lazy_static! {
         headers::ContentType::from("application/offset+octet-stream".parse::<mime::Mime>().unwrap());
 }
 
-#[async_recursion]
-pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: Snowflake) -> WebResult {
+pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: Snowflake) -> ApiResult {
     match route.header::<headers::ContentType>() {
         None => return Err(Error::MissingContentTypeHeader),
         Some(ct) if ct == *APPLICATION_OFFSET_OCTET_STREAM => {}
@@ -24,8 +23,12 @@ pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: 
         return Err(Error::RequestEntityTooLarge);
     }
 
-    let Some(Ok(Ok(upload_offset))) = route.parse_raw_header(HeaderName::from_static("upload-offset")) else { return Err(Error::BadRequest) };
-    let Some(ContentLength(content_length)) = route.header::<headers::ContentLength>() else { return Err(Error::BadRequest) };
+    let Some(Ok(Ok(upload_offset))) = route.parse_raw_header(HeaderName::from_static("upload-offset")) else {
+        return Err(Error::BadRequest);
+    };
+    let Some(ContentLength(content_length)) = route.header::<headers::ContentLength>() else {
+        return Err(Error::BadRequest);
+    };
 
     let checksum = match route.raw_header(HeaderName::from_static("upload-checksum")) {
         Some(checksum_header) => parse_checksum_header(checksum_header)?,
@@ -68,7 +71,9 @@ fn parse_checksum_header(header: &HeaderValue) -> Result<u32, Error> {
         return Err(Error::ChecksumMismatch);
     }
 
-    let Some(checksum_encoded) = parts.next() else { return Err(Error::ChecksumMismatch) };
+    let Some(checksum_encoded) = parts.next() else {
+        return Err(Error::ChecksumMismatch);
+    };
 
     let mut out = [0u8; 4];
 
