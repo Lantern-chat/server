@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use sdk::api::commands::all::*;
+use sdk::{api::commands::all::*, Snowflake};
 
 #[derive(Debug, rkyv::Archive, rkyv::Serialize)]
 #[archive(check_bytes)]
@@ -19,12 +19,45 @@ const fn mirror_tag(t: u16) -> u32 {
     u32::from_le_bytes([le[0], le[1], be[0], be[1]])
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Kind {
+    Nexus,
+    Party(Snowflake),
+    Room(Snowflake),
+}
+
+impl Kind {
+    const fn party(self, id: Snowflake) -> Kind {
+        match self {
+            Kind::Party(_) => self,
+            _ => Kind::Party(id),
+        }
+    }
+
+    const fn room(self, id: Snowflake) -> Kind {
+        match self {
+            Kind::Room(_) => self,
+            _ => Kind::Room(id),
+        }
+    }
+}
+
 macro_rules! decl_procs {
-    ($($code:literal = $cmd:ident),*$(,)?) => {
+    ($($code:literal = $cmd:ident $(@ $kind:ident $(.$path:ident)+)?),*$(,)?) => {
+        pub use proc_impl::{ArchivedProcedure, ProcedureResolver};
+
         #[derive(Debug)]
         #[repr(u16)]
         pub enum Procedure {
             $($cmd(Box<$cmd>) = $code,)*
+        }
+
+        impl Procedure {
+            pub fn endpoint(&self) -> Kind {
+                match self {
+                    $(Self::$cmd(_cmd) => Kind::Nexus $(.$kind(_cmd $(.$path)+))?),*
+                }
+            }
         }
 
         $(
@@ -53,8 +86,6 @@ macro_rules! decl_procs {
                 assert_eq!(mirror_tag($code), mirror_tag($code).swap_bytes());
             )*}
         }
-
-        pub use proc_impl::{ArchivedProcedure, ProcedureResolver};
 
         mod proc_impl {paste::paste! {
             use super::*;
@@ -167,8 +198,10 @@ macro_rules! decl_procs {
 }
 
 decl_procs! {
+    // Stuff not actually sent to a backend
     0   = GetServerConfig,
 
+    // User stuff, all goes to the Nexus
     101 = UserRegister,
     102 = UserLogin,
     103 = Enable2FA,
@@ -184,51 +217,55 @@ decl_procs! {
     113 = UpdateUserPrefs,
     114 = UserLogout,
 
+    // File stuff, will either go to the Nexus or CDN nodes
     201 = CreateFile,
     202 = GetFilesystemStatus,
     203 = GetFileStatus,
 
+    // Invite stuff, goes to the nexus first
     301 = GetInvite,
     302 = RevokeInvite,
     303 = RedeemInvite,
 
-    401 = GetParty,
-    402 = CreateParty,
-    403 = PatchParty,
-    404 = DeleteParty,
-    405 = TransferOwnership,
-    406 = CreateRole,
-    407 = PatchRole,
-    408 = DeleteRole,
-    409 = GetPartyMembers,
-    410 = GetPartyMember,
-    411 = GetPartyRooms,
-    412 = GetPartyInvites,
-    413 = GetMemberProfile,
-    414 = UpdateMemberProfile,
-    415 = CreatePartyInvite,
-    416 = CreatePinFolder,
-    417 = CreateRoom,
-    418 = SearchParty,
+    // Party stuff, goes to faction servers
+    401 = CreateParty,
+    402 = GetParty              @ party.party_id,
+    403 = PatchParty            @ party.party_id,
+    404 = DeleteParty           @ party.party_id,
+    405 = TransferOwnership     @ party.party_id,
+    406 = CreateRole            @ party.party_id,
+    407 = PatchRole             @ party.party_id,
+    408 = DeleteRole            @ party.party_id,
+    409 = GetPartyMembers       @ party.party_id,
+    410 = GetPartyMember        @ party.party_id,
+    411 = GetPartyRooms         @ party.party_id,
+    412 = GetPartyInvites       @ party.party_id,
+    413 = GetMemberProfile      @ party.party_id,
+    414 = UpdateMemberProfile   @ party.party_id,
+    415 = CreatePartyInvite     @ party.party_id,
+    416 = CreatePinFolder       @ party.party_id,
+    417 = CreateRoom            @ party.party_id,
+    418 = SearchParty           @ party.party_id,
 
-    501 = CreateMessage,
-    502 = EditMessage,
-    503 = GetMessage,
-    504 = DeleteMessage,
-    505 = StartTyping,
-    506 = GetMessages,
-    507 = PinMessage,
-    508 = UnpinMessage,
-    509 = StarMessage,
-    510 = UnstarMessage,
-    511 = PutReaction,
-    512 = DeleteOwnReaction,
-    513 = DeleteUserReaction,
-    514 = DeleteAllReactions,
-    515 = GetReactions,
-    516 = PatchRoom,
-    517 = DeleteRoom,
-    518 = GetRoom,
+    // Room stuff, also goes to faction servers but needs a party_id lookup first
+    501 = CreateMessage         @ room.room_id,
+    502 = EditMessage           @ room.room_id,
+    503 = GetMessage            @ room.room_id,
+    504 = DeleteMessage         @ room.room_id,
+    505 = StartTyping           @ room.room_id,
+    506 = GetMessages           @ room.room_id,
+    507 = PinMessage            @ room.room_id,
+    508 = UnpinMessage          @ room.room_id,
+    509 = StarMessage           @ room.room_id,
+    510 = UnstarMessage         @ room.room_id,
+    511 = PutReaction           @ room.room_id,
+    512 = DeleteOwnReaction     @ room.room_id,
+    513 = DeleteUserReaction    @ room.room_id,
+    514 = DeleteAllReactions    @ room.room_id,
+    515 = GetReactions          @ room.room_id,
+    516 = PatchRoom             @ room.room_id,
+    517 = DeleteRoom            @ room.room_id,
+    518 = GetRoom               @ room.room_id,
 }
 
 #[cfg(test)]
