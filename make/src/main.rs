@@ -22,9 +22,13 @@ pub struct CliArgs {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
-enum Target {
-    x86_64_v3_unknown_linux_musl,          // Generic modern Linux
-    aarch64_unknown_linux_musl_cortex_a57, // Raspberry Pi 3B+
+pub enum Target {
+    /// Generic modern Linux
+    x86_64_v3_unknown_linux_musl,
+    /// Windows PC
+    x86_64_v3_pc_windows_msvc,
+    /// Raspberry Pi 3B+
+    aarch64_unknown_linux_musl_cortex_a57,
 }
 
 #[rustfmt::skip]
@@ -32,6 +36,7 @@ impl Target {
     const MAPPING: &'static [(&'static str, Target)] = &[
         ("x86_64_v3_unknown_linux_musl", Target::x86_64_v3_unknown_linux_musl),
         ("aarch64_unknown_linux_musl_cortex_a57", Target::aarch64_unknown_linux_musl_cortex_a57),
+        ("x86_64_v3_pc_windows_msvc", Target::x86_64_v3_pc_windows_msvc),
     ];
 
     fn parse(target: &str) -> Option<Target> {
@@ -43,11 +48,15 @@ impl Target {
         match self {
             Target::x86_64_v3_unknown_linux_musl => (
                 "x86_64-unknown-linux-musl",
-                "-C target-cpu=x86-64-v3 -C target-feature=+aes"
+                "-C target-cpu=x86-64-v3 -C target-feature=+aes",
             ),
             Target::aarch64_unknown_linux_musl_cortex_a57 => (
                 "aarch64-unknown-linux-musl",
-                "-C target-cpu=cortex-a57 -C target-feature=-outline-atomics"
+                "-C target-cpu=cortex-a57 -C target-feature=-outline-atomics",
+            ),
+            Target::x86_64_v3_pc_windows_msvc => (
+                "x86_64-pc-windows-msvc",
+                "-C target-cpu=x86-64-v3 -C target-feature=+aes",
             ),
         }
     }
@@ -62,7 +71,7 @@ impl Target {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum Project {
+pub enum Project {
     Nexus,
     Faction,
     Gateway,
@@ -91,25 +100,25 @@ impl Project {
         Self::MAPPING.iter().find(|(k, _)| *k == project).map(|(_, p)| *p)
     }
 
+    #[rustfmt::skip]
+    fn args(self) -> &'static str {
+        match self {
+            Project::Nexus => todo!(),
+            Project::Faction => r#"--bin faction -p faction"#,
+            Project::Gateway => r#"--bin gateway -p gateway"#,
+            Project::Process => r#"--bin process -p process --features binary"#,
+            Project::Camo2 => r#"--bin camo2 -p camo-worker --config lib.crate-type=["bin"] --no-default-features --features standalone"#,
+            Project::EmbedWorker => todo!(),
+            Project::GifProbe => r#"--bin gif_probe -p gif_probe"#,
+        }
+    }
+
     fn err(verb: &str) -> ! {
         eprintln!("{verb} project, expected one or more of:");
         for (k, _) in Project::MAPPING {
             eprintln!("    {k}");
         }
         std::process::exit(1);
-    }
-
-    #[rustfmt::skip]
-    fn args(self) -> &'static str {
-        match self {
-            Project::Nexus => todo!(),
-            Project::Faction => todo!(),
-            Project::Gateway => todo!(),
-            Project::Process => r#"--bin process -p process --features binary"#,
-            Project::Camo2 => r#"--bin camo2 -p camo-worker --config lib.crate-type=["bin"] --no-default-features --features standalone"#,
-            Project::EmbedWorker => todo!(),
-            Project::GifProbe => r#"--bin gif_probe -p gif_probe"#,
-        }
     }
 }
 
