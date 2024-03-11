@@ -1,0 +1,3 @@
+max_width = 110
+chain_width = 110
+single_line_if_else_max_width = 100

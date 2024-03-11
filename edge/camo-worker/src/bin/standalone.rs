@@ -2,10 +2,10 @@ use futures_util::FutureExt;
 use reqwest::{header::HeaderName, Client};
 
 use axum::{
-    body::{Body, StreamBody},
+    body::Body,
     extract::State,
     http::{HeaderMap, Request, StatusCode},
-    response::IntoResponse,
+    response::{IntoResponse, Response},
     routing::get,
 };
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
@@ -48,11 +48,13 @@ async fn main() {
     let addr = std::env::var("CAMO_BIND_ADDRESS").expect("CAMO_BIND_ADDRESS not found");
     let addr = SocketAddr::from_str(&addr).expect("Unable to parse bind address");
 
-    axum::Server::bind(&addr)
-        .serve(get(root).with_state(state).into_make_service())
-        .with_graceful_shutdown(tokio::signal::ctrl_c().map(|_| ()))
-        .await
-        .expect("Unable to run camo-worker");
+    axum::serve(
+        tokio::net::TcpListener::bind(addr).await.expect("Unable to bind to address"),
+        get(root).with_state(state).into_make_service(),
+    )
+    .with_graceful_shutdown(tokio::signal::ctrl_c().map(|_| ()))
+    .await
+    .expect("Unable to run camo-worker");
 }
 
 use base64::engine::{general_purpose::URL_SAFE_NO_PAD, Engine};
@@ -124,13 +126,12 @@ async fn proxy(client: &Client, url: &str, mut req: Request<Body>) -> impl IntoR
         Ok(mut resp) => {
             let status = resp.status();
             let mut headers = std::mem::take(resp.headers_mut());
-            let body = StreamBody::new(resp.bytes_stream());
 
             for name in &BAD_RESPONSE_HEADERS {
                 headers.remove(name);
             }
 
-            (status, headers, Ok(body))
+            (status, headers, Ok(Response::new(reqwest::Body::from(resp))))
         }
     }
 }

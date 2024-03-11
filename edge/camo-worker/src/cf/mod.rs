@@ -4,12 +4,14 @@ use worker::*;
 mod utils;
 
 fn log_request(req: &Request) {
+    let coord_region = req.cf().map(|cf| (cf.coordinates(), cf.region()));
+
     console_log!(
         "{} - [{}], located at: {:?}, within: {}",
         Date::now().to_string(),
         req.path(),
-        req.cf().coordinates().unwrap_or_default(),
-        req.cf().region().unwrap_or_else(|| "unknown region".into())
+        coord_region.as_ref().and_then(|(coord, _)| *coord).unwrap_or_default(),
+        coord_region.and_then(|(_, region)| region).unwrap_or_else(|| "unknown region".into())
     );
 }
 
