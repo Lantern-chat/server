@@ -114,6 +114,7 @@ impl SearchTerm {
 }
 
 bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     struct Existing: i8 {
         const ROOM = 1 << 0;
         const USER = 1 << 1;

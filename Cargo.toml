@@ -57,7 +57,7 @@ rkyv = { version = "0.7", features = ["strict", "validation"] }
 bytecheck = { version = "0.6" }                                       # 0.6 is used with rkyv 0.7
 serde = { version = "1", features = ["derive"] }
 serde_derive = "1"
-bitflags = "1.2.1"
+bitflags = "2"
 ahash = "0.8"
 scc = "2"
 

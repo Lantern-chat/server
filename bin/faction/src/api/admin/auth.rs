@@ -1,6 +1,7 @@
 use crate::web::auth::Authorization;
 
 bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct AdminFlags: i32 {
         const TRUE_ADMIN    = 1 << 0;
         const BAN_USERS     = 1 << 1;
