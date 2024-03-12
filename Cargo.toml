@@ -26,8 +26,7 @@ client-sdk = { path = "../client-sdk-rs" }
 
 [workspace]
 resolver = "2"
-members = ["crates/*", "components/*", "edge/*", "bin/*", "utilities/*"]
-exclude = ["edge/embed-worker", "edge/camo"]
+members = ["crates/*", "components/*", "bin/*", "utilities/*", "make"]
 
 [workspace.dependencies]
 db = { path = "crates/db" }
