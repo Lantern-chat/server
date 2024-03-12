@@ -9,10 +9,10 @@ extern crate tracing as log;
 
 pub mod allocator;
 pub mod auth;
-pub mod backend;
 pub mod cli;
 pub mod config;
 pub mod error;
+pub mod rpc;
 pub mod state;
 pub mod web;
 

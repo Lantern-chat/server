@@ -20,24 +20,24 @@ const fn mirror_tag(t: u16) -> u32 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Kind {
+pub enum Resolve {
     Nexus,
     Party(Snowflake),
     Room(Snowflake),
 }
 
-impl Kind {
-    const fn party(self, id: Snowflake) -> Kind {
+impl Resolve {
+    const fn party(self, id: Snowflake) -> Resolve {
         match self {
-            Kind::Party(_) => self,
-            _ => Kind::Party(id),
+            Resolve::Party(_) => self,
+            _ => Resolve::Party(id),
         }
     }
 
-    const fn room(self, id: Snowflake) -> Kind {
+    const fn room(self, id: Snowflake) -> Resolve {
         match self {
-            Kind::Room(_) => self,
-            _ => Kind::Room(id),
+            Resolve::Room(_) => self,
+            _ => Resolve::Room(id),
         }
     }
 }
@@ -53,9 +53,9 @@ macro_rules! decl_procs {
         }
 
         impl Procedure {
-            pub fn endpoint(&self) -> Kind {
+            pub fn endpoint(&self) -> Resolve {
                 match self {
-                    $(Self::$cmd(_cmd) => Kind::Nexus $(.$kind(_cmd $(.$path)+))?),*
+                    $(Self::$cmd(_cmd) => Resolve::Nexus $(.$kind(_cmd $(.$path)+))?),*
                 }
             }
         }

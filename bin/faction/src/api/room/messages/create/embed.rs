@@ -77,10 +77,7 @@ pub fn process_embeds(state: ServerState, msg_id: Snowflake, msg: &str, spans: &
 
         let db = match state.db.write.get().await {
             Ok(db) => db,
-            Err(e) => {
-                log::error!("Cannot get database connection to finalize embed update: {e}");
-                return;
-            }
+            Err(e) => return log::error!("Cannot get database connection to finalize embed update: {e}"),
         };
 
         let update_message = db.execute2(schema::sql! {

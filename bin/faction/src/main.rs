@@ -28,21 +28,13 @@ pub mod prelude {
     pub use crate::error::Error;
     pub use crate::state::ServerState;
 
-    pub use rpc::{auth::Authorization, error::Error as CommonError, event::ServerEvent};
+    pub use rpc::{auth::Authorization, error::Error as CommonError, event::ServerEvent, simple_de};
     pub use sdk::models::{Nullable, SmolStr, Snowflake, Timestamp};
 
     pub use crate::config::Config;
     pub use config::HasConfig;
 
     pub use rkyv::Archived;
-
-    pub fn simple_de<T>(value: &Archived<T>) -> T
-    where
-        T: rkyv::Archive,
-        Archived<T>: rkyv::Deserialize<T, rkyv::Infallible>,
-    {
-        rkyv::Deserialize::deserialize(value, &mut rkyv::Infallible).unwrap()
-    }
 
     #[inline(always)]
     pub fn err<T, E>(err: impl Into<E>) -> Result<T, E> {
@@ -58,6 +50,13 @@ async fn main() -> anyhow::Result<()> {
 
     let mut config = config::LocalConfig::default();
     ::config::Configuration::configure(&mut config);
+
+    #[inline(never)]
+    fn get<T>() -> T {
+        unimplemented!()
+    }
+
+    _ = gateway::rpc::dispatch(get(), tokio::io::empty(), get()).await;
 
     Ok(())
 }
@@ -75,8 +74,6 @@ use task_runner::TaskRunner;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
-
-
     let args = CliOptions::parse()?;
 
     // temporary logger until info needed for global logger is loaded

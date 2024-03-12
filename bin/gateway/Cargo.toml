@@ -14,7 +14,7 @@ default = ["memory_metrics", "brotli"]
 built.workspace = true
 
 [dependencies]
-sdk = { workspace = true }
+sdk = { workspace = true, features = ["driver", "cbor"] }
 rpc.workspace = true
 rkyv.workspace = true
 smol_str = { version = "0.2", features = ["serde", "pg"] }

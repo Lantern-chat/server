@@ -1,6 +1,5 @@
 use std::{
     borrow::Cow,
-    future::IntoFuture,
     net::SocketAddr,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -17,8 +16,14 @@ use sdk::Snowflake;
 
 #[derive(Debug, thiserror::Error)]
 pub enum RpcClientError {
-    #[error("RPC Server not found: {0}")]
-    NotFound(Snowflake),
+    #[error("RPC Room association not found: {0}")]
+    MissingRoom(Snowflake),
+
+    #[error("RPC Party association not found: {0}")]
+    MissingParty(Snowflake),
+
+    #[error("RPC Faction Server not found: {0}")]
+    MissingFaction(Snowflake),
 
     #[error("ConnectError: {0}")]
     Connect(#[from] quinn::ConnectError),
@@ -42,17 +47,12 @@ pub struct RpcClient {
 }
 
 pub struct RpcManager {
-    nexus: RpcClient,
+    nexus: Arc<RpcClient>,
     factions: scc::HashMap<Snowflake, Arc<RpcClient>>,
     rooms: scc::HashIndex<Snowflake, Snowflake>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ReqKind {
-    Nexus,
-    Party(Snowflake),
-    Room(Snowflake),
-}
+use crate::msg::Resolve;
 
 impl RpcManager {
     pub async fn add_rooms(&self, rooms: impl Stream<Item = (Snowflake, Snowflake)>) {
@@ -81,7 +81,7 @@ impl RpcManager {
         parties: impl Stream<Item = Snowflake>,
     ) -> Result<(), RpcClientError> {
         let Some(faction_client) = self.factions.get_async(&faction_id).await else {
-            return Err(RpcClientError::NotFound(faction_id));
+            return Err(RpcClientError::MissingFaction(faction_id));
         };
 
         let client = faction_client.get().clone();
@@ -101,21 +101,26 @@ impl RpcManager {
         );
     }
 
-    pub async fn with_client<F, U>(&self, mut kind: ReqKind, cb: impl FnOnce(&RpcClient) -> F) -> Option<U>
-    where
-        F: IntoFuture<Output = U>,
-    {
-        if let ReqKind::Room(room_id) = kind {
-            kind = ReqKind::Party(*self.rooms.peek(&room_id, &scc::ebr::Guard::new())?);
+    pub async fn get_connection(&self, kind: Resolve) -> Result<RpcClientConnection, RpcClientError> {
+        self.get_client(kind).await?.get_connection().await
+    }
+
+    pub async fn get_client(&self, mut kind: Resolve) -> Result<Arc<RpcClient>, RpcClientError> {
+        if let Resolve::Room(room_id) = kind {
+            kind = match self.rooms.peek(&room_id, &scc::ebr::Guard::new()) {
+                Some(party_id) => Resolve::Party(*party_id),
+                None => return Err(RpcClientError::MissingRoom(room_id)),
+            };
         }
 
-        let fut = match kind {
-            ReqKind::Nexus => cb(&self.nexus),
-            ReqKind::Party(ref party_id) => cb(self.factions.get_async(party_id).await?.get()),
+        Ok(match kind {
+            Resolve::Nexus => self.nexus.clone(),
+            Resolve::Party(party_id) => match self.factions.get_async(&party_id).await {
+                Some(client) => client.get().clone(),
+                None => return Err(RpcClientError::MissingParty(party_id)),
+            },
             _ => unreachable!(),
-        };
-
-        Some(fut.await)
+        })
     }
 }
 

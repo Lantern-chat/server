@@ -20,7 +20,7 @@ pub struct RawMessage {
 
 impl RawMessage {
     #[inline]
-    pub const fn authorized(auth: Authorization, proc: impl Into<Procedure>) -> Self {
+    pub fn authorized(auth: Authorization, proc: impl Into<Procedure>) -> Self {
         RawMessage {
             proc: proc.into(),
             auth: Some(auth),
@@ -28,7 +28,7 @@ impl RawMessage {
     }
 
     #[inline]
-    pub const fn unauthorized(proc: impl Into<Procedure>) -> Self {
+    pub fn unauthorized(proc: impl Into<Procedure>) -> Self {
         RawMessage {
             proc: proc.into(),
             auth: None,

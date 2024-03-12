@@ -21,6 +21,8 @@ pub struct InnerServerState {
     pub file_cache: MainFileCache,
     pub hasher: ahash::RandomState,
     pub emoji: common::emoji::EmojiMap,
+
+    pub rpc: rpc::client::RpcManager,
 }
 
 #[derive(Clone)]

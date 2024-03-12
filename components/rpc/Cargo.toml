@@ -5,7 +5,8 @@ edition = "2021"
 
 [dependencies]
 sdk = { workspace = true, features = ["api", "rkyv"] }
-
+quinn.workspace = true
+parking_lot = "0.12"
 smol_str.workspace = true
 serde.workspace = true
 rkyv = { workspace = true, features = ["smallvec"] }
@@ -14,7 +15,9 @@ auth.workspace = true
 thiserror = "1"
 paste = "1"
 framed.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["macros"] }
 futures = "0.3"
 tracing.workspace = true
 smallvec = "1"
+indexmap = "2"
+scc = "2"

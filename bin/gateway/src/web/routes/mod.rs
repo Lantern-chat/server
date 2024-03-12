@@ -27,7 +27,7 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
 
     match route.method_segment() {
         // ANY /api
-        (_, Exact("api")) => api::api(route).await,
+        (_, Exact("api")) => api::api(route).boxed().await,
         //(_, Exact("api")) => {
         //    compression::wrap_route(true, route, |route| {
         //        crate::web::response::wrap_response(route, api::api)

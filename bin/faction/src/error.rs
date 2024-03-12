@@ -1,10 +1,9 @@
-use std::{borrow::Cow, str::Utf8Error, string::FromUtf8Error};
+use std::borrow::Cow;
 
 use rpc::error::Error as CommonError;
 
 use db::pool::Error as DbError;
-use sdk::api::error::{ApiError, ApiErrorCode};
-use smol_str::SmolStr;
+use sdk::api::error::ApiErrorCode;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -64,17 +63,20 @@ impl From<db::pg::Error> for Error {
 impl Error {
     #[rustfmt::skip]
     pub fn is_fatal(&self) -> bool {
-        matches!(self,
-            | Error::InternalError(_)
-            | Error::InternalErrorSmol(_)
-            | Error::InternalErrorStatic(_)
+        match self {
+            Error::Common(err) => err.is_fatal(),
+            _ => matches!(self,
+                | Error::InternalError(_)
+                | Error::InternalErrorSmol(_)
+                | Error::InternalErrorStatic(_)
 
-            | Error::DbError(_)
-            | Error::JoinError(_)
-            | Error::SemaphoreError(_)
-            | Error::HashError(_)
-            | Error::RequestError(_)
-        )
+                | Error::DbError(_)
+                | Error::JoinError(_)
+                | Error::SemaphoreError(_)
+                | Error::HashError(_)
+                | Error::RequestError(_)
+            ),
+        }
     }
 }
 
