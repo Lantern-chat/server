@@ -15,13 +15,14 @@ impl AuthTokenExt for RawAuthToken {
 
 use sdk::models::{Timestamp, UserFlags};
 
-pub async fn do_auth(state: &ServerState, token: RawAuthToken) -> Result<Authorization, Error> {
-    let auth = match state.session_cache.get(&token) {
+#[async_recursion::async_recursion]
+pub async fn do_auth(state: &ServerState, token: &RawAuthToken) -> Result<Authorization, Error> {
+    let auth = match state.session_cache.get(token) {
         Some(auth) => Some(auth),
         None => match token {
-            RawAuthToken::Bearer(token) => do_user_auth(state, token).boxed().await?,
+            RawAuthToken::Bearer(token) => do_user_auth(state, token).await?,
             RawAuthToken::Bot(token) => match token.verify(&state.config().local.keys.bt_key) {
-                true => return do_bot_auth(state, token).boxed().await,
+                true => return do_bot_auth(state, token).await,
                 false => return err(CommonError::Unauthorized),
             },
         },
@@ -34,7 +35,7 @@ pub async fn do_auth(state: &ServerState, token: RawAuthToken) -> Result<Authori
     }
 }
 
-pub async fn do_user_auth(state: &ServerState, token: UserToken) -> Result<Option<Authorization>, Error> {
+pub async fn do_user_auth(state: &ServerState, token: &UserToken) -> Result<Option<Authorization>, Error> {
     let db = state.db.read.get().await?;
 
     let bytes = &token[..];
@@ -54,7 +55,7 @@ pub async fn do_user_auth(state: &ServerState, token: UserToken) -> Result<Optio
     Ok(match row {
         Some(row) => Some({
             let auth = Authorization::User {
-                token,
+                token: *token,
                 user_id: row.user_id()?,
                 expires: row.expires()?,
                 flags: UserFlags::from_bits_truncate(row.user_flags()?),
@@ -68,7 +69,7 @@ pub async fn do_user_auth(state: &ServerState, token: UserToken) -> Result<Optio
     })
 }
 
-pub async fn do_bot_auth(state: &ServerState, token: SplitBotToken) -> Result<Authorization, Error> {
+pub async fn do_bot_auth(state: &ServerState, token: &SplitBotToken) -> Result<Authorization, Error> {
     let db = state.db.read.get().await?;
 
     #[rustfmt::skip]

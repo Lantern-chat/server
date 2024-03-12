@@ -14,7 +14,7 @@ pub async fn authorize(route: &Route<ServerState>) -> Result<Authorization, Erro
         None => return err(CommonError::MissingAuthorizationHeader),
     };
 
-    let auth = crate::auth::do_auth(&route.state, RawAuthToken::from_header(header)?).await?;
+    let auth = crate::auth::do_auth(&route.state, &RawAuthToken::from_header(header)?).await?;
 
     Ok(auth)
 }
@@ -35,7 +35,7 @@ impl MaybeAuth {
 pub async fn maybe_authorize(route: &Route<ServerState>) -> Result<MaybeAuth, Error> {
     match route.raw_header(HeaderName::from_static(AUTH_HEADER)) {
         None => Ok(MaybeAuth(None)),
-        Some(header) => crate::auth::do_auth(&route.state, RawAuthToken::from_header(header.to_str()?)?)
+        Some(header) => crate::auth::do_auth(&route.state, &RawAuthToken::from_header(header.to_str()?)?)
             .await
             .map(|auth| MaybeAuth(Some(auth))),
     }
