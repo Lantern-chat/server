@@ -63,7 +63,7 @@ scc = "2"
 
 http = "1"
 headers = "0.4"
-reqwest = { version = "0.11", default-features = false, features = ["gzip", "deflate", "rustls-tls", "json"] }
+reqwest = { git = "https://github.com/seanmonstar/reqwest", default_features = false, features = ["gzip", "deflate", "rustls-tls", "http2"] }
 quinn = "0.10"
 
 ftl = { git = "https://github.com/Lantern-chat/ftl", features = ["json", "cbor"] }
