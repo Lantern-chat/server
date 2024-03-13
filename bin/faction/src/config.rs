@@ -1,7 +1,30 @@
 pub mod sections {
+    use uuid::Uuid;
     use aes::{cipher::Key, Aes128, Aes256};
     use schema::auth::BotTokenKey;
     use std::{net::SocketAddr, path::PathBuf};
+
+    config::section! {
+        #[serde(default)]
+        pub struct Node {
+            /// Node UUID if this is a faction node, otherwise indicates a user nexus node.
+            pub faction: Uuid = Uuid::nil() => "LANTERN_FACTION_UUID" | config::util::parse_uuid,
+        }
+    }
+
+    impl Node {
+        pub fn is_faction(&self) -> bool {
+            !self.faction.is_nil()
+        }
+
+        pub fn is_user_nexus(&self) -> bool {
+            self.faction.is_nil()
+        }
+
+        pub fn faction_id(&self) -> Option<Uuid> {
+            if self.is_user_nexus() { None } else { Some(self.faction) }
+        }
+    }
 
     config::section! {
         #[serde(default)]
@@ -59,6 +82,8 @@ pub mod sections {
 
 config::config! {
     pub struct LocalConfig {
+        /// Node configuration
+        node: sections::Node,
         /// Overall server configuration
         general: config::general::General,
         /// Filesystem paths

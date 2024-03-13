@@ -28,6 +28,11 @@ impl Authorization {
     }
 
     #[inline(always)]
+    pub const fn is_user(&self) -> bool {
+        matches!(self, Authorization::User { .. })
+    }
+
+    #[inline(always)]
     pub const fn user_id(&self) -> Snowflake {
         *self.user_id_ref()
     }

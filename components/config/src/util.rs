@@ -9,7 +9,11 @@ pub fn parse<T: FromStr>(s: &str, default: T) -> T {
 }
 
 pub fn parse_address(value: &str) -> SocketAddr {
-    SocketAddr::from_str(&value.replace("localhost", "127.0.0.1")).unwrap()
+    SocketAddr::from_str(&value.replace("localhost", "127.0.0.1")).expect("Unable to parse address")
+}
+
+pub fn parse_uuid(value: &str) -> uuid::Uuid {
+    uuid::Uuid::parse_str(value).expect("Unable to parse UUID")
 }
 
 pub fn parse_hex_key<const N: usize>(value: &str, strict: bool) -> [u8; N] {
