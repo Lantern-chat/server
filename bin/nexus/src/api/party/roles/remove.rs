@@ -10,7 +10,7 @@ pub async fn remove_role(
 ) -> Result<(), Error> {
     // cannot remove @everyone role
     if role_id == party_id {
-        return err(CommonError::BadRequest);
+        return Err(Error::BadRequest);
     }
 
     let db = state.db.read.get().await?;
@@ -34,7 +34,7 @@ pub async fn remove_role(
     drop(db);
 
     if role_rows.is_empty() {
-        return err(CommonError::Unauthorized);
+        return Err(Error::Unauthorized);
     }
 
     use schema::roles::{CheckStatus, PartialRole, RoleChecker};
@@ -61,7 +61,7 @@ pub async fn remove_role(
         CheckStatus::Allowed(target_role) => target_role,
         _ => {
             // TODO: improve errors from CheckStatus
-            return err(CommonError::Unauthorized);
+            return Err(Error::Unauthorized);
         }
     };
 

@@ -50,7 +50,7 @@ async fn api_v1_inner(mut route: Route<ServerState>) -> ApiResult {
             // API Requests are limited to a body size of 1MiB
             // TODO: Reduce this eventually?
             if matches!(body.size_hint().upper(), Some(len) if len >= (1024 * 1024)) {
-                return err(CommonError::RequestEntityTooLarge);
+                return Err(Error::RequestEntityTooLarge);
             }
         }
     }
@@ -68,14 +68,15 @@ async fn api_v1_inner(mut route: Route<ServerState>) -> ApiResult {
         #[cfg(debug_assertions)]
         (_, Exact("debug")) => debug::debug(route),
 
-        _ => return err(CommonError::NotFound),
+        _ => return Err(Error::NotFound),
     };
 
     route_res?.await
 }
 
-pub async fn api_v1(mut route: Route<ServerState>) -> Response {
+pub async fn api_v1(route: Route<ServerState>) -> Response {
     let addr = route.real_addr;
+    let state = route.state.clone();
 
     let raw = api_v1_inner(route).await;
 

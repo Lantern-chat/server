@@ -155,6 +155,7 @@ impl FileCache<ServerState> for MainFileCache {
                         last_modified = Some(file.last_modified);
                     }
                     Ok(_) => {
+                        #[allow(clippy::blocks_in_conditions)]
                         let encoding = match accepts.and_then(|a| {
                             // prefer best
                             #[cfg(feature = "brotli")]

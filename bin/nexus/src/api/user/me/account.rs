@@ -28,20 +28,20 @@ pub async fn modify_account(
 
     if let Some(ref username) = form.new_username {
         if !schema::validation::validate_username(username, config.shared.username_length.clone()) {
-            return err(CommonError::InvalidUsername);
+            return Err(Error::InvalidUsername);
         }
         num_fields += 1;
     }
 
     if let Some(ref email) = form.new_email {
         if !schema::validation::validate_email(email) {
-            return err(CommonError::InvalidEmail);
+            return Err(Error::InvalidEmail);
         }
         num_fields += 1;
     }
 
     if num_fields == 0 {
-        return err(CommonError::BadRequest);
+        return Err(Error::BadRequest);
     }
 
     let db = state.db.read.get().await?;
@@ -68,17 +68,17 @@ pub async fn modify_account(
     }
 
     if !super::login::verify_password(&state, passhash, &form.password).await? {
-        return err(CommonError::InvalidCredentials);
+        return Err(Error::InvalidCredentials);
     }
 
     if let Some(mfa) = mfa {
         let Some(token) = form.totp else {
-            return err(CommonError::TOTPRequired);
+            return Err(Error::TOTPRequired);
         };
 
         if !super::login::process_2fa(&state, user_id, ProvidedMfa::Encrypted(mfa), &form.password, &token).await?
         {
-            return err(CommonError::InvalidCredentials);
+            return Err(Error::InvalidCredentials);
         }
     }
 

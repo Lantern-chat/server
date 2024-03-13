@@ -34,7 +34,7 @@ pub fn messages(mut route: Route<ServerState>, auth: Authorization, room_id: Sno
                         Method::DELETE => Ok(pin::unpin_message(route, auth, msg_id, pin_id)),
                         _ => unreachable!(),
                     },
-                    _ => err(CommonError::BadRequest),
+                    _ => Err(Error::BadRequest),
                 },
 
                 // PUT /api/v1/room/1234/messages/5678/star
@@ -43,12 +43,12 @@ pub fn messages(mut route: Route<ServerState>, auth: Authorization, room_id: Sno
                 // DELETE /api/v1/room/1234/messages/5678/star
                 (&Method::DELETE, Exact("star")) => Ok(pin::unstar_message(route, auth, msg_id)),
 
-                (_, End) => err(CommonError::MethodNotAllowed),
-                _ => err(CommonError::NotFound),
+                (_, End) => Err(Error::MethodNotAllowed),
+                _ => Err(Error::NotFound),
             },
-            Some(Err(_)) => err(CommonError::BadRequest),
-            _ => err(CommonError::MethodNotAllowed),
+            Some(Err(_)) => Err(Error::BadRequest),
+            _ => Err(Error::MethodNotAllowed),
         },
-        _ => err(CommonError::MethodNotAllowed),
+        _ => Err(Error::MethodNotAllowed),
     }
 }

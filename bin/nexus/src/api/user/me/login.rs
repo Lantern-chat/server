@@ -15,11 +15,11 @@ pub async fn login(
     form: &Archived<UserLoginForm>,
 ) -> Result<Session, Error> {
     if form.password.len() < 8 {
-        return err(CommonError::InvalidCredentials);
+        return Err(Error::InvalidCredentials);
     }
 
     if !schema::validation::validate_email(&form.email) {
-        return err(CommonError::InvalidEmail);
+        return Err(Error::InvalidEmail);
     }
 
     let mut totp = None;
@@ -47,7 +47,7 @@ pub async fn login(
     }).await?;
 
     let Some(user) = user else {
-        return err(CommonError::InvalidCredentials);
+        return Err(Error::InvalidCredentials);
     };
 
     let user_id: Snowflake = user.id()?;
@@ -57,28 +57,28 @@ pub async fn login(
 
     match flags.elevation() {
         // System user flat out cannot log in. Pretend it doesn't exist.
-        ElevationLevel::System => return err(CommonError::NotFound),
+        ElevationLevel::System => return Err(Error::NotFound),
 
         // don't allow staff to login without 2FA set up
         ElevationLevel::Staff if mfa.is_none() => {
             log::error!("Staff user {user_id} tried to login without 2FA enabled");
 
-            return err(CommonError::NotFound);
+            return Err(Error::NotFound);
         }
         _ => {}
     }
 
     if flags.contains(UserFlags::BANNED) {
-        return err(CommonError::Banned);
+        return Err(Error::Banned);
     }
 
     // early check, before any work is done
     if mfa.is_some() && form.totp.is_none() {
-        return err(CommonError::TOTPRequired);
+        return Err(Error::TOTPRequired);
     }
 
     if !verify_password(&state, passhash, &form.password).await? {
-        return err(CommonError::InvalidCredentials);
+        return Err(Error::InvalidCredentials);
     }
 
     if let Some(mfa) = mfa {
@@ -91,7 +91,7 @@ pub async fn login(
         )
         .await?
         {
-            return err(CommonError::InvalidCredentials);
+            return Err(Error::InvalidCredentials);
         }
     }
 
@@ -157,16 +157,16 @@ pub fn validate_2fa_token(token: &str) -> Result<(), Error> {
     match token.len() {
         6 => {
             if !token.chars().all(|c: char| c.is_ascii_digit()) {
-                return err(CommonError::TOTPRequired);
+                return Err(Error::TOTPRequired);
             }
         }
         13 => {
             // Taken from base32::Alphabet::Crockford
             if !token.bytes().all(|c: u8| b"0123456789ABCDEFGHJKMNPQRSTVWXYZ".contains(&c)) {
-                return err(CommonError::TOTPRequired);
+                return Err(Error::TOTPRequired);
             }
         }
-        _ => return err(CommonError::TOTPRequired),
+        _ => return Err(Error::TOTPRequired),
     }
 
     Ok(())
@@ -183,7 +183,7 @@ impl MfaAttempt {
             // 6-digit TOTP code
             6 => match token.parse() {
                 Ok(token) => Ok(MfaAttempt::Token(token)),
-                Err(_) => err(CommonError::InvalidCredentials),
+                Err(_) => Err(Error::InvalidCredentials),
             },
             // 13-character backup code
             13 => match base32::decode(base32::Alphabet::Crockford, token) {
@@ -192,9 +192,9 @@ impl MfaAttempt {
                     token.copy_from_slice(&token_bytes);
                     Ok(MfaAttempt::Backup(u64::from_le_bytes(token)))
                 }
-                _ => err(CommonError::InvalidCredentials),
+                _ => Err(Error::InvalidCredentials),
             },
-            _ => err(CommonError::InvalidCredentials),
+            _ => Err(Error::InvalidCredentials),
         }
     }
 }
@@ -243,7 +243,7 @@ pub async fn process_2fa<'a>(
             let mut last = state.mfa_last.peek_with(&user_id, |_, last| *last).unwrap_or_default();
 
             if !TOTP6::new(&mfa.key).check(token, now, &mut last) {
-                return err(CommonError::InvalidCredentials);
+                return Err(Error::InvalidCredentials);
             }
 
             use scc::hash_index::Entry;
@@ -259,7 +259,7 @@ pub async fn process_2fa<'a>(
             let mut mfa = mfa; // make mutable
 
             let Some(idx) = mfa.backups.iter().position(|backup| code == *backup) else {
-                return err(CommonError::InvalidCredentials);
+                return Err(Error::InvalidCredentials);
             };
 
             log::debug!("MFA Backup token used, saving new backup to database");

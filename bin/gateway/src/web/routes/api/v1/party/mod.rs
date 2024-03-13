@@ -38,11 +38,11 @@ pub fn party(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
                     Ok(search::search(route, auth, party_id))
                 }
 
-                _ => err(CommonError::NotFound),
+                _ => Err(Error::NotFound),
             },
-            _ => err(CommonError::BadRequest),
+            _ => Err(Error::BadRequest),
         },
-        _ => err(CommonError::NotFound),
+        _ => Err(Error::NotFound),
     }
 }
 

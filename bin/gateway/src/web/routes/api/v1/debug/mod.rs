@@ -3,7 +3,7 @@ use super::*;
 pub fn debug(mut route: Route<ServerState>) -> RouteResult {
     match route.next().segment() {
         Exact("exception") => Ok(test_exception(route.state)),
-        _ => err(CommonError::NotFound),
+        _ => Err(Error::NotFound),
     }
 }
 
@@ -17,5 +17,5 @@ async fn test_exception(state: ServerState) -> ApiResult {
         }
     }
 
-    err(CommonError::Unimplemented)
+    Err(Error::Unimplemented)
 }

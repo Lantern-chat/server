@@ -16,7 +16,7 @@ pub async fn modify_room(
 ) -> Result<FullRoom, Error> {
     // TODO: Maybe change this?
     if *form == PatchRoomForm::default() {
-        return err(CommonError::BadRequest);
+        return Err(Error::BadRequest);
     }
 
     let name;
@@ -24,14 +24,14 @@ pub async fn modify_room(
         let config = state.config();
         if matches!(form.topic, Nullable::Some(ref topic) if !config.shared.room_topic_length.contains(&topic.len()))
         {
-            return err(CommonError::InvalidTopic);
+            return Err(Error::InvalidTopic);
         }
 
         name = form.name.as_ref().map(|name| schema::names::slug_name(name));
 
         if matches!(name, Some(ref name) if !schema::validation::validate_name(name, config.shared.room_name_length.clone()))
         {
-            return err(CommonError::InvalidName);
+            return Err(Error::InvalidName);
         }
     }
 
@@ -42,7 +42,7 @@ pub async fn modify_room(
     let mut needs_perms = true;
     if let Some(perms) = state.perm_cache.get(auth.user_id(), room_id).await {
         if !perms.contains(Permissions::MANAGE_ROOMS) {
-            return err(CommonError::Unauthorized);
+            return Err(Error::Unauthorized);
         }
 
         needs_perms = false;
@@ -61,11 +61,11 @@ pub async fn modify_room(
             WHERE Rooms.UserId = #{auth.user_id_ref() as Users::Id}
               AND Rooms.Id = #{&room_id as Rooms::Id}
         }).await? else {
-            return err(CommonError::Unauthorized);
+            return Err(Error::Unauthorized);
         };
 
         if !Permissions::from_i64(row.permissions1()?, row.permissions2()?).contains(Permissions::MANAGE_ROOMS) {
-            return err(CommonError::Unauthorized);
+            return Err(Error::Unauthorized);
         }
 
         old_avatar_id = row.avatar_file_id()?;
@@ -161,7 +161,7 @@ pub async fn modify_room(
     if removed != form.remove_overwrites.len() as u64 || inserted != raw.id.len() as u64 {
         t.rollback().await?;
 
-        return err(CommonError::BadRequest);
+        return Err(Error::BadRequest);
     }
 
     #[rustfmt::skip]

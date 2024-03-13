@@ -105,7 +105,7 @@ pub async fn patch_file(
                 break Some(if is_fatal {
                     Error::InternalError(e.message().to_string())
                 } else {
-                    CommonError::UploadError.into()
+                    Error::UploadError.into()
                 });
             }
             Some(Ok(bytes)) => {

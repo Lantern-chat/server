@@ -29,20 +29,20 @@ pub fn me(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
                 (_, Exact("2fa")) => {
                     if auth.is_bot() {
                         // bots do not use 2fa
-                        return err(CommonError::BadRequest);
+                        return Err(Error::BadRequest);
                     }
 
                     match *route.method() {
                         Method::POST => Ok(mfa::post_2fa(route, auth)),
                         Method::PATCH => Ok(mfa::patch_2fa(route, auth)),
                         Method::DELETE => Ok(mfa::delete_2fa(route, auth)),
-                        _ => err(CommonError::MethodNotAllowed),
+                        _ => Err(Error::MethodNotAllowed),
                     }
                 }
                 (_, Exact("relationships")) => {
                     if auth.is_bot() {
                         // bots cannot have friends :(
-                        return err(CommonError::BadRequest);
+                        return Err(Error::BadRequest);
                     }
 
                     match route.next().method_segment() {
@@ -51,12 +51,12 @@ pub fn me(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
                             Some(Ok(user_id)) => {
                                 unimplemented!();
                             }
-                            _ => err(CommonError::BadRequest),
+                            _ => Err(Error::BadRequest),
                         },
-                        _ => err(CommonError::NotFound),
+                        _ => Err(Error::NotFound),
                     }
                 }
-                _ => err(CommonError::NotFound),
+                _ => Err(Error::NotFound),
             }
         }
     }

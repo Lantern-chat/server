@@ -11,13 +11,13 @@ pub async fn add_reaction(
     emote: &Archived<EmoteOrEmoji>,
 ) -> Result<(), Error> {
     let Some(emote) = state.emoji.resolve(simple_de(emote)) else {
-        return err(CommonError::BadRequest);
+        return Err(Error::BadRequest);
     };
 
     let perms = state.perm_cache.get(auth.user_id(), room_id).await;
 
     if matches!(perms, Some(perms) if !perms.contains(Permissions::ADD_REACTIONS)) {
-        return err(CommonError::Unauthorized);
+        return Err(Error::Unauthorized);
     }
 
     let reaction_id = state.sf.gen();
@@ -229,7 +229,7 @@ pub async fn add_reaction(
     }).await?;
 
     let Some(row) = row else {
-        return err(CommonError::Unauthorized);
+        return Err(Error::Unauthorized);
     };
 
     if let Some(msg_id) = row.msg_id()? {

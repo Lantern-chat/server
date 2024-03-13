@@ -18,7 +18,7 @@ pub fn reactions(
         (_, Exact(_)) => match route.param::<EmoteOrEmoji>() {
             Some(Ok(emote)) => {
                 let Some(emote) = route.state.emoji.resolve(emote) else {
-                    return err(CommonError::BadRequest);
+                    return Err(Error::BadRequest);
                 };
 
                 match route.next().method_segment() {
@@ -27,14 +27,14 @@ pub fn reactions(
                     (&Method::DELETE, Exact("@me")) => Ok(delete_reaction(route, auth, room_id, msg_id, emote)),
                     (&Method::DELETE, Exact(_)) => match route.param::<Snowflake>() {
                         Some(Ok(user_id)) => todo!("Delete user reaction"),
-                        _ => err(CommonError::BadRequest),
+                        _ => Err(Error::BadRequest),
                     },
-                    _ => err(CommonError::NotFound),
+                    _ => Err(Error::NotFound),
                 }
             }
-            _ => err(CommonError::BadRequest),
+            _ => Err(Error::BadRequest),
         },
-        (_, End) => err(CommonError::MethodNotAllowed),
+        (_, End) => Err(Error::MethodNotAllowed),
     }
 }
 
@@ -47,7 +47,7 @@ async fn put_reaction(
     emote: EmoteOrEmojiId,
 ) -> ApiResult {
     let Some(emote_id) = route.state.emoji.lookup(emote) else {
-        return err(CommonError::BadRequest);
+        return Err(Error::BadRequest);
     };
 
     Ok(RawMessage::authorized(auth, PutReaction { room_id, msg_id, emote_id }))
@@ -62,7 +62,7 @@ async fn delete_reaction(
     emote: EmoteOrEmojiId,
 ) -> ApiResult {
     let Some(emote_id) = route.state.emoji.lookup(emote) else {
-        return err(CommonError::BadRequest);
+        return Err(Error::BadRequest);
     };
 
     Ok(RawMessage::authorized(auth, DeleteOwnReaction { room_id, msg_id, emote_id }))

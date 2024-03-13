@@ -1,6 +1,5 @@
 use crate::prelude::*;
 
-use futures::FutureExt;
 use schema::auth::{RawAuthToken, SplitBotToken, UserToken};
 
 pub trait AuthTokenExt {
@@ -23,7 +22,7 @@ pub async fn do_auth(state: &ServerState, token: &RawAuthToken) -> Result<Author
             RawAuthToken::Bearer(token) => do_user_auth(state, token).await?,
             RawAuthToken::Bot(token) => match token.verify(&state.config().local.keys.bt_key) {
                 true => return do_bot_auth(state, token).await,
-                false => return err(CommonError::Unauthorized),
+                false => return Err(Error::Unauthorized),
             },
         },
     };
@@ -31,7 +30,7 @@ pub async fn do_auth(state: &ServerState, token: &RawAuthToken) -> Result<Author
     match auth {
         Some(auth @ Authorization::Bot { .. }) => Ok(auth),
         Some(auth @ Authorization::User { expires, .. }) if expires > Timestamp::now_utc() => Ok(auth),
-        _ => err(CommonError::NoSession),
+        _ => Err(Error::NoSession),
     }
 }
 
@@ -79,7 +78,7 @@ pub async fn do_bot_auth(state: &ServerState, token: &SplitBotToken) -> Result<A
     }).await?;
 
     let Some(row) = row else {
-        return err(CommonError::NoSession);
+        return Err(Error::NoSession);
     };
 
     let issued: u64 = row.issued::<i64>()? as u64;

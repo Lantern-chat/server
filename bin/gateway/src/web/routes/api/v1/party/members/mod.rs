@@ -11,14 +11,14 @@ pub fn members(mut route: Route<ServerState>, auth: Authorization, party_id: Sno
         // GET /api/v1/party/1234/members/5678
         (&Method::GET, Exact(segment)) => {
             let Ok(member_id) = segment.parse::<Snowflake>() else {
-                return err(CommonError::BadRequest);
+                return Err(Error::BadRequest);
             };
 
             match route.next().segment() {
                 End => Ok(get::get_member(route, auth, party_id, member_id)),
-                _ => err(CommonError::NotFound),
+                _ => Err(Error::NotFound),
             }
         }
-        _ => err(CommonError::NotFound),
+        _ => Err(Error::NotFound),
     }
 }

@@ -12,7 +12,7 @@ pub async fn create_role(
         let config = state.config();
 
         if !schema::validation::validate_name(&form.name, config.shared.role_name_length.clone()) {
-            return err(CommonError::InvalidName);
+            return Err(Error::InvalidName);
         }
     }
 
@@ -68,14 +68,14 @@ pub async fn create_role(
 
     if row.role_id::<Option<Snowflake>>()?.is_none() {
         t.rollback().await?;
-        return err(CommonError::Unauthorized);
+        return Err(Error::Unauthorized);
     };
 
     let Some(position) = row.position()? else {
         t.rollback().await?;
 
         // TODO: Error for too many roles
-        return err(CommonError::BadRequest);
+        return Err(Error::BadRequest);
     };
 
     t.commit().await?;

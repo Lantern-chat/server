@@ -1,15 +1,10 @@
 use std::borrow::Cow;
 
-use rpc::error::Error as CommonError;
-
 use db::pool::Error as DbError;
 use sdk::api::error::ApiErrorCode;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("{0}")]
-    Common(#[from] CommonError),
-
     #[error("Internal Error: {0}")]
     InternalError(String),
     #[error("Internal Error: {0}")]
@@ -52,6 +47,105 @@ pub enum Error {
 
     #[error("Auth Token Error: {0}")]
     AuthTokenError(#[from] schema::auth::AuthTokenError),
+
+    #[error("Unimplemented")]
+    Unimplemented,
+
+    #[error("Missing Upload-Metadata Header")]
+    MissingUploadMetadataHeader,
+
+    #[error("Missing Authorization Header")]
+    MissingAuthorizationHeader,
+
+    #[error("Missing Content Type Header")]
+    MissingContentTypeHeader,
+
+    #[error("Method Not Allowed")]
+    MethodNotAllowed,
+
+    #[error("Already Exists")]
+    AlreadyExists,
+
+    #[error("Blocked")]
+    Blocked,
+
+    #[error("Banned")]
+    Banned,
+
+    #[error("Username Unavailable")]
+    UsernameUnavailable,
+
+    #[error("Invalid Email Address")]
+    InvalidEmail,
+
+    #[error("Invalid Username")]
+    InvalidUsername,
+
+    #[error("Invalid Password")]
+    InvalidPassword,
+
+    #[error("Invalid Credentials")]
+    InvalidCredentials,
+
+    #[error("TOTP Required")]
+    TOTPRequired,
+
+    #[error("Insufficient Age")]
+    InsufficientAge,
+
+    #[error("Invalid Message Content")]
+    InvalidContent,
+
+    #[error("Invalid Name")]
+    InvalidName,
+
+    #[error("Invalid Room Topic")]
+    InvalidTopic,
+
+    #[error("Invalid file preview")]
+    InvalidPreview,
+
+    #[error("Invalid Image Format")]
+    InvalidImageFormat,
+
+    #[error("No Session")]
+    NoSession,
+
+    #[error("Invalid Auth Format")]
+    InvalidAuthFormat,
+
+    #[error("Missing filename")]
+    MissingFilename,
+
+    #[error("Missing mime")]
+    MissingMime,
+
+    #[error("Not Found")]
+    NotFound,
+
+    #[error("Bad Request")]
+    BadRequest,
+
+    #[error("Upload Error")]
+    UploadError,
+
+    #[error("Conflict/Already Exists")]
+    Conflict,
+
+    #[error("Request Entity Too Large")]
+    RequestEntityTooLarge,
+
+    #[error("Temporarily Disabled")]
+    TemporarilyDisabled,
+
+    #[error("Unauthorized")]
+    Unauthorized,
+
+    #[error("Checksum Mismatch")]
+    ChecksumMismatch,
+
+    #[error("Rkyv Encoding Error")]
+    RkyvEncodingError,
 }
 
 impl From<db::pg::Error> for Error {
@@ -63,29 +157,24 @@ impl From<db::pg::Error> for Error {
 impl Error {
     #[rustfmt::skip]
     pub fn is_fatal(&self) -> bool {
-        match self {
-            Error::Common(err) => err.is_fatal(),
-            _ => matches!(self,
-                | Error::InternalError(_)
-                | Error::InternalErrorSmol(_)
-                | Error::InternalErrorStatic(_)
+        matches!(self,
+            | Error::Unimplemented
+            | Error::InternalError(_)
+            | Error::InternalErrorSmol(_)
+            | Error::InternalErrorStatic(_)
+            | Error::RkyvEncodingError
 
-                | Error::DbError(_)
-                | Error::JoinError(_)
-                | Error::SemaphoreError(_)
-                | Error::HashError(_)
-                | Error::RequestError(_)
-            ),
-        }
+            | Error::DbError(_)
+            | Error::JoinError(_)
+            | Error::SemaphoreError(_)
+            | Error::HashError(_)
+            | Error::RequestError(_)
+        )
     }
 }
 
 impl From<Error> for sdk::api::error::ApiError {
     fn from(value: Error) -> Self {
-        if let Error::Common(err) = value {
-            return err.into();
-        }
-
         let message = 'msg: {
             Cow::Borrowed(match value {
                 _ if value.is_fatal() => "Internal Server Error",
@@ -93,6 +182,40 @@ impl From<Error> for sdk::api::error::ApiError {
                 Error::DbError(_) => "Database Error",
                 Error::AuthTokenError(_) => "Auth Token Parse Error",
                 Error::IOError(_) => "IO Error",
+                Error::Unimplemented => "Unimplemented",
+                Error::MissingUploadMetadataHeader => "Missing Upload-Metadata Header",
+                Error::MissingAuthorizationHeader => "Missing Authorization Header",
+                Error::MissingContentTypeHeader => "Missing Content Type Header",
+                Error::MethodNotAllowed => "Method Not Allowed",
+                Error::AlreadyExists => "Already Exists",
+                Error::Blocked => "Blocked",
+                Error::Banned => "Banned",
+                Error::UsernameUnavailable => "Username Unavailable",
+                Error::InvalidEmail => "Invalid Email Address",
+                Error::InvalidUsername => "Invalid Username",
+                Error::InvalidPassword => "Invalid Password",
+                Error::InvalidCredentials => "Invalid Credentials",
+                Error::TOTPRequired => "TOTP Required",
+                Error::InsufficientAge => "Insufficient Age",
+                Error::InvalidContent => "Invalid Message Content",
+                Error::InvalidName => "Invalid Name",
+                Error::InvalidTopic => "Invalid Room Topic",
+                Error::InvalidPreview => "Invalid file preview",
+                Error::InvalidImageFormat => "Invalid Image Format",
+                Error::NoSession => "No Session",
+                Error::InvalidAuthFormat => "Invalid Auth Format",
+                Error::MissingFilename => "Missing filename",
+                Error::MissingMime => "Missing mime",
+                Error::NotFound => "Not Found",
+                Error::BadRequest => "Bad Request",
+                Error::UploadError => "Upload Error",
+                Error::Conflict => "Conflict/Already Exists",
+                Error::RequestEntityTooLarge => "Request Entity Too Large",
+                Error::TemporarilyDisabled => "Temporarily Disabled",
+                Error::Unauthorized => "Unauthorized",
+                Error::ChecksumMismatch => "Checksum Mismatch",
+                Error::RkyvEncodingError => "Rkyv Encoding Error",
+
                 _ => break 'msg value.to_string().into(),
             })
         };
@@ -117,7 +240,42 @@ impl From<Error> for sdk::api::error::ApiError {
             Error::CaptchaError(_)          => ApiErrorCode::InvalidCaptcha,
             Error::SearchError(_)           => ApiErrorCode::SearchError,
 
-            Error::Common(_)                => unreachable!(),
+            Error::RkyvEncodingError            => ApiErrorCode::RkyvEncodingError,
+            Error::Unimplemented                => ApiErrorCode::Unimplemented,
+
+            Error::AlreadyExists                => ApiErrorCode::AlreadyExists,
+            Error::UsernameUnavailable          => ApiErrorCode::UsernameUnavailable,
+            Error::InvalidEmail                 => ApiErrorCode::InvalidEmail,
+            Error::InvalidUsername              => ApiErrorCode::InvalidUsername,
+            Error::InvalidPassword              => ApiErrorCode::InvalidPassword,
+            Error::InvalidCredentials           => ApiErrorCode::InvalidCredentials,
+            Error::InsufficientAge              => ApiErrorCode::InsufficientAge,
+            Error::InvalidContent               => ApiErrorCode::InvalidContent,
+            Error::InvalidName                  => ApiErrorCode::InvalidName,
+            Error::InvalidTopic                 => ApiErrorCode::InvalidTopic,
+            Error::MissingUploadMetadataHeader  => ApiErrorCode::MissingUploadMetadataHeader,
+            Error::MissingAuthorizationHeader   => ApiErrorCode::MissingAuthorizationHeader,
+            Error::MissingContentTypeHeader     => ApiErrorCode::MissingContentTypeHeader,
+            Error::NoSession                    => ApiErrorCode::NoSession,
+            Error::InvalidAuthFormat            => ApiErrorCode::InvalidAuthFormat,
+            Error::MissingFilename              => ApiErrorCode::MissingFilename,
+            Error::MissingMime                  => ApiErrorCode::MissingMime,
+            Error::UploadError                  => ApiErrorCode::UploadError,
+            Error::InvalidPreview               => ApiErrorCode::InvalidPreview,
+            Error::InvalidImageFormat           => ApiErrorCode::InvalidImageFormat,
+            Error::TOTPRequired                 => ApiErrorCode::TOTPRequired,
+            Error::TemporarilyDisabled          => ApiErrorCode::TemporarilyDisabled,
+            Error::Blocked                      => ApiErrorCode::Blocked,
+            Error::Banned                       => ApiErrorCode::Banned,
+
+            // HTTP-like error codes
+            Error::BadRequest               => ApiErrorCode::BadRequest,
+            Error::Unauthorized             => ApiErrorCode::Unauthorized,
+            Error::NotFound                 => ApiErrorCode::NotFound,
+            Error::MethodNotAllowed         => ApiErrorCode::MethodNotAllowed,
+            Error::Conflict                 => ApiErrorCode::Conflict,
+            Error::RequestEntityTooLarge    => ApiErrorCode::RequestEntityTooLarge,
+            Error::ChecksumMismatch         => ApiErrorCode::ChecksumMismatch,
         };
 
         Self { code, message }
@@ -133,9 +291,9 @@ impl From<DbError> for Error {
 
             // TODO: Improve this with names of specific constraints
             match *e.code() {
-                SqlState::FOREIGN_KEY_VIOLATION => return CommonError::NotFound.into(),
-                SqlState::CHECK_VIOLATION => return CommonError::BadRequest.into(),
-                SqlState::UNIQUE_VIOLATION => return CommonError::BadRequest.into(),
+                SqlState::FOREIGN_KEY_VIOLATION => return Error::NotFound,
+                SqlState::CHECK_VIOLATION => return Error::BadRequest,
+                SqlState::UNIQUE_VIOLATION => return Error::BadRequest,
                 _ => {}
             }
         }

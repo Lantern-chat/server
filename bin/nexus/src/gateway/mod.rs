@@ -6,7 +6,8 @@ use crate::prelude::*;
 
 pub type ConnectionId = Snowflake;
 
-use ::rpc::error::ApiError;
+use sdk::api::error::ApiError;
+
 use tokio::sync::Notify;
 use triomphe::Arc;
 

@@ -10,7 +10,7 @@ pub async fn create_party(
     form: &Archived<CreatePartyForm>,
 ) -> Result<Party, Error> {
     if !schema::validation::validate_name(&form.name, state.config().shared.party_name_length.clone()) {
-        return err(CommonError::InvalidName);
+        return Err(Error::InvalidName);
     }
 
     let party_id = state.sf.gen();

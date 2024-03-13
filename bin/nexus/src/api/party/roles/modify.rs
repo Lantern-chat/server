@@ -17,12 +17,12 @@ pub async fn modify_role(
 ) -> Result<Role, Error> {
     // TODO: Maybe change this?
     if *form == PatchRoleForm::default() {
-        return err(CommonError::BadRequest);
+        return Err(Error::BadRequest);
     }
 
     if matches!(form.name.as_deref(), Some(name) if !schema::validation::validate_name(name, state.config().shared.role_name_length.clone()))
     {
-        return err(CommonError::InvalidName);
+        return Err(Error::InvalidName);
     }
 
     let has_assets = form.avatar.is_some();
@@ -53,7 +53,7 @@ pub async fn modify_role(
     drop(db);
 
     if role_rows.is_empty() {
-        return err(CommonError::Unauthorized);
+        return Err(Error::Unauthorized);
     }
 
     use schema::roles::{CheckStatus, PartialRole, RoleChecker};
@@ -92,7 +92,7 @@ pub async fn modify_role(
         CheckStatus::Allowed(target_role) => target_role,
         _ => {
             // TODO: improve errors from CheckStatus
-            return err(CommonError::Unauthorized);
+            return Err(Error::Unauthorized);
         }
     };
 
@@ -161,7 +161,7 @@ pub async fn modify_role(
             return Ok(());
         }
 
-        err(CommonError::Unimplemented)
+        Err(Error::Unimplemented)
     };
 
     let (row, _) = tokio::try_join!(updating_role, updating_role_positions)?;

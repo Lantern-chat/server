@@ -20,7 +20,7 @@ pub fn party_rooms(mut route: Route<ServerState>, auth: Authorization, party_id:
         //     },
         //     _ => Err(Error::NotFound),
         // },
-        _ => err(CommonError::NotFound),
+        _ => Err(Error::NotFound),
     }
 }
 

@@ -14,7 +14,7 @@ pub async fn delete_msg(
     if let Some(ref perms) = perms {
         // user cannot view room at all
         if !perms.contains(Permissions::READ_MESSAGE_HISTORY) {
-            return err(CommonError::Unauthorized);
+            return Err(Error::Unauthorized);
         }
     }
 
@@ -67,7 +67,7 @@ pub async fn delete_msg(
 
     match res {
         Ok(1) => Ok(()),
-        Ok(_) => err(CommonError::Unauthorized),
+        Ok(_) => Err(Error::Unauthorized),
         Err(e) => Err(e.into()),
     }
 }

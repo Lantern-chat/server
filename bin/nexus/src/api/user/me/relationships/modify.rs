@@ -12,7 +12,7 @@ pub async fn modify_relationship(
     form: sdk::api::commands::user::PatchRelationshipBody,
 ) -> Result<(), Error> {
     if form.note.is_undefined() && form.rel.is_undefined() {
-        return err(CommonError::BadRequest);
+        return Err(Error::BadRequest);
     }
 
     Ok(())

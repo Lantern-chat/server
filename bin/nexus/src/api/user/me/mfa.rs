@@ -17,7 +17,7 @@ pub async fn enable_2fa(
     let config = state.config_full();
 
     if !config.shared.password_length.contains(&form.password.len()) {
-        return err(CommonError::InvalidCredentials);
+        return Err(Error::InvalidCredentials);
     }
 
     let _verified = state
@@ -42,11 +42,11 @@ pub async fn enable_2fa(
 
     // if the user already has 2FA enabled, it must be disabled first
     if user.has_mfa()? {
-        return err(CommonError::Conflict);
+        return Err(Error::Conflict);
     }
 
     if !super::login::verify_password(&state, user.passhash()?, &form.password).await? {
-        return err(CommonError::InvalidCredentials);
+        return Err(Error::InvalidCredentials);
     }
 
     let email = user.email()?;
@@ -91,7 +91,7 @@ pub async fn confirm_2fa(
     form: &Archived<Confirm2FAForm>,
 ) -> Result<(), Error> {
     if form.totp.len() != 6 {
-        return err(CommonError::TOTPRequired);
+        return Err(Error::TOTPRequired);
     }
 
     let mut db = state.db.write.get().await?;
@@ -108,7 +108,7 @@ pub async fn confirm_2fa(
     }).await?;
 
     if user.expired()? {
-        return err(CommonError::NotFound);
+        return Err(Error::NotFound);
     }
 
     let encrypted_mfa = user.mfa()?;
@@ -125,7 +125,7 @@ pub async fn confirm_2fa(
     )
     .await?
     {
-        return err(CommonError::InvalidCredentials);
+        return Err(Error::InvalidCredentials);
     }
 
     tokio::try_join!(
@@ -151,7 +151,7 @@ pub async fn remove_2fa(
     form: &Archived<Remove2FAForm>,
 ) -> Result<(), Error> {
     if !state.config().shared.password_length.contains(&form.password.len()) {
-        return err(CommonError::InvalidCredentials);
+        return Err(Error::InvalidCredentials);
     }
 
     super::login::validate_2fa_token(&form.totp)?;
@@ -169,17 +169,17 @@ pub async fn remove_2fa(
 
     // these roles are not allowed to remove 2FA
     if let ElevationLevel::System | ElevationLevel::Staff = flags.elevation() {
-        return err(CommonError::Unauthorized);
+        return Err(Error::Unauthorized);
     }
 
     let Some(encrypted_mfa) = user.mfa()? else {
-        return err(CommonError::NotFound);
+        return Err(Error::NotFound);
     };
 
     let passhash = user.passhash()?;
 
     if !super::login::verify_password(&state, passhash, &form.password).await? {
-        return err(CommonError::InvalidCredentials);
+        return Err(Error::InvalidCredentials);
     }
 
     if !super::login::process_2fa(
@@ -191,7 +191,7 @@ pub async fn remove_2fa(
     )
     .await?
     {
-        return err(CommonError::InvalidCredentials);
+        return Err(Error::InvalidCredentials);
     }
 
     #[rustfmt::skip]

@@ -35,7 +35,7 @@ pub async fn list_sessions(
 
 pub async fn clear_other_sessions(state: ServerState, auth: Authorization) -> Result<u64, Error> {
     let Authorization::User { token: bytes, .. } = auth else {
-        return err(CommonError::Unauthorized);
+        return Err(Error::Unauthorized);
     };
 
     let db = state.db.write.get().await?;

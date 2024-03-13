@@ -8,8 +8,6 @@ use http::header::IntoHeaderName;
 use http::{HeaderMap, HeaderValue, StatusCode};
 use sdk::driver::Encoding;
 
-use crate::Error;
-
 use ftl::reply::deferred::*;
 
 pub enum WebResponse {
@@ -87,39 +85,41 @@ pub type RouteResult = Result<BoxFuture<'static, WebResult>, Error>;
 #[inline(never)]
 pub fn web_response(encoding: Encoding, res: WebResult) -> Response {
     let res = res.and_then(|r| {
-        let (mut resp, headers) = match r {
-            WebResponse::Status(s, headers) => (s.into_response(), headers),
-            WebResponse::Single(status, headers, value) => {
-                let (buf, ct) = match encoding {
-                    Encoding::JSON => (value.as_json()?.into_bytes(), ContentType::json()),
-                    Encoding::CBOR => (value.as_cbor()?, ftl::APPLICATION_CBOR.clone()),
-                };
+        return unimplemented!();
 
-                (
-                    hyper::Body::from(buf).with_header(ct).with_status(status).into_response(),
-                    headers,
-                )
-            }
-            WebResponse::Stream(status, headers, stream) => (
-                match encoding {
-                    Encoding::JSON => stream.as_json().with_status(status).into_response(),
-                    Encoding::CBOR => stream.as_cbor().with_status(status).into_response(),
-                },
-                headers,
-            ),
-            WebResponse::Raw(raw) => (*raw, None),
-        };
+        // let (mut resp, headers) = match r {
+        //     WebResponse::Status(s, headers) => (s.into_response(), headers),
+        //     WebResponse::Single(status, headers, value) => {
+        //         let (buf, ct) = match encoding {
+        //             Encoding::JSON => (value.as_json()?.into_bytes(), ContentType::json()),
+        //             Encoding::CBOR => (value.as_cbor()?, ftl::APPLICATION_CBOR.clone()),
+        //         };
 
-        if let Some(headers) = headers {
-            resp.headers_mut().extend(*headers);
-        }
+        //         (
+        //             ftl::Body::from(buf).with_header(ct).with_status(status).into_response(),
+        //             headers,
+        //         )
+        //     }
+        //     WebResponse::Stream(status, headers, stream) => (
+        //         match encoding {
+        //             Encoding::JSON => stream.as_json().with_status(status).into_response(),
+        //             Encoding::CBOR => stream.as_cbor().with_status(status).into_response(),
+        //         },
+        //         headers,
+        //     ),
+        //     WebResponse::Raw(raw) => (*raw, None),
+        // };
 
-        Ok(resp)
+        // if let Some(headers) = headers {
+        //     resp.headers_mut().extend(*headers);
+        // }
+
+        // Ok(resp)
     });
 
     match res {
         Ok(res) => res,
-        Err(e) => e.into_encoding(encoding),
+        Err(e) => unimplemented!(), //e.into_encoding(encoding),
     }
 }
 

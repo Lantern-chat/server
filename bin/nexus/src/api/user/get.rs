@@ -23,7 +23,7 @@ pub async fn get_full_user(state: ServerState, auth: Authorization, user_id: Sno
     };
 
     let Some(row) = db.query_opt_cached_typed(|| q::query(false), &params.as_params()).await? else {
-        return err(CommonError::NotFound);
+        return Err(Error::NotFound);
     };
 
     let associated = params.self_id == user_id || row.try_get(AssocColumns::associated())?;

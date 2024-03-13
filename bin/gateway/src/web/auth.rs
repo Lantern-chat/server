@@ -11,7 +11,7 @@ const AUTH_HEADER: &str = "authorization";
 pub async fn authorize(route: &Route<ServerState>) -> Result<Authorization, Error> {
     let header = match route.raw_header(HeaderName::from_static(AUTH_HEADER)) {
         Some(header) => header.to_str()?,
-        None => return err(CommonError::MissingAuthorizationHeader),
+        None => return Err(Error::MissingAuthorizationHeader),
     };
 
     let auth = crate::auth::do_auth(&route.state, &RawAuthToken::from_header(header)?).await?;
@@ -27,7 +27,7 @@ impl MaybeAuth {
     pub fn unwrap(self) -> Result<Authorization, Error> {
         match self.0 {
             Some(auth) => Ok(auth),
-            None => err(CommonError::Unauthorized),
+            None => Err(Error::Unauthorized),
         }
     }
 }

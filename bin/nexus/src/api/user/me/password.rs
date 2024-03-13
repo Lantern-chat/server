@@ -18,11 +18,11 @@ pub async fn change_password(
     let config = state.config_full();
 
     if !config.shared.password_length.contains(&form.current.len()) {
-        return err(CommonError::InvalidCredentials);
+        return Err(Error::InvalidCredentials);
     };
 
     if !schema::validation::validate_password(&form.new, config.shared.password_length.clone()) {
-        return err(CommonError::InvalidPassword);
+        return Err(Error::InvalidPassword);
     }
 
     #[rustfmt::skip]
@@ -38,11 +38,11 @@ pub async fn change_password(
     let encrypted_mfa: Option<&[u8]> = user.mfa()?;
 
     if encrypted_mfa.is_some() && form.totp.is_none() {
-        return err(CommonError::TOTPRequired);
+        return Err(Error::TOTPRequired);
     }
 
     if !super::login::verify_password(&state, passhash, &form.current).await? {
-        return err(CommonError::InvalidCredentials);
+        return Err(Error::InvalidCredentials);
     }
 
     let mut new_mfa = None;
@@ -59,7 +59,7 @@ pub async fn change_password(
         if !super::login::process_2fa(&state, auth.user_id(), ProvidedMfa::Plain(&mfa), &form.current, token)
             .await?
         {
-            return err(CommonError::InvalidCredentials);
+            return Err(Error::InvalidCredentials);
         }
 
         new_mfa = match mfa.encrypt(&mfa_key, &nonce, &form.new) {

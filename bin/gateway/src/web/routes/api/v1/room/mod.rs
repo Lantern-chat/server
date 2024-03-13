@@ -20,9 +20,9 @@ pub fn room(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
 
             (_, Exact("messages")) => messages::messages(route, auth, room_id),
             //(_, Exact("threads")) => threads::threads(route, auth, room_id),
-            _ => err(CommonError::NotFound),
+            _ => Err(Error::NotFound),
         },
-        _ => err(CommonError::BadRequest),
+        _ => Err(Error::BadRequest),
     }
 }
 

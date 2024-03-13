@@ -1,4 +1,5 @@
-use crate::error::ApiError;
+use sdk::api::error::ApiError;
+
 use futures::future::Either;
 use futures::{Stream, StreamExt};
 

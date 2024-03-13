@@ -20,18 +20,13 @@ pub mod prelude {
     pub use crate::error::Error;
     pub use crate::state::ServerState;
 
-    pub use rpc::{auth::Authorization, error::Error as CommonError, event::ServerEvent, simple_de};
+    pub use rpc::{auth::Authorization, event::ServerEvent, simple_de};
     pub use sdk::models::{Nullable, SmolStr, Snowflake, Timestamp};
 
     pub use crate::config::Config;
     pub use config::HasConfig;
 
     pub use rkyv::Archived;
-
-    #[inline(always)]
-    pub fn err<T, E>(err: impl Into<E>) -> Result<T, E> {
-        Err(err.into())
-    }
 }
 
 pub mod built {
@@ -48,6 +43,13 @@ async fn main() -> anyhow::Result<()> {
     ::config::Configuration::configure(&mut config);
 
     println!("Hello, world!");
+
+    #[inline(never)]
+    fn get_any<T>() -> T {
+        unimplemented!()
+    }
+
+    _ = auth::do_auth(get_any(), get_any()).await;
 
     Ok(())
 }

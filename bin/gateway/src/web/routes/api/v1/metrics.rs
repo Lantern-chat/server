@@ -10,7 +10,7 @@ use super::*;
 //use crate::api::metrics::MetricsOptions;
 
 pub async fn metrics(route: Route<ServerState>) -> ApiResult {
-    err(CommonError::Unimplemented)
+    Err(Error::Unimplemented)
 
     // let options = match route.query::<MetricsOptions>() {
     //     Some(res) => res?,

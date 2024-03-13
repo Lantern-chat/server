@@ -5,13 +5,30 @@ use crate::prelude::*;
 use db::pool::Error as DbError;
 use ftl::{body::BodyDeserializeError, reply::WithStatus, ws::WsError, *};
 use http::header::InvalidHeaderValue;
-use rpc::error::ApiError;
-use sdk::{api::error::ApiErrorCode, driver::Encoding};
+use sdk::{
+    api::error::{ApiError, ApiErrorCode},
+    driver::Encoding,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("{0}")]
-    Common(#[from] CommonError),
+    // Common Errors
+    #[error("Not Found")]
+    NotFound,
+    #[error("Bad Request")]
+    BadRequest,
+    #[error("Method Not Allowed")]
+    MethodNotAllowed,
+    #[error("Unimplemented")]
+    Unimplemented,
+    #[error("Request Entity Too Large")]
+    RequestEntityTooLarge,
+    #[error("Missing Authorization Header")]
+    MissingAuthorizationHeader,
+    #[error("Unauthorized")]
+    Unauthorized,
+    #[error("No Session")]
+    NoSession,
 
     // FATAL ERRORS
     #[error("Internal Error: {0}")]
@@ -100,33 +117,32 @@ lazy_static::lazy_static! {
 impl Error {
     #[rustfmt::skip]
     pub fn is_fatal(&self) -> bool {
-        match self {
-            Error::Common(err) => err.is_fatal(),
-            _ => matches!(self,
-                | Error::DbError(_)
-                | Error::JoinError(_)
-                | Error::SemaphoreError(_)
-                | Error::JsonError(_)
-                | Error::CborDecodingError(_)
-                | Error::CborEncodingError(_)
+        matches!(self,
+            | Error::Unimplemented
+            | Error::DbError(_)
+            | Error::JoinError(_)
+            | Error::SemaphoreError(_)
+            | Error::JsonError(_)
+            | Error::CborDecodingError(_)
+            | Error::CborEncodingError(_)
 
-                | Error::XMLError(_)
-                | Error::IOError(_)
-                | Error::RequestError(_)
-            )
-        }
+            | Error::XMLError(_)
+            | Error::IOError(_)
+            | Error::RequestError(_)
+        )
     }
 }
 
 impl From<Error> for sdk::api::error::ApiError {
     fn from(value: Error) -> Self {
-        if let Error::Common(err) = value {
-            return err.into();
-        }
-
         let message = 'msg: {
             Cow::Borrowed(match value {
-                _ if value.is_fatal() => "Internal Server Error",
+                _ if value.is_fatal() => {
+                    return Self {
+                        code: ApiErrorCode::InternalError,
+                        message: "Internal Server Error".into(),
+                    }
+                }
 
                 // TODO: at least say if it's a database error, for now
                 Error::DbError(_) => "Database Error",
@@ -135,44 +151,59 @@ impl From<Error> for sdk::api::error::ApiError {
                 Error::Base85DecodeError(_) => "Base85 Decode Error",
                 Error::IOError(_) => "IO Error",
                 Error::InvalidHeaderValue(_) => "Invalid Header Value",
+                Error::NotFound => "Not Found",
+                Error::BadRequest => "Bad Request",
+                Error::MethodNotAllowed => "Method Not Allowed",
+                Error::RequestEntityTooLarge => "Request Entity Too Large",
+                Error::MissingAuthorizationHeader => "Missing Authorization Header",
+                Error::Unauthorized => "Unauthorized",
+
                 _ => break 'msg value.to_string().into(),
             })
         };
 
         #[rustfmt::skip]
         let code = match value {
+            Error::NotFound                     => ApiErrorCode::NotFound,
+            Error::BadRequest                   => ApiErrorCode::BadRequest,
+            Error::MethodNotAllowed             => ApiErrorCode::MethodNotAllowed,
+            Error::RequestEntityTooLarge        => ApiErrorCode::RequestEntityTooLarge,
+            Error::MissingAuthorizationHeader   => ApiErrorCode::MissingAuthorizationHeader,
+            Error::Unauthorized                 => ApiErrorCode::Unauthorized,
+            Error::NoSession                    => ApiErrorCode::NoSession,
+
+            Error::IOError(_)               => ApiErrorCode::IOError,
+            Error::DbError(_)               => ApiErrorCode::DbError,
+            Error::JoinError(_)             => ApiErrorCode::JoinError,
+            Error::SemaphoreError(_)        => ApiErrorCode::SemaphoreError,
+            Error::XMLError(_)              => ApiErrorCode::XMLError,
+            Error::RequestError(_)          => ApiErrorCode::RequestError,
+            Error::Utf8ParseError(_)        => ApiErrorCode::Utf8ParseError,
+            Error::Utf8CheckError(_)        => ApiErrorCode::Utf8ParseError, // revisit
+            Error::InvalidHeaderValue(_)    => ApiErrorCode::InvalidHeaderValue,
+            Error::QueryParseError(_)       => ApiErrorCode::QueryParseError,
+            Error::MimeParseError(_)        => ApiErrorCode::MimeParseError,
+            Error::SearchError(_)           => ApiErrorCode::SearchError,
+
+            Error::UnsupportedMediaType(_)  => ApiErrorCode::UnsupportedMediaType,
+
+            Error::AuthTokenError(_)        => ApiErrorCode::AuthTokenError,
+            Error::Base64DecodeError(_)     => ApiErrorCode::Base64DecodeError,
+            Error::Base85DecodeError(_)     => ApiErrorCode::Base85DecodeError,
+            Error::CborDecodingError(_) |
+            Error::CborEncodingError(_)     => ApiErrorCode::CborError,
+            Error::JsonError(_)             => ApiErrorCode::JsonError,
+
+            Error::HeaderParseError(_)      => ApiErrorCode::HeaderParseError,
+            Error::BodyDeserializeError(_)  => ApiErrorCode::BodyDeserializeError,
+
+            Error::WsError(WsError::MethodNotAllowed)   => ApiErrorCode::MethodNotAllowed,
+            Error::WsError(_)                           => ApiErrorCode::WebsocketError,
+
+            | Error::Unimplemented
             | Error::InternalError(_)
             | Error::InternalErrorStatic(_)
-            | Error::InternalErrorSmol(_)   => ApiErrorCode::InternalError,
-
-            Error::IOError(_) => ApiErrorCode::IOError,
-            Error::DbError(_) => ApiErrorCode::DbError,
-            Error::JoinError(_) => ApiErrorCode::JoinError,
-            Error::SemaphoreError(_) => ApiErrorCode::SemaphoreError,
-            Error::XMLError(_) => ApiErrorCode::XMLError,
-            Error::RequestError(_) => ApiErrorCode::RequestError,
-            Error::Utf8ParseError(_) => ApiErrorCode::Utf8ParseError,
-            Error::Utf8CheckError(_) => ApiErrorCode::Utf8ParseError, // revisit
-            Error::InvalidHeaderValue(_) => ApiErrorCode::InvalidHeaderValue,
-            Error::QueryParseError(_) => ApiErrorCode::QueryParseError,
-            Error::MimeParseError(_) => ApiErrorCode::MimeParseError,
-            Error::SearchError(_) => ApiErrorCode::SearchError,
-
-            Error::UnsupportedMediaType(_) => ApiErrorCode::UnsupportedMediaType,
-
-            Error::AuthTokenError(_) => ApiErrorCode::AuthTokenError,
-            Error::Base64DecodeError(_) => ApiErrorCode::Base64DecodeError,
-            Error::Base85DecodeError(_) => ApiErrorCode::Base85DecodeError,
-            Error::CborDecodingError(_) | Error::CborEncodingError(_) => ApiErrorCode::CborError,
-            Error::JsonError(_) => ApiErrorCode::JsonError,
-
-            Error::HeaderParseError(_) => ApiErrorCode::HeaderParseError,
-            Error::BodyDeserializeError(_) => ApiErrorCode::BodyDeserializeError,
-
-            Error::WsError(WsError::MethodNotAllowed) => ApiErrorCode::MethodNotAllowed,
-            Error::WsError(_) => ApiErrorCode::WebsocketError,
-
-            Error::Common(_) => unreachable!(),
+            | Error::InternalErrorSmol(_) => unreachable!(),
         };
 
         Self { code, message }
@@ -205,11 +236,11 @@ impl Error {
         macro_rules! impl_cached {
             ($($name:ident),*) => {{
                 lazy_static::lazy_static! {$(
-                    static ref $name: WithStatus<Json> = Error::Common(CommonError::$name).into_json();
+                    static ref $name: WithStatus<Json> = Error::$name.into_json();
                 )*}
 
                 match self {
-                    $(Self::Common(CommonError::$name) => $name.clone(),)*
+                    $(Self::$name => $name.clone(),)*
                     _ => self.into_json(),
                 }
             }}
@@ -219,13 +250,11 @@ impl Error {
             NotFound,
             BadRequest,
             MethodNotAllowed,
+            Unimplemented,
+            RequestEntityTooLarge,
+            MissingAuthorizationHeader,
             Unauthorized,
-            NoSession,
-            InvalidCredentials,
-            AlreadyExists,
-            Blocked,
-            Banned,
-            Conflict
+            NoSession
         }
     }
 
@@ -248,9 +277,9 @@ impl From<DbError> for Error {
 
             // TODO: Improve this with names of specific constraints
             match *e.code() {
-                SqlState::FOREIGN_KEY_VIOLATION => return CommonError::NotFound.into(),
-                SqlState::CHECK_VIOLATION => return CommonError::BadRequest.into(),
-                SqlState::UNIQUE_VIOLATION => return CommonError::BadRequest.into(),
+                SqlState::FOREIGN_KEY_VIOLATION => return Error::NotFound,
+                SqlState::CHECK_VIOLATION => return Error::BadRequest,
+                SqlState::UNIQUE_VIOLATION => return Error::BadRequest,
                 _ => {}
             }
         }

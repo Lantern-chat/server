@@ -55,6 +55,6 @@ pub async fn process(
         EventCode::SelfUpdated => user_event::self_update(state, db, id, party_id).await,
         EventCode::UserUpdated => user_event::user_update(state, db, id).await,
         EventCode::ProfileUpdated => profile_event::profile_updated(state, db, id, party_id).await,
-        _ => err(CommonError::Unimplemented),
+        _ => Err(Error::Unimplemented),
     }
 }

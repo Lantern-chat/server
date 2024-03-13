@@ -28,7 +28,7 @@ pub async fn get_invite(state: &ServerState, auth: Authorization, code: SmolStr)
         LEFT JOIN PartyMembers ON PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
         WHERE Invite.Id = #{&id as Invite::Id} OR Invite.Vanity = #{&code as Invite::Vanity}
     }).await? else {
-        return err(CommonError::NotFound);
+        return Err(Error::NotFound);
     };
 
     let inviter: Snowflake = row.user_id()?;

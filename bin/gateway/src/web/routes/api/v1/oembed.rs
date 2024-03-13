@@ -4,7 +4,7 @@ use super::*;
 
 #[async_recursion]
 pub async fn oembed(route: Route<ServerState>) -> ApiResult {
-    err(CommonError::Unimplemented)
+    Err(Error::Unimplemented)
 
     // let req = match route.query::<OEmbedRequest>() {
     //     Some(res) => res?,

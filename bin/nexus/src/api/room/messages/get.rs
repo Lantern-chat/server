@@ -18,7 +18,7 @@ pub async fn get_many(
         None => true,
         Some(perms) => {
             if !perms.contains(Permissions::READ_MESSAGE_HISTORY) {
-                return err(CommonError::NotFound);
+                return Err(Error::NotFound);
             }
 
             false
@@ -56,7 +56,7 @@ where
     match stream.next().await {
         Some(Ok(msg)) => Ok(msg),
         Some(Err(e)) => Err(e),
-        None => err(CommonError::NotFound),
+        None => Err(Error::NotFound),
     }
 }
 

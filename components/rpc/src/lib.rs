@@ -3,7 +3,6 @@ extern crate tracing as log;
 pub mod auth;
 pub mod client;
 pub mod cmd;
-pub mod error;
 pub mod event;
 pub mod msg;
 pub mod stream;

@@ -26,7 +26,7 @@ where
     let addr = msg.addr.as_socket_addr();
     let auth = || match msg.auth.as_deref() {
         Some(auth) => Ok(simple_de::<Authorization>(auth)),
-        None => Err(CommonError::Unauthorized),
+        None => Err(Error::Unauthorized),
     };
 
     use core::{future::Future, pin::Pin};
