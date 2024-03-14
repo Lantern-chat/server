@@ -7,17 +7,6 @@ iso8601-timestamp = { git = "https://github.com/Lantern-chat/iso8601-timestamp" 
 rkyv = { git = "https://github.com/Lantern-chat/rkyv", branch = "0.7" }
 rend = { git = "https://github.com/Lantern-chat/rend", branch = "0.4" }
 
-# Contains fixes for nightly
-# rand = { git = "https://github.com/rust-random/rand" }
-# rand_core = { git = "https://github.com/rust-random/rand" }
-# rand_chacha = { git = "https://github.com/rust-random/rand" }
-
-# contains unpublished dependency bumps
-# postgres-protocol = { git = "https://github.com/sfackler/rust-postgres" }
-# postgres-types = { git = "https://github.com/sfackler/rust-postgres" }
-# tokio-postgres = { git = "https://github.com/sfackler/rust-postgres" }
-# postgres-derive = { git = "https://github.com/sfackler/rust-postgres" }
-
 # postgres-inet = { git = "https://github.com/Lantern-chat/postgres-inet" }
 
 [patch."https://github.com/Lantern-chat/client-sdk-rs"]
@@ -63,7 +52,6 @@ scc = "2"
 
 http = "1"
 headers = "0.4"
-reqwest = { git = "https://github.com/seanmonstar/reqwest", default_features = false, features = ["gzip", "deflate", "rustls-tls", "http2", "json"] }
 quinn = "0.10"
 
 ftl = { git = "https://github.com/Lantern-chat/ftl", features = ["json", "cbor"] }
@@ -82,6 +70,12 @@ tracing = { version = "0.1", default-features = false, features = ["log", "std"]
 tracing-futures = { version = "0.2.4", default-features = false, features = ["std-future"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter", "parking_lot", "registry"] }
 tracing-appender = { version = "0.2", features = ["parking_lot"] }
+
+[workspace.dependencies.reqwest]
+git = "https://github.com/seanmonstar/reqwest"
+branch = "0.12-dev"
+default_features = false
+features = ["gzip", "deflate", "rustls-tls", "http2", "json"]
 
 [profile.dev]
 opt-level = 1
