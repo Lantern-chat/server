@@ -1,7 +1,7 @@
 use sdk::api::error::ApiError;
 
-use futures::future::Either;
-use futures::{Stream, StreamExt};
+use futures_util::future::Either;
+use futures_util::{Stream, StreamExt};
 
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
@@ -20,7 +20,7 @@ where
     ApiError: From<E>,
 {
     // stream::iter is more efficient
-    encode_stream(out, Ok(futures::stream::iter([item]))).await
+    encode_stream(out, Ok(futures_util::stream::iter([item]))).await
 }
 
 pub async fn encode_stream<T, E, W, const N: usize>(
@@ -38,7 +38,7 @@ where
 
     let mut stream = std::pin::pin!(match stream {
         Ok(stream) => Either::Left(stream),
-        Err(err) => Either::Right(futures::stream::iter([Err(err)])),
+        Err(err) => Either::Right(futures_util::stream::iter([Err(err)])),
     });
 
     while let Some(item) = stream.next().await {

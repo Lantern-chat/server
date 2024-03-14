@@ -64,6 +64,7 @@ dotenv = "0.15.0"
 anyhow = "1"
 built = { version = "0.7", features = ["chrono"] }
 
+parking_lot = "0.12"
 futures = "0.3"
 tokio = { version = "1", features = ["parking_lot"] }
 tracing = { version = "0.1", default-features = false, features = ["log", "std"] }

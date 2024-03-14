@@ -7,7 +7,7 @@ use std::{
     },
 };
 
-use futures::{FutureExt, Stream, StreamExt};
+use futures_util::{FutureExt, Stream, StreamExt};
 use indexmap::IndexMap;
 use parking_lot::RwLock;
 
