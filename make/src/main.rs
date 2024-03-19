@@ -73,7 +73,6 @@ impl Target {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Project {
     Nexus,
-    Faction,
     Gateway,
     Process,
     Camo2,
@@ -84,7 +83,6 @@ pub enum Project {
 impl Project {
     const MAPPING: &'static [(&'static str, Project)] = &[
         ("nexus", Project::Nexus),
-        ("faction", Project::Faction),
         ("gateway", Project::Gateway),
         ("process", Project::Process),
         ("camo2", Project::Camo2),
@@ -103,8 +101,7 @@ impl Project {
     #[rustfmt::skip]
     fn args(self) -> &'static str {
         match self {
-            Project::Nexus => todo!(),
-            Project::Faction => r#"--bin faction -p faction"#,
+            Project::Nexus => r#"--bin nexus -p nexus"#,
             Project::Gateway => r#"--bin gateway -p gateway"#,
             Project::Process => r#"--bin process -p process --features binary"#,
             Project::Camo2 => r#"--bin camo2 -p camo-worker --config lib.crate-type=["bin"] --no-default-features --features standalone"#,
