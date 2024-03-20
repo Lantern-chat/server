@@ -72,11 +72,7 @@ tracing-futures = { version = "0.2.4", default-features = false, features = ["st
 tracing-subscriber = { version = "0.3", features = ["env-filter", "parking_lot", "registry"] }
 tracing-appender = { version = "0.2", features = ["parking_lot"] }
 
-[workspace.dependencies.reqwest]
-git = "https://github.com/seanmonstar/reqwest"
-branch = "0.12-dev"
-default_features = false
-features = ["gzip", "deflate", "rustls-tls", "http2", "json"]
+reqwest = { version = "0.12", default-features = false, features = ["gzip", "deflate", "rustls-tls", "http2", "json"] }
 
 [profile.dev]
 opt-level = 1
