@@ -91,12 +91,12 @@ macro_rules! decl_procs {
             use super::*;
 
             #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-            #[repr(u32)]
+            #[repr(u32, align(4))]
             enum ArchivedTag {
                 $($cmd = mirror_tag($code),)*
             }
 
-            #[repr(u32)]
+            #[repr(u32, align(4))]
             pub enum ArchivedProcedure {
                 $($cmd(rkyv::Archived<Box<$cmd>>) = ArchivedTag::$cmd as u32,)*
             }
