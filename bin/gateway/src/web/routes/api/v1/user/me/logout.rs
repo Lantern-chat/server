@@ -2,7 +2,7 @@ use sdk::api::commands::user::UserLogout;
 
 use super::*;
 
-#[async_recursion] #[rustfmt::skip]
-pub async fn logout(route: Route<ServerState>, auth: Authorization) -> ApiResult {
-    Ok(RawMessage::authorized(auth, UserLogout {}))
+#[async_recursion]
+pub async fn logout(route: Route<ServerState>, _auth: Authorization) -> ApiResult {
+    Ok(Procedure::from(UserLogout {}))
 }

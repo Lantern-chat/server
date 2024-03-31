@@ -20,16 +20,16 @@ pub fn party_rooms(mut route: Route<ServerState>, auth: Authorization, party_id:
         //     },
         //     _ => Err(Error::NotFound),
         // },
-        _ => Err(Error::NotFound),
+        _ => Err(Error::NotFoundSignaling),
     }
 }
 
 #[async_recursion]
-pub async fn get(route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> ApiResult {
-    Ok(RawMessage::authorized(auth, GetPartyRooms { party_id }))
+pub async fn get(route: Route<ServerState>, _auth: Authorization, party_id: Snowflake) -> ApiResult {
+    Ok(Procedure::from(GetPartyRooms { party_id }))
 }
 
 #[async_recursion] #[rustfmt::skip]
-pub async fn post(mut route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> ApiResult {
-    Ok(RawMessage::authorized(auth, CreateRoom { party_id, body: body::any(&mut route).await? }))
+pub async fn post(mut route: Route<ServerState>, _auth: Authorization, party_id: Snowflake) -> ApiResult {
+    Ok(Procedure::from(CreateRoom { party_id, body: body::any(&mut route).await? }))
 }

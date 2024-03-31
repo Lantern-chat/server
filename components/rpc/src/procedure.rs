@@ -1,45 +1,12 @@
-use std::net::SocketAddr;
+use sdk::api::commands::all::*;
 
-use sdk::{api::commands::all::*, Snowflake};
+use crate::client::Resolve;
 
-#[derive(Debug, rkyv::Archive, rkyv::Serialize)]
-#[archive(check_bytes)]
-pub struct Message {
-    pub proc: Procedure,
-
-    pub addr: SocketAddr,
-
-    #[with(rkyv::with::Niche)]
-    pub auth: Option<Box<crate::auth::Authorization>>,
-}
+// Note to self: figure out a way to send the party/room lookups via the RPC messages
 
 const fn mirror_tag(t: u16) -> u32 {
     let le = t.to_le_bytes();
-    let be = t.to_be_bytes();
-    u32::from_le_bytes([le[0], le[1], be[0], be[1]])
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Resolve {
-    Nexus,
-    Party(Snowflake),
-    Room(Snowflake),
-}
-
-impl Resolve {
-    const fn party(self, id: Snowflake) -> Resolve {
-        match self {
-            Resolve::Party(_) => self,
-            _ => Resolve::Party(id),
-        }
-    }
-
-    const fn room(self, id: Snowflake) -> Resolve {
-        match self {
-            Resolve::Room(_) => self,
-            _ => Resolve::Room(id),
-        }
-    }
+    u32::from_le_bytes([le[0], le[1], le[1], le[0]])
 }
 
 macro_rules! decl_procs {

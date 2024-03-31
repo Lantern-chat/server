@@ -38,10 +38,10 @@ pub fn reactions(
     }
 }
 
-#[async_recursion] #[rustfmt::skip]
+#[async_recursion]
 async fn put_reaction(
     route: Route<ServerState>,
-    auth: Authorization,
+    _auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,
     emote: EmoteOrEmojiId,
@@ -50,13 +50,17 @@ async fn put_reaction(
         return Err(Error::BadRequest);
     };
 
-    Ok(RawMessage::authorized(auth, PutReaction { room_id, msg_id, emote_id }))
+    Ok(Procedure::from(PutReaction {
+        room_id,
+        msg_id,
+        emote_id,
+    }))
 }
 
-#[async_recursion] #[rustfmt::skip]
+#[async_recursion]
 async fn delete_reaction(
     route: Route<ServerState>,
-    auth: Authorization,
+    _auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,
     emote: EmoteOrEmojiId,
@@ -65,5 +69,9 @@ async fn delete_reaction(
         return Err(Error::BadRequest);
     };
 
-    Ok(RawMessage::authorized(auth, DeleteOwnReaction { room_id, msg_id, emote_id }))
+    Ok(Procedure::from(DeleteOwnReaction {
+        room_id,
+        msg_id,
+        emote_id,
+    }))
 }

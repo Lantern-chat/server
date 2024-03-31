@@ -9,6 +9,13 @@ pub type SmallSnowflakeVec = SmallVec<[Snowflake; 1]>;
 
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 #[archive(check_bytes)]
+pub enum ClientCommand {
+    /// Regular client message/command
+    Regular(ClientMsg),
+}
+
+#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[archive(check_bytes)]
 pub enum ServerEvent {
     Regular {
         msg: ServerMsg,

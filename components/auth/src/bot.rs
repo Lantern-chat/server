@@ -39,9 +39,9 @@ impl SplitBotToken {
     pub fn to_bytes(&self) -> [u8; Self::SPLIT_BOT_TOKEN_SIZE] {
         let mut bytes = [0u8; Self::SPLIT_BOT_TOKEN_SIZE];
 
-        let mut w: &mut [u8] = &mut bytes;
-
         unsafe {
+            let mut w: &mut [u8] = &mut bytes;
+
             w.write_u64::<LittleEndian>(self.id.to_u64()).unwrap_unchecked();
             w.write_u64::<LittleEndian>(self.issued).unwrap_unchecked();
             w.write(&self.hmac).unwrap_unchecked();

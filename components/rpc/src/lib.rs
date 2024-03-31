@@ -4,7 +4,8 @@ pub mod auth;
 pub mod client;
 pub mod cmd;
 pub mod event;
-pub mod msg;
+pub mod procedure;
+pub mod request;
 pub mod stream;
 
 pub fn simple_de<T>(value: &rkyv::Archived<T>) -> T

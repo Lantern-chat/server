@@ -38,25 +38,25 @@ pub fn party(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
                     Ok(search::search(route, auth, party_id))
                 }
 
-                _ => Err(Error::NotFound),
+                _ => Err(Error::NotFoundSignaling),
             },
             _ => Err(Error::BadRequest),
         },
-        _ => Err(Error::NotFound),
+        _ => Err(Error::NotFoundSignaling),
     }
 }
 
 #[async_recursion]
-pub async fn get(route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> ApiResult {
-    Ok(RawMessage::authorized(auth, GetParty { party_id }))
+pub async fn get(route: Route<ServerState>, _auth: Authorization, party_id: Snowflake) -> ApiResult {
+    Ok(Procedure::from(GetParty { party_id }))
 }
 
 #[async_recursion] #[rustfmt::skip]
-pub async fn patch(mut route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> ApiResult {
-    Ok(RawMessage::authorized(auth, PatchParty { party_id, body: body::any(&mut route).await? }))
+pub async fn patch(mut route: Route<ServerState>, _auth: Authorization, party_id: Snowflake) -> ApiResult {
+    Ok(Procedure::from(PatchParty { party_id, body: body::any(&mut route).await? }))
 }
 
 #[async_recursion] #[rustfmt::skip]
-pub async fn post(mut route: Route<ServerState>, auth: Authorization) -> ApiResult {
-    Ok(RawMessage::authorized(auth, CreateParty { body: body::any(&mut route).await? }))
+pub async fn post(mut route: Route<ServerState>, _auth: Authorization) -> ApiResult {
+    Ok(Procedure::from(CreateParty { body: body::any(&mut route).await? }))
 }

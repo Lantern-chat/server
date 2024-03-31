@@ -12,9 +12,12 @@ use sdk::{
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    // Common Errors
     #[error("Not Found")]
     NotFound,
+    /// Signals that an invalid path was requested
+    #[error("Not Found")]
+    NotFoundSignaling,
+
     #[error("Bad Request")]
     BadRequest,
     #[error("Method Not Allowed")]
@@ -165,6 +168,7 @@ impl From<Error> for sdk::api::error::ApiError {
         #[rustfmt::skip]
         let code = match value {
             Error::NotFound                     => ApiErrorCode::NotFound,
+            Error::NotFoundSignaling           => ApiErrorCode::NotFound,
             Error::BadRequest                   => ApiErrorCode::BadRequest,
             Error::MethodNotAllowed             => ApiErrorCode::MethodNotAllowed,
             Error::RequestEntityTooLarge        => ApiErrorCode::RequestEntityTooLarge,
@@ -248,6 +252,7 @@ impl Error {
 
         impl_cached! {
             NotFound,
+            NotFoundSignaling,
             BadRequest,
             MethodNotAllowed,
             Unimplemented,

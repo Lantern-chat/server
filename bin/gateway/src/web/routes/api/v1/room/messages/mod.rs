@@ -44,7 +44,7 @@ pub fn messages(mut route: Route<ServerState>, auth: Authorization, room_id: Sno
                 (&Method::DELETE, Exact("star")) => Ok(pin::unstar_message(route, auth, msg_id)),
 
                 (_, End) => Err(Error::MethodNotAllowed),
-                _ => Err(Error::NotFound),
+                _ => Err(Error::NotFoundSignaling),
             },
             Some(Err(_)) => Err(Error::BadRequest),
             _ => Err(Error::MethodNotAllowed),

@@ -4,7 +4,7 @@ use super::*;
 
 #[async_recursion]
 pub async fn register(mut route: Route<ServerState>) -> ApiResult {
-    Ok(RawMessage::unauthorized(UserRegister {
+    Ok(Procedure::from(UserRegister {
         body: body::any(&mut route).await?,
     }))
 }

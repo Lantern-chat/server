@@ -27,18 +27,18 @@ pub fn room(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
 }
 
 #[async_recursion]
-pub async fn get(route: Route<ServerState>, auth: Authorization, room_id: Snowflake) -> ApiResult {
-    Ok(RawMessage::authorized(auth, GetRoom { room_id }))
+pub async fn get(route: Route<ServerState>, _auth: Authorization, room_id: Snowflake) -> ApiResult {
+    Ok(Procedure::from(GetRoom { room_id }))
 }
 
 #[async_recursion]
-pub async fn delete(route: Route<ServerState>, auth: Authorization, room_id: Snowflake) -> ApiResult {
-    Ok(RawMessage::authorized(auth, DeleteRoom { room_id }))
+pub async fn delete(route: Route<ServerState>, _auth: Authorization, room_id: Snowflake) -> ApiResult {
+    Ok(Procedure::from(DeleteRoom { room_id }))
 }
 
-#[async_recursion] #[rustfmt::skip]
-pub async fn patch(mut route: Route<ServerState>, auth: Authorization, room_id: Snowflake) -> ApiResult {
-    Ok(RawMessage::authorized(auth, PatchRoom {
+#[async_recursion]
+pub async fn patch(mut route: Route<ServerState>, _auth: Authorization, room_id: Snowflake) -> ApiResult {
+    Ok(Procedure::from(PatchRoom {
         room_id,
         body: body::any(&mut route).await?,
     }))

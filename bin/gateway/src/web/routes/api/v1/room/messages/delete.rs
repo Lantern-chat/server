@@ -5,9 +5,9 @@ use super::*;
 #[async_recursion]
 pub async fn delete(
     route: Route<ServerState>,
-    auth: Authorization,
+    _auth: Authorization,
     room_id: Snowflake,
     msg_id: Snowflake,
 ) -> ApiResult {
-    Ok(RawMessage::authorized(auth, DeleteMessage { room_id, msg_id }))
+    Ok(Procedure::from(DeleteMessage { room_id, msg_id }))
 }

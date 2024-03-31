@@ -1,9 +1,5 @@
 use std::process::{Command, Stdio};
 
-const fn default_jobs() -> usize {
-    0
-}
-
 #[derive(argh::FromArgs)]
 /// Build Lantern components
 pub struct CliArgs {
@@ -12,7 +8,7 @@ pub struct CliArgs {
     project: String,
 
     /// how many processes to use to build
-    #[argh(option, short = 'j', default = "default_jobs()")]
+    #[argh(option, short = 'j', default = "0")]
     jobs: usize,
 
     /// target triple

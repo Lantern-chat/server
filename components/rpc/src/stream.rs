@@ -16,7 +16,7 @@ pub async fn encode_item<T, E, W, const N: usize>(out: W, item: Result<T, E>) ->
 where
     W: AsyncWrite + Unpin,
     T: Serialize<AllocSerializer<N>>,
-    E: std::error::Error,
+    E: core::fmt::Debug,
     ApiError: From<E>,
 {
     // stream::iter is more efficient
@@ -30,7 +30,7 @@ pub async fn encode_stream<T, E, W, const N: usize>(
 where
     W: AsyncWrite + Unpin,
     T: Serialize<AllocSerializer<N>>,
-    E: std::error::Error,
+    E: core::fmt::Debug,
     ApiError: From<E>,
 {
     let mut out = AsyncFramedWriter::new(out);
@@ -43,7 +43,7 @@ where
 
     while let Some(item) = stream.next().await {
         let item = item.map_err(|err| {
-            log::error!("Error in RPC encode stream: {err}");
+            log::error!("Error in RPC encode stream: {err:?}");
 
             ApiError::from(err)
         });
@@ -82,10 +82,10 @@ impl<R: AsyncRead + Unpin> RpcRecvReader<R> {
 }
 
 impl<R: AsyncRead + Unpin> RpcRecvReader<R> {
-    pub async fn recv<T>(&mut self) -> Result<Option<&rkyv::Archived<T>>, io::Error>
+    pub async fn recv<'a, T>(&'a mut self) -> Result<Option<&'a rkyv::Archived<T>>, io::Error>
     where
-        T: rkyv::Archive,
-        rkyv::Archived<T>: for<'a> rkyv::CheckBytes<rkyv::validation::validators::DefaultValidator<'a>>,
+        T: rkyv::Archive + 'a,
+        rkyv::Archived<T>: for<'b> rkyv::CheckBytes<rkyv::validation::validators::DefaultValidator<'b>>,
     {
         let Some(msg) = self.stream.next_msg().await? else {
             return Ok(None);

@@ -53,10 +53,10 @@ pub fn me(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
                             }
                             _ => Err(Error::BadRequest),
                         },
-                        _ => Err(Error::NotFound),
+                        _ => Err(Error::NotFoundSignaling),
                     }
                 }
-                _ => Err(Error::NotFound),
+                _ => Err(Error::NotFoundSignaling),
             }
         }
     }

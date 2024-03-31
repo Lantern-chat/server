@@ -2,7 +2,7 @@ use futures::FutureExt;
 
 use ftl::*;
 
-use headers::{ContentType, HeaderName, HeaderValue};
+use headers::{ContentType, HeaderName, HeaderValue, RetryAfter};
 
 use crate::prelude::*;
 
@@ -18,9 +18,8 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
         return StatusCode::METHOD_NOT_ALLOWED.into_response();
     }
 
-    if !route.state.rate_limit.req(&route).await {
-        // TODO: Add headers
-        return StatusCode::TOO_MANY_REQUESTS.into_response();
+    if let Err(e) = route.state.rate_limit.req(&route).await {
+        return StatusCode::TOO_MANY_REQUESTS.with_header(RetryAfter::delay(e)).into_response();
     }
 
     route.next();

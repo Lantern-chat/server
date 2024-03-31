@@ -28,6 +28,6 @@ pub fn user(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
                 _ => Err(Error::Unimplemented),
             }
         }
-        _ => Err(Error::NotFound),
+        _ => Err(Error::NotFoundSignaling),
     }
 }

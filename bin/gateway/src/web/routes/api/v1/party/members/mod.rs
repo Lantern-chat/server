@@ -19,6 +19,6 @@ pub fn members(mut route: Route<ServerState>, auth: Authorization, party_id: Sno
                 _ => Err(Error::NotFound),
             }
         }
-        _ => Err(Error::NotFound),
+        _ => Err(Error::NotFoundSignaling),
     }
 }
