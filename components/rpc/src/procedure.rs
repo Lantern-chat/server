@@ -1,12 +1,62 @@
+use futures_util::future::BoxFuture;
+use futures_util::{FutureExt, StreamExt};
+
 use sdk::api::commands::all::*;
+use sdk::api::error::ApiError;
+use sdk::{api::Command, driver::Encoding};
+use tokio::io::AsyncRead;
 
 use crate::client::Resolve;
-
-// Note to self: figure out a way to send the party/room lookups via the RPC messages
+use crate::stream::RpcRecvReader;
 
 const fn mirror_tag(t: u16) -> u32 {
     let le = t.to_le_bytes();
     u32::from_le_bytes([le[0], le[1], le[1], le[0]])
+}
+
+pub async fn stream_response<S, P, T, E>(recv: S, encoding: Encoding) -> Result<ftl::Response, E>
+where
+    S: Send + AsyncRead + Unpin + 'static,
+    P: Command<Item = T>,
+    T: 'static + serde::Serialize + rkyv::Archive + Send + Sync,
+    rkyv::Archived<T>: rkyv::Deserialize<T, rkyv::de::deserializers::SharedDeserializeMap>,
+    rkyv::Archived<T>: for<'b> rkyv::CheckBytes<rkyv::validation::validators::DefaultValidator<'b>>,
+    E: From<std::io::Error> + From<ApiError> + 'static,
+{
+    use ftl::Reply;
+
+    let mut stream = Box::pin(
+        RpcRecvReader::new(recv).recv_stream_deserialized::<Result<T, ApiError>, _, _>(|| {
+            rkyv::de::deserializers::SharedDeserializeMap::new()
+        }),
+    );
+
+    let Some(first) = stream.next().await else {
+        return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "No Response").into());
+    };
+
+    let first = first??;
+
+    if !P::STREAM {
+        return Ok(match encoding {
+            Encoding::JSON => ftl::reply::json::json(first).into_response(),
+            Encoding::CBOR => ftl::reply::cbor::cbor(first).into_response(),
+        });
+    }
+
+    // put the first item back into the stream and merge additional errors into IO errors
+    //
+    // In practice, only the first item should be an error.
+    let stream = futures_util::stream::iter([Ok(first)]).chain(stream.map(|value| match value {
+        Ok(Ok(item)) => Ok(item),
+        Ok(Err(api_error)) => Err(std::io::Error::new(std::io::ErrorKind::Other, api_error)),
+        Err(err) => Err(err),
+    }));
+
+    Ok(match encoding {
+        Encoding::JSON => ftl::reply::json::array_stream(stream).into_response(),
+        Encoding::CBOR => ftl::reply::cbor::array_stream(stream).into_response(),
+    })
 }
 
 macro_rules! decl_procs {
@@ -23,6 +73,16 @@ macro_rules! decl_procs {
             pub fn endpoint(&self) -> Resolve {
                 match self {
                     $(Self::$cmd(_cmd) => Resolve::Nexus $(.$kind(_cmd $(.$path)+))?),*
+                }
+            }
+
+            pub fn stream_response<S, E>(&self, recv: S, encoding: Encoding) -> BoxFuture<Result<ftl::Response, E>>
+            where
+                S: Send + AsyncRead + Unpin + 'static,
+                E: From<std::io::Error> + From<ApiError> + 'static,
+            {
+                match self {
+                    $(Self::$cmd(_) => stream_response::<_, $cmd, _, _>(recv, encoding).boxed()),*
                 }
             }
         }

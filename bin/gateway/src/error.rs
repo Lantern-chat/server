@@ -12,6 +12,9 @@ use sdk::{
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("API Error")]
+    ApiError(ApiError),
+
     #[error("Not Found")]
     NotFound,
     /// Signals that an invalid path was requested
@@ -118,63 +121,72 @@ lazy_static::lazy_static! {
 }
 
 impl Error {
+    /// Returns whether the error is fatal and should be logged as an error
     #[rustfmt::skip]
     pub fn is_fatal(&self) -> bool {
-        matches!(self,
-            | Error::Unimplemented
+        match self {
             | Error::DbError(_)
             | Error::JoinError(_)
             | Error::SemaphoreError(_)
             | Error::JsonError(_)
             | Error::CborDecodingError(_)
             | Error::CborEncodingError(_)
-
             | Error::XMLError(_)
             | Error::IOError(_)
-            | Error::RequestError(_)
-        )
+            | Error::RequestError(_) => true,
+
+            Error::ApiError(e) if e.code == ApiErrorCode::InternalError => true,
+
+            _ => false,
+        }
     }
 }
 
 impl From<Error> for sdk::api::error::ApiError {
+    #[rustfmt::skip]
     fn from(value: Error) -> Self {
         let message = 'msg: {
             Cow::Borrowed(match value {
+                Error::ApiError(err) => return err,
+                Error::IOError(err) => return err.into(),
+
+                // TODO: at least say if it's a database error, for now
+                Error::DbError(_)                   => "Database Error",
+                Error::AuthTokenError(_)            => "Auth Token Parse Error",
+                Error::Base64DecodeError(_)         => "Base64 Decode Error",
+                Error::Base85DecodeError(_)         => "Base85 Decode Error",
+                Error::InvalidHeaderValue(_)        => "Invalid Header Value",
+                Error::NotFound                     => "Not Found",
+                Error::NotFoundSignaling            => "Not Found",
+                Error::BadRequest                   => "Bad Request",
+                Error::MethodNotAllowed             => "Method Not Allowed",
+                Error::RequestEntityTooLarge        => "Request Entity Too Large",
+                Error::MissingAuthorizationHeader   => "Missing Authorization Header",
+                Error::Unauthorized                 => "Unauthorized",
+                Error::NoSession                    => "No Session",
+                Error::Unimplemented                => "Unimplemented",
+
                 _ if value.is_fatal() => {
                     return Self {
                         code: ApiErrorCode::InternalError,
-                        message: "Internal Server Error".into(),
-                    }
+                        message: Cow::Borrowed("Internal Server Error"),
+                    };
                 }
-
-                // TODO: at least say if it's a database error, for now
-                Error::DbError(_) => "Database Error",
-                Error::AuthTokenError(_) => "Auth Token Parse Error",
-                Error::Base64DecodeError(_) => "Base64 Decode Error",
-                Error::Base85DecodeError(_) => "Base85 Decode Error",
-                Error::IOError(_) => "IO Error",
-                Error::InvalidHeaderValue(_) => "Invalid Header Value",
-                Error::NotFound => "Not Found",
-                Error::BadRequest => "Bad Request",
-                Error::MethodNotAllowed => "Method Not Allowed",
-                Error::RequestEntityTooLarge => "Request Entity Too Large",
-                Error::MissingAuthorizationHeader => "Missing Authorization Header",
-                Error::Unauthorized => "Unauthorized",
 
                 _ => break 'msg value.to_string().into(),
             })
         };
 
-        #[rustfmt::skip]
         let code = match value {
             Error::NotFound                     => ApiErrorCode::NotFound,
-            Error::NotFoundSignaling           => ApiErrorCode::NotFound,
+            Error::NotFoundSignaling            => ApiErrorCode::NotFound,
             Error::BadRequest                   => ApiErrorCode::BadRequest,
             Error::MethodNotAllowed             => ApiErrorCode::MethodNotAllowed,
             Error::RequestEntityTooLarge        => ApiErrorCode::RequestEntityTooLarge,
             Error::MissingAuthorizationHeader   => ApiErrorCode::MissingAuthorizationHeader,
             Error::Unauthorized                 => ApiErrorCode::Unauthorized,
             Error::NoSession                    => ApiErrorCode::NoSession,
+            Error::Unimplemented                => ApiErrorCode::Unimplemented,
 
             Error::IOError(_)               => ApiErrorCode::IOError,
             Error::DbError(_)               => ApiErrorCode::DbError,
@@ -204,10 +216,11 @@ impl From<Error> for sdk::api::error::ApiError {
             Error::WsError(WsError::MethodNotAllowed)   => ApiErrorCode::MethodNotAllowed,
             Error::WsError(_)                           => ApiErrorCode::WebsocketError,
 
-            | Error::Unimplemented
             | Error::InternalError(_)
             | Error::InternalErrorStatic(_)
-            | Error::InternalErrorSmol(_) => unreachable!(),
+            | Error::InternalErrorSmol(_)   => ApiErrorCode::InternalError,
+
+            Error::ApiError(_) => unreachable!(),
         };
 
         Self { code, message }
@@ -290,5 +303,22 @@ impl From<DbError> for Error {
         }
 
         Error::DbError(e)
+    }
+}
+
+impl From<ApiError> for Error {
+    fn from(e: ApiError) -> Self {
+        // These are more for faster formatting than anything else
+        match e.code {
+            ApiErrorCode::NotFound => Error::NotFound,
+            ApiErrorCode::BadRequest => Error::BadRequest,
+            ApiErrorCode::MethodNotAllowed => Error::MethodNotAllowed,
+            ApiErrorCode::Unimplemented => Error::Unimplemented,
+            ApiErrorCode::RequestEntityTooLarge => Error::RequestEntityTooLarge,
+            ApiErrorCode::MissingAuthorizationHeader => Error::MissingAuthorizationHeader,
+            ApiErrorCode::Unauthorized => Error::Unauthorized,
+            ApiErrorCode::NoSession => Error::NoSession,
+            _ => Error::ApiError(e),
+        }
     }
 }

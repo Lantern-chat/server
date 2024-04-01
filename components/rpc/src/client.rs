@@ -6,7 +6,7 @@ use std::sync::{
 };
 use std::{borrow::Cow, net::SocketAddr};
 
-use futures_util::{stream::FuturesUnordered, StreamExt};
+use futures_util::{stream::FuturesUnordered, FutureExt, StreamExt};
 use indexmap::IndexMap;
 use parking_lot::RwLock;
 
@@ -173,15 +173,15 @@ impl RpcManager {
         Ok(None)
     }
 
-    pub async fn send(&self, cmd: RpcRequest) -> Result<quinn::RecvStream, RpcClientError> {
+    pub async fn send(&self, cmd: &RpcRequest) -> Result<quinn::RecvStream, RpcClientError> {
         let client = match cmd {
-            RpcRequest::Procedure { ref proc, .. } => {
+            RpcRequest::Procedure { proc, .. } => {
                 let endpoint = proc.endpoint();
 
                 match self.get_client(endpoint).await {
                     Ok(client) => client,
                     Err(RpcClientError::MissingParty(_) | RpcClientError::MissingRoom(_)) => {
-                        match self.find_faction(endpoint).await? {
+                        match self.find_faction(endpoint).boxed().await? {
                             Some(client) => client,
                             None => return Err(RpcClientError::DoesNotExist),
                         }
@@ -192,7 +192,7 @@ impl RpcManager {
             _ => unimplemented!("Non-procedure requests"),
         };
 
-        client.send(&cmd).await
+        client.send(cmd).await
     }
 }
 

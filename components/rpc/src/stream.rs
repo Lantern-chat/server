@@ -82,6 +82,7 @@ impl<R: AsyncRead + Unpin> RpcRecvReader<R> {
 }
 
 impl<R: AsyncRead + Unpin> RpcRecvReader<R> {
+    /// Reads from the underlying stream and returns the next message.
     pub async fn recv<'a, T>(&'a mut self) -> Result<Option<&'a rkyv::Archived<T>>, io::Error>
     where
         T: rkyv::Archive + 'a,
@@ -101,5 +102,30 @@ impl<R: AsyncRead + Unpin> RpcRecvReader<R> {
                 format!("Error reading archived value: {e}"),
             )),
         }
+    }
+
+    /// Converts the reader into a stream of deserialized values.
+    ///
+    /// This requires a deserializer function that returns a new deserializer for each message.
+    pub fn recv_stream_deserialized<T, F, D>(self, de: F) -> impl Stream<Item = Result<T, io::Error>>
+    where
+        T: rkyv::Archive,
+        F: Fn() -> D,
+        D: rkyv::Fallible,
+        rkyv::Archived<T>: for<'b> rkyv::CheckBytes<rkyv::validation::validators::DefaultValidator<'b>>,
+        rkyv::Archived<T>: rkyv::Deserialize<T, D>,
+    {
+        futures_util::stream::try_unfold((de, self), |(de, mut reader)| async move {
+            Ok(match reader.recv::<T>().await? {
+                Some(msg) => {
+                    let msg = rkyv::Deserialize::deserialize(msg, &mut de()).map_err(|_| {
+                        io::Error::new(ErrorKind::InvalidData, "Error deserializing archived value")
+                    })?;
+
+                    Some((msg, (de, reader)))
+                }
+                None => None,
+            })
+        })
     }
 }

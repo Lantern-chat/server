@@ -1,5 +1,5 @@
 Lantern Servers and Services
-=============================
+============================
 
 # Core Infrastructure
 
