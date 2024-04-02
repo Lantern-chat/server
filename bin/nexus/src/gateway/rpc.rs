@@ -1,8 +1,9 @@
 use crate::prelude::*;
 
+use rpc::request::ArchivedRpcRequest;
 use tokio::io::AsyncWrite;
 
-pub async fn dispatch<W>(state: ServerState, out: W, msg: &rpc::msg::ArchivedMessage) -> Result<(), Error>
+pub async fn dispatch<W>(state: ServerState, out: W, cmd: &ArchivedRpcRequest) -> Result<(), Error>
 where
     W: AsyncWrite + Unpin + Send,
 {
@@ -22,19 +23,23 @@ where
         };
     }
 
+    let ArchivedRpcRequest::Procedure { addr, auth, proc } = cmd else {
+        unimplemented!();
+    };
+
     // prepare fields
-    let addr = msg.addr.as_socket_addr();
-    let auth = || match msg.auth.as_deref() {
+    let addr = addr.as_socket_addr();
+    let auth = || match auth.as_ref() {
         Some(auth) => Ok(simple_de::<Authorization>(auth)),
         None => Err(Error::Unauthorized),
     };
 
     use core::{future::Future, pin::Pin};
-    use rpc::msg::ArchivedProcedure as Proc;
+    use rpc::procedure::ArchivedProcedure as Proc;
 
     #[allow(unused_variables)]
     #[rustfmt::skip]
-    let running: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> = match &msg.proc {
+    let running: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> = match proc {
         Proc::GetServerConfig(form) => todo!("GetServerConfig"),
         Proc::UserRegister(form) => c!(user::register::register_user(state, addr, &form.body)),
         Proc::UserLogin(form) => c!(user::me::login::login(state, addr, &form.body)),

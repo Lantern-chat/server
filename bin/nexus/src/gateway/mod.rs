@@ -172,7 +172,7 @@ impl RpcConnection {
 
         let mut stream = ::rpc::stream::RpcRecvReader::new(recv);
 
-        match stream.recv::<Result<::rpc::msg::Message, ApiError>>().await? {
+        match stream.recv::<Result<::rpc::request::RpcRequest, ApiError>>().await? {
             Some(ArchivedResult::Ok(msg)) => return self::rpc::dispatch(state, send, msg).await,
             Some(ArchivedResult::Err(e)) => log::warn!("Received error from gateway via RPC: {:?}", e.code()),
             None => log::warn!("Empty message from gateway"),

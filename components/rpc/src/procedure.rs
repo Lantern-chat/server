@@ -46,7 +46,7 @@ where
 
     // put the first item back into the stream and merge additional errors into IO errors
     //
-    // In practice, only the first item should be an error.
+    // In practice, only the first item should be an API error.
     let stream = futures_util::stream::iter([Ok(first)]).chain(stream.map(|value| match value {
         Ok(Ok(item)) => Ok(item),
         Ok(Err(api_error)) => Err(std::io::Error::new(std::io::ErrorKind::Other, api_error)),
