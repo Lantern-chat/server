@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 sdk = { workspace = true, features = ["api", "rkyv", "driver", "cbor"] }
-ftl = { workspace = true }
+ftl = { workspace = true, optional = true }
 quinn.workspace = true
 parking_lot.workspace = true
 smol_str.workspace = true

@@ -15,7 +15,7 @@ built.workspace = true
 
 [dependencies]
 sdk = { workspace = true, features = ["driver", "cbor"] }
-rpc.workspace = true
+rpc = { workspace = true, features = ["ftl"] }
 rkyv.workspace = true
 smol_str = { version = "0.2", features = ["serde", "pg"] }
 
