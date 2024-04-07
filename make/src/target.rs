@@ -26,15 +26,15 @@ impl Target {
         match self {
             Target::x86_64_v3_unknown_linux_musl => (
                 "x86_64-unknown-linux-musl",
-                "-C target-cpu=x86-64-v3 -C target-feature=+aes",
-            ),
-            Target::aarch64_unknown_linux_musl_cortex_a57 => (
-                "aarch64-unknown-linux-musl",
-                "-C target-cpu=cortex-a57 -C target-feature=-outline-atomics",
+                "-C target-cpu=x86-64-v3 -C target-feature=+aes -C opt-level=3 -C codegen-units=1",
             ),
             Target::x86_64_v3_pc_windows_msvc => (
                 "x86_64-pc-windows-msvc",
-                "-C target-cpu=x86-64-v3 -C target-feature=+aes",
+                "-C target-cpu=x86-64-v3 -C target-feature=+aes -C opt-level=3 -C codegen-units=1",
+            ),
+            Target::aarch64_unknown_linux_musl_cortex_a57 => (
+                "aarch64-unknown-linux-musl",
+                "-C target-cpu=cortex-a57 -C target-feature=-outline-atomics -C opt-level=3 -C codegen-units=1",
             ),
         }
     }
