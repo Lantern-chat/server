@@ -14,6 +14,8 @@ use miniz_oxide::inflate::{
 
 use std::{cell::RefCell, error::Error, fmt};
 
+use thin_vec::ThinVec;
+
 pub use miniz_oxide::inflate::DecompressError as InflateError;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -33,7 +35,7 @@ impl fmt::Display for DeflateError {
 }
 
 // Near exact copy of `miniz_oxide::deflate::compress_to_vec_inner` with thread-local compressor to reuse memory
-pub fn deflate(input: &[u8], level: u8) -> Result<Vec<u8>, DeflateError> {
+pub fn deflate(input: &[u8], level: u8) -> Result<ThinVec<u8>, DeflateError> {
     thread_local! {
         static COMPRESSOR: RefCell<(u8, CompressorOxide)> = RefCell::new((7, CompressorOxide::new(create_comp_flags_from_zip_params(7, 1, 0))));
     }
@@ -52,7 +54,12 @@ pub fn deflate(input: &[u8], level: u8) -> Result<Vec<u8>, DeflateError> {
             *old_level = level;
         }
 
-        let mut output = vec![0; std::cmp::max(input.len() / 2, 2)];
+        let mut output = {
+            // fill with zeroes
+            let mut output = ThinVec::with_capacity(std::cmp::max(input.len() / 2, 2));
+            output.resize(output.capacity(), 0);
+            output
+        };
 
         let mut in_pos = 0;
         let mut out_pos = 0;

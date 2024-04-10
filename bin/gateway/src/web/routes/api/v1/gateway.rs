@@ -1,7 +1,9 @@
 use super::*;
 
+use ftl::{real_ip, ws};
+
 #[allow(clippy::field_reassign_with_default)]
-pub fn gateway(route: Route<crate::ServerState>) -> ApiResult {
+pub fn gateway(route: Route<ServerState>) -> Result<Response, Error> {
     let Ok(addr) = real_ip::get_real_ip(&route) else {
         return Err(Error::BadRequest);
     };
@@ -23,5 +25,7 @@ pub fn gateway(route: Route<crate::ServerState>) -> ApiResult {
 
     let ws = ws::Ws::new(route, Some(config))?;
 
-    Ok(ws.on_upgrade(move |ws| crate::web::gateway::client_connected(ws, query, addr, state)).into())
+    Ok(ws
+        .on_upgrade(move |ws| crate::web::gateway::client_connected(ws, query, addr, state))
+        .into_response())
 }

@@ -1,4 +1,5 @@
 pub mod admin;
+pub mod gateway;
 pub mod invite;
 pub mod oembed;
 pub mod party;
@@ -13,21 +14,29 @@ use super::*;
 // import all these to be used by child modules
 use crate::prelude::*;
 use crate::web::auth::MaybeAuth;
-use sdk::Snowflake;
+use sdk::{driver::Encoding, Snowflake};
 
-use futures::{future::BoxFuture, Future};
-use rpc::{procedure::Procedure, request::RpcRequest};
+use futures::future::BoxFuture;
+use rpc::{client::RpcClientError, procedure::Procedure, request::RpcRequest};
 
 pub type ApiResult = Result<Procedure, Error>;
 pub type RouteResult = Result<BoxFuture<'static, ApiResult>, Error>;
 
-async fn api_v1_inner(mut route: Route<ServerState>) -> Result<RpcRequest, Error> {
-    route.next();
-
+async fn api_v1_inner(
+    mut route: Route<ServerState>,
+    state: &ServerState,
+    encoding: Encoding,
+) -> Result<Response, Error> {
     let addr = route.real_addr;
 
     // only `PATCH api/v1/file` is allowed to exceed this value
     // if *route.method() != Method::PATCH || route.segment() != Exact("file") {}
+
+    route.next();
+
+    if Exact("gateway") == route.segment() {
+        return gateway::gateway(route);
+    }
 
     if let Some(body) = route.body() {
         use hyper::body::Body;
@@ -63,16 +72,30 @@ async fn api_v1_inner(mut route: Route<ServerState>) -> Result<RpcRequest, Error
         _ => return Err(Error::NotFoundSignaling),
     };
 
-    Ok(RpcRequest::Procedure {
+    let cmd = RpcRequest::Procedure {
         proc: route_res?.await?,
         auth: auth.0,
         addr,
-    })
+    };
+
+    match state.rpc.send(&cmd).await {
+        // penalize for non-existent resources
+        Err(RpcClientError::DoesNotExist) => Err(Error::NotFoundHighPenalty),
+        Err(e) => {
+            log::error!("Error sending RPC request: {:?}", e);
+            Err(Error::InternalErrorStatic("RPC Error"))
+        }
+        Ok(recv) => {
+            let RpcRequest::Procedure { ref proc, .. } = cmd else {
+                unreachable!()
+            };
+
+            proc.stream_response(recv, encoding).await
+        }
+    }
 }
 
 pub async fn api_v1(route: Route<ServerState>) -> Response {
-    use rpc::client::RpcClientError;
-
     let state = route.state.clone();
     let addr = route.real_addr;
 
@@ -81,42 +104,11 @@ pub async fn api_v1(route: Route<ServerState>) -> Response {
         _ => sdk::driver::Encoding::JSON,
     };
 
-    let res = match api_v1_inner(route).await {
-        Ok(cmd) => match state.rpc.send(&cmd).await {
-            // penalize for non-existent resources
-            Err(RpcClientError::DoesNotExist) => Err((500, Error::NotFound)),
-            Err(e) => {
-                log::error!("Error sending RPC request: {:?}", e);
-                Err((0, Error::InternalErrorStatic("RPC Error")))
-            }
-            Ok(recv) => {
-                let RpcRequest::Procedure { ref proc, .. } = cmd else {
-                    unreachable!()
-                };
-
-                match proc.stream_response(recv, encoding).await {
-                    Ok(resp) => Ok(resp),
-                    Err(e) => Err((0, e)),
-                }
-            }
-        },
-        Err(e) => Err((
-            // Rate-limiting penalty in milliseconds
-            // TODO: Make this configurable or find better values
-            match e {
-                Error::NotFoundSignaling => 100,
-                Error::BadRequest => 200,
-                Error::Unauthorized => 200,
-                Error::MethodNotAllowed => 200,
-                _ => 0,
-            },
-            e,
-        )),
-    };
-
-    match res {
+    match api_v1_inner(route, &state, encoding).await {
         Ok(resp) => resp,
-        Err((penalty, e)) => {
+        Err(e) => {
+            let penalty = e.penalty();
+
             if penalty > 0 {
                 state.rate_limit.penalize(&state, addr, penalty).await;
             }

@@ -1,8 +1,9 @@
-use std::{ops::Deref, sync::Arc};
+use std::ops::Deref;
+use triomphe::Arc;
 
 use crate::{
     config::Config,
-    web::{file_cache::MainFileCache, rate_limit::RateLimitTable},
+    web::{file_cache::MainFileCache, gateway::Heart, rate_limit::RateLimitTable},
 };
 
 use arc_swap::ArcSwap;
@@ -10,9 +11,12 @@ use futures::{Stream, StreamExt};
 use sdk::Snowflake;
 use tokio::sync::{Notify, Semaphore};
 
+use schema::sf::SnowflakeGenerator;
+
 pub mod session_cache;
 
 pub struct InnerServerState {
+    pub sf: SnowflakeGenerator,
     pub db: db::DatabasePools,
     pub config: config::Config<Config>,
 
@@ -23,6 +27,8 @@ pub struct InnerServerState {
     pub emoji: common::emoji::EmojiMap,
 
     pub rpc: rpc::client::RpcManager,
+
+    pub heart: Arc<Heart>,
 }
 
 #[derive(Clone)]

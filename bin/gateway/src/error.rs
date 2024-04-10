@@ -1,7 +1,5 @@
 use std::{borrow::Cow, str::Utf8Error, string::FromUtf8Error};
 
-use crate::prelude::*;
-
 use db::pool::Error as DbError;
 use ftl::{body::BodyDeserializeError, reply::WithStatus, ws::WsError, *};
 use http::header::InvalidHeaderValue;
@@ -20,6 +18,9 @@ pub enum Error {
     /// Signals that an invalid path was requested
     #[error("Not Found")]
     NotFoundSignaling,
+    /// Signals that a high penalty should be applied
+    #[error("Not Found")]
+    NotFoundHighPenalty,
 
     #[error("Bad Request")]
     BadRequest,
@@ -121,6 +122,19 @@ lazy_static::lazy_static! {
 }
 
 impl Error {
+    /// Rate-limiting penalty in milliseconds
+    pub fn penalty(&self) -> u64 {
+        // TODO: Make this configurable or find better values
+        match self {
+            Error::NotFoundSignaling => 100,
+            Error::NotFoundHighPenalty => 500,
+            Error::BadRequest => 200,
+            Error::Unauthorized => 200,
+            Error::MethodNotAllowed => 200,
+            _ => 0,
+        }
+    }
+
     /// Returns whether the error is fatal and should be logged as an error
     #[rustfmt::skip]
     pub fn is_fatal(&self) -> bool {
@@ -180,6 +194,7 @@ impl From<Error> for sdk::api::error::ApiError {
         let code = match value {
             Error::NotFound                     => ApiErrorCode::NotFound,
             Error::NotFoundSignaling            => ApiErrorCode::NotFound,
+            Error::NotFoundHighPenalty          => ApiErrorCode::NotFound,
             Error::BadRequest                   => ApiErrorCode::BadRequest,
             Error::MethodNotAllowed             => ApiErrorCode::MethodNotAllowed,
             Error::RequestEntityTooLarge        => ApiErrorCode::RequestEntityTooLarge,
@@ -266,6 +281,7 @@ impl Error {
         impl_cached! {
             NotFound,
             NotFoundSignaling,
+            NotFoundHighPenalty,
             BadRequest,
             MethodNotAllowed,
             Unimplemented,

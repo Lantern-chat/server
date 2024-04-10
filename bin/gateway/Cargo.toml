@@ -30,6 +30,7 @@ hyper = { version = "1", features = ["http1", "http2", "server"] }
 hyper-util = { version = "0.1.2", features = ["tokio"] }
 http-body-util = "0.1.0"
 tokio-tungstenite = { version = "0.21", default-features = false, features = ["connect"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
 http.workspace = true
 headers.workspace = true
 
@@ -77,6 +78,10 @@ mime = "0.3.17"
 bytes = "1.5.0"
 urlencoding = "2.1.3"
 async-recursion = "1"
+thin-vec = "0.2"
+parking_lot = "0.12"
+once_cell = { version = "1.19.0", features = ["parking_lot"] }
+quanta = "0.12.3"
 
 
 [target.'cfg(all(unix, any(target_arch = "x86", target_arch = "x86_64")))'.dependencies]

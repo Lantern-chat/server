@@ -20,10 +20,11 @@ lazy_static = "1.4.0"
 futures = "0.3.14"
 thiserror = "1.0.24"
 hex = "0.4"
-base64 = "0.21.0"
+base64 = "0.22.0"
 serde = "1"
 time = { version = "0.3", features = ["macros"] }
 miniz_oxide = { version = "0.7", features = ["std"] }
+thin-vec = "0.2"
 # itoa = "0.4.8"
 # regex = "1.5.4"
 # regex-automata = "0.1.10"
