@@ -79,6 +79,11 @@ impl<R: AsyncRead + Unpin> RpcRecvReader<R> {
             buffer: rkyv::AlignedVec::new(),
         }
     }
+
+    #[inline(always)]
+    pub fn into_inner(self) -> R {
+        self.stream.into_inner()
+    }
 }
 
 impl<R: AsyncRead + Unpin> RpcRecvReader<R> {

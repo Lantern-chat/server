@@ -7,7 +7,7 @@ use smallvec::{smallvec, SmallVec};
 
 pub type SmallSnowflakeVec = SmallVec<[Snowflake; 1]>;
 
-#[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
+#[derive(Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 #[archive(check_bytes)]
 pub enum ClientCommand {
     /// Regular client message/command

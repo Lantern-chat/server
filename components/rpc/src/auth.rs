@@ -7,7 +7,7 @@ use auth::UserToken;
 /// These are typically cached in the gateway for faster reauth
 #[derive(Debug, Clone, Copy, PartialEq, Eq, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 #[archive(check_bytes)]
-#[repr(u64, C)] // make sure things are tidy
+#[repr(u64, C)] // make sure things are tidy enough for branchless lookup of user_id/bot_id
 pub enum Authorization {
     User {
         user_id: Snowflake,
