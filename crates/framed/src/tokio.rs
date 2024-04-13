@@ -198,6 +198,11 @@ impl<R: AsyncRead + Unpin> AsyncFramedReader<R> {
         }
     }
 
+    #[inline(always)]
+    pub fn into_inner(self) -> R {
+        self.inner
+    }
+
     pub const fn len(&self) -> u64 {
         self.len
     }
