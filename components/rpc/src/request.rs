@@ -1,6 +1,6 @@
 use sdk::Snowflake;
 
-use crate::procedure::Procedure;
+use crate::{event::ClientCommand, procedure::Procedure};
 
 #[derive(Debug, rkyv::Archive, rkyv::Serialize)]
 #[archive(check_bytes)]
@@ -14,6 +14,8 @@ pub enum RpcRequest {
     GetPartyInfoFromPartyId(Snowflake),
     /// Fetch party info from a room_id
     GetPartyInfoFromRoomId(Snowflake),
+
+    ForwardedClientCommand(ClientCommand),
 }
 
 #[derive(Debug, rkyv::Archive, rkyv::Serialize)]
