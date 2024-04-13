@@ -6,7 +6,10 @@ pub struct Heart {
 impl Default for Heart {
     fn default() -> Self {
         let clock = quanta::Clock::new();
-        Heart { start: clock.raw(), clock }
+        Heart {
+            start: clock.raw(),
+            clock,
+        }
     }
 }
 

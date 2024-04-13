@@ -9,6 +9,16 @@ use sdk::api::gateway::{Encoding, GatewayQueryParams};
 
 use sdk::models::gateway::message::ServerMsg;
 
+pub mod internal;
+
+pub use internal::InternalEvent;
+
+lazy_static::lazy_static! {
+    pub static ref HELLO_EVENT: Event = Event::new_compressed(ServerMsg::new_hello(sdk::models::events::Hello::default()), None, 10).unwrap();
+    pub static ref HEARTBEAT_ACK: Event = Event::new_compressed(ServerMsg::new_heartbeat_ack(), None, 10).unwrap();
+    pub static ref INVALID_SESSION: Event = Event::new_compressed(ServerMsg::new_invalid_session(), None, 10).unwrap();
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum EventEncodingError {
     #[error("Json Encoding Error: {0}")]
@@ -44,8 +54,6 @@ pub struct ExternalEvent {
     pub room_id: Option<Snowflake>,
 }
 
-pub use super::internal::InternalEvent;
-
 /// Actual event enum
 #[derive(Debug)]
 pub enum EventInner {
@@ -72,7 +80,10 @@ use util::zlib::{deflate, DeflateError};
 impl CompressedEvent {
     fn new(level: u8, value: ThinVec<u8>) -> Result<Self, EventEncodingError> {
         let compressed = deflate(&value, level)?;
-        Ok(CompressedEvent { uncompressed: value, compressed })
+        Ok(CompressedEvent {
+            uncompressed: value,
+            compressed,
+        })
     }
 
     pub fn get(&self, compressed: bool) -> &[u8] {
@@ -129,7 +140,11 @@ impl Event {
         })))
     }
 
-    pub fn new_compressed(msg: ServerMsg, room_id: Option<Snowflake>, level: u8) -> Result<Event, EventEncodingError> {
+    pub fn new_compressed(
+        msg: ServerMsg,
+        room_id: Option<Snowflake>,
+        level: u8,
+    ) -> Result<Event, EventEncodingError> {
         let encoded = EncodedEvent::new(&msg, level)?;
 
         Ok(Event(Arc::new(EventInner::External(ExternalEvent {

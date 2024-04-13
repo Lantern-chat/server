@@ -3,7 +3,8 @@ use triomphe::Arc;
 
 use crate::{
     config::Config,
-    web::{file_cache::MainFileCache, gateway::Heart, rate_limit::RateLimitTable},
+    gateway::{Gateway, Heart},
+    web::{file_cache::MainFileCache, rate_limit::RateLimitTable},
 };
 
 use arc_swap::ArcSwap;
@@ -29,6 +30,7 @@ pub struct InnerServerState {
     pub rpc: rpc::client::RpcManager,
 
     pub heart: Arc<Heart>,
+    pub gateway: Gateway,
 }
 
 #[derive(Clone)]

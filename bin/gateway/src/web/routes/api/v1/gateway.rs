@@ -2,6 +2,8 @@ use super::*;
 
 use ftl::{real_ip, ws};
 
+use crate::gateway::handler;
+
 #[allow(clippy::field_reassign_with_default)]
 pub fn gateway(route: Route<ServerState>) -> Result<Response, Error> {
     let Ok(addr) = real_ip::get_real_ip(&route) else {
@@ -14,7 +16,6 @@ pub fn gateway(route: Route<ServerState>) -> Result<Response, Error> {
         _ => return Err(Error::BadRequest),
     };
 
-    // TODO: Move this into FTL websocket part?
     let state = route.state.clone();
 
     let mut config = ws::WebSocketConfig::default();
@@ -25,7 +26,5 @@ pub fn gateway(route: Route<ServerState>) -> Result<Response, Error> {
 
     let ws = ws::Ws::new(route, Some(config))?;
 
-    Ok(ws
-        .on_upgrade(move |ws| crate::web::gateway::client_connected(ws, query, addr, state))
-        .into_response())
+    Ok(ws.on_upgrade(move |ws| handler::client_connected(ws, query, addr, state)).into_response())
 }
