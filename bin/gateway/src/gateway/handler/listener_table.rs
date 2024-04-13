@@ -1,6 +1,6 @@
 use futures::{
     stream::{self, AbortHandle, BoxStream, SelectAll},
-    FutureExt, StreamExt,
+    StreamExt,
 };
 
 use tokio_stream::wrappers::BroadcastStream;
@@ -9,17 +9,22 @@ use hashbrown::HashMap;
 use sdk::Snowflake;
 
 #[repr(transparent)]
+#[derive(Debug, Default)]
 pub struct ListenerTable {
     table: HashMap<Snowflake, AbortHandle>,
 }
 
-use super::{Item, PartySubscription};
+impl std::ops::Deref for ListenerTable {
+    type Target = HashMap<Snowflake, AbortHandle>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.table
+    }
+}
+
+use crate::gateway::{handler::Item, PartySubscription};
 
 impl ListenerTable {
-    pub fn new() -> Self {
-        Self { table: HashMap::new() }
-    }
-
     // TODO: to implement sub/unsub low-bandwidth modes, the abort handles will
     // probably need to be replaced with something that pauses them instead
     pub fn register_subs(&mut self, events: &mut SelectAll<BoxStream<Item>>, subs: Vec<PartySubscription>) {
@@ -29,7 +34,7 @@ impl ListenerTable {
             // this is so we can unsubscribe later if needed
             let (stream, handle) = stream::abortable(BroadcastStream::new(sub.rx));
 
-            self.insert(sub.party_id, handle);
+            self.table.insert(sub.party_id, handle);
 
             // map the stream to the `Item` type
             stream.map(|event| Item::Event(event.map_err(Into::into))).boxed()
