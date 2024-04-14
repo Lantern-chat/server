@@ -15,21 +15,21 @@ pub type RoomId = Snowflake;
 pub type PartyId = Snowflake;
 
 #[derive(Default)]
-pub struct GatewayMetadata {
+pub struct StructureCache {
     pub role_perms: scc::HashIndex<RoleId, Permissions, ahash::RandomState>,
     pub user_roles: scc::HashIndex<(PartyId, UserId), Arc<RwLock<VecSet<RoleId>>>, ahash::RandomState>,
-    pub rooms: scc::HashIndex<RoomId, RoomMetadata, ahash::RandomState>,
-    pub parties: scc::HashIndex<PartyId, Arc<PartyMetadata>, ahash::RandomState>,
+    pub rooms: scc::HashIndex<RoomId, RoomStructure, ahash::RandomState>,
+    pub parties: scc::HashIndex<PartyId, Arc<PartyStructure>, ahash::RandomState>,
 }
 
-pub struct PartyMetadata {
+pub struct PartyStructure {
     pub owner_id: UserId,
     pub rooms: AsyncRwLock<VecSet<RoomId>>,
     pub roles: AsyncRwLock<VecSet<RoleId>>,
 }
 
 #[derive(Clone)]
-pub struct RoomMetadata {
+pub struct RoomStructure {
     pub party_id: PartyId,
     pub overwrites: Arc<[Overwrite]>,
 }
@@ -38,7 +38,7 @@ use rkyv::Archived;
 
 use sdk::models::gateway::events::Ready;
 
-impl GatewayMetadata {
+impl StructureCache {
     pub async fn populate_from_ready(&self, ready: &Archived<Ready>) {
         todo!("populate_from_ready")
     }

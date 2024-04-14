@@ -3,7 +3,7 @@ pub mod conn;
 pub mod event;
 pub mod handler;
 pub mod heart;
-pub mod metadata;
+pub mod structure;
 
 use crate::prelude::*;
 
