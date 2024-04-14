@@ -3,6 +3,7 @@ pub mod conn;
 pub mod event;
 pub mod handler;
 pub mod heart;
+pub mod metadata;
 
 use crate::prelude::*;
 
@@ -224,9 +225,7 @@ impl Gateway {
         for party_id in missing {
             subs.push(match self.parties.entry_async(party_id).await {
                 scc::hash_index::Entry::Occupied(party) => party.get().subscribe(),
-                scc::hash_index::Entry::Vacant(vacant) => {
-                    vacant.insert_entry(PartyEmitter::new(party_id)).get().subscribe()
-                }
+                scc::hash_index::Entry::Vacant(vacant) => vacant.insert_entry(PartyEmitter::new(party_id)).get().subscribe(),
             });
         }
 
