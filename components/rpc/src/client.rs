@@ -127,13 +127,13 @@ pub struct RpcManager {
     nexus: RpcClient,
 
     /// All configured clients, excluding the nexus.
-    clients: scc::HashSet<RpcClient>,
+    clients: scc::HashSet<RpcClient, ahash::RandomState>,
     /// Faction clients, with party_id as the key.
     ///
     /// There will be a unique entry for the faction server using its own faction_id.
-    factions: scc::HashMap<Snowflake, RpcClient>,
+    factions: scc::HashIndex<Snowflake, RpcClient, ahash::RandomState>,
     /// Room to party association.
-    rooms: scc::HashIndex<Snowflake, Snowflake>,
+    rooms: scc::HashIndex<Snowflake, Snowflake, ahash::RandomState>,
 }
 
 use crate::request::{PartyInfo, RpcRequest};
@@ -178,7 +178,7 @@ impl RpcManager {
             RpcRequest::Procedure { proc, .. } => {
                 let endpoint = proc.endpoint();
 
-                match self.get_client(endpoint).await {
+                match self.get_client(endpoint) {
                     Ok(client) => client,
                     Err(RpcClientError::MissingParty(_) | RpcClientError::MissingRoom(_)) => {
                         match self.find_faction(endpoint).boxed().await? {
@@ -200,16 +200,16 @@ impl RpcManager {
     pub fn new(nexus: RpcClient) -> RpcManager {
         RpcManager {
             nexus,
-            clients: scc::HashSet::new(),
-            factions: scc::HashMap::new(),
-            rooms: scc::HashIndex::new(),
+            clients: scc::HashSet::default(),
+            factions: scc::HashIndex::default(),
+            rooms: scc::HashIndex::default(),
         }
     }
 
     /// Add a faction to the manager, returning the client to use for the faction,
     /// or the existing client if it already exists.
     pub async fn add_faction(&self, mut client: RpcClient) -> RpcClient {
-        use scc::hash_map::Entry;
+        use scc::hash_index::Entry;
 
         match self.factions.entry_async(client.faction_id).await {
             Entry::Vacant(v) => {
@@ -231,7 +231,7 @@ impl RpcManager {
     where
         'a: 'b, // don't let the room_ids reference outlive the party_id
     {
-        use scc::hash_map::Entry;
+        use scc::hash_index::Entry;
 
         let client = match self.factions.get_async(&faction_id).await {
             Some(faction_client) => faction_client.get().clone(),
@@ -243,7 +243,7 @@ impl RpcManager {
             async {
                 match self.factions.entry_async(party_id).await {
                     Entry::Vacant(v) => _ = v.insert_entry(client.clone()),
-                    Entry::Occupied(mut v) => _ = v.insert(client.clone()),
+                    Entry::Occupied(v) => v.update(client.clone()),
                 }
             },
             async {
@@ -266,23 +266,34 @@ impl RpcManager {
     }
 
     pub async fn get_connection(&self, kind: Resolve) -> Result<RpcClientConnection, RpcClientError> {
-        self.get_client(kind).await?.get_connection().await
+        self.get_client(kind)?.get_connection().await
     }
 
-    pub async fn get_client(&self, mut kind: Resolve) -> Result<RpcClient, RpcClientError> {
+    pub fn get_client(&self, mut kind: Resolve) -> Result<RpcClient, RpcClientError> {
+        let mut _guard = None;
+
         if let Resolve::Room(room_id) = kind {
-            kind = match self.rooms.peek(&room_id, &scc::ebr::Guard::new()) {
+            let _guard2 = scc::ebr::Guard::new();
+
+            kind = match self.rooms.peek(&room_id, &_guard2) {
                 Some(party_id) => Resolve::Party(*party_id),
                 None => return Err(RpcClientError::MissingRoom(room_id)),
             };
+
+            _guard = Some(_guard2);
         }
 
         Ok(match kind {
             Resolve::Nexus => self.nexus.clone(),
-            Resolve::Party(party_id) => match self.factions.get_async(&party_id).await {
-                Some(client) => client.get().clone(),
-                None => return Err(RpcClientError::MissingParty(party_id)),
-            },
+            Resolve::Party(party_id) => {
+                // reuse the guard if we already have it
+                let _guard = _guard.unwrap_or_else(scc::ebr::Guard::new);
+
+                match self.factions.peek(&party_id, &_guard) {
+                    Some(client) => client.clone(),
+                    None => return Err(RpcClientError::MissingParty(party_id)),
+                }
+            }
             _ => unreachable!(),
         })
     }

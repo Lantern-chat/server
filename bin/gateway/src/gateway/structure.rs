@@ -48,9 +48,9 @@ impl StructureCache {
 
         let room = self.rooms.peek(&room_id, &_guard)?.clone();
         let party_id = room.party_id;
-        let party = self.parties.peek(&party_id, &_guard)?.clone();
 
-        if user_id == party.owner_id {
+        // owners implicitly have all permissions
+        if user_id == self.parties.peek(&party_id, &_guard)?.owner_id {
             return Some(Permissions::all());
         }
 

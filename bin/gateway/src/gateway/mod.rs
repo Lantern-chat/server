@@ -90,13 +90,13 @@ use conn::GatewayConnection;
 #[derive(Default)]
 pub struct Gateway {
     /// per-party emitters that can be subscribed to
-    pub parties: scc::HashIndex<PartyId, PartyEmitter>,
+    pub parties: scc::HashIndex<PartyId, PartyEmitter, ahash::RandomState>,
 
     /// All gateway connections, even unidentified
-    pub conns: scc::HashIndex<ConnectionId, GatewayConnection>,
+    pub conns: scc::HashIndex<ConnectionId, GatewayConnection, ahash::RandomState>,
 
     /// Identified gateway connections that can targetted by UserId
-    pub users: scc::HashMap<UserId, HashMap<ConnectionId, GatewayConnection>>,
+    pub users: scc::HashMap<UserId, HashMap<ConnectionId, GatewayConnection>, ahash::RandomState>,
 
     /// Tracks connection heartbeats using a monotonic clock
     pub heart: Arc<Heart>,
