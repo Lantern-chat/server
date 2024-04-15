@@ -9,7 +9,7 @@ lazy_static::lazy_static! {
         headers::ContentType::from("application/offset+octet-stream".parse::<mime::Mime>().unwrap());
 }
 
-pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: Snowflake) -> ApiResult {
+pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: FileId) -> ApiResult {
     match route.header::<headers::ContentType>() {
         None => return Err(Error::MissingContentTypeHeader),
         Some(ct) if ct == *APPLICATION_OFFSET_OCTET_STREAM => {}

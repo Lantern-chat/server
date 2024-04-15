@@ -2,7 +2,7 @@ use std::time::{Duration, SystemTime};
 
 use mfa_totp::{totp::TOTP6, MFA};
 use sdk::api::commands::user::{Added2FA, Confirm2FAForm, Enable2FAForm, Remove2FAForm};
-use sdk::models::{ElevationLevel, Snowflake, UserFlags};
+use sdk::models::{ElevationLevel, UserFlags};
 
 use crate::prelude::*;
 use crate::util::encrypt::nonce_from_user_id;
@@ -11,7 +11,7 @@ use super::login::ProvidedMfa;
 
 pub async fn enable_2fa(
     state: ServerState,
-    user_id: Snowflake,
+    user_id: UserId,
     form: &Archived<Enable2FAForm>,
 ) -> Result<Added2FA, Error> {
     let config = state.config_full();
@@ -87,7 +87,7 @@ pub async fn enable_2fa(
 
 pub async fn confirm_2fa(
     state: ServerState,
-    user_id: Snowflake,
+    user_id: UserId,
     form: &Archived<Confirm2FAForm>,
 ) -> Result<(), Error> {
     if form.totp.len() != 6 {
@@ -145,11 +145,7 @@ pub async fn confirm_2fa(
     Ok(())
 }
 
-pub async fn remove_2fa(
-    state: ServerState,
-    user_id: Snowflake,
-    form: &Archived<Remove2FAForm>,
-) -> Result<(), Error> {
+pub async fn remove_2fa(state: ServerState, user_id: UserId, form: &Archived<Remove2FAForm>) -> Result<(), Error> {
     if !state.config().shared.password_length.contains(&form.password.len()) {
         return Err(Error::InvalidCredentials);
     }

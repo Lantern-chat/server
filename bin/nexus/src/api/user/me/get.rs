@@ -3,7 +3,7 @@ use thorn::pg::Json;
 
 use crate::{prelude::*, util::encrypted_asset::encrypt_snowflake_opt};
 
-pub async fn get_full_self(state: &ServerState, user_id: Snowflake) -> Result<User, Error> {
+pub async fn get_full_self(state: &ServerState, user_id: UserId) -> Result<User, Error> {
     let db = state.db.read.get().await?;
 
     get_full_self_inner(state, user_id, &db).await
@@ -11,7 +11,7 @@ pub async fn get_full_self(state: &ServerState, user_id: Snowflake) -> Result<Us
 
 pub async fn get_full_self_inner(
     state: &ServerState,
-    user_id: Snowflake,
+    user_id: UserId,
     db: &db::pool::Object,
 ) -> Result<User, Error> {
     #[rustfmt::skip]

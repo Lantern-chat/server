@@ -1,7 +1,7 @@
 use schema::sf::SnowflakeGenerator;
-use sdk::Snowflake;
 use tokio::sync::Semaphore;
 
+use crate::prelude::*;
 use crate::{config::Config, gateway::Gateway, queues::Queues, services::Services};
 
 pub mod permission_cache;
@@ -42,7 +42,7 @@ pub struct ServerStateInner {
     pub emoji: EmojiMap,
 
     /// Last timestep used for MFA per-user.
-    pub mfa_last: scc::HashIndex<Snowflake, u64, ahash::RandomState>,
+    pub mfa_last: scc::HashIndex<UserId, u64, ahash::RandomState>,
 }
 
 #[derive(Clone)]

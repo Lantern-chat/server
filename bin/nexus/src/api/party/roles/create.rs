@@ -5,7 +5,7 @@ use crate::prelude::*;
 pub async fn create_role(
     state: ServerState,
     auth: Authorization,
-    party_id: Snowflake,
+    party_id: PartyId,
     form: &Archived<CreateRoleForm>,
 ) -> Result<Role, Error> {
     {
@@ -66,7 +66,7 @@ pub async fn create_role(
         FROM TempRole LEFT JOIN Inserted ON TRUE
     }).await?;
 
-    if row.role_id::<Option<Snowflake>>()?.is_none() {
+    if row.role_id::<Option<RoleId>>()?.is_none() {
         t.rollback().await?;
         return Err(Error::Unauthorized);
     };

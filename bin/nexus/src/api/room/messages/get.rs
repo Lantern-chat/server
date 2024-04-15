@@ -1,6 +1,6 @@
 use futures::{Stream, StreamExt};
 
-use schema::{flags::AttachmentFlags, Snowflake};
+use schema::flags::AttachmentFlags;
 use sdk::models::*;
 use thorn::pg::Json;
 
@@ -11,7 +11,7 @@ use sdk::api::commands::room::GetMessagesQuery;
 pub async fn get_many(
     state: ServerState,
     auth: Authorization,
-    room_id: Snowflake,
+    room_id: RoomId,
     form: &Archived<GetMessagesQuery>,
 ) -> Result<impl Stream<Item = Result<Message, Error>> + '_, Error> {
     let needs_perms = match state.perm_cache.get(auth.user_id(), room_id).await {
@@ -34,7 +34,7 @@ pub async fn get_many(
         user_id: auth.user_id(),
         room_id,
         needs_perms,
-        cursor: simple_de::<Option<_>>(&form.query).unwrap_or_else(|| Cursor::Before(Snowflake::max_safe_value())),
+        cursor: simple_de::<Option<_>>(&form.query).unwrap_or_else(|| Cursor::Before(MessageId::max_safe_value())),
         parent: form.parent.as_ref().copied(),
         limit,
         pins: form.pinned.as_slice(),
@@ -47,7 +47,7 @@ pub async fn get_many(
     do_get(state, &*db, req).await
 }
 
-pub async fn get_one<DB>(state: ServerState, db: &DB, msg_id: Snowflake) -> Result<Message, Error>
+pub async fn get_one<DB>(state: ServerState, db: &DB, msg_id: MessageId) -> Result<Message, Error>
 where
     DB: db::pool::AnyClient,
 {
@@ -62,15 +62,15 @@ where
 
 pub enum GetMsgRequest<'a> {
     /// Single unauthorized message
-    Single { msg_id: Snowflake },
+    Single { msg_id: MessageId },
     Many {
         needs_perms: bool,
-        user_id: Snowflake,
-        room_id: Snowflake,
+        user_id: UserId,
+        room_id: RoomId,
         cursor: Cursor,
-        parent: Option<Snowflake>,
+        parent: Option<MessageId>,
         limit: i16,
-        pins: &'a [Snowflake],
+        pins: &'a [FolderId],
         starred: bool,
         recurse: i16,
     },
@@ -349,8 +349,8 @@ where
     Ok(stream.map(move |row| match row {
         Err(e) => Err(e.into()),
         Ok(row) => {
-            let party_id: Snowflake = row.party_id()?;
-            let msg_id: Snowflake = row.msg_id()?;
+            let party_id: PartyId = row.party_id()?;
+            let msg_id: MessageId = row.msg_id()?;
 
             // many fields here are empty, easy to construct, and are filled in below
             let mut msg = Message {
@@ -363,7 +363,7 @@ where
                 content: None,
                 author: PartyMember {
                     user: User {
-                        id: Snowflake(unsafe { std::num::NonZeroU64::new_unchecked(1) }),
+                        id: UserId::null(),
                         discriminator: 0,
                         username: SmolStr::new_inline("SYSTEM"),
                         flags: UserFlags::SYSTEM_USER,
@@ -577,7 +577,7 @@ where
 #[serde(default)]
 struct RawReaction {
     /// emote_id
-    pub e: Option<Snowflake>,
+    pub e: Option<EmoteId>,
     /// emoji_id
     pub j: Option<i32>,
     /// me (own reaction)

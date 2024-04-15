@@ -1,12 +1,10 @@
 use futures::TryStreamExt;
 
-use schema::Snowflake;
-
 use crate::{api::SearchMode, prelude::*, util::encrypted_asset::encrypt_snowflake_opt};
 
 use sdk::models::*;
 
-pub async fn get_party(state: ServerState, auth: Authorization, party_id: Snowflake) -> Result<Party, Error> {
+pub async fn get_party(state: ServerState, auth: Authorization, party_id: PartyId) -> Result<Party, Error> {
     let db = state.db.read.get().await?;
 
     get_party_inner(state, &db, auth.user_id(), party_id).await
@@ -15,8 +13,8 @@ pub async fn get_party(state: ServerState, auth: Authorization, party_id: Snowfl
 pub async fn get_party_inner(
     state: ServerState,
     db: &db::pool::Client,
-    user_id: Snowflake,
-    party_id: Snowflake,
+    user_id: UserId,
+    party_id: PartyId,
 ) -> Result<Party, Error> {
     #[rustfmt::skip]
     let row = db.query_one2(schema::sql! {

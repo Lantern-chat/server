@@ -5,8 +5,8 @@ use super::prelude::*;
 pub async fn presence_updated(
     state: &ServerState,
     db: &db::pool::Client,
-    user_id: Snowflake,
-    party_id: Option<Snowflake>,
+    user_id: UserId,
+    party_id: Option<PartyId>,
 ) -> Result<(), Error> {
     let do_update = async {
         #[rustfmt::skip]
@@ -33,7 +33,7 @@ pub async fn presence_updated(
         while let Some(row_res) = stream.next().await {
             let row = row_res?;
 
-            let party_id: Option<Snowflake> = row.party_id()?;
+            let party_id: Option<PartyId> = row.party_id()?;
             // TODO: Get other broadcast ids
 
             let inner = UserPresenceEvent {

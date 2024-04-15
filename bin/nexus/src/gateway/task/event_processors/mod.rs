@@ -1,11 +1,10 @@
 use db::pool::Client;
-use schema::Snowflake;
 
 use crate::prelude::*;
 
 pub mod prelude {
     pub use crate::prelude::*;
-    pub use schema::Snowflake;
+
     pub use sdk::models::{
         gateway::{events::*, message::ServerMsg, Intent},
         *,
@@ -24,7 +23,7 @@ pub mod user_event;
 #[derive(Debug, Clone, Copy)]
 pub struct RawEvent {
     pub id: Snowflake,
-    pub room_id: Option<Snowflake>,
+    pub room_id: Option<RoomId>,
     pub code: EventCode,
 }
 
@@ -35,7 +34,7 @@ pub async fn process(
     state: &ServerState,
     db: &Client,
     event: RawEvent,
-    party_id: Option<Snowflake>,
+    party_id: Option<PartyId>,
 ) -> Result<(), Error> {
     let RawEvent { id, code, room_id } = event;
 

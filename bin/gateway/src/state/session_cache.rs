@@ -1,15 +1,12 @@
-use sdk::models::{Timestamp, UserFlags};
+use sdk::models::{aliases::*, Timestamp, UserFlags};
 
-use schema::{
-    auth::{RawAuthToken, UserToken},
-    Snowflake,
-};
+use schema::auth::{RawAuthToken, UserToken};
 
 use rpc::auth::Authorization;
 
 #[derive(Debug, Clone, Copy)]
 struct PartialUserAuthorization {
-    user_id: Snowflake,
+    user_id: UserId,
     expires: Timestamp,
     flags: UserFlags,
 }
@@ -23,7 +20,7 @@ struct PartialBotAuthorization {
 #[derive(Default)]
 pub struct AuthCache {
     users: scc::HashIndex<UserToken, PartialUserAuthorization, ahash::RandomState>,
-    bots: scc::HashIndex<Snowflake, PartialBotAuthorization, ahash::RandomState>,
+    bots: scc::HashIndex<UserId, PartialBotAuthorization, ahash::RandomState>,
 }
 
 impl AuthCache {
@@ -74,7 +71,7 @@ impl AuthCache {
         self.users.retain_async(|_, part| part.expires < now).await;
     }
 
-    // pub async fn clear_user(&self, user_id: Snowflake) {
+    // pub async fn clear_user(&self, user_id: UserId) {
     //     self.map.retain_async(|_, part| part.user_id != user_id).await;
     // }
 }

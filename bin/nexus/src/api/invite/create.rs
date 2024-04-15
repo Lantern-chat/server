@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use schema::Snowflake;
+
 use timestamp::Duration;
 
 use sdk::api::commands::party::CreatePartyInviteBody;
@@ -11,7 +11,7 @@ const MAX_DURATION: u64 = 100 * 365 * 24 * 60 * 60 * 1000;
 pub async fn create_invite(
     state: ServerState,
     auth: Authorization,
-    party_id: Snowflake,
+    party_id: PartyId,
     body: CreatePartyInviteBody,
 ) -> Result<Invite, Error> {
     let duration = match body.duration {
@@ -70,7 +70,7 @@ pub async fn create_invite(
             Checked LEFT JOIN Inserted ON TRUE
     }).await?;
 
-    if row.invite_id::<Option<Snowflake>>()?.is_none() {
+    if row.invite_id::<Option<InviteId>>()?.is_none() {
         return Err(Error::Unauthorized);
     }
 

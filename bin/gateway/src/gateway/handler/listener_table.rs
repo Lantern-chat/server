@@ -6,16 +6,17 @@ use futures::{
 use tokio_stream::wrappers::BroadcastStream;
 
 use hashbrown::HashMap;
-use sdk::Snowflake;
+
+use crate::prelude::*;
 
 #[repr(transparent)]
 #[derive(Debug, Default)]
 pub struct ListenerTable {
-    table: HashMap<Snowflake, AbortHandle>,
+    table: HashMap<PartyId, AbortHandle>,
 }
 
 impl std::ops::Deref for ListenerTable {
-    type Target = HashMap<Snowflake, AbortHandle>;
+    type Target = HashMap<PartyId, AbortHandle>;
 
     fn deref(&self) -> &Self::Target {
         &self.table

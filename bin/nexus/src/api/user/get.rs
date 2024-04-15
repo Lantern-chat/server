@@ -5,13 +5,13 @@ use sdk::models::*;
 pub async fn get_full_member(
     state: ServerState,
     auth: Authorization,
-    user_id: Snowflake,
-    party_id: Snowflake,
+    user_id: UserId,
+    party_id: PartyId,
 ) -> Result<PartyMember, Error> {
     unimplemented!()
 }
 
-pub async fn get_full_user(state: ServerState, auth: Authorization, user_id: Snowflake) -> Result<User, Error> {
+pub async fn get_full_user(state: ServerState, auth: Authorization, user_id: UserId) -> Result<User, Error> {
     let db = state.db.read.get().await?;
 
     use q::{columns::*, Parameters, Params};
@@ -89,6 +89,7 @@ pub async fn get_full_user(state: ServerState, auth: Authorization, user_id: Sno
 mod q {
     use sdk::models::UserPrefsFlags;
 
+    use crate::prelude::*;
     use schema::*;
     pub use thorn::*;
 
@@ -109,9 +110,9 @@ mod q {
 
     thorn::params! {
         pub struct Params {
-            pub self_id: Snowflake = Users::Id,
-            pub user_id: Snowflake = Users::Id,
-            pub party_id: Option<Snowflake> = Party::Id,
+            pub self_id: UserId = Users::Id,
+            pub user_id: UserId = Users::Id,
+            pub party_id: Option<PartyId> = Party::Id,
         }
     }
 

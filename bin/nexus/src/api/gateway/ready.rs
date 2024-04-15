@@ -1,7 +1,7 @@
 use futures::TryStreamExt;
 use hashbrown::HashMap;
 
-use schema::Snowflake;
+use crate::prelude::*;
 
 use crate::{
     backend::{
@@ -12,16 +12,16 @@ use crate::{
 };
 
 //struct Associated<T> {
-//    pub party_id: Snowflake,
+//    pub party_id: PartyId,
 //    pub value: T,
 //}
 
 pub struct FullReady {
     pub ready: sdk::models::events::Ready,
-    pub blocked_by: Vec<Snowflake>,
+    pub blocked_by: Vec<UserId>,
 }
 
-pub async fn ready(state: ServerState, conn_id: Snowflake, auth: Authorization) -> Result<FullReady, Error> {
+pub async fn ready(state: ServerState, conn_id: ConnectionId, auth: Authorization) -> Result<FullReady, Error> {
     use sdk::models::*;
 
     let user_id = auth.user_id();

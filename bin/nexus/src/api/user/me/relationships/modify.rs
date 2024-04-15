@@ -8,7 +8,7 @@ use sdk::models::*;
 pub async fn modify_relationship(
     state: ServerState,
     auth: Authorization,
-    user_id: Snowflake,
+    user_id: UserId,
     form: sdk::api::commands::user::PatchRelationshipBody,
 ) -> Result<(), Error> {
     if form.note.is_undefined() && form.rel.is_undefined() {

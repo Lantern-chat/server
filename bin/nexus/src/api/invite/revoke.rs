@@ -1,4 +1,3 @@
-use schema::{Snowflake, SnowflakeExt};
 use smol_str::SmolStr;
 
 use crate::prelude::*;

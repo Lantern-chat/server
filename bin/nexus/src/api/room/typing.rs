@@ -1,4 +1,3 @@
-use schema::Snowflake;
 use sdk::models::*;
 
 use crate::prelude::*;
@@ -10,7 +9,7 @@ use sdk::models::gateway::message::ServerMsg;
 pub async fn trigger_typing(
     state: ServerState,
     auth: Authorization,
-    room_id: Snowflake,
+    room_id: RoomId,
     body: &Archived<StartTypingBody>,
 ) -> Result<(), Error> {
     let has_perms = match state.perm_cache.get(auth.user_id(), room_id).await {

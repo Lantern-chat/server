@@ -1,5 +1,4 @@
 use hashbrown::HashSet;
-use schema::Snowflake;
 
 use crate::api::party::rooms::create::RawOverwrites;
 use crate::asset::{maybe_add_asset, AssetMode};
@@ -11,7 +10,7 @@ use sdk::models::*;
 pub async fn modify_room(
     state: ServerState,
     auth: Authorization,
-    room_id: Snowflake,
+    room_id: RoomId,
     form: &Archived<PatchRoomForm>,
 ) -> Result<FullRoom, Error> {
     // TODO: Maybe change this?
@@ -37,7 +36,7 @@ pub async fn modify_room(
 
     let has_assets = form.avatar.is_some();
 
-    let mut old_avatar_id: Nullable<Snowflake> = Nullable::Null;
+    let mut old_avatar_id: Nullable<FileId> = Nullable::Null;
 
     let mut needs_perms = true;
     if let Some(perms) = state.perm_cache.get(auth.user_id(), room_id).await {

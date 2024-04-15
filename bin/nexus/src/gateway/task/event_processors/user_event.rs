@@ -5,7 +5,7 @@ use sdk::models::gateway::{
 
 use super::prelude::*;
 
-pub async fn user_update(state: &ServerState, db: &db::pool::Client, user_id: Snowflake) -> Result<(), Error> {
+pub async fn user_update(state: &ServerState, db: &db::pool::Client, user_id: UserId) -> Result<(), Error> {
     let self_future = self_update(state, db, user_id, None);
 
     let user_future = async {
@@ -54,7 +54,7 @@ pub async fn user_update(state: &ServerState, db: &db::pool::Client, user_id: Sn
             AND AggRelationships.RelA != 0
         }).await?;
 
-        Ok::<Vec<Snowflake>, Error>(row.friend_ids()?)
+        Ok::<Vec<UserId>, Error>(row.friend_ids()?)
     };
 
     let parties_future = async {
@@ -65,7 +65,7 @@ pub async fn user_update(state: &ServerState, db: &db::pool::Client, user_id: Sn
             FROM PartyMembers WHERE PartyMembers.UserId = #{&user_id as PartyMembers::UserId}
         }).await?;
 
-        Ok::<Vec<Snowflake>, Error>(row.party_ids()?)
+        Ok::<Vec<PartyId>, Error>(row.party_ids()?)
     };
 
     let (_, user, friend_ids, party_ids) =
@@ -91,8 +91,8 @@ pub async fn user_update(state: &ServerState, db: &db::pool::Client, user_id: Sn
 pub async fn self_update(
     state: &ServerState,
     db: &db::pool::Client,
-    user_id: Snowflake,
-    party_id: Option<Snowflake>,
+    user_id: UserId,
+    party_id: Option<PartyId>,
 ) -> Result<(), Error> {
     // When a party_id is present, it signifies that the event is just a position update in the party list
     if let Some(party_id) = party_id {
@@ -110,8 +110,8 @@ pub async fn self_update(
 async fn party_position_update(
     state: &ServerState,
     db: &db::pool::Client,
-    user_id: Snowflake,
-    party_id: Snowflake,
+    user_id: UserId,
+    party_id: PartyId,
 ) -> Result<(), Error> {
     #[rustfmt::skip]
     let row = db.query_one2(schema::sql! {

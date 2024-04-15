@@ -1,11 +1,11 @@
-use sdk::models::{Snowflake, UserPresence};
+use sdk::models::UserPresence;
 
 use crate::prelude::*;
 
 pub async fn set_presence(
     state: ServerState,
-    user_id: Snowflake,
-    conn_id: Snowflake,
+    user_id: UserId,
+    conn_id: ConnectionId,
     presence: UserPresence,
 ) -> Result<(), Error> {
     let flags = presence.flags.bits();
@@ -23,7 +23,7 @@ pub async fn set_presence(
     Ok(())
 }
 
-pub async fn clear_presence(state: ServerState, user_id: Snowflake, conn_id: Snowflake) -> Result<(), Error> {
+pub async fn clear_presence(state: ServerState, user_id: UserId, conn_id: ConnectionId) -> Result<(), Error> {
     #[rustfmt::skip]
     state.db.write.get().await?.execute2(schema::sql! {
         DELETE FROM UserPresence

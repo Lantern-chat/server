@@ -1,5 +1,4 @@
 use schema::SnowflakeExt;
-use sdk::models::Snowflake;
 use smol_str::SmolStr;
 
 //use util::hex::HexidecimalInt;

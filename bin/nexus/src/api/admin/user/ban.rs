@@ -1,7 +1,8 @@
-use sdk::{models::UserFlags, Snowflake};
+use sdk::models::UserFlags;
 
 use crate::prelude::*;
-pub async fn ban_user(state: ServerState, user_id: Snowflake) -> Result<(), Error> {
+
+pub async fn ban_user(state: ServerState, user_id: UserId) -> Result<(), Error> {
     let mut db = state.db.write.get().await?;
 
     let t = db.transaction().await?;

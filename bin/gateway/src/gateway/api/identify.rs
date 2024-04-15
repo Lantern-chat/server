@@ -1,5 +1,4 @@
 use sdk::models::{AuthToken, Intent};
-use sdk::Snowflake;
 
 use crate::prelude::*;
 
@@ -15,12 +14,7 @@ pub async fn identify(state: ServerState, conn: GatewayConnection, auth: AuthTok
     }
 }
 
-async fn do_identify(
-    state: ServerState,
-    conn: &GatewayConnection,
-    auth: AuthToken,
-    _intent: Intent,
-) -> Result<Vec<Snowflake>, Error> {
+async fn do_identify(state: ServerState, conn: &GatewayConnection, auth: AuthToken, _intent: Intent) -> Result<Vec<UserId>, Error> {
     let auth = crate::auth::do_auth(&state, auth.try_into()?).await?;
     let ready = ready(state, conn.id, auth).await?;
     let _ = conn.tx.send(Event::new(ServerMsg::new_ready(Box::new(ready.ready)), None)).await;

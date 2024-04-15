@@ -66,11 +66,11 @@ impl Default for PermissionCache {
 }
 
 impl PermissionCache {
-    pub async fn has_user(&self, user_id: Snowflake) -> bool {
+    pub async fn has_user(&self, user_id: UserId) -> bool {
         self.map.contains_async(&user_id).await
     }
 
-    pub async fn get(&self, user_id: Snowflake, room_id: Snowflake) -> Option<PermMute> {
+    pub async fn get(&self, user_id: UserId, room_id: RoomId) -> Option<PermMute> {
         self.map
             .read_async(&user_id, |_, cache| {
                 // double-check if not stale
@@ -84,7 +84,7 @@ impl PermissionCache {
             .flatten()
     }
 
-    async fn with_cache_mut<U>(&self, user_id: Snowflake, f: impl FnOnce(&mut UserCache) -> U) -> U {
+    async fn with_cache_mut<U>(&self, user_id: UserId, f: impl FnOnce(&mut UserCache) -> U) -> U {
         let mut entry = self.map.entry_async(user_id).await.or_insert_with(|| UserCache {
             room: HashMap::with_hasher(self.hb.clone()),
             rc: AtomicIsize::new(1), // initialize with one reference
@@ -93,14 +93,14 @@ impl PermissionCache {
         f(entry.get_mut())
     }
 
-    pub async fn set(&self, user_id: Snowflake, room_id: Snowflake, perm: PermMute) {
+    pub async fn set(&self, user_id: UserId, room_id: RoomId, perm: PermMute) {
         self.with_cache_mut(user_id, |cache| {
             cache.room.insert(room_id, perm);
         })
         .await;
     }
 
-    pub async fn batch_set(&self, user_id: Snowflake, iter: impl IntoIterator<Item = (Snowflake, PermMute)>) {
+    pub async fn batch_set(&self, user_id: UserId, iter: impl IntoIterator<Item = (Snowflake, PermMute)>) {
         self.with_cache_mut(user_id, |cache| {
             cache.room.extend(iter);
             if cache.room.capacity() > (cache.room.len() * 3 / 2) {
@@ -110,11 +110,11 @@ impl PermissionCache {
         .await;
     }
 
-    pub async fn remove(&self, user_id: Snowflake, room_id: Snowflake) -> bool {
+    pub async fn remove(&self, user_id: UserId, room_id: RoomId) -> bool {
         self.map.update_async(&user_id, |_, cache| cache.room.remove(&room_id)).await.flatten().is_some()
     }
 
-    pub async fn clear_user(&self, user_id: Snowflake) -> bool {
+    pub async fn clear_user(&self, user_id: UserId) -> bool {
         self.map.update_async(&user_id, |_, cache| cache.room.clear()).await.is_some()
     }
 
@@ -123,13 +123,13 @@ impl PermissionCache {
     ///
     /// NOTE: May return false AND increment the reference count, so `remove_reference`
     /// must always be called after this.
-    pub async fn add_reference(&self, user_id: Snowflake) -> bool {
+    pub async fn add_reference(&self, user_id: UserId) -> bool {
         // only return true when there was an existing reference, don't allow stale results
         Some(false) != self.map.read_async(&user_id, |_, cache| 0 < cache.rc.fetch_add(1, Ordering::AcqRel)).await
     }
 
     #[rustfmt::skip]
-    pub async fn remove_reference(&self, user_id: Snowflake) {
+    pub async fn remove_reference(&self, user_id: UserId) {
         self.map.update_async(&user_id, |_, cache| {
             if 1 == cache.rc.fetch_sub(1, Ordering::AcqRel) {
                 cache.room.clear();

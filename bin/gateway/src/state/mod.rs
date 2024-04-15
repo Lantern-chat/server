@@ -9,7 +9,6 @@ use crate::{
 
 use arc_swap::ArcSwap;
 use futures::{Stream, StreamExt};
-use sdk::Snowflake;
 use tokio::sync::{Notify, Semaphore};
 
 use schema::sf::SnowflakeGenerator;

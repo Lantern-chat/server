@@ -5,14 +5,12 @@ use std::{
 use tokio::sync::{mpsc, Notify};
 use triomphe::Arc;
 
-use schema::Snowflake;
-
 use crate::prelude::*;
 
-use super::{Event, Heart};
+use super::{ConnectionId, Event, Heart};
 
 pub struct GatewayConnectionInner {
-    pub id: Snowflake,
+    pub id: ConnectionId,
     pub is_active: AtomicBool,
     pub kill: Notify,
     pub heart: Arc<Heart>,

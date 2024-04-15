@@ -1,5 +1,5 @@
 use schema::SnowflakeExt;
-use sdk::models::{Snowflake, UserFlags};
+use sdk::models::UserFlags;
 use timestamp::Timestamp;
 
 use crate::prelude::*;
@@ -8,7 +8,7 @@ use sdk::api::commands::file::FilesystemStatus;
 pub async fn file_options(state: &ServerState, auth: Authorization) -> Result<FilesystemStatus, Error> {
     let month_start = {
         let (year, month, _) = Timestamp::now_utc().date().to_calendar_date();
-        Snowflake::at_date(time::Date::from_calendar_date(year, month, 1).unwrap())
+        FileId::at_date(time::Date::from_calendar_date(year, month, 1).unwrap())
     };
 
     #[rustfmt::skip]

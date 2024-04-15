@@ -7,8 +7,8 @@ use sdk::models::*;
 pub async fn get_cached_room_permissions_with_conn(
     state: &ServerState,
     db: &Client,
-    user_id: Snowflake,
-    room_id: Snowflake,
+    user_id: UserId,
+    room_id: RoomId,
 ) -> Result<Permissions, Error> {
     if let Some(perm) = state.perm_cache.get(user_id, room_id).await {
         return Ok(perm.perms);
@@ -19,8 +19,8 @@ pub async fn get_cached_room_permissions_with_conn(
 
 pub async fn get_cached_room_permissions(
     state: &ServerState,
-    user_id: Snowflake,
-    room_id: Snowflake,
+    user_id: UserId,
+    room_id: RoomId,
 ) -> Result<Permissions, Error> {
     if let Some(perm) = state.perm_cache.get(user_id, room_id).await {
         return Ok(perm.perms);
@@ -31,11 +31,7 @@ pub async fn get_cached_room_permissions(
     get_room_permissions(&db, user_id, room_id).await
 }
 
-pub async fn get_room_permissions(
-    db: &Client,
-    user_id: Snowflake,
-    room_id: Snowflake,
-) -> Result<Permissions, Error> {
+pub async fn get_room_permissions(db: &Client, user_id: UserId, room_id: RoomId) -> Result<Permissions, Error> {
     #[rustfmt::skip]
     let row = db.query_opt2(schema::sql! {
         SELECT

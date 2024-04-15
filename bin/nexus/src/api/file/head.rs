@@ -1,7 +1,6 @@
 use std::io::ErrorKind;
 
 use crate::prelude::*;
-use schema::Snowflake;
 use smol_str::SmolStr;
 
 pub struct UploadHead {
@@ -13,7 +12,7 @@ pub struct UploadHead {
     pub offset: i32,
 }
 
-pub async fn head(state: ServerState, auth: Authorization, file_id: Snowflake) -> Result<UploadHead, Error> {
+pub async fn head(state: ServerState, auth: Authorization, file_id: FileId) -> Result<UploadHead, Error> {
     let fetch_record = async {
         #[rustfmt::skip]
         let row = state.db.read.get().await?.query_opt2(schema::sql! {

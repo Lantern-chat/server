@@ -1,13 +1,12 @@
-use schema::Snowflake;
-
 use crate::prelude::*;
+
 use sdk::api::commands::party::{CreateRoomForm, CreateRoomKind};
 use sdk::models::*;
 
 pub async fn create_room(
     state: ServerState,
     auth: Authorization,
-    party_id: Snowflake,
+    party_id: PartyId,
     form: &Archived<CreateRoomForm>,
 ) -> Result<FullRoom, Error> {
     let config = state.config_full();

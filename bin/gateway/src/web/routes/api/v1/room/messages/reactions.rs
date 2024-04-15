@@ -10,8 +10,8 @@ use common::emoji::EmoteOrEmojiId;
 pub fn reactions(
     mut route: Route<ServerState>,
     auth: Authorization,
-    room_id: Snowflake,
-    msg_id: Snowflake,
+    room_id: RoomId,
+    msg_id: MessageId,
 ) -> RouteResult {
     match route.next().method_segment() {
         (&Method::DELETE, End) => todo!("Delete all reactions"),
@@ -25,7 +25,7 @@ pub fn reactions(
                     (&Method::GET, End) => todo!("Get reactions"),
                     (&Method::PUT, Exact("@me")) => Ok(put_reaction(route, auth, room_id, msg_id, emote)),
                     (&Method::DELETE, Exact("@me")) => Ok(delete_reaction(route, auth, room_id, msg_id, emote)),
-                    (&Method::DELETE, Exact(_)) => match route.param::<Snowflake>() {
+                    (&Method::DELETE, Exact(_)) => match route.param::<UserId>() {
                         Some(Ok(user_id)) => todo!("Delete user reaction"),
                         _ => Err(Error::BadRequest),
                     },
@@ -42,8 +42,8 @@ pub fn reactions(
 async fn put_reaction(
     route: Route<ServerState>,
     _auth: Authorization,
-    room_id: Snowflake,
-    msg_id: Snowflake,
+    room_id: RoomId,
+    msg_id: MessageId,
     emote: EmoteOrEmojiId,
 ) -> ApiResult {
     let Some(emote_id) = route.state.emoji.lookup(emote) else {
@@ -61,8 +61,8 @@ async fn put_reaction(
 async fn delete_reaction(
     route: Route<ServerState>,
     _auth: Authorization,
-    room_id: Snowflake,
-    msg_id: Snowflake,
+    room_id: RoomId,
+    msg_id: MessageId,
     emote: EmoteOrEmojiId,
 ) -> ApiResult {
     let Some(emote_id) = route.state.emoji.lookup(emote) else {

@@ -1,6 +1,6 @@
 use std::{net::SocketAddr, time::SystemTime};
 
-use schema::{auth::RawAuthToken, Snowflake};
+use schema::auth::RawAuthToken;
 
 use crate::prelude::*;
 
@@ -50,7 +50,7 @@ pub async fn login(
         return Err(Error::InvalidCredentials);
     };
 
-    let user_id: Snowflake = user.id()?;
+    let user_id: UserId = user.id()?;
     let flags = UserFlags::from_bits_truncate(user.flags()?);
     let passhash = user.passhash()?;
     let mfa: Option<&[u8]> = user.mfa()?;
@@ -101,7 +101,7 @@ pub async fn login(
 pub async fn do_login(
     state: ServerState,
     addr: SocketAddr,
-    user_id: Snowflake,
+    user_id: UserId,
     now: std::time::SystemTime,
 ) -> Result<Session, Error> {
     let token = RawAuthToken::bearer(util::rng::crypto_thread_rng());
@@ -206,7 +206,7 @@ pub enum ProvidedMfa<'a> {
 
 pub async fn process_2fa<'a>(
     state: &ServerState,
-    user_id: Snowflake,
+    user_id: UserId,
     mfa: ProvidedMfa<'a>,
     password: &str,
     token: &str,

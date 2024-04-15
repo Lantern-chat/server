@@ -1,12 +1,7 @@
-use ftl::*;
-
-use sdk::models::Snowflake;
-
-use super::ApiResult;
-use crate::{Authorization, Error, ServerState};
+use super::*;
 
 pub async fn post_avatar(mut route: Route<ServerState>, auth: Authorization) -> ApiResult {
-    let file_id = match route.next().param::<Snowflake>() {
+    let file_id = match route.next().param::<FileId>() {
         Some(Ok(file_id)) => file_id,
         _ => return Err(Error::BadRequest),
     };

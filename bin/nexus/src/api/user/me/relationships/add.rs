@@ -5,7 +5,7 @@ use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, prelude::*};
 
 use sdk::models::*;
 
-pub async fn add_friend(state: ServerState, auth: Authorization, user_id: Snowflake) -> Result<(), Error> {
+pub async fn add_friend(state: ServerState, auth: Authorization, user_id: UserId) -> Result<(), Error> {
     let (user_a_id, user_b_id) = user_id.min_max(auth.user_id);
 
     use q::{Parameters, Params};
@@ -46,16 +46,17 @@ pub async fn add_friend(state: ServerState, auth: Authorization, user_id: Snowfl
 
 mod q {
     use super::{FriendFlags, UserFlags};
+    use crate::prelude::*;
 
     pub use schema::*;
     pub use thorn::*;
 
     thorn::params! {
         pub struct Params {
-            pub from_id: Snowflake = Friends::UserAId,
-            pub to_id: Snowflake = Friends::UserBId,
-            pub user_a_id: Snowflake = Friends::UserAId,
-            pub user_b_id: Snowflake = Friends::UserBId,
+            pub from_id: UserId = Friends::UserAId,
+            pub to_id: UserId = Friends::UserBId,
+            pub user_a_id: UserId = Friends::UserAId,
+            pub user_b_id: UserId = Friends::UserBId,
             pub flags: FriendFlags = Friends::Flags,
         }
     }

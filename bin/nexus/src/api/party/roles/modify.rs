@@ -11,8 +11,8 @@ use crate::{
 pub async fn modify_role(
     state: ServerState,
     auth: Authorization,
-    party_id: Snowflake,
-    role_id: Snowflake,
+    party_id: PartyId,
+    role_id: RoleId,
     form: &Archived<PatchRoleForm>,
 ) -> Result<Role, Error> {
     // TODO: Maybe change this?
@@ -60,10 +60,10 @@ pub async fn modify_role(
 
     let mut user_roles = Vec::new();
     let mut roles = Vec::with_capacity(role_rows.len());
-    let mut existing_avatar_file_id: Option<Snowflake> = None;
+    let mut existing_avatar_file_id: Option<FileId> = None;
 
     for row in role_rows {
-        let id: Snowflake = row.role_id()?;
+        let id: RoleId = row.role_id()?;
 
         let role = PartialRole {
             permissions: Permissions::from_i64(row.permissions1()?, row.permissions2()?),

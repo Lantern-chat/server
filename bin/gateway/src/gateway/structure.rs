@@ -1,18 +1,10 @@
-use sdk::{
-    models::{Overwrite, Permissions},
-    Snowflake,
-};
+use sdk::models::{aliases::*, Overwrite, Permissions};
 
 use parking_lot::RwLock;
 use thin_vec::ThinVec;
 use tokio::sync::RwLock as AsyncRwLock;
 
 use triomphe::Arc;
-
-pub type UserId = Snowflake;
-pub type RoleId = Snowflake;
-pub type RoomId = Snowflake;
-pub type PartyId = Snowflake;
 
 #[derive(Default)]
 pub struct StructureCache {

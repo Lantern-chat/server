@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use crate::prelude::*;
 
-use schema::{flags::FileFlags, Snowflake, SnowflakeExt};
+use schema::flags::FileFlags;
 
 use rand::Rng;
 use smol_str::SmolStr;
@@ -26,7 +26,7 @@ pub struct FilePostBody {
     preview: Option<String>,
 }
 
-pub async fn post_file(state: &ServerState, user_id: Snowflake, body: FilePostBody) -> Result<Snowflake, Error> {
+pub async fn post_file(state: &ServerState, user_id: UserId, body: FilePostBody) -> Result<FileId, Error> {
     let mime = match body.mime {
         None => None,
         Some(mime) => {
@@ -73,15 +73,15 @@ pub async fn post_file(state: &ServerState, user_id: Snowflake, body: FilePostBo
 #[allow(clippy::too_many_arguments)]
 pub async fn do_post_file(
     state: &ServerState,
-    user_id: Snowflake,
+    user_id: UserId,
     upload_size: i32,
     filename: SmolStr,
     mime: Option<SmolStr>,
     preview: Option<Vec<u8>>,
     width: Option<i32>,
     height: Option<i32>,
-) -> Result<(Snowflake, i64), Error> {
-    let file_id = Snowflake::now();
+) -> Result<(FileId, i64), Error> {
+    let file_id = FileId::now();
     let nonce: i64 = util::rng::crypto_thread_rng().gen();
     let flags = FileFlags::PARTIAL.bits();
 

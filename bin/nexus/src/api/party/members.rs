@@ -1,5 +1,3 @@
-use schema::Snowflake;
-
 use crate::{prelude::*, util::encrypted_asset::encrypt_snowflake_opt};
 
 use futures::{Stream, StreamExt};
@@ -14,9 +12,9 @@ pub enum MemberMode {
 
 pub async fn get_members(
     state: ServerState,
-    party_id: Snowflake,
-    user_id: Option<Snowflake>,
-    member_id: Option<Snowflake>,
+    party_id: PartyId,
+    user_id: Option<UserId>,
+    member_id: Option<UserId>,
     mode: MemberMode,
 ) -> Result<impl Stream<Item = Result<PartyMember, Error>>, Error> {
     let db = state.db.read.get().await?;
@@ -27,9 +25,9 @@ pub async fn get_members(
 pub async fn get_members_inner(
     state: ServerState,
     db: &db::pool::Client,
-    party_id: Snowflake,
-    user_id: Option<Snowflake>,
-    member_id: Option<Snowflake>,
+    party_id: PartyId,
+    user_id: Option<UserId>,
+    member_id: Option<UserId>,
     mode: MemberMode,
 ) -> Result<impl Stream<Item = Result<PartyMember, Error>>, Error> {
     let stream = db
@@ -179,8 +177,8 @@ pub async fn get_members_inner(
 pub async fn get_one_anonymous(
     state: &ServerState,
     db: &db::pool::Client,
-    party_id: Snowflake,
-    member_id: Snowflake,
+    party_id: PartyId,
+    member_id: UserId,
     mode: MemberMode,
 ) -> Result<PartyMember, Error> {
     let mut stream =
@@ -194,9 +192,9 @@ pub async fn get_one_anonymous(
 
 pub async fn get_one(
     state: ServerState,
-    user_id: Snowflake,
-    party_id: Snowflake,
-    member_id: Snowflake,
+    user_id: UserId,
+    party_id: PartyId,
+    member_id: UserId,
     mode: MemberMode,
 ) -> Result<PartyMember, Error> {
     let mut stream = std::pin::pin!(get_members(state, party_id, Some(user_id), Some(member_id), mode).await?);
@@ -210,7 +208,7 @@ pub async fn get_one(
 pub async fn get_many(
     state: ServerState,
     auth: Authorization,
-    party_id: Snowflake,
+    party_id: PartyId,
 ) -> Result<impl Stream<Item = Result<PartyMember, Error>>, Error> {
     get_members(state, party_id, Some(auth.user_id()), None, MemberMode::Simple).await
 }

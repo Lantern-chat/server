@@ -47,7 +47,7 @@ pub fn me(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
 
                     match route.next().method_segment() {
                         (&Method::GET, End) => unimplemented!(),
-                        (&Method::PATCH, Exact(_)) => match route.param::<Snowflake>() {
+                        (&Method::PATCH, Exact(_)) => match route.param::<UserId>() {
                             Some(Ok(user_id)) => {
                                 unimplemented!();
                             }

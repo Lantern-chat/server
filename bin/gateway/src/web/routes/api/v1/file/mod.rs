@@ -48,7 +48,7 @@ pub fn file(mut route: Route<ServerState>, auth: MaybeAuth) -> ApiResult {
         (&Method::POST, End) => Ok(post::post(route, auth)),
 
         (&Method::HEAD | &Method::PATCH | &Method::DELETE, Exact(_)) => {
-            match route.param::<Snowflake>() {
+            match route.param::<FileId>() {
                 Some(Ok(file_id)) => {
                     // nothing should be after the file_id
                     if route.next().segment() != End {

@@ -1,7 +1,5 @@
 use futures::{Stream, StreamExt};
 
-use schema::Snowflake;
-
 use sdk::models::*;
 use thorn::pg::Json;
 
@@ -10,8 +8,8 @@ use crate::util::encrypted_asset::encrypt_snowflake_opt;
 
 #[derive(Debug, Clone, Copy)]
 pub enum RoomScope {
-    Party(Snowflake),
-    Room(Snowflake),
+    Party(PartyId),
+    Room(RoomId),
 }
 
 pub async fn get_rooms(
@@ -90,8 +88,8 @@ pub async fn get_rooms(
 
 #[derive(Deserialize)]
 struct RawOverwrite {
-    u: Option<Snowflake>,
-    r: Option<Snowflake>,
+    u: Option<UserId>,
+    r: Option<RoleId>,
     a1: Option<i64>,
     a2: Option<i64>,
     d1: Option<i64>,

@@ -6,7 +6,7 @@ use crate::prelude::*;
 use futures::{FutureExt, StreamExt};
 use tokio::io::AsyncSeekExt;
 
-use schema::{flags::FileFlags, Snowflake};
+use schema::flags::FileFlags;
 
 pub struct FilePatch {
     pub complete: bool,
@@ -22,7 +22,7 @@ pub struct FilePatchParams {
 pub async fn patch_file(
     state: ServerState,
     auth: Authorization,
-    file_id: Snowflake,
+    file_id: FileId,
     params: FilePatchParams,
     mut body: hyper::Body,
 ) -> Result<FilePatch, Error> {

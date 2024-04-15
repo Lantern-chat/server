@@ -6,7 +6,7 @@ use crate::prelude::*;
 
 use md_utils::{Span, SpanType};
 
-pub fn process_embeds(state: ServerState, msg_id: Snowflake, msg: &str, spans: &[Span]) {
+pub fn process_embeds(state: ServerState, msg_id: MessageId, msg: &str, spans: &[Span]) {
     let mut position = 0;
     let max_embeds = state.config().shared.max_embeds as i16;
 
@@ -92,7 +92,7 @@ pub fn process_embeds(state: ServerState, msg_id: Snowflake, msg: &str, spans: &
 
 pub async fn run_embed(
     state: ServerState,
-    msg_id: Snowflake,
+    msg_id: MessageId,
     url: String,
     position: i16,
     spoilered: bool,
@@ -109,7 +109,7 @@ pub async fn run_embed(
     });
 
     if let Some(row) = existing.await? {
-        let existing_id: Snowflake = row.embed_id()?;
+        let existing_id: EmbedId = row.embed_id()?;
         let expires: Timestamp = row.expires()?;
 
         embed_id = Some(existing_id);

@@ -3,14 +3,12 @@ use std::ops::Deref;
 use thin_vec::ThinVec;
 use triomphe::Arc;
 
-use schema::Snowflake;
+use crate::prelude::*;
 
 use sdk::api::gateway::{Encoding, GatewayQueryParams};
-
 use sdk::models::gateway::message::ServerMsg;
 
 pub mod internal;
-
 pub use internal::InternalEvent;
 
 lazy_static::lazy_static! {
@@ -51,7 +49,7 @@ pub struct EncodedEvent {
 pub struct ExternalEvent {
     pub msg: ServerMsg,
     pub encoded: OnceCell<EncodedEvent>,
-    pub room_id: Option<Snowflake>,
+    pub room_id: Option<RoomId>,
 }
 
 /// Actual event enum
@@ -80,10 +78,7 @@ use util::zlib::{deflate, DeflateError};
 impl CompressedEvent {
     fn new(level: u8, value: ThinVec<u8>) -> Result<Self, EventEncodingError> {
         let compressed = deflate(&value, level)?;
-        Ok(CompressedEvent {
-            uncompressed: value,
-            compressed,
-        })
+        Ok(CompressedEvent { uncompressed: value, compressed })
     }
 
     pub fn get(&self, compressed: bool) -> &[u8] {
@@ -132,7 +127,7 @@ impl Event {
     const DEFAULT_COMPRESSION_LEVEL: u8 = 7;
 
     /// Constructs a new external event, but does not encode it yet.
-    pub fn new(msg: ServerMsg, room_id: Option<Snowflake>) -> Event {
+    pub fn new(msg: ServerMsg, room_id: Option<RoomId>) -> Event {
         Event(Arc::new(EventInner::External(ExternalEvent {
             msg,
             encoded: OnceCell::new(),
@@ -140,11 +135,7 @@ impl Event {
         })))
     }
 
-    pub fn new_compressed(
-        msg: ServerMsg,
-        room_id: Option<Snowflake>,
-        level: u8,
-    ) -> Result<Event, EventEncodingError> {
+    pub fn new_compressed(msg: ServerMsg, room_id: Option<RoomId>, level: u8) -> Result<Event, EventEncodingError> {
         let encoded = EncodedEvent::new(&msg, level)?;
 
         Ok(Event(Arc::new(EventInner::External(ExternalEvent {

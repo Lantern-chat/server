@@ -1,7 +1,8 @@
-use sdk::{models::UserFlags, Snowflake};
+use sdk::models::UserFlags;
 
 use crate::prelude::*;
-pub async fn unban_user(state: ServerState, user_id: Snowflake) -> Result<(), Error> {
+
+pub async fn unban_user(state: ServerState, user_id: UserId) -> Result<(), Error> {
     let db = state.db.write.get().await?;
 
     db.execute2(schema::sql! {

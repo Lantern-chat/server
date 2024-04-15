@@ -1,4 +1,3 @@
-use sdk::models::Snowflake;
 use smol_str::SmolStr;
 
 use crate::prelude::*;
@@ -56,7 +55,7 @@ pub async fn modify_account(
         FROM Users WHERE Users.Id = #{auth.user_id_ref() as Users::Id}
     }).await?;
 
-    let user_id: Snowflake = auth.user_id();
+    let user_id: UserId = auth.user_id();
     let old_username: &str = user.username()?;
     let passhash: &str = user.passhash()?;
     let mfa: Option<&[u8]> = user.mfa()?;

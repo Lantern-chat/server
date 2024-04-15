@@ -1,5 +1,4 @@
 use futures::FutureExt;
-use schema::Snowflake;
 
 use crate::{prelude::*, state::permission_cache::PermMute};
 
@@ -15,7 +14,7 @@ use sdk::api::commands::room::CreateMessageBody;
 pub async fn create_message(
     state: ServerState,
     auth: Authorization,
-    room_id: Snowflake,
+    room_id: RoomId,
     body: &Archived<CreateMessageBody>,
 ) -> Result<Option<Message>, Error> {
     // fast-path for if the perm_cache does contain a value, otherwise defer until content is checked
@@ -122,8 +121,8 @@ pub(crate) async fn insert_message(
     t: db::pool::Transaction<'_>,
     state: ServerState,
     auth: Authorization,
-    room_id: Snowflake,
-    msg_id: Snowflake,
+    room_id: RoomId,
+    msg_id: MessageId,
     body: &Archived<CreateMessageBody>,
     content: &str,
     flags: MessageFlags,

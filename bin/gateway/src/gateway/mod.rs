@@ -14,15 +14,8 @@ use std::sync::atomic::AtomicI64;
 use std::time::Duration;
 
 use hashbrown::HashMap;
-use scc::ebr::Guard;
-use sdk::Snowflake;
 use tokio::sync::{broadcast, mpsc, Notify};
 use triomphe::Arc;
-
-pub type PartyId = Snowflake;
-pub type UserId = Snowflake;
-pub type EventId = Snowflake;
-pub type ConnectionId = Snowflake;
 
 /// Stored in the gateway, provides a channel directly
 /// to a user connection
@@ -126,7 +119,7 @@ impl Gateway {
         &self.last_events[0]
     }
 
-    pub async fn broadcast_user_event(&self, event: Event, user_id: Snowflake) {
+    pub async fn broadcast_user_event(&self, event: Event, user_id: UserId) {
         self.users
             .read_async(&user_id, |_, users| {
                 for conn in users.values() {
@@ -147,7 +140,7 @@ impl Gateway {
         //crate::metrics::API_METRICS.load().add_event();
     }
 
-    pub fn broadcast_event(&self, event: Event, party_id: Snowflake) {
+    pub fn broadcast_event(&self, event: Event, party_id: PartyId) {
         match *event {
             EventInner::Internal(_) => log::debug!("broadcasting internal event"),
             EventInner::External(ref event) => {
@@ -155,7 +148,7 @@ impl Gateway {
             }
         }
 
-        let guard = Guard::new();
+        let guard = scc::ebr::Guard::new();
 
         let Some(party) = self.parties.peek(&party_id, &guard) else {
             log::warn!("Could not find tx for party {party_id}!");
@@ -187,7 +180,7 @@ impl Gateway {
         subs
     }
 
-    pub async fn remove_connection(&self, conn_id: Snowflake, user_id: Option<Snowflake>) {
+    pub async fn remove_connection(&self, conn_id: ConnectionId, user_id: Option<UserId>) {
         tokio::join!(self.conns.remove_async(&conn_id), async {
             if let Some(user_id) = user_id {
                 if let scc::hash_map::Entry::Occupied(mut occupied) = self.users.entry_async(user_id).await {

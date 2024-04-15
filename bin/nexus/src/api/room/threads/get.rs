@@ -1,13 +1,11 @@
-use schema::Snowflake;
-
 use sdk::models::*;
 
 use crate::prelude::*;
 pub async fn get_thread(
     state: ServerState,
     auth: Authorization,
-    room_id: Snowflake,
-    thread_id: Snowflake,
+    room_id: RoomId,
+    thread_id: ThreadId,
 ) -> Result<Thread, Error> {
     unimplemented!()
 

@@ -1,9 +1,7 @@
-use schema::Snowflake;
-
 use crate::prelude::*;
 use sdk::models::*;
 
-pub async fn remove_room(state: ServerState, auth: Authorization, room_id: Snowflake) -> Result<(), Error> {
+pub async fn remove_room(state: ServerState, auth: Authorization, room_id: RoomId) -> Result<(), Error> {
     let mut db = state.db.write.get().await?;
     let t = db.transaction().await?;
 

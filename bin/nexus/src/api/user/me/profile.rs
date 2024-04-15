@@ -9,7 +9,7 @@ use crate::{
 pub async fn patch_profile(
     state: ServerState,
     auth: Authorization,
-    party_id: Option<Snowflake>,
+    party_id: Option<PartyId>,
     profile: &Archived<UpdateUserProfileBody>,
 ) -> Result<UserProfile, Error> {
     {
@@ -27,8 +27,8 @@ pub async fn patch_profile(
     let has_assets = profile.avatar.is_some() || profile.banner.is_some();
 
     let mut perms = Permissions::all();
-    let mut old_avatar_id: Option<Snowflake> = None;
-    let mut old_banner_id: Option<Snowflake> = None;
+    let mut old_avatar_id: Option<FileId> = None;
+    let mut old_banner_id: Option<FileId> = None;
 
     if party_id.is_some() {
         // for a party profile, we at least need the permissions, but also fetch old asset files if needed
@@ -82,11 +82,11 @@ pub async fn patch_profile(
 
         if has_assets {
             // No change, don't change
-            if Nullable::<Snowflake>::from(old_avatar_id) == profile.avatar {
+            if Nullable::<FileId>::from(old_avatar_id) == profile.avatar {
                 new_avatar = Nullable::Undefined;
             }
 
-            if Nullable::<Snowflake>::from(old_banner_id) == profile.banner {
+            if Nullable::<FileId>::from(old_banner_id) == profile.banner {
                 new_banner = Nullable::Undefined;
             }
         }

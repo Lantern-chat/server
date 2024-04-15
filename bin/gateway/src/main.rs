@@ -22,7 +22,10 @@ pub mod prelude {
     pub use crate::state::ServerState;
 
     pub use rpc::{auth::Authorization, event::ServerEvent, simple_de};
-    pub use sdk::models::{Nullable, SmolStr, Snowflake, Timestamp};
+    pub use sdk::models::{aliases::*, Nullable, SmolStr, Snowflake, Timestamp};
+
+    pub type EventId = sdk::Snowflake;
+    pub type ConnectionId = sdk::Snowflake;
 
     pub use crate::config::Config;
     pub use config::HasConfig;

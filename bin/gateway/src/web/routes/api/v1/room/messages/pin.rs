@@ -4,8 +4,8 @@ use super::*;
 pub async fn pin_message(
     route: Route<ServerState>,
     auth: Authorization,
-    msg_id: Snowflake,
-    pin_id: Snowflake,
+    msg_id: MessageId,
+    pin_id: FolderId,
 ) -> ApiResult {
     unimplemented!()
 }
@@ -14,18 +14,18 @@ pub async fn pin_message(
 pub async fn unpin_message(
     route: Route<ServerState>,
     auth: Authorization,
-    msg_id: Snowflake,
-    pin_id: Snowflake,
+    msg_id: MessageId,
+    pin_id: FolderId,
 ) -> ApiResult {
     unimplemented!()
 }
 
 #[async_recursion]
-pub async fn star_message(route: Route<ServerState>, auth: Authorization, msg_id: Snowflake) -> ApiResult {
+pub async fn star_message(route: Route<ServerState>, auth: Authorization, msg_id: MessageId) -> ApiResult {
     unimplemented!()
 }
 
 #[async_recursion]
-pub async fn unstar_message(route: Route<ServerState>, auth: Authorization, msg_id: Snowflake) -> ApiResult {
+pub async fn unstar_message(route: Route<ServerState>, auth: Authorization, msg_id: MessageId) -> ApiResult {
     unimplemented!()
 }

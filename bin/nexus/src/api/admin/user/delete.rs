@@ -1,9 +1,9 @@
 use rand::distributions::{Alphanumeric, DistString};
-use sdk::Snowflake;
 
 use crate::prelude::*;
+
 // NOTE: It's assumed that the calling user has permission to do this
-pub async fn delete_user(state: ServerState, user_id: Snowflake) -> Result<(), Error> {
+pub async fn delete_user(state: ServerState, user_id: UserId) -> Result<(), Error> {
     // generate 10 alphanumeric characters for the new username
     let mut new_username = "DeletedUser ".to_owned();
     Alphanumeric.append_string(&mut rand::thread_rng(), &mut new_username, 10);

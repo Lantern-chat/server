@@ -15,7 +15,7 @@ pub fn party(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
         (&Method::POST, End) => Ok(post(route, auth)),
 
         // ANY /api/v1/party/1234
-        (_, Exact(_)) => match route.param::<Snowflake>() {
+        (_, Exact(_)) => match route.param::<PartyId>() {
             Some(Ok(party_id)) => match route.next().method_segment() {
                 // GET /api/v1/party/1234
                 (&Method::GET, End) => Ok(get(route, auth, party_id)),
@@ -47,12 +47,12 @@ pub fn party(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
 }
 
 #[async_recursion]
-pub async fn get(route: Route<ServerState>, _auth: Authorization, party_id: Snowflake) -> ApiResult {
+pub async fn get(route: Route<ServerState>, _auth: Authorization, party_id: PartyId) -> ApiResult {
     Ok(Procedure::from(GetParty { party_id }))
 }
 
 #[async_recursion] #[rustfmt::skip]
-pub async fn patch(mut route: Route<ServerState>, _auth: Authorization, party_id: Snowflake) -> ApiResult {
+pub async fn patch(mut route: Route<ServerState>, _auth: Authorization, party_id: PartyId) -> ApiResult {
     Ok(Procedure::from(PatchParty { party_id, body: body::any(&mut route).await? }))
 }
 

@@ -16,7 +16,7 @@ pub fn user(mut route: Route<ServerState>, auth: MaybeAuth) -> RouteResult {
 
         // ANY /api/v1/user/1234
         (_, Exact(segment)) => {
-            let Ok(user_id) = segment.parse::<Snowflake>() else {
+            let Ok(user_id) = segment.parse::<UserId>() else {
                 return Err(Error::BadRequest);
             };
 

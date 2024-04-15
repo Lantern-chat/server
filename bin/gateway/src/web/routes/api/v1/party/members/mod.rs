@@ -3,14 +3,14 @@ use super::*;
 pub mod get;
 pub mod profile;
 
-pub fn members(mut route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> RouteResult {
+pub fn members(mut route: Route<ServerState>, auth: Authorization, party_id: PartyId) -> RouteResult {
     match route.next().method_segment() {
         // GET /api/v1/party/1234/members
         (&Method::GET, End) => Ok(get::get_members(route, auth, party_id)),
 
         // GET /api/v1/party/1234/members/5678
         (&Method::GET, Exact(segment)) => {
-            let Ok(member_id) = segment.parse::<Snowflake>() else {
+            let Ok(member_id) = segment.parse::<UserId>() else {
                 return Err(Error::BadRequest);
             };
 

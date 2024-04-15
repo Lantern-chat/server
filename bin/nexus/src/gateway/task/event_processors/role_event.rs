@@ -8,8 +8,8 @@ pub async fn role_event(
     state: &ServerState,
     event: EventCode,
     db: &db::pool::Client,
-    role_id: Snowflake,
-    party_id: Option<Snowflake>,
+    role_id: RoleId,
+    party_id: Option<PartyId>,
 ) -> Result<(), Error> {
     if event == EventCode::RoleDeleted {
         let Some(party_id) = party_id else {

@@ -9,8 +9,8 @@ use sdk::api::commands::room::EditMessageBody;
 pub async fn edit_message(
     state: ServerState,
     auth: Authorization,
-    room_id: Snowflake,
-    msg_id: Snowflake,
+    room_id: RoomId,
+    msg_id: MessageId,
     body: &Archived<EditMessageBody>,
 ) -> Result<Option<Message>, Error> {
     // fast-path for if the perm_cache does contain a value
@@ -56,7 +56,7 @@ pub async fn edit_message(
         return Err(Error::NotFound);
     };
 
-    let author_id: Snowflake = row.try_get(0)?;
+    let author_id: UserId = row.try_get(0)?;
 
     if author_id != auth.user_id() {
         return Err(Error::Unauthorized);
@@ -64,7 +64,7 @@ pub async fn edit_message(
 
     let _prev_flags = MessageFlags::from_bits_truncate_public(row.try_get(1)?);
     let prev_content: Option<&str> = row.try_get(2)?;
-    let prev_files: Option<Vec<Snowflake>> = row.try_get(3)?;
+    let prev_files: Option<Vec<FileId>> = row.try_get(3)?;
 
     // do full trimming
     let Some(trimmed_content) = ({
@@ -103,8 +103,8 @@ pub async fn edit_message(
     // if there are old or new attachments
     if prev_files.is_some() || !body.attachments.is_empty() {
         // attachments may be unordered, so a Set is required
-        let pre_set: HashSet<Snowflake> = HashSet::from_iter(prev_files.unwrap_or_default());
-        let new_set: HashSet<Snowflake> = HashSet::from_iter(body.attachments.as_slice().iter().copied());
+        let pre_set: HashSet<FileId> = HashSet::from_iter(prev_files.unwrap_or_default());
+        let new_set: HashSet<FileId> = HashSet::from_iter(body.attachments.as_slice().iter().copied());
 
         if pre_set != new_set {
             let added = new_set.difference(&pre_set).copied().collect::<Vec<_>>();

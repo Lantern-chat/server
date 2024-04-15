@@ -1,7 +1,6 @@
 use db::pg::error::SqlState;
 use futures::{future::Either, FutureExt, TryFutureExt};
 
-use schema::{Snowflake, SnowflakeExt};
 use smol_str::SmolStr;
 
 use crate::prelude::*;
@@ -57,8 +56,8 @@ pub async fn redeem_invite(
         }
     };
 
-    let invite_id: Snowflake = row.try_get(0)?;
-    let party_id: Snowflake = row.try_get(1)?;
+    let invite_id: InviteId = row.try_get(0)?;
+    let party_id: PartyId = row.try_get(1)?;
 
     let update_member = async {
         if let Some(nickname) = body.nickname {

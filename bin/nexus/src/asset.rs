@@ -1,5 +1,3 @@
-use sdk::models::{Nullable, Snowflake};
-
 use crate::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -11,8 +9,8 @@ pub enum AssetMode {
 pub async fn maybe_add_asset(
     state: &ServerState,
     mode: AssetMode,
-    user_id: Snowflake,
-    file_id: Nullable<Snowflake>,
-) -> Result<Nullable<Snowflake>, Error> {
+    user_id: UserId,
+    file_id: Nullable<FileId>,
+) -> Result<Nullable<FileId>, Error> {
     Ok(Nullable::Null)
 }

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use sdk::{models::Permissions, Snowflake};
+use sdk::models::Permissions;
 use smallvec::SmallVec;
 
 use crate::prelude::*;
@@ -10,7 +10,7 @@ pub async fn verify<'a>(
     t: &db::pool::Transaction<'_>,
     _state: &ServerState,
     auth: Authorization,
-    room_id: Snowflake,
+    room_id: RoomId,
     perms: Permissions,
     content: Cow<'a, str>,
 ) -> Result<Cow<'a, str>, Error> {
@@ -21,7 +21,7 @@ pub async fn verify<'a>(
     for span in spans {
         if span.kind() == SpanType::CustomEmote {
             if let Some((name, id)) = content[span.range()].split_once(':') {
-                if let Ok(id) = id.parse::<Snowflake>() {
+                if let Ok(id) = id.parse::<EmoteId>() {
                     emotes.push((span, name, id));
                 }
             }
@@ -32,7 +32,7 @@ pub async fn verify<'a>(
         return Ok(content);
     }
 
-    let mut emote_ids: SmallVec<[Snowflake; 8]> = emotes.iter().map(|&(_, _, id)| id).collect();
+    let mut emote_ids: SmallVec<[EmoteId; 8]> = emotes.iter().map(|&(_, _, id)| id).collect();
 
     emote_ids.sort_unstable();
     emote_ids.dedup();
@@ -57,7 +57,7 @@ pub async fn verify<'a>(
         AND Emotes.Id = ANY(#{&emote_ids as SNOWFLAKE_ARRAY})
     }).await?;
 
-    let mut usable_emotes: SmallVec<[(&str, Snowflake); 16]> = SmallVec::new();
+    let mut usable_emotes: SmallVec<[(&str, EmoteId); 16]> = SmallVec::new();
 
     for row in &rows {
         usable_emotes.push((row.emotes_name()?, row.emotes_id()?));

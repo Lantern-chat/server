@@ -1,16 +1,16 @@
 use std::collections::HashMap;
 
-use schema::Snowflake;
-
 use crate::prelude::*;
 use sdk::models::*;
 
 #[derive(Default, Debug, Clone, Deserialize)]
 pub struct StatsForm {
     #[serde(default)]
-    pub room_id: Option<Snowflake>,
+    pub room_id: Option<RoomId>,
+
     #[serde(default)]
-    pub user_id: Option<Snowflake>,
+    pub user_id: Option<UserId>,
+
     #[serde(default)]
     pub prefix: Option<SmolStr>,
 }
@@ -18,7 +18,7 @@ pub struct StatsForm {
 pub async fn get_stats(
     state: ServerState,
     auth: Authorization,
-    party_id: Snowflake,
+    party_id: PartyId,
     form: StatsForm,
 ) -> Result<Statistics, Error> {
     #[rustfmt::skip]

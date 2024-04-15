@@ -5,8 +5,8 @@ use crate::prelude::*;
 pub async fn remove_role(
     state: ServerState,
     auth: Authorization,
-    party_id: Snowflake,
-    role_id: Snowflake,
+    party_id: PartyId,
+    role_id: RoleId,
 ) -> Result<(), Error> {
     // cannot remove @everyone role
     if role_id == party_id {
@@ -43,7 +43,7 @@ pub async fn remove_role(
     let mut roles = Vec::with_capacity(role_rows.len());
 
     for row in role_rows {
-        let id: Snowflake = row.role_id()?;
+        let id: RoleId = row.role_id()?;
 
         let role = PartialRole {
             permissions: Permissions::from_i64(row.permissions1()?, row.permissions2()?),

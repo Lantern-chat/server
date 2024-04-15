@@ -31,7 +31,7 @@ pub async fn get_invite(state: &ServerState, auth: Authorization, code: SmolStr)
         return Err(Error::NotFound);
     };
 
-    let inviter: Snowflake = row.user_id()?;
+    let inviter: UserId = row.user_id()?;
 
     let can_view_metadata = match (row.permissions1()?, row.permissions2()?) {
         (Some(low), Some(high)) => {

@@ -7,17 +7,17 @@ use futures::{Stream, StreamExt};
 use schema::{
     flags::AttachmentFlags,
     search::{Has, SearchError, SearchTerm, SearchTermKind, SearchTerms, Sort},
-    Snowflake, SnowflakeExt,
 };
 use sdk::models::*;
 use thorn::pg::Json;
 
-use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, prelude::*};
+use crate::backend::util::encrypted_asset::encrypt_snowflake_opt;
+use crate::prelude::*;
 
 pub async fn get_search(
     state: ServerState,
     auth: Authorization,
-    party_id: Snowflake,
+    party_id: PartyId,
     terms: SearchTerms,
 ) -> Result<SearchResult<impl Stream<Item = Result<Message, Error>>>, Error> {
     let db = state.db.read.get().await?;
@@ -49,11 +49,11 @@ use sdk::api::commands::room::GetMessagesQuery;
 
 fn form_to_search(
     auth: Authorization,
-    room_id: Snowflake,
+    room_id: RoomId,
     form: GetMessagesQuery,
     needs_perms: bool,
 ) -> SearchRequest {
-    let cursor = form.query.unwrap_or_else(|| Cursor::Before(Snowflake::max_value()));
+    let cursor = form.query.unwrap_or_else(|| Cursor::Before(MessageId::max_value()));
 
     let mut terms = SearchTerms::empty();
 
@@ -91,7 +91,7 @@ fn form_to_search(
 pub async fn get_many(
     state: ServerState,
     auth: Authorization,
-    room_id: Snowflake,
+    room_id: RoomId,
     form: GetMessagesQuery,
 ) -> Result<impl Stream<Item = Result<Message, Error>>, Error> {
     let needs_perms = match state.perm_cache.get(auth.user_id, room_id).await {
@@ -119,7 +119,7 @@ pub async fn get_many(
     Ok(stream)
 }
 
-pub async fn get_one<DB>(state: ServerState, db: &DB, msg_id: Snowflake) -> Result<Message, Error>
+pub async fn get_one<DB>(state: ServerState, db: &DB, msg_id: MessageId) -> Result<Message, Error>
 where
     DB: db::pool::AnyClient,
 {
@@ -136,14 +136,14 @@ where
 
 #[derive(Clone, Copy)]
 pub enum SearchScope {
-    Party(Snowflake),
-    Room(Snowflake, bool),
+    Party(PartyId),
+    Room(RoomId, bool),
 }
 
 pub struct Search {
     pub auth: Authorization,
     pub scope: SearchScope,
-    pub party_id: Option<Snowflake>,
+    pub party_id: Option<PartyId>,
     pub count: bool,
     pub terms: SearchTerms,
 }
@@ -151,13 +151,13 @@ pub struct Search {
 pub enum SearchRequest {
     /// Single unauthorized message
     Single {
-        msg_id: Snowflake,
+        msg_id: MessageId,
     },
     Search(Box<Search>),
 }
 
 impl SearchRequest {
-    fn user_id(&self) -> Option<&Snowflake> {
+    fn user_id(&self) -> Option<&UserId> {
         match self {
             SearchRequest::Search(ref search) => Some(&search.auth.user_id),
             _ => None,
@@ -684,8 +684,8 @@ where
         stream: stream.map(move |row| match row {
             Err(e) => Err(e.into()),
             Ok(row) => {
-                let party_id: Option<Snowflake> = row.party_id()?;
-                let msg_id: Snowflake = row.msg_id()?;
+                let party_id: Option<PartyId> = row.party_id()?;
+                let msg_id: MessageId = row.msg_id()?;
 
                 // many fields here are empty, easy to construct, and are filled in below
                 let mut msg = Message {
@@ -898,7 +898,7 @@ where
 
 pub const fn make_system_user() -> User {
     User {
-        id: Snowflake(unsafe { std::num::NonZeroU64::new_unchecked(1) }),
+        id: UserId::null(),
         discriminator: 0,
         username: SmolStr::new_inline("SYSTEM"),
         flags: UserFlags::SYSTEM_USER,
@@ -913,7 +913,7 @@ pub const fn make_system_user() -> User {
 #[serde(default)]
 struct RawReaction {
     /// emote_id
-    pub e: Option<Snowflake>,
+    pub e: Option<EmoteId>,
     /// emoji_id
     pub j: Option<i32>,
     /// me (own reaction)
@@ -938,8 +938,8 @@ pub struct ProcessedSearch {
     has_not_media: ArrayVec<Has, 3>,
     has_embed: Option<bool>,
     has_file: Option<bool>,
-    pin_tags: Vec<Snowflake>,
-    pin_not_tags: Vec<Snowflake>,
+    pin_tags: Vec<FolderId>,
+    pin_not_tags: Vec<FolderId>,
     has_link: bool,
     query: Option<SmolStr>,
     starred: bool,

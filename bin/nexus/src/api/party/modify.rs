@@ -1,5 +1,3 @@
-use schema::Snowflake;
-
 use crate::asset::{maybe_add_asset, AssetMode};
 use crate::prelude::*;
 use sdk::api::commands::party::PatchPartyForm;
@@ -8,7 +6,7 @@ use sdk::models::*;
 pub async fn modify_party(
     state: ServerState,
     auth: Authorization,
-    party_id: Snowflake,
+    party_id: PartyId,
     form: &Archived<PatchPartyForm>,
 ) -> Result<Party, Error> {
     if *form == PatchPartyForm::default() {
@@ -64,8 +62,8 @@ pub async fn modify_party(
         let mut new_banner = form.banner;
 
         if has_assets {
-            let old_avatar_id: Nullable<Snowflake> = row.avatar_file_id()?;
-            let old_banner_id: Nullable<Snowflake> = row.banner_file_id()?;
+            let old_avatar_id: Nullable<FileId> = row.avatar_file_id()?;
+            let old_banner_id: Nullable<FileId> = row.banner_file_id()?;
 
             if old_avatar_id == form.avatar {
                 new_avatar = Nullable::Undefined;

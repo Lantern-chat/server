@@ -1,6 +1,6 @@
 use super::prelude::*;
 
-pub async fn message_create(state: &ServerState, db: &db::pool::Client, id: Snowflake) -> Result<(), Error> {
+pub async fn message_create(state: &ServerState, db: &db::pool::Client, id: MessageId) -> Result<(), Error> {
     let msg = crate::api::room::messages::get::get_one(state.clone(), db, id).await?;
 
     #[rustfmt::skip]

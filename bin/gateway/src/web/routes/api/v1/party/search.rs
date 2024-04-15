@@ -3,7 +3,7 @@ use http::{HeaderName, HeaderValue};
 use super::*;
 
 #[async_recursion]
-pub async fn search(mut route: Route<ServerState>, auth: Authorization, party_id: Snowflake) -> ApiResult {
+pub async fn search(mut route: Route<ServerState>, auth: Authorization, party_id: PartyId) -> ApiResult {
     // match route.content_length() {
     //     None => return Err(Error::BadRequest),
     //     Some(len) if len > (1024 * 1024) => return Err(Error::RequestEntityTooLarge),

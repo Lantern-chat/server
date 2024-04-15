@@ -14,7 +14,7 @@ use super::*;
 // import all these to be used by child modules
 use crate::prelude::*;
 use crate::web::auth::MaybeAuth;
-use sdk::{driver::Encoding, Snowflake};
+use sdk::driver::Encoding;
 
 use futures::future::BoxFuture;
 use rpc::{client::RpcClientError, procedure::Procedure, request::RpcRequest};

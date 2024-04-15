@@ -6,8 +6,8 @@ use sdk::models::{events::UserReactionEvent, gateway::message::ServerMsg, *};
 pub async fn add_reaction(
     state: ServerState,
     auth: Authorization,
-    room_id: Snowflake,
-    msg_id: Snowflake,
+    room_id: RoomId,
+    msg_id: MessageId,
     emote: &Archived<EmoteOrEmoji>,
 ) -> Result<(), Error> {
     let Some(emote) = state.emoji.resolve(simple_de(emote)) else {

@@ -1,13 +1,11 @@
-use schema::Snowflake;
-
 use crate::prelude::*;
 use sdk::models::*;
 
 pub async fn delete_msg(
     state: ServerState,
     auth: Authorization,
-    room_id: Snowflake,
-    msg_id: Snowflake,
+    room_id: RoomId,
+    msg_id: MessageId,
 ) -> Result<(), Error> {
     let perms = state.perm_cache.get(auth.user_id(), room_id).await;
 

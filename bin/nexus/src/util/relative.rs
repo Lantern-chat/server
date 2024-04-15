@@ -1,4 +1,3 @@
-use sdk::Snowflake;
 use timestamp::Timestamp;
 
 use crate::prelude::*;
@@ -6,7 +5,7 @@ use crate::prelude::*;
 /// converts a timestamp to decaseconds elapsed since `now`, randomized
 pub fn approximate_relative_time(
     state: &ServerState,
-    user_id: Snowflake,
+    user_id: UserId,
     ts: Option<Timestamp>,
     now: Option<Timestamp>,
 ) -> Option<u64> {
