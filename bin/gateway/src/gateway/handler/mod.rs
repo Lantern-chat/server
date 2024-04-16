@@ -8,10 +8,9 @@ use futures::{
 
 use tokio_stream::wrappers::ReceiverStream;
 
-use hashbrown::{HashMap, HashSet};
+use hashbrown::{hash_map::Entry, HashMap, HashSet};
 
 use ftl::ws::{Message as WsMessage, SinkError, WebSocket};
-use schema::Snowflake;
 
 use sdk::{
     api::gateway::GatewayQueryParams,
@@ -46,10 +45,24 @@ pub struct ConnectionState {
     /// for each party that is being listened on, keep the associated cancel handle, to kill the stream if we unsub from them
     pub listener_table: listener_table::ListenerTable,
     /// Contains a list of user ids that have blocked the current user of this connection
-    pub blocked_by: HashSet<Snowflake>,
+    pub blocked_by: HashSet<UserId>,
     pub roles: role_cache::RoleCache,
-    pub user_id: Option<Snowflake>,
+    pub user_id: Option<UserId>,
     pub intent: sdk::models::Intent,
+    pub perm_cache: HashMap<RoomId, Permissions>,
+}
+
+impl ConnectionState {
+    pub async fn get_perm(&mut self, user_id: UserId, room_id: RoomId) -> Option<Permissions> {
+        Some(match self.perm_cache.entry(room_id) {
+            Entry::Occupied(entry) => *entry.get(),
+            Entry::Vacant(entry) => {
+                let perms = self.state.gateway.structure.compute_permissions_slow(room_id, user_id).await?;
+
+                *entry.insert(perms)
+            }
+        })
+    }
 }
 
 pub enum Loop<T> {
@@ -125,6 +138,7 @@ pub async fn client_connection(ws: WebSocket, query: GatewayQueryParams, _addr: 
         roles: role_cache::RoleCache::default(),
         user_id: None,
         intent: sdk::models::Intent::empty(),
+        perm_cache: HashMap::default(),
     };
 
     'event_loop: while let Some(event) = events.next().await {
@@ -253,7 +267,8 @@ impl ConnectionState {
                 use sdk::models::gateway::message::server_msg_payloads::{MemberRemovePayload, MemberUpdatePayload};
 
                 // if the event indicates things that can invalidate the permission cache, they must be handled
-                let clear_user = match e.msg {
+                #[rustfmt::skip]
+                let clear_cache = match e.msg {
                     // role updates when the current user has this role
                     ServerMsg::RoleUpdate(ref r) if self.roles.has(r.party_id, r.id) => true,
                     ServerMsg::RoleDelete(ref r) if self.roles.has(r.party_id, r.id) => {
@@ -261,7 +276,8 @@ impl ConnectionState {
                         true
                     }
                     // member events for the current user
-                    ServerMsg::MemberUpdate(MemberUpdatePayload { ref inner }) | ServerMsg::MemberRemove(MemberRemovePayload { ref inner }) if inner.member.user.id == user_id => {
+                    ServerMsg::MemberUpdate(MemberUpdatePayload { ref inner }) |
+                    ServerMsg::MemberRemove(MemberRemovePayload { ref inner }) if inner.member.user.id == user_id => {
                         // remove old roles and add new
                         self.roles.remove_party(inner.party_id);
 
@@ -274,50 +290,48 @@ impl ConnectionState {
                         true
                     }
                     ServerMsg::RoomUpdate(ref _r) => {
-                        // TODO
+                        // TODO: self.perm_cache.remove(_r.id);
+                        // false
+
                         true
                     }
                     _ => false,
                 };
 
-                if clear_user {
-                    state.perm_cache.clear_user(user_id).await;
+                if clear_cache {
+                    self.perm_cache.clear();
                 }
 
-                let mut now_invalid = false;
-
                 if let Some(room_id) = e.room_id {
-                    match state.perm_cache.get(user_id, room_id).await {
+                    let perms = match self.get_perm(user_id, room_id).await {
+                        Some(perms) => perms,
                         None => match refresh(state.clone(), user_id, room_id).boxed().await {
-                            Ok(Some(perms)) => {
-                                // skip this event if they don't have permissions to view it
-                                if !perms.contains(Permissions::VIEW_ROOM) {
-                                    Loop::Continue;
-                                }
-                            }
+                            Ok(Some(perms)) => perms,
                             Ok(None) => {
-                                now_invalid = true;
+                                // if there are no perms after refresh, they don't exist,
+                                // but we're still receiving events for them, so something is wrong.
+                                log::error!("No permissions found for user {user_id} room {room_id} after refresh");
+                                return Loop::Break;
                             }
                             Err(e) => {
                                 log::error!("Error refreshing user {user_id} room {room_id} permissions: {e}");
-                                Loop::Break;
+                                return Loop::Break;
                             }
                         },
-                        // skip event if user can't view room
-                        Some(perms) if !perms.contains(Permissions::VIEW_ROOM) => Loop::Continue,
-                        _ => { /* send message as normal*/ }
+                    };
+
+                    // skip event if user can't view room
+                    if !perms.contains(Permissions::VIEW_ROOM) {
+                        return Loop::Continue;
                     }
                 }
 
                 match e.msg {
-                    _ if now_invalid => {
-                        event = events::INVALID_SESSION.clone();
-                        events.clear();
+                    ServerMsg::PartyCreate(ref payload) => {
+                        let subs = self.state.gateway.sub_and_activate_connection(user_id, self.conn.clone(), &[payload.id]).boxed().await;
+
+                        self.listener_table.register_subs(&mut events, subs)
                     }
-                    ServerMsg::PartyCreate(ref payload) => self.listener_table.register_subs(
-                        &mut events,
-                        self.state.gateway.sub_and_activate_connection(user_id, self.conn.clone(), &[payload.id]).boxed().await,
-                    ),
                     ServerMsg::PartyDelete(ref payload) => {
                         // by cancelling a stream, it will be removed from the SelectStream automatically
                         if let Some(event_stream) = self.listener_table.get(&payload.id) {

@@ -101,6 +101,8 @@ pub struct Gateway {
 
     /// Triggered by the database listener
     pub notifier: Notify,
+
+    pub structure: structure::StructureCache,
 }
 
 impl ServerState {
