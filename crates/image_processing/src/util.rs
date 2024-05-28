@@ -37,8 +37,7 @@ impl AlphaValue for f32 {
 
 fn check_pixels_for_alpha<G>(image: &G) -> bool
 where
-    G: GenericImageView,
-    <<G as GenericImageView>::Pixel as Pixel>::Subpixel: AlphaValue,
+    G: GenericImageView<Pixel: Pixel<Subpixel: AlphaValue>>,
 {
     // use last channel as alpha
     let x = <<G as GenericImageView>::Pixel as Pixel>::CHANNEL_COUNT as usize - 1;

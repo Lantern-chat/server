@@ -158,8 +158,7 @@ impl<T> Connector for T
 where
     T: MakeTlsConnect<Socket> + Clone + Sync + Send + 'static,
     T::Stream: Sync + Send,
-    T::TlsConnect: Sync + Send,
-    <T::TlsConnect as TlsConnect<Socket>>::Future: Send,
+    T::TlsConnect: Sync + Send + TlsConnect<Socket, Future: Send>,
 {
     async fn connect(&self, config: &PoolConfig) -> Result<(PgClient, Connection, Receiver<Notification>), Error> {
         let name = config.pg_config.get_dbname().unwrap_or("Unnamed");

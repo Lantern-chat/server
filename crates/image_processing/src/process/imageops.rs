@@ -217,9 +217,6 @@ impl<'a, S, P> ReducedView<'a, S, P> {
     }
 }
 
-pub type GenericImageViewPixel<S> = <S as GenericImageView>::Pixel;
-pub type GenericImageViewSubpixel<S> = <GenericImageViewPixel<S> as Pixel>::Subpixel;
-
 fn integer_luma(r: u8, g: u8, b: u8) -> u8 {
     // 255 * 72(max channel) * 3 <= 2^16-1
     let r = r as u16 * 21;
@@ -279,8 +276,7 @@ pub fn reduce_pixel<FROM: Pixel, TO: Pixel>(mut channels: [u8; 4]) -> [u8; 4] {
 
 impl<S, P> GenericImageView for ReducedView<'_, S, P>
 where
-    S: GenericImageView,
-    GenericImageViewSubpixel<S>: ReduceSubpixel,
+    S: GenericImageView<Pixel: Pixel<Subpixel: ReduceSubpixel>>,
     P: Pixel<Subpixel = u8>,
 {
     type Pixel = P;
@@ -292,6 +288,7 @@ where
 
     #[inline]
     fn bounds(&self) -> (u32, u32, u32, u32) {
+        #[allow(deprecated)]
         self.inner.bounds()
     }
 
@@ -308,11 +305,9 @@ where
     }
 }
 
-pub fn reduce_to_u8<I, FP, P>(image: &I) -> ImageBuffer<P, Vec<u8>>
+pub fn reduce_to_u8<I, P>(image: &I) -> ImageBuffer<P, Vec<u8>>
 where
-    I: GenericImageView<Pixel = FP>,
-    FP: Pixel,
-    <FP as Pixel>::Subpixel: ReduceSubpixel,
+    I: GenericImageView<Pixel: Pixel<Subpixel: ReduceSubpixel>>,
     P: Pixel<Subpixel = u8>,
 {
     let (width, height) = image.dimensions();

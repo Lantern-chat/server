@@ -26,7 +26,7 @@ where
     P: Pixel<Subpixel = u8>,
     F: FnMut(u32, u32, [f32; 3]),
 {
-    const TAPS: &[(isize, isize)] = &[
+    const TAPS: &[(isize, isize); 9] = &[
         (-1, -1),
         (0, -1),
         (1, -1),
@@ -60,10 +60,6 @@ where
                 }
             }
 
-            for tc in &mut t {
-                *tc = tc.clamp(0.0, 1.0);
-            }
-
             cb(x, y, t);
         }
     }
@@ -80,9 +76,9 @@ const LAPLACIAN: [f32; 9] = [
 #[rustfmt::skip]
 #[inline]
 fn luma([r, g, b]: [f32; 3]) -> f32 {
-    0.212671 * r +
-    0.715160 * g +
-    0.072169 * b
+    0.212671 * r.clamp(0.0, 1.0) +
+    0.715160 * g.clamp(0.0, 1.0) +
+    0.072169 * b.clamp(0.0, 1.0)
 }
 
 pub fn compute_heuristics<I, P>(image: &I) -> HeuristicsInfo
