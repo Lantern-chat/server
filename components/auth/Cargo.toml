@@ -10,7 +10,7 @@ sdk = { workspace = true, features = ["rkyv"] }
 rkyv = { workspace = true }
 
 aes = "0.8"
-base64 = "0.21.0"
+base64 = "0.22"
 sha1 = "0.10"
 hmac = "0.12"
 thiserror = "1"

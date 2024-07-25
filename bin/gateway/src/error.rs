@@ -60,8 +60,8 @@ pub enum Error {
     CborEncodingError(#[from] ciborium::ser::Error<std::io::Error>),
     #[error("Cbor Decoding Error: {0}")]
     CborDecodingError(#[from] ciborium::de::Error<std::io::Error>),
-    #[error("XML Error {0}")]
-    XMLError(#[from] quick_xml::Error),
+    // #[error("XML Error {0}")]
+    // XMLError(#[from] quick_xml::Error),
     #[error("Request Error: {0}")]
     RequestError(#[from] reqwest::Error),
 
@@ -145,7 +145,7 @@ impl Error {
             | Error::JsonError(_)
             | Error::CborDecodingError(_)
             | Error::CborEncodingError(_)
-            | Error::XMLError(_)
+            //| Error::XMLError(_)
             | Error::IOError(_)
             | Error::RequestError(_) => true,
 
@@ -207,7 +207,7 @@ impl From<Error> for sdk::api::error::ApiError {
             Error::DbError(_)               => ApiErrorCode::DbError,
             Error::JoinError(_)             => ApiErrorCode::JoinError,
             Error::SemaphoreError(_)        => ApiErrorCode::SemaphoreError,
-            Error::XMLError(_)              => ApiErrorCode::XMLError,
+            //Error::XMLError(_)              => ApiErrorCode::XMLError,
             Error::RequestError(_)          => ApiErrorCode::RequestError,
             Error::Utf8ParseError(_)        => ApiErrorCode::Utf8ParseError,
             Error::Utf8CheckError(_)        => ApiErrorCode::Utf8ParseError, // revisit

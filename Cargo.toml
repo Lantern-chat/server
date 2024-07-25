@@ -53,7 +53,7 @@ scc = "2"
 
 http = "1"
 headers = "0.4"
-quinn = "0.10"
+quinn = "0.11"
 
 ftl = { git = "https://github.com/Lantern-chat/ftl", features = ["json", "cbor"] }
 mime_db = { git = "https://github.com/Lantern-chat/mime_db" }

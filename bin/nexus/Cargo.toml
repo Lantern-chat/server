@@ -66,14 +66,14 @@ uuid = { version = "1.1.2", features = ["v4", "serde"] }
 rust-argon2 = "2"
 lazy_static = "1.4.0"
 aes-gcm-siv = "0.11"
-base32 = "0.4.0"
+base32 = "0.5.0"
 aho-corasick = "1"
 smallvec = "1.11.2"
 paste = "1.0.14"
 failsafe = "1.2"
 
 [target.'cfg(all(unix, any(target_arch = "x86", target_arch = "x86_64")))'.dependencies]
-tikv-jemallocator = { version = "0.5" }
+tikv-jemallocator = { version = "0.6" }
 
 # [target.'cfg(any(target_arch = "x86_64", target_arch = "x86"))'.dependencies]
 # server = { path = "../../layers/server", features = ["brotli"] }
