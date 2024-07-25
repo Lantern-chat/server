@@ -10,7 +10,6 @@ use std::{any::TypeId, collections::VecDeque};
 use std::{borrow::Cow, time::Duration};
 
 use arc_swap::{ArcSwap, ArcSwapOption};
-use hashbrown::HashMap;
 
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::sync::{
@@ -226,6 +225,7 @@ pub struct Pool(Arc<PoolInner>);
 impl Deref for Pool {
     type Target = PoolInner;
 
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -414,6 +414,7 @@ pub struct Object {
 }
 
 impl Object {
+    #[inline(always)]
     fn inner(&self) -> &Client {
         match self.inner {
             Some(ref inner) => inner,
@@ -421,6 +422,7 @@ impl Object {
         }
     }
 
+    #[inline(always)]
     fn inner_mut(&mut self) -> &mut Client {
         match self.inner {
             Some(ref mut inner) => inner,
@@ -440,12 +442,14 @@ impl Object {
 impl Deref for Object {
     type Target = Client;
 
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         self.inner()
     }
 }
 
 impl DerefMut for Object {
+    #[inline(always)]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.inner_mut()
     }
@@ -455,6 +459,7 @@ impl Drop for Object {
     fn drop(&mut self) {
         if let Some(pool) = self.pool.upgrade() {
             match self.state {
+                State::Waiting | State::Dropped => { /*no-op*/ }
                 State::Receiving | State::Creating | State::Taken => pool.semaphore.add_permits(1),
                 State::Recycling | State::Ready => {
                     let client = self.inner.take().expect("Double-take of dropped client");
@@ -469,59 +474,36 @@ impl Drop for Object {
                     // it frees up space for a new connection
                     pool.semaphore.add_permits(1);
                 }
-                State::Waiting | State::Dropped => {}
             }
         }
+
         self.inner = None;
         self.state = State::Dropped;
     }
 }
 
-pub struct StatementCache {
-    cache: ArcSwap<HashMap<TypeId, Statement>>,
-    cache2: ArcSwap<HashMap<Arc<str>, Statement>>,
-}
+mod key;
 
-impl Default for StatementCache {
-    fn default() -> Self {
-        StatementCache {
-            cache: ArcSwap::new(Arc::new(HashMap::new())),
-            cache2: ArcSwap::new(Arc::new(HashMap::new())),
-        }
-    }
+use key::{StatementCacheKey, StaticStatementCacheKey};
+
+#[derive(Default)]
+pub struct StatementCache {
+    cache: scc::HashMap<StaticStatementCacheKey, Statement, ahash::RandomState>,
 }
 
 impl StatementCache {
-    pub fn insert(&self, key: TypeId, stmt: &Statement) {
-        self.cache.rcu(|cache| {
-            let mut cache = HashMap::clone(cache);
-            cache.insert(key, stmt.clone());
-            cache
-        });
+    pub fn insert_keyed(&self, query: String, types: Vec<Type>, stmt: Statement) {
+        let key = StaticStatementCacheKey::owned(query, types);
+        _ = self.cache.entry(key).insert_entry(stmt);
     }
 
-    pub fn insert2(&self, key: Arc<str>, stmt: &Statement) {
-        self.cache2.rcu(|cache| {
-            let mut cache = HashMap::clone(cache);
-            cache.insert(key.clone(), stmt.clone());
-            cache
-        });
-    }
-
-    pub fn get(&self, key: TypeId) -> Option<Statement> {
-        self.cache.load().get(&key).cloned()
-    }
-
-    pub fn get2(&self, key: &str) -> Option<Statement> {
-        self.cache2.load().get(key).cloned()
+    pub fn get_keyed(&self, query: &str, types: &[Type]) -> Option<Statement> {
+        let key = StatementCacheKey::borrowed(query, types);
+        self.cache.read(&key, |_k, v| v.clone())
     }
 
     pub fn clear(&self) {
-        self.cache.store(Arc::new(HashMap::new()));
-    }
-
-    pub fn clear2(&self) {
-        self.cache2.store(Arc::new(HashMap::new()));
+        self.cache.clear();
     }
 }
 
@@ -585,34 +567,6 @@ lazy_static::lazy_static! {
 }
 
 impl Client {
-    #[inline(always)]
-    fn debug_check_readonly<'a>(&self, query: &'a str) -> &'a str {
-        if cfg!(debug_assertions) && self.readonly {
-            assert!(!WRITE_REGEX.is_match(query));
-        }
-
-        query
-    }
-
-    pub async fn prepare_cached<F>(&self, query: F) -> Result<Statement, Error>
-    where
-        F: Any + FnOnce() -> &'static str,
-    {
-        let id = TypeId::of::<F>();
-
-        // It's fine to get a cached entry if the client is disconnected
-        // since it can't be used anyway.
-        if let Some(stmt) = self.stmt_cache.get(id) {
-            return Ok(stmt);
-        }
-
-        let stmt = self.client.prepare(self.debug_check_readonly(query())).boxed().await?;
-
-        self.stmt_cache.insert(id, &stmt);
-
-        Ok(stmt)
-    }
-
     pub async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, Error>
     where
         T: ?Sized + ToStatement,
@@ -621,16 +575,6 @@ impl Client {
         I::IntoIter: ExactSizeIterator,
     {
         self.client.query_raw(statement, params).await.map_err(Error::from)
-    }
-
-    pub async fn query_raw_cached<F, P, I>(&self, query: F, params: I) -> Result<RowStream, Error>
-    where
-        F: Any + FnOnce() -> &'static str,
-        P: BorrowToSql,
-        I: IntoIterator<Item = P>,
-        I::IntoIter: ExactSizeIterator,
-    {
-        self.query_raw(&self.prepare_cached(query).await?, params).await
     }
 
     pub async fn query_stream<T>(
@@ -648,29 +592,11 @@ impl Client {
         Ok(self.query_raw(statement, slice_iter(params)).await?.map_err(Error::from))
     }
 
-    pub async fn query_stream_cached<F>(
-        &self,
-        query: F,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<impl Stream<Item = Result<Row, Error>>, Error>
-    where
-        F: Any + FnOnce() -> &'static str,
-    {
-        self.query_stream(&self.prepare_cached(query).await?, params).await
-    }
-
     pub async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
     where
         T: ?Sized + ToStatement,
     {
         self.client.execute(statement, params).await.map_err(Error::from)
-    }
-
-    pub async fn execute_cached<F>(&self, query: F, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
-    where
-        F: Any + FnOnce() -> &'static str,
-    {
-        self.client.execute(&self.prepare_cached(query).await?, params).await.map_err(Error::from)
     }
 
     pub async fn query<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<Vec<Row>, Error>
@@ -680,13 +606,6 @@ impl Client {
         self.client.query(statement, params).await.map_err(Error::from)
     }
 
-    pub async fn query_cached<F>(&self, query: F, params: &[&(dyn ToSql + Sync)]) -> Result<Vec<Row>, Error>
-    where
-        F: Any + FnOnce() -> &'static str,
-    {
-        self.query(&self.prepare_cached(query).await?, params).await
-    }
-
     pub async fn query_one<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<Row, Error>
     where
         T: ?Sized + ToStatement,
@@ -694,110 +613,11 @@ impl Client {
         self.client.query_one(statement, params).await.map_err(Error::from)
     }
 
-    pub async fn query_one_cached<F>(&self, query: F, params: &[&(dyn ToSql + Sync)]) -> Result<Row, Error>
-    where
-        F: Any + FnOnce() -> &'static str,
-    {
-        self.query_one(&self.prepare_cached(query).await?, params).await
-    }
-
     pub async fn query_opt<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<Option<Row>, Error>
     where
         T: ?Sized + ToStatement,
     {
         self.client.query_opt(statement, params).await.map_err(Error::from)
-    }
-
-    pub async fn query_opt_cached<F>(&self, query: F, params: &[&(dyn ToSql + Sync)]) -> Result<Option<Row>, Error>
-    where
-        F: Any + FnOnce() -> &'static str,
-    {
-        self.query_opt(&self.prepare_cached(query).await?, params).await
-    }
-}
-
-impl Client {
-    pub async fn prepare_cached_typed<F, Q>(&self, query: F) -> Result<Statement, Error>
-    where
-        F: Any + FnOnce() -> Q,
-        Q: AnyQuery,
-    {
-        let id = TypeId::of::<F>();
-
-        // It's fine to get a cached entry if the client is disconnected
-        // since it can't be used anyway.
-        if let Some(stmt) = self.stmt_cache.get(id) {
-            return Ok(stmt);
-        }
-
-        let (query, collector) = query().to_string();
-        let types = collector.types();
-
-        log::debug!("Preparing {} query: \"{query}\"", self.conn.id);
-
-        // this future is boxed to avoid extra growth on the stack of async functions calling this
-        // and since it's rare for this to be reached (only on startup), the allocation cost is trivial
-        let stmt = self.client.prepare_typed(self.debug_check_readonly(&query), &types).boxed().await?;
-
-        self.stmt_cache.insert(id, &stmt);
-
-        Ok(stmt)
-    }
-
-    pub async fn query_stream_cached_typed<F, Q>(
-        &self,
-        query: F,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<impl Stream<Item = Result<Row, Error>>, Error>
-    where
-        F: Any + FnOnce() -> Q,
-        Q: AnyQuery,
-    {
-        self.query_stream(&self.prepare_cached_typed(query).await?, params).await
-    }
-
-    pub async fn execute_cached_typed<F, Q>(&self, query: F, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
-    where
-        F: Any + FnOnce() -> Q,
-        Q: AnyQuery,
-    {
-        self.execute(&self.prepare_cached_typed(query).await?, params).await
-    }
-
-    pub async fn query_cached_typed<F, Q>(
-        &self,
-        query: F,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Vec<Row>, Error>
-    where
-        F: Any + FnOnce() -> Q,
-        Q: AnyQuery,
-    {
-        self.query(&self.prepare_cached_typed(query).await?, params).await
-    }
-
-    pub async fn query_one_cached_typed<F, Q>(
-        &self,
-        query: F,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Row, Error>
-    where
-        F: Any + FnOnce() -> Q,
-        Q: AnyQuery,
-    {
-        self.query_one(&self.prepare_cached_typed(query).await?, params).await
-    }
-
-    pub async fn query_opt_cached_typed<F, Q>(
-        &self,
-        query: F,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Option<Row>, Error>
-    where
-        F: Any + FnOnce() -> Q,
-        Q: AnyQuery,
-    {
-        self.query_opt(&self.prepare_cached_typed(query).await?, params).await
     }
 }
 
@@ -837,34 +657,6 @@ impl Transaction<'_> {
 }
 
 impl Transaction<'_> {
-    #[inline(always)]
-    fn debug_check_readonly<'a>(&self, query: &'a str) -> &'a str {
-        if cfg!(debug_assertions) && self.readonly {
-            assert!(!WRITE_REGEX.is_match(query));
-        }
-
-        query
-    }
-
-    pub async fn prepare_cached<F>(&self, query: F) -> Result<Statement, Error>
-    where
-        F: Any + FnOnce() -> &'static str,
-    {
-        let id = TypeId::of::<F>();
-
-        // It's fine to get a cached entry if the client is disconnected
-        // since it can't be used anyway.
-        if let Some(stmt) = self.stmt_cache.get(id) {
-            return Ok(stmt);
-        }
-
-        let stmt = self.t.prepare(self.debug_check_readonly(query())).await?;
-
-        self.stmt_cache.insert(id, &stmt);
-
-        Ok(stmt)
-    }
-
     pub async fn query_raw<T, P, I>(&self, statement: &T, params: I) -> Result<RowStream, Error>
     where
         T: ?Sized + ToStatement,
@@ -873,16 +665,6 @@ impl Transaction<'_> {
         I::IntoIter: ExactSizeIterator,
     {
         self.t.query_raw(statement, params).await.map_err(Error::from)
-    }
-
-    pub async fn query_raw_cached<F, P, I>(&self, query: F, params: I) -> Result<RowStream, Error>
-    where
-        F: Any + FnOnce() -> &'static str,
-        P: BorrowToSql,
-        I: IntoIterator<Item = P>,
-        I::IntoIter: ExactSizeIterator,
-    {
-        self.query_raw(&self.prepare_cached(query).await?, params).await
     }
 
     pub async fn query_stream<T>(
@@ -900,29 +682,11 @@ impl Transaction<'_> {
         Ok(self.query_raw(statement, slice_iter(params)).await?.map_err(Error::from))
     }
 
-    pub async fn query_stream_cached<F>(
-        &self,
-        query: F,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<impl Stream<Item = Result<Row, Error>>, Error>
-    where
-        F: Any + FnOnce() -> &'static str,
-    {
-        self.query_stream(&self.prepare_cached(query).await?, params).await
-    }
-
     pub async fn execute<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
     where
         T: ?Sized + ToStatement,
     {
         self.t.execute(statement, params).await.map_err(Error::from)
-    }
-
-    pub async fn execute_cached<F>(&self, query: F, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
-    where
-        F: Any + FnOnce() -> &'static str,
-    {
-        self.t.execute(&self.prepare_cached(query).await?, params).await.map_err(Error::from)
     }
 
     pub async fn query<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<Vec<Row>, Error>
@@ -932,25 +696,11 @@ impl Transaction<'_> {
         self.t.query(statement, params).await.map_err(Error::from)
     }
 
-    pub async fn query_cached<F>(&self, query: F, params: &[&(dyn ToSql + Sync)]) -> Result<Vec<Row>, Error>
-    where
-        F: Any + FnOnce() -> &'static str,
-    {
-        self.query(&self.prepare_cached(query).await?, params).await
-    }
-
     pub async fn query_one<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<Row, Error>
     where
         T: ?Sized + ToStatement,
     {
         self.t.query_one(statement, params).await.map_err(Error::from)
-    }
-
-    pub async fn query_one_cached<F>(&self, query: F, params: &[&(dyn ToSql + Sync)]) -> Result<Row, Error>
-    where
-        F: Any + FnOnce() -> &'static str,
-    {
-        self.query_one(&self.prepare_cached(query).await?, params).await
     }
 
     pub async fn query_opt<T>(&self, statement: &T, params: &[&(dyn ToSql + Sync)]) -> Result<Option<Row>, Error>
@@ -959,111 +709,34 @@ impl Transaction<'_> {
     {
         self.t.query_opt(statement, params).await.map_err(Error::from)
     }
-
-    pub async fn query_opt_cached<F>(&self, query: F, params: &[&(dyn ToSql + Sync)]) -> Result<Option<Row>, Error>
-    where
-        F: Any + FnOnce() -> &'static str,
-    {
-        self.query_opt(&self.prepare_cached(query).await?, params).await
-    }
-}
-
-impl Transaction<'_> {
-    pub async fn prepare_cached_typed<F, Q>(&self, query: F) -> Result<Statement, Error>
-    where
-        F: Any + FnOnce() -> Q,
-        Q: AnyQuery,
-    {
-        let id = TypeId::of::<F>();
-
-        // It's fine to get a cached entry if the client is disconnected
-        // since it can't be used anyway.
-        if let Some(stmt) = self.stmt_cache.get(id) {
-            return Ok(stmt);
-        }
-
-        let (query, collector) = query().to_string();
-        let types = collector.types();
-
-        log::debug!("Preparing query: \"{query}\"");
-
-        let stmt = self.t.prepare_typed(self.debug_check_readonly(&query), &types).await?;
-
-        self.stmt_cache.insert(id, &stmt);
-
-        Ok(stmt)
-    }
-
-    pub async fn query_stream_cached_typed<F, Q>(
-        &self,
-        query: F,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<impl Stream<Item = Result<Row, Error>>, Error>
-    where
-        F: Any + FnOnce() -> Q,
-        Q: AnyQuery,
-    {
-        self.query_stream(&self.prepare_cached_typed(query).await?, params).await
-    }
-
-    pub async fn execute_cached_typed<F, Q>(&self, query: F, params: &[&(dyn ToSql + Sync)]) -> Result<u64, Error>
-    where
-        F: Any + FnOnce() -> Q,
-        Q: AnyQuery,
-    {
-        self.execute(&self.prepare_cached_typed(query).await?, params).await
-    }
-
-    pub async fn query_cached_typed<F, Q>(
-        &self,
-        query: F,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Vec<Row>, Error>
-    where
-        F: Any + FnOnce() -> Q,
-        Q: AnyQuery,
-    {
-        self.query(&self.prepare_cached_typed(query).await?, params).await
-    }
-
-    pub async fn query_one_cached_typed<F, Q>(
-        &self,
-        query: F,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Row, Error>
-    where
-        F: Any + FnOnce() -> Q,
-        Q: AnyQuery,
-    {
-        self.query_one(&self.prepare_cached_typed(query).await?, params).await
-    }
-
-    pub async fn query_opt_cached_typed<F, Q>(
-        &self,
-        query: F,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Option<Row>, Error>
-    where
-        F: Any + FnOnce() -> Q,
-        Q: AnyQuery,
-    {
-        self.query_opt(&self.prepare_cached_typed(query).await?, params).await
-    }
 }
 
 use thorn::macros::{Query, SqlFormatError};
 
 impl Client {
+    #[inline(always)]
+    fn debug_check_readonly<'a>(&self, query: &'a str) -> &'a str {
+        if cfg!(debug_assertions) && self.readonly {
+            assert!(!WRITE_REGEX.is_match(query));
+        }
+
+        query
+    }
+
     pub async fn prepare_cached2<'a, E: From<Row>>(&self, query: &mut Query<'a, E>) -> Result<Statement, Error> {
-        if let Some(stmt) = self.stmt_cache.get2(&query.q) {
+        if let Some(stmt) = self.stmt_cache.get_keyed(&query.q, &query.param_tys) {
             return Ok(stmt);
         }
 
         log::debug!("Preparing query: \"{}\"", query.q);
 
-        let stmt = self.client.prepare_typed(&query.q, &query.param_tys).await?;
+        let stmt = self.client.prepare_typed(self.debug_check_readonly(&query.q), &query.param_tys).await?;
 
-        self.stmt_cache.insert2(std::mem::take(&mut query.q).into(), &stmt);
+        self.stmt_cache.insert_keyed(
+            std::mem::take(&mut query.q),
+            std::mem::take(&mut query.param_tys),
+            stmt.clone(),
+        );
 
         Ok(stmt)
     }
@@ -1129,16 +802,29 @@ impl Client {
 }
 
 impl Transaction<'_> {
+    #[inline(always)]
+    fn debug_check_readonly<'a>(&self, query: &'a str) -> &'a str {
+        if cfg!(debug_assertions) && self.readonly {
+            assert!(!WRITE_REGEX.is_match(query));
+        }
+
+        query
+    }
+
     pub async fn prepare_cached2<'a, E: From<Row>>(&self, query: &mut Query<'a, E>) -> Result<Statement, Error> {
-        if let Some(stmt) = self.stmt_cache.get2(&query.q) {
+        if let Some(stmt) = self.stmt_cache.get_keyed(&query.q, &query.param_tys) {
             return Ok(stmt);
         }
 
         log::debug!("Preparing query: \"{}\"", query.q);
 
-        let stmt = self.t.prepare_typed(&query.q, &query.param_tys).await?;
+        let stmt = self.t.prepare_typed(self.debug_check_readonly(&query.q), &query.param_tys).await?;
 
-        self.stmt_cache.insert2(std::mem::take(&mut query.q).into(), &stmt);
+        self.stmt_cache.insert_keyed(
+            std::mem::take(&mut query.q),
+            std::mem::take(&mut query.param_tys),
+            stmt.clone(),
+        );
 
         Ok(stmt)
     }

@@ -20,11 +20,12 @@ arc-swap = "1.2.0"
 thiserror = "1.0.24"
 parking_lot = "0.12"
 tracing = "0.1.25"
-hashbrown = { version = "0.14", features = ["inline-more"] }
 # parking_lot = "0.11.1"
 lazy_static = "1.4.0"
 regex = "1.4.6"
 num_cpus = "1.13.0"
+scc = "2"
+ahash = "0.8"
 
 # deadpool = { version = "0.8.0", default_features = false, features = ["managed", "config", "rt_tokio_1"] }
 # sea-query = { version = "0.10", features = ["with-json", "with-chrono", "with-uuid"] }
