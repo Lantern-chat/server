@@ -17,6 +17,14 @@ pub struct CliArgs {
     /// target triple
     #[argh(option)]
     target: String,
+
+    /// strip debug symbols
+    #[argh(option, default = "false")]
+    strip: bool,
+
+    /// lto mode (true, "fat", "thin")
+    #[argh(option, default = "String::new()")]
+    lto: String,
 }
 
 use self::{project::Project, target::Target};
@@ -58,8 +66,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let jobs = if args.jobs > 0 { format!("-j {}", args.jobs) } else { String::new() };
 
     let shared = format!(
-        r#"{jobs} --config build.rustflags=["{}"] --config profile.release.strip=true --target {target} --release"#,
-        rustflags.split_whitespace().collect::<Vec<&str>>().join(r#"",""#)
+        r#"{jobs} --config build.rustflags=["{}"] {} {} --target {target} --release"#,
+        rustflags.split_whitespace().collect::<Vec<&str>>().join(r#"",""#),
+        if args.strip { "--config profile.release.strip=true" } else { "" },
+        match args.lto.is_empty() {
+            true => String::new(),
+            false => format!("--config profile.release.lto=\"{}\"", args.lto),
+        }
     );
 
     for project in projects {
