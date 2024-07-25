@@ -20,24 +20,17 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
         // if task has never run before, get latest event
         // otherwise it's assumed to be resuming from a crashed iteration
         if state.gateway.last_event().load(Ordering::SeqCst) == 0 {
-            let row = db
-                .query_opt_cached_typed(
-                    || {
-                        use schema::*;
-                        use thorn::*;
-
-                        Query::select()
-                            .from_table::<EventLog>()
-                            .col(EventLog::Counter)
-                            .limit_n(1)
-                            .order_by(EventLog::Counter.descending())
-                    },
-                    &[],
-                )
-                .await?;
+            #[rustfmt::skip]
+            let row = db.query_opt2(schema::sql! {
+                SELECT
+                    EventLog.Counter AS @_
+                FROM EventLog
+                ORDER BY EventLog.Counter DESC
+                LIMIT 1
+            }).await?;
 
             if let Some(row) = row {
-                state.gateway.last_event().store(row.try_get(0)?, Ordering::SeqCst);
+                state.gateway.last_event().store(row.event_log_counter()?, Ordering::SeqCst);
             }
         }
 
@@ -66,39 +59,30 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
 
             let mut latest_event = state.gateway.last_event().load(Ordering::SeqCst);
 
-            let stream = db
-                .query_stream_cached_typed(
-                    || {
-                        use schema::*;
-                        use thorn::*;
-
-                        Query::select()
-                            .from_table::<EventLog>()
-                            .cols(&[
-                                EventLog::Counter,
-                                EventLog::Code,
-                                EventLog::Id,
-                                EventLog::PartyId,
-                                EventLog::RoomId,
-                            ])
-                            .order_by(EventLog::Counter.ascending())
-                            .and_where(EventLog::Counter.greater_than(Var::of(EventLog::Counter)))
-                    },
-                    &[&latest_event],
-                )
-                .await?;
+            #[rustfmt::skip]
+            let stream = db.query_stream2(schema::sql! {
+                SELECT
+                    EventLog.Counter AS @_,
+                    EventLog.Code AS @_,
+                    EventLog.Id AS @_,
+                    EventLog.PartyId AS @_,
+                    EventLog.RoomId AS @_
+                FROM EventLog
+                WHERE EventLog.Counter > #{&latest_event as EventLog::Counter}
+                ORDER BY EventLog.Counter ASC
+            }).await?;
 
             // partition events by party or generic user events
             let mut stream = std::pin::pin!(stream);
 
             while let Some(row) = stream.try_next().await? {
                 let event = RawEvent {
-                    code: row.try_get(1)?,
-                    id: row.try_get(2)?,
-                    room_id: row.try_get(4)?,
+                    code: row.event_log_code()?,
+                    id: row.event_log_id()?,
+                    room_id: row.event_log_room_id()?,
                 };
 
-                match row.try_get(3)? {
+                match row.event_log_party_id()? {
                     Some(party_id) => party_events.entry(party_id).or_default().push(event),
                     None => match event.room_id {
                         None => user_events.push(event),
@@ -106,7 +90,7 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
                     },
                 }
 
-                latest_event = row.try_get(0)?;
+                latest_event = row.event_log_counter()?;
             }
 
             log::debug!(

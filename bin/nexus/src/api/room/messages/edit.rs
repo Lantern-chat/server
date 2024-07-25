@@ -50,21 +50,45 @@ pub async fn edit_message(
     };
 
     // first read-only query is not within the transaction because without repeatable-read it doesn't matter anyway
-    let prev = db.query_opt_cached_typed(|| query_existing_message(), &[&msg_id, &room_id]).await?;
+    #[rustfmt::skip]
+    let prev = db.query_opt2(schema::sql! {
+        tables! {
+            struct AggFileIds {
+                FileIds: SNOWFLAKE_ARRAY,
+            }
+        }
+
+        SELECT
+            Messages.UserId     AS @UserId,
+            Messages.Flags      AS @Flags,
+            Messages.Content    AS @Content,
+            AggFileIds.FileIds  AS @FileIds
+
+        // TODO: Check if this can be optimized to not use a LATERAL
+        FROM Messages LEFT JOIN LATERAL (
+            SELECT ARRAY_AGG(Attachments.FileId) AS AggFileIds.FileIds
+            FROM Attachments
+            WHERE Attachments.MsgId = Messages.Id
+        ) AS AggFileIds ON TRUE
+
+        WHERE Messages.Id = #{&msg_id as Messages::Id}
+            AND Messages.RoomId = #{&room_id as Messages::RoomId}
+            AND NOT Messages.Flags & {MessageFlags::DELETED.bits()}
+    }).await?;
 
     let Some(row) = prev else {
         return Err(Error::NotFound);
     };
 
-    let author_id: UserId = row.try_get(0)?;
+    let author_id: UserId = row.user_id()?;
 
     if author_id != auth.user_id() {
         return Err(Error::Unauthorized);
     }
 
-    let _prev_flags = MessageFlags::from_bits_truncate_public(row.try_get(1)?);
-    let prev_content: Option<&str> = row.try_get(2)?;
-    let prev_files: Option<Vec<FileId>> = row.try_get(3)?;
+    let _prev_flags = MessageFlags::from_bits_truncate_public(row.flags()?);
+    let prev_content: Option<&str> = row.content()?;
+    let prev_files: Option<Vec<FileId>> = row.file_ids()?;
 
     // do full trimming
     let Some(trimmed_content) = ({
@@ -100,45 +124,62 @@ pub async fn edit_message(
     let mut orphan_attachments = Either::Left(ok::<(), Error>(()));
     let mut update_message = Either::Left(ok::<(), Error>(()));
 
-    // if there are old or new attachments
-    if prev_files.is_some() || !body.attachments.is_empty() {
+    'attachments: {
+        // if no attachments were added or removed, skip the attachment processing
+        if prev_files.is_none() && body.attachments.is_empty() {
+            break 'attachments;
+        }
+
         // attachments may be unordered, so a Set is required
         let pre_set: HashSet<FileId> = HashSet::from_iter(prev_files.unwrap_or_default());
         let new_set: HashSet<FileId> = HashSet::from_iter(body.attachments.as_slice().iter().copied());
 
-        if pre_set != new_set {
-            let added = new_set.difference(&pre_set).copied().collect::<Vec<_>>();
+        // if the sets are identical, skip the attachment processing
+        if pre_set == new_set {
+            break 'attachments;
+        }
 
-            if !added.is_empty() && !perms.contains(Permissions::EDIT_NEW_ATTACHMENT) {
-                return Err(Error::Unauthorized);
-            }
+        let added = new_set.difference(&pre_set).copied().collect::<Vec<_>>();
 
-            let removed = pre_set.difference(&new_set).copied().collect::<Vec<_>>();
+        // if attachments were added and the user lacks the permission to edit attachments, reject the edit
+        if !added.is_empty() && !perms.contains(Permissions::EDIT_NEW_ATTACHMENT) {
+            return Err(Error::Unauthorized);
+        }
 
-            let t = &t; // hackery, can't take ownership of t within below async move blocks, so move a reference
+        let removed = pre_set.difference(&new_set).copied().collect::<Vec<_>>();
 
-            if !added.is_empty() {
-                add_attachments = Either::Right(async move {
-                    t.execute_cached_typed(|| add_attachments_query(), &[&msg_id, &added]).await?;
+        let t = &t; // hackery, can't take ownership of t within below async move blocks, so move a reference
 
-                    Ok(())
-                });
-            }
+        if !added.is_empty() {
+            add_attachments = Either::Right(async move {
+                // add new attachments
+                t.execute2(schema::sql! {
+                    INSERT INTO Attachments (FileId, MsgId)
+                    SELECT UNNEST(#{&added as SNOWFLAKE_ARRAY}), #{&msg_id as Messages::Id}
+                })
+                .await?;
 
-            if !removed.is_empty() {
-                orphan_attachments = Either::Right(async move {
-                    t.execute_cached_typed(|| orphan_attachments_query(), &[&removed]).await?;
+                Ok(())
+            });
+        }
 
-                    Ok(())
-                });
-            }
+        if !removed.is_empty() {
+            orphan_attachments = Either::Right(async move {
+                // mark removed attachments as orphaned
+                t.execute2(schema::sql! {
+                    UPDATE Attachments SET (Flags) = (Attachments.Flags | {flags::AttachmentFlags::ORPHANED.bits()})
+                     WHERE Attachments.FileId = ANY(#{&removed as SNOWFLAKE_ARRAY})
+                })
+                .await?;
+
+                Ok(())
+            });
         }
     }
 
     // avoid reprocessing the message content if it's identical
     if prev_content.unwrap_or("") != modified_content {
         update_message = Either::Right(async {
-            #[rustfmt::skip]
             t.execute2(schema::sql! {
                 UPDATE Messages SET (Content, EditedAt) = (NULLIF(#{&modified_content as Messages::Content}, ""), NOW())
                  WHERE Messages.Id = #{&msg_id as Messages::Id}
@@ -155,69 +196,4 @@ pub async fn edit_message(
     t.commit().await?;
 
     Ok(Some(msg))
-}
-
-fn query_existing_message() -> impl thorn::AnyQuery {
-    use schema::*;
-    use thorn::*;
-
-    tables! {
-        struct AggFileIds {
-            FileIds: SNOWFLAKE_ARRAY
-        }
-    }
-
-    Query::select()
-        .and_where(Messages::Id.equals(Var::of(Messages::Id)))
-        .and_where(Messages::RoomId.equals(Var::of(Messages::RoomId)))
-        .cols(&[Messages::UserId, Messages::Flags, Messages::Content])
-        .col(AggFileIds::FileIds)
-        .from(
-            // Use a lateral join because it's easier to do aggregate this way
-            Messages::left_join(Lateral(AggFileIds::as_query(
-                Query::select()
-                    .from_table::<Attachments>()
-                    .expr(Builtin::array_agg(Attachments::FileId).alias_to(AggFileIds::FileIds))
-                    .and_where(Attachments::MsgId.equals(Messages::Id)),
-            )))
-            .on(true.lit()),
-        )
-        .and_where(Messages::Flags.has_no_bits(MessageFlags::DELETED.bits().lit()))
-}
-
-// TODO: Deduplicate this with query in message_create
-fn add_attachments_query() -> impl thorn::AnyQuery {
-    use schema::*;
-    use thorn::*;
-
-    tables! {
-        struct AggIds {
-            Id: Files::Id,
-        }
-    }
-
-    let msg_id_var = Var::at(Messages::Id, 1);
-    let att_id_var = Var::at(SNOWFLAKE_ARRAY, 2);
-
-    Query::with()
-        .with(
-            AggIds::as_query(Query::select().expr(Builtin::unnest((att_id_var,)).alias_to(AggIds::Id))).exclude(),
-        )
-        .insert()
-        .into::<Attachments>()
-        .cols(&[Attachments::FileId, Attachments::MsgId])
-        .query(Query::select().col(AggIds::Id).expr(msg_id_var).from_table::<AggIds>().as_value())
-}
-
-fn orphan_attachments_query() -> impl thorn::AnyQuery {
-    use schema::*;
-    use thorn::*;
-
-    Query::update()
-        .table::<Attachments>()
-        .set(
-            Attachments::Flags,
-            Attachments::Flags.bitor(flags::AttachmentFlags::ORPHANED.bits().lit()),
-        )
-        .and_where(Attachments::FileId.equals(Builtin::any(Var::of(SNOWFLAKE_ARRAY))))
 }

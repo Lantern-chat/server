@@ -7,26 +7,17 @@ pub async fn list_sessions(
 ) -> Result<impl Stream<Item = Result<AnonymousSession, Error>>, Error> {
     let db = state.db.read.get().await?;
 
-    let sessions = db
-        .query_stream_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
-
-                Query::select()
-                    .col(Sessions::Expires)
-                    .from_table::<Sessions>()
-                    .and_where(Sessions::UserId.equals(Var::of(Sessions::UserId)))
-                    .order_by(Sessions::Expires.ascending())
-            },
-            &[auth.user_id_ref()],
-        )
-        .await?;
+    #[rustfmt::skip]
+    let sessions = db.query_stream2(schema::sql! {
+        SELECT Sessions.Expires AS @_ FROM Sessions
+        WHERE Sessions.UserId = #{auth.user_id_ref() as Users::Id}
+        ORDER BY Sessions.Expires ASC
+    }).await?;
 
     Ok(sessions.map(|row| match row {
         Err(e) => Err(e.into()),
         Ok(row) => Ok(AnonymousSession {
-            expires: row.try_get(0)?,
+            expires: row.sessions_expires()?,
         }),
     }))
 }
@@ -37,21 +28,14 @@ pub async fn clear_other_sessions(state: ServerState, auth: Authorization) -> Re
     };
 
     let db = state.db.write.get().await?;
+    let bytes = &bytes[..];
 
-    let num_deleted = db
-        .execute_cached_typed(
-            || {
-                use schema::*;
-                use thorn::*;
-
-                Query::delete()
-                    .from::<Sessions>()
-                    .and_where(Sessions::UserId.equals(Var::of(Users::Id)))
-                    .and_where(Sessions::Token.not_equals(Var::of(Sessions::Token)))
-            },
-            &[auth.user_id_ref(), &&bytes[..]],
-        )
-        .await?;
+    #[rustfmt::skip]
+    let num_deleted = db.execute2(schema::sql! {
+        DELETE FROM Sessions
+        WHERE Sessions.UserId = #{auth.user_id_ref() as Users::Id}
+          AND Sessions.Token != #{&bytes as Sessions::Token}
+    }).await?;
 
     Ok(num_deleted)
 }
