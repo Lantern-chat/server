@@ -76,9 +76,11 @@ impl Deref for Event {
 use util::zlib::{deflate, DeflateError};
 
 impl CompressedEvent {
-    fn new(level: u8, value: ThinVec<u8>) -> Result<Self, EventEncodingError> {
-        let compressed = deflate(&value, level)?;
-        Ok(CompressedEvent { uncompressed: value, compressed })
+    fn new(level: u8, uncompressed: ThinVec<u8>) -> Result<Self, EventEncodingError> {
+        Ok(CompressedEvent {
+            compressed: deflate(&uncompressed, level)?,
+            uncompressed,
+        })
     }
 
     pub fn get(&self, compressed: bool) -> &[u8] {
@@ -124,7 +126,7 @@ impl ExternalEvent {
 }
 
 impl Event {
-    const DEFAULT_COMPRESSION_LEVEL: u8 = 7;
+    pub const DEFAULT_COMPRESSION_LEVEL: u8 = 7;
 
     /// Constructs a new external event, but does not encode it yet.
     pub fn new(msg: ServerMsg, room_id: Option<RoomId>) -> Event {

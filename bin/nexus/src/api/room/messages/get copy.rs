@@ -2,8 +2,6 @@ use std::sync::atomic::AtomicUsize;
 
 use arrayvec::ArrayVec;
 
-use futures::{Stream, StreamExt};
-
 use schema::{
     flags::AttachmentFlags,
     search::{Has, SearchError, SearchTerm, SearchTermKind, SearchTerms, Sort},
@@ -121,7 +119,7 @@ pub async fn get_many(
 
 pub async fn get_one<DB>(state: ServerState, db: &DB, msg_id: MessageId) -> Result<Message, Error>
 where
-    DB: db::pool::AnyClient,
+    DB: db::AnyClient,
 {
     let SearchResult { stream, .. } = do_search(state, db, 1, SearchRequest::Single { msg_id }).await?;
 
@@ -177,7 +175,7 @@ pub async fn do_search<DB>(
     mut search: SearchRequest,
 ) -> Result<SearchResult<impl Stream<Item = Result<Message, Error>>>, Error>
 where
-    DB: db::pool::AnyClient,
+    DB: db::AnyClient,
 {
     let data = match search {
         SearchRequest::Search(ref mut search) => Some(process_terms(

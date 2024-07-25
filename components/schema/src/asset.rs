@@ -21,13 +21,13 @@ pub fn parse(s: &str) -> Result<AssetQuery, AssetQueryParseError> {
             "f" | "flags" => {
                 return Ok(AssetQuery::Flags {
                     flags: if let Some(value) = value.strip_suffix("0b") {
-                        u16::from_str_radix(value, 2)?
+                        u16::from_str_radix(value, 2)
                     } else if let Some(value) = value.strip_prefix("0x") {
-                        u16::from_str_radix(value, 16)?
+                        u16::from_str_radix(value, 16)
                     } else {
                         #[allow(clippy::from_str_radix_10)]
-                        u16::from_str_radix(&value, 10)?
-                    },
+                        u16::from_str_radix(&value, 10)
+                    }?,
                 });
             }
             "q" | "quality" => quality = value.parse()?,
