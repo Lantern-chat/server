@@ -48,7 +48,7 @@ impl MFA {
         // initialize with the data we're going to encrypt
         let mut buf: [u8; ENCRYPTED_LENGTH] = {
             let mut tmp = [0; ENCRYPTED_LENGTH];
-            tmp[..MFA_LENGTH].copy_from_slice(unsafe { std::mem::transmute::<_, &[u8; MFA_LENGTH]>(self) });
+            tmp[..MFA_LENGTH].copy_from_slice(unsafe { std::mem::transmute::<&MFA, &[u8; MFA_LENGTH]>(self) });
             tmp
         };
 
@@ -77,7 +77,7 @@ impl MFA {
 
         Aes256GcmSiv::new(&key).decrypt_in_place_detached(nonce, AD, &mut data, tag)?;
 
-        Ok(unsafe { std::mem::transmute(data) })
+        Ok(unsafe { std::mem::transmute::<[u8; 96], MFA>(data) })
     }
 
     pub fn totp<const DIGITS: usize>(&self) -> totp::TOTP<DIGITS> {
