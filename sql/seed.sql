@@ -41,6 +41,15 @@ AS $$
     SELECT ARRAY( SELECT DISTINCT UNNEST(arr) )
 $$;
 
+-- IIF is a ternary operator, returns true_result if condition is true, else false_result
+CREATE OR REPLACE FUNCTION IIF(
+    condition boolean,       -- IF condition
+    true_result anyelement,  -- THEN
+    false_result anyelement  -- ELSE
+) RETURNS anyelement AS $$
+  SELECT CASE WHEN condition THEN true_result ELSE false_result END
+$$ LANGUAGE SQL IMMUTABLE;
+
 CREATE DOMAIN lantern.uint2 AS int4
    CHECK(VALUE >= 0 AND VALUE < 65536);
 
@@ -514,18 +523,9 @@ $$
             THEN base_bits
         ELSE
         -- Select lower 7 avatar bits
-        (PROFILE_AVATAR_ROUNDNESS & CASE
-            WHEN party_avatar IS NOT NULL
-                THEN party_bits
-            ELSE base_bits
-        END) |
+        (PROFILE_AVATAR_ROUNDNESS & IIF(party_avatar IS NOT NULL, party_bits, base_bits)) |
         -- Select higher 25 banner bits
-        (PROFILE_COLOR_FIELDS & CASE
-            -- pick out 8th bit, which signifies whether to override banner color
-            WHEN party_bits & PROFILE_OVERRIDE_COLOR != 0
-                THEN party_bits
-            ELSE base_bits
-        END)
+        (PROFILE_COLOR_FIELDS & IIF(party_bits & PROFILE_OVERRIDE_COLOR != 0, party_bits, base_bits))
     END
 $$ LANGUAGE SQL IMMUTABLE;
 
@@ -1354,6 +1354,7 @@ $$
 BEGIN
     INSERT INTO lantern.event_log (code, id) VALUES (
         'presence_updated'::lantern.event_code,
+        -- NOTE: Unsure if IIF would work here due to OLD/NEW maybe being null in some cases
         CASE TG_OP WHEN 'DELETE' THEN OLD.user_id
                                  ELSE NEW.user_id
         END
@@ -1401,13 +1402,12 @@ $$
 BEGIN
     INSERT INTO lantern.event_log (code, id, party_id)
     SELECT
-        CASE
-            -- Deleting a member entry when unbanning signifies the ban has been lifted
-            -- but they must rejoin manually
-            WHEN ((OLD.flags & MEMBER_BANNED = 1))
-                THEN 'member_unban'::lantern.event_code
-            ELSE 'member_left'::lantern.event_code
-        END,
+        -- Deleting a member entry when unbanning signifies the ban has been lifted
+        -- but they must rejoin manually
+        IIF((OLD.flags & MEMBER_BANNED = 1),
+            'member_unban'::lantern.event_code,
+            'member_left'::lantern.event_code
+        ),
         OLD.user_id,
         OLD.party_id;
     RETURN NEW;
@@ -1432,11 +1432,10 @@ BEGIN
     ELSEIF (OLD.flags != NEW.flags) THEN
         INSERT INTO lantern.event_log (code, id, party_id)
         SELECT
-            CASE
-                WHEN ((OLD.flags & MEMBER_BANNED = 0)) AND ((NEW.flags & MEMBER_BANNED = 1))
-                    THEN 'member_ban'::lantern.event_code
-                ELSE 'member_updated'::lantern.event_code
-            END,
+            IIF((OLD.flags & MEMBER_BANNED = 0) AND (NEW.flags & MEMBER_BANNED = 1),
+                'member_ban'::lantern.event_code,
+                'member_updated'::lantern.event_code
+            ),
             NEW.user_id,
             NEW.party_id;
     END IF;
@@ -1491,11 +1490,7 @@ BEGIN
     ELSE
         INSERT INTO lantern.event_log(code, id, party_id)
         SELECT
-            CASE
-                WHEN TG_OP = 'INSERT'
-                    THEN 'role_created'::lantern.event_code
-                    ELSE 'role_updated'::lantern.event_code
-            END,
+            IIF(TG_OP = 'INSERT', 'role_created'::lantern.event_code, 'role_updated'::lantern.event_code),
             NEW.id,
             NEW.party_id;
 
@@ -1724,8 +1719,8 @@ BEGIN
         -- Also select @everyone
         SELECT party_members.party_id, party_members.user_id,
             -- for this part of the UNION ALL, also check for owner admin perms, since this only runs once
-            CASE WHEN party_members.user_id = party.owner_id THEN -1 ELSE roles.permissions1 END,
-            CASE WHEN party_members.user_id = party.owner_id THEN -1 ELSE roles.permissions2 END
+            IIF(party_members.user_id = party.owner_id, -1, roles.permissions1),
+            IIF(party_members.user_id = party.owner_id, -1, roles.permissions2)
 
         FROM lantern.party_members
             INNER JOIN lantern.roles ON roles.party_id = party_members.party_id AND roles.party_id = roles.id
@@ -1771,8 +1766,8 @@ BEGIN
     IF _role_id = _party_id THEN
         WITH perms AS (
             SELECT party_members.user_id,
-                bit_or((CASE WHEN party_members.user_id = _owner_id THEN -1 ELSE roles.permissions1 END)) AS permissions1,
-                bit_or((CASE WHEN party_members.user_id = _owner_id THEN -1 ELSE roles.permissions2 END)) as permissions2
+                bit_or(IIF(party_members.user_id = _owner_id, -1, roles.permissions1)) AS permissions1,
+                bit_or(IIF(party_members.user_id = _owner_id, -1, roles.permissions2)) AS permissions2
             FROM lantern.party_members
                 INNER JOIN lantern.roles ON roles.id = party_members.party_id AND roles.party_id = party_members.party_id
             GROUP BY party_members.user_id
@@ -1791,8 +1786,8 @@ BEGIN
             -- compute base permissions for each user
             SELECT
                 m.user_id,
-                bit_or((CASE WHEN role_members.user_id = _owner_id THEN -1 ELSE roles.permissions1 END)) AS permissions1,
-                bit_or((CASE WHEN role_members.user_id = _owner_id THEN -1 ELSE roles.permissions2 END)) AS permissions2
+                bit_or(IIF(role_members.user_id = _owner_id, -1, roles.permissions1)) AS permissions1,
+                bit_or(IIF(role_members.user_id = _owner_id, -1, roles.permissions2)) AS permissions2
             FROM role_members
                 -- join with roles to get roles.permissions
                 INNER JOIN roles ON roles.id = role_members.role_id OR roles.id = roles.party_id
@@ -2047,8 +2042,8 @@ BEGIN
     ), perms AS (
         -- pass through p.party_id to limit party_members below
         SELECT p.party_id,
-            bit_or(CASE WHEN role_members.user_id = p.owner_id THEN -1 ELSE roles.permissions1 END) AS permissions1,
-            bit_or(CASE WHEN role_members.user_id = p.owner_id THEN -1 ELSE roles.permissions2 END) AS permissions2
+            bit_or(IIF(role_members.user_id = p.owner_id, -1, roles.permissions1)) AS permissions1,
+            bit_or(IIF(role_members.user_id = p.owner_id, -1, roles.permissions2)) AS permissions2
         FROM lantern.role_members
         INNER JOIN lantern.roles ON roles.id = role_members.role_id
         INNER JOIN p ON roles.party_id = p.party_id
@@ -2216,14 +2211,9 @@ FROM
 CREATE OR REPLACE VIEW lantern.agg_room_perms AS
 SELECT
     rooms.*, party_members.user_id, party_members.joined_at,
-    CASE
-        WHEN party_members.permissions1 = -1 THEN -1
-        ELSE COALESCE(allow1, 0) | (party_members.permissions1 & ~COALESCE(deny1, 0))
-    END AS permissions1,
-    CASE
-        WHEN party_members.permissions2 = -1 THEN -1
-        ELSE COALESCE(allow2, 0) | (party_members.permissions2 & ~COALESCE(deny2, 0))
-    END AS permissions2
+    -- if user is admin, return -1, otherwise return the permissions
+    IIF(party_members.permissions1 = -1, -1, COALESCE(allow1, 0) | (party_members.permissions1 & ~COALESCE(deny1, 0))) AS permissions1,
+    IIF(party_members.permissions2 = -1, -1, COALESCE(allow2, 0) | (party_members.permissions2 & ~COALESCE(deny2, 0))) AS permissions2
 FROM
     lantern.party_members
         INNER JOIN lantern.live_rooms rooms ON rooms.party_id = party_members.party_id
@@ -2302,7 +2292,7 @@ SELECT
     users.discriminator,
     users.email,
     users.flags,
-    CASE WHEN (users.preferences->'flags')::int4 & USER_PREFS_HIDE_LAST_ACTIVE = 0 THEN users.last_active ELSE NULL END,
+    IIF((users.preferences->'flags')::int4 & USER_PREFS_HIDE_LAST_ACTIVE = 0, users.last_active, NULL),
     users.username,
     users.preferences,
     agg_presence.flags,
