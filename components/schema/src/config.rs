@@ -75,7 +75,7 @@ pub struct SharedConfig {
 use postgres_range::{BoundType, Range as PgRange, RangeBound};
 
 impl SharedConfig {
-    pub async fn save(&self, obj: &db::pool::Object) -> Result<Self, db::pool::Error> {
+    pub async fn save(&self, obj: &db::Object) -> Result<Self, db::Error> {
         #[inline]
         fn range(range: &RangeInclusive<usize>) -> PgRange<i64> {
             PgRange::new(
@@ -164,7 +164,7 @@ impl SharedConfig {
         Ok(config)
     }
 
-    pub async fn load(obj: &db::pool::Object) -> Result<Self, db::pool::Error> {
+    pub async fn load(obj: &db::Object) -> Result<Self, db::Error> {
         #[rustfmt::skip]
         let row = obj.query_one2(crate::sql! {
             SELECT

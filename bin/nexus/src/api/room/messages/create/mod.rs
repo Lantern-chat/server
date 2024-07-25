@@ -118,7 +118,7 @@ pub async fn create_message(
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn insert_message(
-    t: db::pool::Transaction<'_>,
+    t: db::Transaction<'_>,
     state: ServerState,
     auth: Authorization,
     room_id: RoomId,

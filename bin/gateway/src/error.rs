@@ -1,6 +1,6 @@
 use std::{borrow::Cow, str::Utf8Error, string::FromUtf8Error};
 
-use db::pool::Error as DbError;
+use db::Error as DbError;
 use ftl::{body::BodyDeserializeError, reply::WithStatus, ws::WsError, *};
 use http::header::InvalidHeaderValue;
 use sdk::{

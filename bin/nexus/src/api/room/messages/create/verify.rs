@@ -7,7 +7,7 @@ use crate::prelude::*;
 use md_utils::SpanType;
 
 pub async fn verify<'a>(
-    t: &db::pool::Transaction<'_>,
+    t: &db::Transaction<'_>,
     _state: &ServerState,
     auth: Authorization,
     room_id: RoomId,

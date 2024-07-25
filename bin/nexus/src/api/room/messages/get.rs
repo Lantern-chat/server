@@ -1,5 +1,3 @@
-use futures::{Stream, StreamExt};
-
 use schema::flags::AttachmentFlags;
 use sdk::models::*;
 use thorn::pg::Json;
@@ -49,7 +47,7 @@ pub async fn get_many(
 
 pub async fn get_one<DB>(state: ServerState, db: &DB, msg_id: MessageId) -> Result<Message, Error>
 where
-    DB: db::pool::AnyClient,
+    DB: db::AnyClient,
 {
     let mut stream = std::pin::pin!(do_get(state, db, GetMsgRequest::Single { msg_id }).await?);
 
@@ -82,7 +80,7 @@ pub async fn do_get<'a, DB>(
     req: GetMsgRequest<'a>,
 ) -> Result<impl Stream<Item = Result<Message, Error>> + 'a, Error>
 where
-    DB: db::pool::AnyClient,
+    DB: db::AnyClient,
 {
     #[rustfmt::skip]
     let stream = db.query_stream2(schema::sql! {
@@ -137,7 +135,7 @@ where
                         1               AS SelectedMessages.Depth,
                         Messages.Id     AS SelectedMessages.Id,
                         Rooms.PartyId   AS SelectedMessages.PartyId
-                    FROM LiveMessages AS Messages
+                    FROM LiveMessages   AS Messages
 
                     if needs_perms {
                         INNER JOIN AggRoomPerms AS Rooms ON Rooms.Id = Messages.RoomId

@@ -8,7 +8,7 @@ use super::prelude::*;
 pub async fn member_event(
     state: &ServerState,
     event: EventCode,
-    db: &db::pool::Client,
+    db: &db::Client,
     user_id: UserId,
     party_id: Option<PartyId>,
 ) -> Result<(), Error> {

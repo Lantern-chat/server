@@ -1,6 +1,4 @@
-use futures::{Stream, StreamExt};
-
-use db::pool::Client;
+use db::Client;
 
 use crate::{api::SearchMode, prelude::*, util::encrypted_asset::encrypt_snowflake_opt};
 

@@ -7,7 +7,7 @@ use super::prelude::*;
 
 pub async fn profile_updated(
     state: &ServerState,
-    db: &db::pool::Client,
+    db: &db::Client,
     user_id: UserId,
     party_id: Option<PartyId>,
 ) -> Result<(), Error> {

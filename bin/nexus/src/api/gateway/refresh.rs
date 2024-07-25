@@ -6,7 +6,7 @@ use sdk::models::Permissions;
 use crate::backend::cache::permission_cache::PermMute;
 use crate::prelude::*;
 
-pub async fn refresh_room_perms(state: &ServerState, db: &db::pool::Object, user_id: UserId) -> Result<(), Error> {
+pub async fn refresh_room_perms(state: &ServerState, db: &db::Object, user_id: UserId) -> Result<(), Error> {
     #[rustfmt::skip]
     let stream = db.query_stream2(schema::sql! {
         SELECT

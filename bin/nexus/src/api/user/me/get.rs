@@ -9,11 +9,7 @@ pub async fn get_full_self(state: &ServerState, user_id: UserId) -> Result<User,
     get_full_self_inner(state, user_id, &db).await
 }
 
-pub async fn get_full_self_inner(
-    state: &ServerState,
-    user_id: UserId,
-    db: &db::pool::Object,
-) -> Result<User, Error> {
+pub async fn get_full_self_inner(state: &ServerState, user_id: UserId, db: &db::Object) -> Result<User, Error> {
     #[rustfmt::skip]
     let row = db.query_one2(schema::sql! {
         SELECT

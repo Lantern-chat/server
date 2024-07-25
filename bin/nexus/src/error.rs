@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use db::pool::Error as DbError;
+use db::Error as DbError;
 use sdk::api::error::ApiErrorCode;
 
 #[derive(Debug, thiserror::Error)]

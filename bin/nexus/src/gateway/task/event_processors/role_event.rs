@@ -7,7 +7,7 @@ use super::prelude::*;
 pub async fn role_event(
     state: &ServerState,
     event: EventCode,
-    db: &db::pool::Client,
+    db: &db::Client,
     role_id: RoleId,
     party_id: Option<PartyId>,
 ) -> Result<(), Error> {

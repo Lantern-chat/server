@@ -10,7 +10,7 @@ use xorf::{Filter, Xor16};
 
 use util::cmap::{CHashSet, DefaultHashBuilder};
 
-use db::pool::Pool;
+use db::Pool;
 
 use crate::ctrl::Error;
 

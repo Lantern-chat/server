@@ -1,5 +1,3 @@
-use futures::stream::{Stream, StreamExt};
-
 use crate::prelude::*;
 use sdk::models::AnonymousSession;
 

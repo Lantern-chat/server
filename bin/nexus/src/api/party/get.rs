@@ -12,7 +12,7 @@ pub async fn get_party(state: ServerState, auth: Authorization, party_id: PartyI
 
 pub async fn get_party_inner(
     state: ServerState,
-    db: &db::pool::Client,
+    db: &db::Client,
     user_id: UserId,
     party_id: PartyId,
 ) -> Result<Party, Error> {

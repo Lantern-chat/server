@@ -1,4 +1,4 @@
-use db::{pg::AsyncMessage, pool::Object};
+use db::{pg::AsyncMessage, Object};
 use futures::StreamExt;
 use task_runner::{RetryAsyncFnTask, TaskRunner};
 

@@ -33,10 +33,6 @@ pub mod prelude {
     pub use rkyv::Archived;
 }
 
-pub mod built {
-    include!(concat!(env!("OUT_DIR"), "/built.rs"));
-}
-
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> anyhow::Result<()> {
     println!("Build time: {}", built::BUILT_TIME_UTC);
@@ -56,4 +52,8 @@ async fn main() -> anyhow::Result<()> {
     _ = auth::do_auth(get_any(), get_any()).await;
 
     Ok(())
+}
+
+pub mod built {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }

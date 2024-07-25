@@ -19,7 +19,6 @@ resolver = "2"
 members = ["crates/*", "components/*", "bin/*", "utilities/*", "make"]
 
 [workspace.dependencies]
-db = { path = "crates/db" }
 emoji = { path = "crates/emoji" }
 filesystem = { path = "crates/filesystem" }
 framed = { path = "crates/framed" }
@@ -31,6 +30,7 @@ z85 = { path = "crates/z85" }
 process_utils = { path = "crates/process_utils" }
 tracking_allocator = { path = "crates/tracking_allocator" }
 
+db = { path = "components/db" }
 common = { path = "components/common" }
 config = { path = "components/config" }
 auth = { path = "components/auth" }

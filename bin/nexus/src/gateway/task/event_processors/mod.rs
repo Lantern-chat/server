@@ -1,4 +1,4 @@
-use db::pool::Client;
+use db::Client;
 
 use crate::prelude::*;
 

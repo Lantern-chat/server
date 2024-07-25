@@ -5,7 +5,7 @@ use tokio::time::{Duration, Instant};
 
 use task_runner::{RetryAsyncFnTask, TaskRunner};
 
-use db::pool::Object;
+use db::Object;
 use schema::Snowflake;
 
 use super::event_processors::RawEvent;
@@ -121,7 +121,7 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
             async fn process_party_events(
                 events: &mut HashMap<Snowflake, Vec<RawEvent>>,
                 state: &ServerState,
-                db: &db::pool::Client,
+                db: &db::Client,
             ) {
                 futures::stream::iter(events.drain())
                     .for_each_concurrent(None, |(party_id, events)| async move {
@@ -142,7 +142,7 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
             async fn process_direct_events(
                 events: &mut HashMap<Snowflake, Vec<RawEvent>>,
                 state: &ServerState,
-                db: &db::pool::Client,
+                db: &db::Client,
             ) {
                 futures::stream::iter(events.drain())
                     .for_each_concurrent(None, |(_room_id, events)| async move {
@@ -157,7 +157,7 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
             }
 
             // user events can be processed in any order
-            async fn process_user_events(events: &mut Vec<RawEvent>, state: &ServerState, db: &db::pool::Client) {
+            async fn process_user_events(events: &mut Vec<RawEvent>, state: &ServerState, db: &db::Client) {
                 futures::stream::iter(events.drain(..))
                     .for_each_concurrent(None, |event| async move {
                         if let Err(e) = super::event_processors::process(state, db, event, None).await {

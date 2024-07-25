@@ -1,4 +1,3 @@
-use futures::{Stream, StreamExt};
 use schema::SnowflakeExt;
 
 use crate::{backend::util::encrypted_asset::encrypt_snowflake_opt, prelude::*};

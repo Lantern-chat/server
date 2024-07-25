@@ -2,7 +2,7 @@ use super::prelude::*;
 
 pub async fn message_delete(
     state: &ServerState,
-    _db: &db::pool::Client,
+    _db: &db::Client,
     id: MessageId,
     party_id: Option<PartyId>,
     room_id: Option<RoomId>,

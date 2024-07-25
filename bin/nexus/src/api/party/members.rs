@@ -1,7 +1,5 @@
 use crate::{prelude::*, util::encrypted_asset::encrypt_snowflake_opt};
 
-use futures::{Stream, StreamExt};
-
 use sdk::models::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,7 +22,7 @@ pub async fn get_members(
 
 pub async fn get_members_inner(
     state: ServerState,
-    db: &db::pool::Client,
+    db: &db::Client,
     party_id: PartyId,
     user_id: Option<UserId>,
     member_id: Option<UserId>,
@@ -176,7 +174,7 @@ pub async fn get_members_inner(
 
 pub async fn get_one_anonymous(
     state: &ServerState,
-    db: &db::pool::Client,
+    db: &db::Client,
     party_id: PartyId,
     member_id: UserId,
     mode: MemberMode,

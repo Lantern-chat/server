@@ -5,7 +5,7 @@ use sdk::models::gateway::{
 
 use super::prelude::*;
 
-pub async fn user_update(state: &ServerState, db: &db::pool::Client, user_id: UserId) -> Result<(), Error> {
+pub async fn user_update(state: &ServerState, db: &db::Client, user_id: UserId) -> Result<(), Error> {
     let self_future = self_update(state, db, user_id, None);
 
     let user_future = async {
@@ -90,7 +90,7 @@ pub async fn user_update(state: &ServerState, db: &db::pool::Client, user_id: Us
 
 pub async fn self_update(
     state: &ServerState,
-    db: &db::pool::Client,
+    db: &db::Client,
     user_id: UserId,
     party_id: Option<PartyId>,
 ) -> Result<(), Error> {
@@ -109,7 +109,7 @@ pub async fn self_update(
 
 async fn party_position_update(
     state: &ServerState,
-    db: &db::pool::Client,
+    db: &db::Client,
     user_id: UserId,
     party_id: PartyId,
 ) -> Result<(), Error> {

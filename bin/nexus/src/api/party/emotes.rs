@@ -1,10 +1,8 @@
-use futures::{Stream, StreamExt};
-
 use crate::{api::SearchMode, prelude::*};
 
 use sdk::models::*;
 
-pub async fn get_custom_emotes_raw<'a, DB: db::pool::AnyClient>(
+pub async fn get_custom_emotes_raw<'a, DB: db::AnyClient>(
     db: &DB,
     party_id: SearchMode<'a>,
 ) -> Result<impl Stream<Item = Result<CustomEmote, Error>> + 'static, Error> {

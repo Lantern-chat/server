@@ -1,16 +1,7 @@
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::{atomic::Ordering, Arc};
-use std::{
-    borrow::Cow,
-    path::{Path, PathBuf},
-};
 
-use futures::{Stream, StreamExt};
-
-use pg::Connection;
-use tokio::sync::mpsc;
-
-use crate::pool::{Client, ConnectionStream, Error, Pool};
+use crate::{util::SqlIterator, Client, Error, Pool};
 
 #[derive(Debug, thiserror::Error)]
 pub enum MigrationError {
@@ -106,18 +97,6 @@ pub struct Migration {
     down: String,
 }
 
-lazy_static::lazy_static! {
-    static ref SQL_COMMENT: regex::Regex = regex::Regex::new(r#"--.*"#).unwrap();
-}
-
-async fn load_sql(path: PathBuf) -> Result<String, MigrationError> {
-    let mut sql = tokio::fs::read_to_string(path).await?;
-
-    sql = SQL_COMMENT.replace_all(&sql, "").into_owned();
-
-    Ok(sql)
-}
-
 async fn load_migration(path: PathBuf) -> Result<Migration, MigrationError> {
     let mut up = path.clone();
     let mut down = path;
@@ -126,42 +105,7 @@ async fn load_migration(path: PathBuf) -> Result<Migration, MigrationError> {
     down.push("down.sql");
 
     Ok(Migration {
-        up: load_sql(up).await?,
-        down: load_sql(down).await?,
+        up: tokio::fs::read_to_string(up).await?,
+        down: tokio::fs::read_to_string(down).await?,
     })
-}
-
-struct SqlIterator<'a> {
-    sql: &'a str,
-}
-
-impl<'a> SqlIterator<'a> {
-    pub fn new(sql: &'a str) -> Self {
-        SqlIterator { sql }
-    }
-}
-
-impl<'a> Iterator for SqlIterator<'a> {
-    type Item = &'a str;
-
-    fn next(&mut self) -> Option<&'a str> {
-        let mut in_dollar = false;
-        let mut ic = self.sql.char_indices().peekable();
-
-        loop {
-            if let Some((idx, c)) = ic.next() {
-                if c == '$' && ic.peek().map(|(_, c)| *c == '$') == Some(true) {
-                    in_dollar = !in_dollar;
-                }
-
-                if c == ';' && !in_dollar {
-                    let res = Some(&self.sql[..idx]);
-                    self.sql = &self.sql[idx + 1..];
-                    return res;
-                }
-            } else {
-                return None;
-            }
-        }
-    }
 }

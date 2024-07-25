@@ -7,10 +7,6 @@ extern crate serde;
 
 extern crate tracing as log;
 
-pub mod built {
-    include!(concat!(env!("OUT_DIR"), "/built.rs"));
-}
-
 pub mod allocator;
 pub mod api;
 pub mod asset;
@@ -27,6 +23,8 @@ pub mod util;
 pub mod prelude {
     pub use crate::error::Error;
     pub use crate::state::ServerState;
+
+    pub use futures::stream::{Stream, StreamExt};
 
     pub use rpc::{auth::Authorization, event::ServerEvent, simple_de};
     pub use sdk::models::{aliases::*, Nullable, SmolStr, Snowflake, Timestamp};
@@ -57,6 +55,10 @@ async fn main() -> anyhow::Result<()> {
     _ = gateway::rpc::dispatch(get(), tokio::io::empty(), get()).await;
 
     Ok(())
+}
+
+pub mod built {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }
 
 /*
@@ -95,7 +97,7 @@ async fn main() -> anyhow::Result<()> {
     log::dispatcher::set_global_default(dispatch).expect("setting default subscriber failed");
 
     let db = {
-        use db::pool::{Pool, PoolConfig};
+        use db::{Pool, PoolConfig};
 
         let pool_config = config.db.db_str.parse::<PoolConfig>()?;
 
@@ -133,7 +135,7 @@ async fn main() -> anyhow::Result<()> {
             match load_config(&args).await {
                 Err(e) => log::error!("Error loading config: {e}"),
                 Ok(config) => {
-                    use db::pool::PoolConfig;
+                    use db::PoolConfig;
 
                     let db_config = match config.db.db_str.parse::<PoolConfig>() {
                         Ok(c) => c,
