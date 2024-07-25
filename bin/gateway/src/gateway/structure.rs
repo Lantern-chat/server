@@ -1,6 +1,6 @@
-use futures::{FutureExt, StreamExt};
+use futures::StreamExt;
 use sdk::models::gateway::events::Ready;
-use sdk::models::{aliases::*, Overwrite, Permissions, Room};
+use sdk::models::{aliases::*, Overwrite, Permissions, Role, Room};
 
 use parking_lot::RwLock;
 use thin_vec::ThinVec;
@@ -29,9 +29,56 @@ pub struct RoomStructure {
     pub overwrites: Arc<[Overwrite]>,
 }
 
+impl PartyStructure {
+    pub async fn add_rooms(&self, party_id: PartyId, new_rooms: &[Archived<Room>]) {
+        // if none of the rooms are relevant to this party, return early
+        if !new_rooms.iter().any(|room| room.party_id == party_id) {
+            return;
+        }
+
+        let mut rooms = self.rooms.write().await;
+
+        for room in new_rooms.iter() {
+            if room.party_id != party_id {
+                continue;
+            }
+
+            rooms.insert(room.id);
+        }
+    }
+
+    pub fn add_rooms_mut(&mut self, party_id: PartyId, new_rooms: &[Archived<Room>]) {
+        let rooms = self.rooms.get_mut();
+
+        for room in new_rooms.iter() {
+            if room.party_id != party_id {
+                continue;
+            }
+
+            rooms.insert(room.id);
+        }
+    }
+
+    pub async fn add_roles(&self, new_roles: &[Archived<Role>]) {
+        let mut roles = self.roles.write().await;
+
+        for role in new_roles.iter() {
+            roles.insert(role.id);
+        }
+    }
+
+    pub fn add_roles_mut(&mut self, new_roles: &[Archived<Role>]) {
+        let roles = self.roles.get_mut();
+
+        for role in new_roles.iter() {
+            roles.insert(role.id);
+        }
+    }
+}
+
 impl RoomStructure {
     pub fn is_same(&self, room: &Archived<Room>) -> bool {
-        self.party_id == room.party_id && &*self.overwrites == &*room.overwrites
+        self.party_id == room.party_id && *self.overwrites == *room.overwrites
     }
 }
 
@@ -76,8 +123,48 @@ impl StructureCache {
         let update_parties = async {
             let _guard = scc::ebr::Guard::new();
 
-            for new_party in ready.parties.iter() {}
+            for new_party in ready.parties.iter() {
+                if let Some(party) = self.parties.peek_with(&new_party.id, |_, party| party.clone()) {
+                    if party.owner_id != new_party.owner {
+                        // owner changed, regen party
+                        self.parties.remove_async(&new_party.id).await;
+                    } else {
+                        tokio::join! {
+                            party.add_roles(&new_party.roles),
+                            party.add_rooms(new_party.id, &ready.rooms),
+                        };
+                    }
+                }
+
+                match self.parties.entry_async(new_party.id).await {
+                    Entry::Occupied(mut entry) => {
+                        // TODO: Could use a mut ref here to avoid locking the inner RwLock twice
+                        let party = unsafe { entry.get_mut() };
+
+                        if let Some(party) = Arc::get_mut(party) {
+                            party.add_roles_mut(&new_party.roles);
+                            party.add_rooms_mut(new_party.id, &ready.rooms);
+                        } else {
+                            tokio::join! {
+                                party.add_roles(&new_party.roles),
+                                party.add_rooms(new_party.id, &ready.rooms),
+                            };
+                        }
+                    }
+                    Entry::Vacant(entry) => {
+                        entry.insert_entry(Arc::new(PartyStructure {
+                            owner_id: new_party.owner,
+                            rooms: AsyncRwLock::new(VecSet::from_iter_ordered(
+                                ready.rooms.iter().filter(|room| room.party_id == new_party.id).map(|room| room.id),
+                            )),
+                            roles: AsyncRwLock::new(VecSet::from_iter_ordered(new_party.roles.iter().map(|role| role.id))),
+                        }));
+                    }
+                }
+            }
         };
+
+        tokio::join!(update_rooms, update_parties);
 
         todo!("populate_from_ready")
     }
@@ -145,7 +232,7 @@ impl StructureCache {
         }
 
         // RwLock here should almost always succeed immediately
-        let roles = roles.read();
+        let roles = roles.read().clone();
 
         let mut base_perms = Permissions::empty();
 
@@ -153,9 +240,9 @@ impl StructureCache {
         futures::stream::iter([&room.party_id]) // include @everyone role
             .chain(futures::stream::iter(roles.iter()))
             .for_each_concurrent(16, |role| async move {
-                let Some(perms) = self.role_perms.get_async(&role).await else { return };
+                let Some(perms) = self.role_perms.get_async(role).await else { return };
 
-                base_perms |= perms.get().clone();
+                base_perms |= *perms.get();
             })
             .await;
 
@@ -193,7 +280,7 @@ impl StructureCache {
         }
 
         // get @everyone perms
-        let mut base_perms = self.role_perms.peek(&room.party_id, &_guard)?.clone();
+        let mut base_perms = *self.role_perms.peek(&room.party_id, &_guard)?;
 
         // RwLock here should almost always succeed immediately
         let roles = roles.read();

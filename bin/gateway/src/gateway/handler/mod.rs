@@ -25,7 +25,7 @@ use crate::{gateway::event::InternalEvent, prelude::*};
 
 use super::{
     conn::GatewayConnection,
-    event::{self as events, Event, EventInner},
+    event::{self as events, Event, EventInner, ExternalEvent},
 };
 
 pub mod item;
@@ -80,7 +80,7 @@ pub async fn client_connection(ws: WebSocket, query: GatewayQueryParams, _addr: 
     // map each incoming websocket message such that it will decompress/decode the message
     // AND update the last_msg value concurrently.
     let conn2 = conn.clone();
-    let ws_rx = ws_rx.map(move |msg| (msg, &conn2)).then(move |(msg, conn)| async move {
+    let ws_rx = ws_rx.map(|msg| (msg, &conn2)).then(move |(msg, conn)| async move {
         match msg {
             Err(e) => Item::Msg(Err(MessageIncomingError::from(e))),
             Ok(msg) if msg.is_close() => Item::Msg(Err(MessageIncomingError::SocketClosed)),
@@ -173,19 +173,16 @@ pub async fn client_connection(ws: WebSocket, query: GatewayQueryParams, _addr: 
 
     log::trace!("Gateway event loop ended");
 
-    // un-cache permissions
     if let Some(user_id) = cstate.user_id {
-        state.perm_cache.remove_reference(user_id).await;
-
         // if there was a user_id, that means the connection had been readied and a presence possibly set,
         // so kick off a task that will clear the presence after 5 seconds.
         //
         // 5 seconds would give enough time for a page reload, so if the user starts a new connection before then
         // we can avoid flickering presences
-        let conn_id = conn.id;
+        let conn_id = cstate.conn.id;
         let state = state.clone();
         tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_secs(5)).await;
+            tokio::time::sleep(state.config().shared.presence_timeout).await;
 
             //if let Err(e) = clear_presence(state, user_id, conn_id).await {
             //    log::error!("Error clearing connection presence: {e}");
@@ -194,7 +191,7 @@ pub async fn client_connection(ws: WebSocket, query: GatewayQueryParams, _addr: 
     }
 
     // remove connection from gateway tables
-    state.gateway.remove_connection(conn.id, cstate.user_id).await;
+    state.gateway.remove_connection(cstate.conn.id, cstate.user_id).await;
 }
 
 impl ConnectionState {
@@ -262,66 +259,14 @@ impl ConnectionState {
                 log::warn!("Attempted to receive events before user_id was set");
                 return Loop::Break;
             }
+
             // for other events, session must be authenticated and have permission to view such events
             (Some(user_id), _) => {
-                use sdk::models::gateway::message::server_msg_payloads::{MemberRemovePayload, MemberUpdatePayload};
-
-                // if the event indicates things that can invalidate the permission cache, they must be handled
-                #[rustfmt::skip]
-                let clear_cache = match e.msg {
-                    // role updates when the current user has this role
-                    ServerMsg::RoleUpdate(ref r) if self.roles.has(r.party_id, r.id) => true,
-                    ServerMsg::RoleDelete(ref r) if self.roles.has(r.party_id, r.id) => {
-                        self.roles.remove_role(r.party_id, r.id);
-                        true
-                    }
-                    // member events for the current user
-                    ServerMsg::MemberUpdate(MemberUpdatePayload { ref inner }) |
-                    ServerMsg::MemberRemove(MemberRemovePayload { ref inner }) if inner.member.user.id == user_id => {
-                        // remove old roles and add new
-                        self.roles.remove_party(inner.party_id);
-
-                        self.roles.add(inner.party_id, &inner.member.roles);
-
-                        true
-                    }
-                    ServerMsg::PartyDelete(ref p) => {
-                        self.roles.remove_party(p.id);
-                        true
-                    }
-                    ServerMsg::RoomUpdate(ref _r) => {
-                        // TODO: self.perm_cache.remove(_r.id);
-                        // false
-
-                        true
-                    }
-                    _ => false,
-                };
-
-                if clear_cache {
-                    self.perm_cache.clear();
-                }
+                self.maybe_clear_cache(e, user_id);
 
                 if let Some(room_id) = e.room_id {
-                    let perms = match self.get_perm(user_id, room_id).await {
-                        Some(perms) => perms,
-                        None => match refresh(state.clone(), user_id, room_id).boxed().await {
-                            Ok(Some(perms)) => perms,
-                            Ok(None) => {
-                                // if there are no perms after refresh, they don't exist,
-                                // but we're still receiving events for them, so something is wrong.
-                                log::error!("No permissions found for user {user_id} room {room_id} after refresh");
-                                return Loop::Break;
-                            }
-                            Err(e) => {
-                                log::error!("Error refreshing user {user_id} room {room_id} permissions: {e}");
-                                return Loop::Break;
-                            }
-                        },
-                    };
-
                     // skip event if user can't view room
-                    if !perms.contains(Permissions::VIEW_ROOM) {
+                    if !matches!(self.get_perm(user_id, room_id).await, Some(perms) if perms.contains(Permissions::VIEW_ROOM)) {
                         return Loop::Continue;
                     }
                 }
@@ -330,7 +275,7 @@ impl ConnectionState {
                     ServerMsg::PartyCreate(ref payload) => {
                         let subs = self.state.gateway.sub_and_activate_connection(user_id, self.conn.clone(), &[payload.id]).boxed().await;
 
-                        self.listener_table.register_subs(&mut events, subs)
+                        self.listener_table.register_subs(events, subs)
                     }
                     ServerMsg::PartyDelete(ref payload) => {
                         // by cancelling a stream, it will be removed from the SelectStream automatically
@@ -344,6 +289,47 @@ impl ConnectionState {
         }
 
         Loop::Yield(Ok(event)) // forward event directly to tx
+    }
+
+    /// Check if the event should clear the permission cache due to changing the underlying structure
+    pub fn maybe_clear_cache(&mut self, e: &ExternalEvent, user_id: UserId) {
+        use sdk::models::gateway::message::server_msg_payloads::{MemberRemovePayload, MemberUpdatePayload};
+
+        // if the event indicates things that can invalidate the permission cache, they must be handled
+        #[rustfmt::skip]
+        let clear_cache = match e.msg {
+            // role updates when the current user has this role
+            ServerMsg::RoleUpdate(ref r) if self.roles.has(r.party_id, r.id) => true,
+            ServerMsg::RoleDelete(ref r) if self.roles.has(r.party_id, r.id) => {
+                self.roles.remove_role(r.party_id, r.id);
+                true
+            }
+            // member events for the current user
+            ServerMsg::MemberUpdate(MemberUpdatePayload { ref inner }) |
+            ServerMsg::MemberRemove(MemberRemovePayload { ref inner }) if inner.member.user.id == user_id => {
+                // remove old roles and add new
+                self.roles.remove_party(inner.party_id);
+
+                self.roles.add(inner.party_id, &inner.member.roles);
+
+                true
+            }
+            ServerMsg::PartyDelete(ref p) => {
+                self.roles.remove_party(p.id);
+                true
+            }
+            ServerMsg::RoomUpdate(ref _r) => {
+                // TODO: self.perm_cache.remove(_r.id);
+                // false
+
+                true
+            }
+            _ => false,
+        };
+
+        if clear_cache {
+            self.perm_cache.clear();
+        }
     }
 
     pub async fn handle_msg(&mut self, msg: ClientMsg, events: &mut SelectAll<BoxStream<'_, Item>>) -> Loop<Result<Event, MessageOutgoingError>> {
@@ -390,7 +376,7 @@ impl ConnectionState {
 
             // Pong resposes should be handled by the underlying socket,
             // but we still need to ignore the message
-            Item::Ping => return Loop::Continue,
+            Item::Ping => Loop::Continue,
 
             Item::Event(Err(e)) => {
                 log::warn!("Event error: {e}");
