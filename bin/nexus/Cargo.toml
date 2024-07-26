@@ -64,7 +64,6 @@ hmac = "0.12.1"
 thiserror = "1"
 uuid = { version = "1.1.2", features = ["v4", "serde"] }
 rust-argon2 = "2"
-lazy_static = "1.4.0"
 aes-gcm-siv = "0.11"
 base32 = "0.5.0"
 aho-corasick = "1"

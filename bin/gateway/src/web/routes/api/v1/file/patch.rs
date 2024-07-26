@@ -4,10 +4,10 @@ use hyper::body::HttpBody;
 use super::*;
 use crate::backend::api::file::patch::FilePatchParams;
 
-lazy_static::lazy_static! {
-    static ref APPLICATION_OFFSET_OCTET_STREAM: headers::ContentType =
-        headers::ContentType::from("application/offset+octet-stream".parse::<mime::Mime>().unwrap());
-}
+use std::sync::LazyLock;
+
+static APPLICATION_OFFSET_OCTET_STREAM: LazyLock<headers::ContentType> =
+    LazyLock::new(|| headers::ContentType::from("application/offset+octet-stream".parse::<mime::Mime>().unwrap()));
 
 pub async fn patch(mut route: Route<ServerState>, auth: Authorization, file_id: FileId) -> ApiResult {
     match route.header::<headers::ContentType>() {

@@ -5,6 +5,6 @@ pub mod rate_limit;
 pub mod routes;
 pub mod service;
 
-lazy_static::lazy_static! {
-    pub static ref METHOD_QUERY: http::Method = http::Method::from_bytes(b"QUERY").unwrap();
-}
+use std::sync::LazyLock;
+
+pub static METHOD_QUERY: LazyLock<http::Method> = LazyLock::new(|| http::Method::from_bytes(b"QUERY").unwrap());

@@ -101,13 +101,16 @@ pub async fn entry(mut route: Route<ServerState>) -> Response {
 
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 
-lazy_static::lazy_static! {
-    static ref BAD_PATTERNS: AhoCorasick = AhoCorasickBuilder::new().build([
+use std::sync::LazyLock;
+
+#[rustfmt::skip]
+static BAD_PATTERNS: LazyLock<AhoCorasick> = LazyLock::new(|| {
+    AhoCorasickBuilder::new().build([
         "wp-includes", "wp-admin", "wp-login", "wp-content", "wordpress",
         "wlwmanifest", ".git", ".env", "drupal", "ajax", "claro", "wp-json", "tinymce", "kcfinder",
         "filemanager", "alfa", "eval"
-    ]).unwrap();
-}
+    ]).unwrap()
+});
 
 fn gen_oembed_header_value(route: &Route<ServerState>) -> Option<HeaderValue> {
     let host = route.host()?;

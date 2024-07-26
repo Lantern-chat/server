@@ -374,15 +374,18 @@ impl FileCache<ServerState> for MainFileCache {
 }
 
 use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
+use std::sync::LazyLock;
 
-lazy_static::lazy_static! {
-    static ref VARIABLE_PATTERNS: AhoCorasick = AhoCorasickBuilder::new().build([
-        /*0*/ "__CONFIG__",
-        /*1*/ "__BASE_URL__",
-        /*2*/ "__SERVER_NAME__",
-        /*3*/ "__CDN_DOMAIN__",
-    ]).unwrap();
-}
+static VARIABLE_PATTERNS: LazyLock<AhoCorasick> = LazyLock::new(|| {
+    AhoCorasickBuilder::new()
+        .build([
+            /*0*/ "__CONFIG__",
+            /*1*/ "__BASE_URL__",
+            /*2*/ "__SERVER_NAME__",
+            /*3*/ "__CDN_DOMAIN__",
+        ])
+        .unwrap()
+});
 
 impl MainFileCache {
     pub async fn process(&self, state: &ServerState, path: &Path, mut file: Vec<u8>) -> Vec<u8> {

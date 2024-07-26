@@ -22,10 +22,6 @@ impl<K, T> CHashMap<K, T, DefaultHashBuilder> {
     }
 }
 
-lazy_static::lazy_static! {
-    static ref NUM_CPUS: usize = num_cpus::get();
-}
-
 impl<K, T> Default for CHashMap<K, T, DefaultHashBuilder> {
     fn default() -> Self {
         Self::new(Self::default_num_shards())
@@ -40,7 +36,12 @@ where
     S: Clone,
 {
     pub fn default_num_shards() -> usize {
-        *NUM_CPUS * 32
+        use std::sync::LazyLock;
+
+        static NUM_SHARDS: LazyLock<usize> =
+            LazyLock::new(|| std::thread::available_parallelism().unwrap().get() * 32);
+
+        *NUM_SHARDS
     }
 
     pub fn with_hasher(num_shards: usize, hash_builder: S) -> Self {

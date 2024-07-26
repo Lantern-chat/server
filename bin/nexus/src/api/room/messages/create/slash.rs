@@ -4,14 +4,16 @@ use aho_corasick::{AhoCorasick, MatchKind, StartKind};
 
 use crate::prelude::*;
 
-lazy_static::lazy_static! {
-    static ref SLASH_PATTERNS: AhoCorasick = aho_corasick::AhoCorasickBuilder::new()
+use std::sync::LazyLock;
+
+static SLASH_PATTERNS: LazyLock<AhoCorasick> = LazyLock::new(|| {
+    aho_corasick::AhoCorasickBuilder::new()
         .start_kind(StartKind::Anchored)
         .match_kind(MatchKind::LeftmostFirst)
         // include a space at the end of the name
         .build(Pattern::NAMES)
-        .unwrap();
-}
+        .unwrap()
+});
 
 #[allow(unused)]
 macro_rules! decl_patterns {

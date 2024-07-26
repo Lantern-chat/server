@@ -113,13 +113,12 @@ impl From<db::pg::Error> for Error {
     }
 }
 
-lazy_static::lazy_static! {
-    // 460 Checksum Mismatch
-    pub static ref CHECKSUM_MISMATCH: StatusCode = StatusCode::from_u16(460).unwrap();
+use std::sync::LazyLock;
 
-    // 413 Request Entity Too Large
-    pub static ref REQUEST_ENTITY_TOO_LARGE: StatusCode = StatusCode::from_u16(413).unwrap();
-}
+// 460 Checksum Mismatch
+pub static CHECKSUM_MISMATCH: LazyLock<StatusCode> = LazyLock::new(|| StatusCode::from_u16(460).unwrap());
+// 413 Request Entity Too Large
+pub static REQUEST_ENTITY_TOO_LARGE: LazyLock<StatusCode> = LazyLock::new(|| StatusCode::from_u16(413).unwrap());
 
 impl Error {
     /// Rate-limiting penalty in milliseconds
@@ -267,9 +266,7 @@ impl Error {
 
         macro_rules! impl_cached {
             ($($name:ident),*) => {{
-                lazy_static::lazy_static! {$(
-                    static ref $name: WithStatus<Json> = Error::$name.into_json();
-                )*}
+                $(static $name: LazyLock<WithStatus<Json>> = LazyLock::new(|| Error::$name.into_json());)*
 
                 match self {
                     $(Self::$name => $name.clone(),)*
