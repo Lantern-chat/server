@@ -26,6 +26,8 @@ pub async fn create_invite(
 
     #[rustfmt::skip]
     let row = state.db.write.get().await?.query_one2(schema::sql! {
+        const ${ assert!(!Columns::IS_DYNAMIC); }
+
         tables! {
             struct Checked {
                 Allowed: Type::BOOL,
@@ -43,9 +45,9 @@ pub async fn create_invite(
                 Party.Name AS Checked.PartyName,
                 Party.Description AS Checked.PartyDesc,
 
-                let perms = Permissions::CREATE_INVITE.to_i64();
-                (PartyMembers.Permissions1 & {perms[0]} = {perms[0]} AND
-                 PartyMembers.Permissions2 & {perms[1]} = {perms[1]}) AS Checked.Allowed
+                const PERMS: [i64; 2] = Permissions::CREATE_INVITE.to_i64();
+                (PartyMembers.Permissions1 & const {PERMS[0]} = const {PERMS[0]} AND
+                 PartyMembers.Permissions2 & const {PERMS[1]} = const {PERMS[1]}) AS Checked.Allowed
             FROM PartyMembers INNER JOIN LiveParties AS Party ON Party.Id = PartyMembers.PartyId
             WHERE PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
             AND PartyMembers.PartyId = #{&party_id as Party::Id}

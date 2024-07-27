@@ -52,6 +52,8 @@ pub async fn edit_message(
     // first read-only query is not within the transaction because without repeatable-read it doesn't matter anyway
     #[rustfmt::skip]
     let prev = db.query_opt2(schema::sql! {
+        const ${ assert!(!Columns::IS_DYNAMIC); }
+
         tables! {
             struct AggFileIds {
                 FileIds: SNOWFLAKE_ARRAY,
@@ -73,7 +75,7 @@ pub async fn edit_message(
 
         WHERE Messages.Id = #{&msg_id as Messages::Id}
             AND Messages.RoomId = #{&room_id as Messages::RoomId}
-            AND NOT Messages.Flags & {MessageFlags::DELETED.bits()}
+            AND NOT Messages.Flags & const {MessageFlags::DELETED.bits()}
     }).await?;
 
     let Some(row) = prev else {
@@ -167,7 +169,9 @@ pub async fn edit_message(
             orphan_attachments = Either::Right(async move {
                 // mark removed attachments as orphaned
                 t.execute2(schema::sql! {
-                    UPDATE Attachments SET (Flags) = (Attachments.Flags | {flags::AttachmentFlags::ORPHANED.bits()})
+                    const ${ assert!(!Columns::IS_DYNAMIC); }
+
+                    UPDATE Attachments SET (Flags) = (Attachments.Flags | const {flags::AttachmentFlags::ORPHANED.bits()})
                      WHERE Attachments.FileId = ANY(#{&removed as SNOWFLAKE_ARRAY})
                 })
                 .await?;

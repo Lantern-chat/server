@@ -24,6 +24,8 @@ pub async fn create_room(
     // check permissions AND check for the room limit at the same time.
     #[rustfmt::skip]
     let Some(row) = state.db.read.get().await?.query_opt2(schema::sql! {
+        const ${ assert!(!Columns::IS_DYNAMIC); }
+
         SELECT
             COUNT(Rooms.Id)::int4 AS @TotalRooms,
             COUNT(CASE WHEN Rooms.DeletedAt IS NULL THEN Rooms.Id ELSE NULL END)::int4 AS @LiveRooms
@@ -31,10 +33,10 @@ pub async fn create_room(
         WHERE PartyMembers.PartyId = #{&party_id as Party::Id}
         AND PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
 
-        let perms = Permissions::MANAGE_ROOMS.to_i64();
-        assert_eq!(perms[1], 0);
+        const PERMS: [i64; 2] = Permissions::MANAGE_ROOMS.to_i64();
+        const ${ assert!(PERMS[1] == 0); }
 
-        AND PartyMembers.Permissions1 & {perms[0]} = {perms[0]}
+        AND PartyMembers.Permissions1 & const {PERMS[0]} = const {PERMS[0]}
     }).await? else {
         return Err(Error::Unauthorized);
     };

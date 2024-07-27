@@ -8,6 +8,8 @@ pub async fn revoke_invite(state: ServerState, auth: Authorization, code: SmolSt
 
     #[rustfmt::skip]
     state.db.write.get().await?.execute2(schema::sql! {
+        const ${ assert!(!Columns::IS_DYNAMIC); }
+
         tables! {
             struct Perms {
                 InviteId: Invite::Id,
@@ -21,9 +23,9 @@ pub async fn revoke_invite(state: ServerState, auth: Authorization, code: SmolSt
                 // if this is the user that created the invite
                 Invite.UserId = PartyMembers.UserId OR
                 // or they have the correct party permissions
-                let perms = Permissions::MANAGE_PARTY.to_i64();
-                (PartyMembers.Permissions1 & {perms[0]} = {perms[0]} AND
-                 PartyMembers.Permissions2 & {perms[1]} = {perms[1]}) AS Perms.Allowed
+                const PERMS: [i64; 2] = Permissions::MANAGE_PARTY.to_i64();
+                (PartyMembers.Permissions1 & const {PERMS[0]} = const {PERMS[0]} AND
+                 PartyMembers.Permissions2 & const {PERMS[1]} = const {PERMS[1]}) AS Perms.Allowed
             FROM PartyMembers INNER JOIN Invite ON PartyMembers.PartyId = Invite.PartyId
             WHERE (Invite.Id = #{&maybe_id as Invite::Id}
             OR Invite.Vanity = #{&code as Invite::Vanity})

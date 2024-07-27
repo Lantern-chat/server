@@ -12,6 +12,8 @@ pub async fn get_relationships(
     let stream = db.query_stream2(schema::sql! {
         use sdk::models::UserRelationship;
 
+        const ${ assert!(!Columns::IS_DYNAMIC); }
+
         SELECT
             AggRelationships.FriendId AS @FriendId,
             AggRelationships.UpdatedAt AS @UpdatedAt,
@@ -42,7 +44,7 @@ pub async fn get_relationships(
 
         WHERE AggRelationships.UserId = #{auth.user_id_ref() as AggRelationships::UserId}
           // where the other user has not blocked this one
-          AND AggRelationships.RelB < {UserRelationship::Blocked as i8}
+          AND AggRelationships.RelB < const {UserRelationship::Blocked as i8}
           // where b < 2 && !((a == b) && (a == 0)), meaning it should filter None relationships, only
           // allowing friends, pending, and users blocked by ourselves
           AND NOT (AggRelationships.RelA = AggRelationships.RelB AND AggRelationships.RelA = 0)

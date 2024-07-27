@@ -7,6 +7,8 @@ pub async fn remove_room(state: ServerState, auth: Authorization, room_id: RoomI
 
     #[rustfmt::skip]
     let res = t.execute2(schema::sql! {
+        const ${ assert!(!Columns::IS_DYNAMIC); }
+
         tables! { struct PendingRoom { Id: Rooms::Id } };
 
         WITH PendingRoom AS (
@@ -15,9 +17,10 @@ pub async fn remove_room(state: ServerState, auth: Authorization, room_id: RoomI
              WHERE Rooms.Id = #{&room_id as Rooms::Id}
                AND PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
 
-            let perms = Permissions::MANAGE_ROOMS.to_i64();
-            assert_eq!(perms[1], 0);
-            AND PartyMembers.Permissions1 & {perms[0]} = {perms[0]}
+            const PERMS: [i64; 2] = Permissions::MANAGE_ROOMS.to_i64();
+            const ${ assert!(PERMS[1] == 0); }
+
+            AND PartyMembers.Permissions1 & const {PERMS[0]} = const {PERMS[0]}
         )
         UPDATE Rooms SET (DeletedAt) = now()
         FROM PendingRoom WHERE Rooms.Id = PendingRoom.Id

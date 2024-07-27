@@ -61,6 +61,8 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
 
             #[rustfmt::skip]
             let stream = db.query_stream2(schema::sql! {
+                const ${ assert!(!Columns::IS_DYNAMIC); }
+
                 SELECT
                     EventLog.Counter AS @_,
                     EventLog.Code AS @_,

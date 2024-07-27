@@ -18,7 +18,7 @@ pub struct Arguments {
 async fn main() -> anyhow::Result<()> {
     let args: Arguments = argh::from_env();
 
-    use db::pool::{Object, Pool};
+    use db::{Object, Pool};
 
     let pool = Pool::new(args.db.parse()?, db::pg::NoTls);
     let db = Object::take(pool.get().await?);

@@ -134,7 +134,7 @@ pub async fn confirm_2fa(
         }),
         t.execute2(schema::sql! {
             UPDATE Users SET (Flags, Mfa) = (
-                Users.Flags | {UserFlags::MFA_ENABLED.bits()},
+                Users.Flags | const {UserFlags::MFA_ENABLED.bits()},
                 #{&encrypted_mfa as Users::Mfa}
             ) WHERE Users.Id = #{&user_id as Users::Id}
         })
@@ -192,7 +192,7 @@ pub async fn remove_2fa(state: ServerState, user_id: UserId, form: &Archived<Rem
 
     #[rustfmt::skip]
     state.db.write.get().await?.execute2(schema::sql! {
-        UPDATE Users SET (Mfa, Flags) = (NULL, Users.Flags & ~{UserFlags::MFA_ENABLED.bits()})
+        UPDATE Users SET (Mfa, Flags) = (NULL, Users.Flags & ~const {UserFlags::MFA_ENABLED.bits()})
         WHERE Users.Id = #{&user_id as Users::Id}
     }).await?;
 

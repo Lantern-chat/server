@@ -73,7 +73,7 @@ pub async fn get_members_inner(
             }
 
             WHERE AggMembersFull.PartyId     = #{&party_id as SNOWFLAKE}
-              AND AggMembersFull.MemberFlags & {MemberFlags::BANNED.bits()} = 0
+              AND AggMembersFull.MemberFlags & const {MemberFlags::BANNED.bits()} = 0
 
             // if not anonymous, double-check this user is actually a party member
             if let Some(ref user_id) = user_id {

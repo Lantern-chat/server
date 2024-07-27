@@ -171,8 +171,8 @@ pub async fn modify_room(
             if !form.topic.is_undefined() { Rooms./Topic    = #{&form.topic as Rooms::Topic}, }
             if !avatar_id.is_undefined()  { Rooms./AvatarId = #{&avatar_id  as Rooms::AvatarId}, }
             Rooms./Flags = match form.nsfw.as_ref().copied() {
-                Some(true)  => { Rooms./Flags |  {RoomFlags::NSFW.bits()} },
-                Some(false) => { Rooms./Flags & ~{RoomFlags::NSFW.bits()} },
+                Some(true)  => { Rooms./Flags |  const {RoomFlags::NSFW.bits()} },
+                Some(false) => { Rooms./Flags & ~const {RoomFlags::NSFW.bits()} },
                 None        => { Rooms./Flags }
             }
         WHERE Rooms.Id = #{&room_id as Rooms::Id}

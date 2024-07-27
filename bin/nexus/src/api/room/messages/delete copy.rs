@@ -63,9 +63,10 @@ pub async fn delete_msg(
                 Messages.Flags AS Selected.Flags,
                 Messages.Content AS Selected.Content,
                 if has_perms { TRUE } else {(
-                    let perms = Permissions::MANAGE_MESSAGES.to_i64();
-                    assert_eq!(perms[1], 0);
-                    AggRoomPerms.Permissions1 & {perms[0]} = {perms[0]}
+                    const perms: [i64; 2] = Permissions::MANAGE_MESSAGES.to_i64();
+                    const ${ assert!(perms[1] == 0); }
+
+                    AggRoomPerms.Permissions1 & const {perms[0]} = const {perms[0]}
                     OR Messages.UserId = #{auth.user_id_ref() as Users::Id}
                 )} AS Selected.HasPerms
 

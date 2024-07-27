@@ -9,6 +9,8 @@ use crate::prelude::*;
 pub async fn refresh_room_perms(state: &ServerState, db: &db::Object, user_id: UserId) -> Result<(), Error> {
     #[rustfmt::skip]
     let stream = db.query_stream2(schema::sql! {
+        const ${ assert!(!Columns::IS_DYNAMIC); }
+
         SELECT
             AggRoomPerms.Id             AS @RoomId,
             AggRoomPerms.Permissions1   AS @Permissions1,

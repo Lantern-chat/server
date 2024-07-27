@@ -41,6 +41,8 @@ pub async fn ready(state: ServerState, conn_id: ConnectionId, auth: Authorizatio
     let parties_future = async {
         #[rustfmt::skip]
         let rows = db.query2(schema::sql! {
+            const ${ assert!(!Columns::IS_DYNAMIC); }
+
             tables! { struct AggRoles { RoleIds: SNOWFLAKE_ARRAY } };
 
             SELECT

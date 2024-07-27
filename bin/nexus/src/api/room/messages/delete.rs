@@ -31,14 +31,16 @@ pub async fn delete_msg(
 
         // Update Flags to include the deleted bit
         UPDATE Messages SET (Flags) = (Messages.Flags | CASE WHEN Messages.UserId = #{auth.user_id_ref() as Users::Id} THEN
-            // Add REMOVED if not deleted by the author
-            {MessageFlags::DELETED.bits()} ELSE {(MessageFlags::DELETED | MessageFlags::REMOVED).bits()} END
+                // Add REMOVED if not deleted by the author
+                const {MessageFlags::DELETED.bits()} ELSE
+                const {(MessageFlags::DELETED.union(MessageFlags::REMOVED)).bits()}
+            END
         )
 
         if perms.is_none() { FROM TempPerms } // include CTE if needed
 
         WHERE Messages.Id = #{&msg_id as Messages::Id}
-          AND Messages.Flags & {MessageFlags::DELETED.bits()} = 0 // prevent double updates
+          AND Messages.Flags & const {MessageFlags::DELETED.bits()} = 0 // prevent double updates
 
         match perms {
             Some(perm) if !perm.contains(Permissions::MANAGE_MESSAGES) => {
@@ -47,12 +49,12 @@ pub async fn delete_msg(
                 // Some(perm) implies membership
             }
             None => {
-                let m = Permissions::MANAGE_MESSAGES.to_i64();
-                assert_eq!(m[1], 0);
+                const M: [i64; 2] = Permissions::MANAGE_MESSAGES.to_i64();
+                const ${ assert!(M[1] == 0); }
 
                 AND ((
                     // if the user has permissions to manage messages
-                    {m[0]} & TempPerms.Permissions1 = {m[0]}
+                    const {M[0]} & TempPerms.Permissions1 = const {M[0]}
                 ) OR (
                     // or they are a valid party member and it's their own message
                     Messages.UserId = #{auth.user_id_ref() as Users::Id}

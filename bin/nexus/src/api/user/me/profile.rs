@@ -100,14 +100,14 @@ pub async fn patch_profile(
     #[rustfmt::skip]
     let res = state.db.write.get().await?.execute2(schema::sql! {
         INSERT INTO Profiles (UserId, PartyId, Bits, AvatarId, BannerId, Nickname, CustomStatus, Biography) VALUES (
-            #{auth.user_id_ref()     as Users::Id},
-            #{&party_id         as Party::Id},
-            #{&profile.bits     as Profiles::Bits},
-            #{&avatar_id        as Profiles::AvatarId},
-            #{&banner_id        as Profiles::BannerId},
-            #{&profile.nick     as Profiles::Nickname},
-            #{&profile.status   as Profiles::CustomStatus},
-            #{&profile.bio      as Profiles::Biography}
+            #{auth.user_id_ref()    as Users::Id},
+            #{&party_id             as Party::Id},
+            #{&profile.bits         as Profiles::Bits},
+            #{&avatar_id            as Profiles::AvatarId},
+            #{&banner_id            as Profiles::BannerId},
+            #{&profile.nick         as Profiles::Nickname},
+            #{&profile.status       as Profiles::CustomStatus},
+            #{&profile.bio          as Profiles::Biography}
         )
         ON CONFLICT (Profiles./UserId, Profiles./PartyId) DO UPDATE SET
             if !avatar_id.is_undefined()      { Profiles./AvatarId = #{&avatar_id as Profiles::AvatarId}, }

@@ -8,7 +8,7 @@ pub async fn ban_user(state: ServerState, user_id: UserId) -> Result<(), Error> 
     let t = db.transaction().await?;
 
     let do_ban_user = t.execute2(schema::sql! {
-        UPDATE Users SET (Flags) = (Users.Flags | {UserFlags::BANNED.bits()})
+        UPDATE Users SET (Flags) = (Users.Flags | const {UserFlags::BANNED.bits()})
         WHERE Users.Id = #{&user_id as Users::Id}
     });
 
