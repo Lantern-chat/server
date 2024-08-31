@@ -28,22 +28,21 @@ pub struct ConnectionSubscription {
     pub rx: mpsc::UnboundedReceiver<Event>,
 }
 
-/// Receives party events
-pub struct PartySubscription {
-    pub party_id: PartyId,
+pub struct GenericSubscription {
+    pub id: Snowflake, // PartyId or RoomId currently
     pub rx: broadcast::Receiver<Event>,
 }
 
-/// Stored in the gateway, provides a channel to party subscribers
+/// Stored in the gateway, provides a channel to room or party subscribers
 #[derive(Clone)]
-pub struct PartyEmitter {
-    pub id: PartyId,
+pub struct GenericEmitter {
+    pub id: Snowflake,
     pub tx: mpsc::UnboundedSender<Event>,
     pub bc: broadcast::Sender<Event>,
 }
 
-impl PartyEmitter {
-    pub fn new(id: PartyId) -> Self {
+impl GenericEmitter {
+    pub fn new(id: Snowflake) -> Self {
         let bc = broadcast::channel(16).0;
         let (tx, mut rx) = mpsc::unbounded_channel();
 
@@ -67,12 +66,12 @@ impl PartyEmitter {
             }
         });
 
-        PartyEmitter { id, bc, tx }
+        GenericEmitter { id, bc, tx }
     }
 
-    pub fn subscribe(&self) -> PartySubscription {
-        PartySubscription {
-            party_id: self.id,
+    pub fn subscribe(&self) -> GenericSubscription {
+        GenericSubscription {
+            id: self.id,
             rx: self.bc.subscribe(),
         }
     }
@@ -83,7 +82,9 @@ use conn::GatewayConnection;
 #[derive(Default)]
 pub struct Gateway {
     /// per-party emitters that can be subscribed to
-    pub parties: scc::HashIndex<PartyId, PartyEmitter, ahash::RandomState>,
+    pub parties: scc::HashIndex<PartyId, GenericEmitter, ahash::RandomState>,
+    /// per-room emitters that can be subscribed to
+    pub rooms: scc::HashIndex<RoomId, GenericEmitter, ahash::RandomState>,
 
     /// All gateway connections, even unidentified
     pub conns: scc::HashIndex<ConnectionId, GatewayConnection, ahash::RandomState>,
@@ -172,11 +173,12 @@ impl Gateway {
         &self,
         user_id: UserId,
         conn: GatewayConnection,
-        party_ids: impl IntoIterator<Item = &PartyId>,
-    ) -> Vec<PartySubscription> {
+        party_ids: impl IntoIterator<Item = PartyId>,
+        room_ids: impl IntoIterator<Item = RoomId>,
+    ) -> Subscriptions {
         let (_, subs) = tokio::join!(
             self.activate_connection(user_id, conn),
-            self.subscribe(party_ids),
+            self.subscribe(party_ids, room_ids),
         );
 
         subs
@@ -200,30 +202,58 @@ impl Gateway {
         self.users.entry_async(user_id).await.or_default().get_mut().insert(conn.id, conn);
     }
 
-    async fn subscribe(&self, party_ids: impl IntoIterator<Item = &PartyId>) -> Vec<PartySubscription> {
-        let mut subs = Vec::new();
-        let mut missing = Vec::new();
+    async fn subscribe(&self, party_ids: impl IntoIterator<Item = PartyId>, room_ids: impl IntoIterator<Item = RoomId>) -> Subscriptions {
+        let mut subs = Subscriptions::default();
+
+        let mut missing_parties = Vec::new();
+        let mut missing_rooms = Vec::new();
 
         {
             let guard = scc::ebr::Guard::new();
 
-            for &party_id in party_ids {
+            for party_id in party_ids {
                 if let Some(party) = self.parties.peek(&party_id, &guard) {
-                    subs.push(party.subscribe())
+                    subs.parties.push(party.subscribe())
                 } else {
-                    missing.push(party_id);
+                    missing_parties.push(party_id);
+                }
+            }
+
+            for room_id in room_ids {
+                if let Some(room) = self.rooms.peek(&room_id, &guard) {
+                    subs.rooms.push(room.subscribe())
+                } else {
+                    missing_rooms.push(room_id);
                 }
             }
         }
 
-        // this is really only invoked on startup or new parties
-        for party_id in missing {
-            subs.push(match self.parties.entry_async(party_id).await {
-                scc::hash_index::Entry::Occupied(party) => party.get().subscribe(),
-                scc::hash_index::Entry::Vacant(vacant) => vacant.insert_entry(PartyEmitter::new(party_id)).get().subscribe(),
-            });
-        }
+        // this is really only invoked on startup or new parties/rooms
+        tokio::join! {
+            async {
+                for party_id in missing_parties {
+                    subs.parties.push(match self.parties.entry_async(party_id).await {
+                        scc::hash_index::Entry::Occupied(party) => party.get().subscribe(),
+                        scc::hash_index::Entry::Vacant(vacant) => vacant.insert_entry(GenericEmitter::new(party_id)).get().subscribe(),
+                    });
+                }
+            },
+            async {
+                for room_id in missing_rooms {
+                    subs.rooms.push(match self.rooms.entry_async(room_id).await {
+                        scc::hash_index::Entry::Occupied(room) => room.get().subscribe(),
+                        scc::hash_index::Entry::Vacant(vacant) => vacant.insert_entry(GenericEmitter::new(room_id)).get().subscribe(),
+                    });
+                }
+            },
+        };
 
         subs
     }
+}
+
+#[derive(Default)]
+pub struct Subscriptions {
+    pub parties: Vec<GenericSubscription>,
+    pub rooms: Vec<GenericSubscription>,
 }

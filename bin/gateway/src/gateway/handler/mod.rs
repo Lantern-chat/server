@@ -238,19 +238,18 @@ impl ConnectionState {
                 return Loop::Continue;
             }
             (_, ServerMsg::Ready(ref ready)) => {
-                use sdk::models::gateway::events::ReadyParty;
-
                 self.user_id = Some(ready.user.id);
 
                 for party in &ready.parties {
                     self.roles.add(party.id, &party.me.roles);
                 }
 
+                #[rustfmt::skip]
                 let subs = self.state.gateway.sub_and_activate_connection(
                     ready.user.id,
                     self.conn.clone(),
-                    // NOTE: https://github.com/rust-lang/rust/issues/70263
-                    ready.parties.iter().map(::util::passthrough(|p: &ReadyParty| &p.id)),
+                    ready.parties.iter().map(|p| p.id),
+                    ready.rooms.iter().map(|r| r.id),
                 );
 
                 self.listener_table.register_subs(events, subs.boxed().await);
@@ -273,15 +272,21 @@ impl ConnectionState {
 
                 match e.msg {
                     ServerMsg::PartyCreate(ref payload) => {
-                        let subs = self.state.gateway.sub_and_activate_connection(user_id, self.conn.clone(), &[payload.id]).boxed().await;
+                        let subs = self.state.gateway.sub_and_activate_connection(user_id, self.conn.clone(), [payload.id], []).boxed().await;
 
-                        self.listener_table.register_subs(events, subs)
+                        self.listener_table.register_subs(events, subs);
+                    }
+                    ServerMsg::RoomCreate(ref payload) => {
+                        todo!();
+                        //let subs = self.state.gateway.sub_and_activate_connection(user_id, self.conn.clone(), [], [payload.id]).boxed().await;
+                        //self.listener_table.register_subs(events, subs);
                     }
                     ServerMsg::PartyDelete(ref payload) => {
                         // by cancelling a stream, it will be removed from the SelectStream automatically
-                        if let Some(event_stream) = self.listener_table.get(&payload.id) {
-                            event_stream.abort();
-                        }
+                        self.listener_table.get(&payload.id).map(|event_stream| event_stream.abort());
+                    }
+                    ServerMsg::RoomDelete(ref payload) => {
+                        self.listener_table.get(&payload.id).map(|event_stream| event_stream.abort());
                     }
                     _ => {}
                 }

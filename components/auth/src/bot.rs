@@ -74,9 +74,8 @@ impl SplitBotToken {
     }
 
     pub fn format(&self) -> BotToken {
-        let mut token;
+        let mut token = BotToken::repeat_ascii('\0');
         unsafe {
-            token = BotToken::zeroized();
             if Ok(BotToken::LEN) != STANDARD_NO_PAD.encode_slice(self.to_bytes(), token.as_bytes_mut()) {
                 unreachable!("Could not encode bot token to base64");
             };

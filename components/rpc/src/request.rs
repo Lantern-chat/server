@@ -22,7 +22,5 @@ pub enum RpcRequest {
 #[archive(check_bytes)]
 pub struct PartyInfo {
     pub party_id: Snowflake,
-
-    #[with(rkyv::with::CopyOptimize)]
     pub room_ids: Vec<Snowflake>,
 }

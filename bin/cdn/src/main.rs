@@ -4,6 +4,11 @@
 
 extern crate tracing as log;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     println!("Hello, world!");
+}
+
+pub mod built {
+    include!(concat!(env!("OUT_DIR"), "/built.rs"));
 }

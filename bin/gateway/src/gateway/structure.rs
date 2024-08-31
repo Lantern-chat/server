@@ -43,7 +43,7 @@ impl PartyStructure {
                 continue;
             }
 
-            rooms.insert(room.id);
+            rooms.insert(room.id.into());
         }
     }
 
@@ -55,7 +55,7 @@ impl PartyStructure {
                 continue;
             }
 
-            rooms.insert(room.id);
+            rooms.insert(room.id.into());
         }
     }
 
@@ -63,7 +63,7 @@ impl PartyStructure {
         let mut roles = self.roles.write().await;
 
         for role in new_roles.iter() {
-            roles.insert(role.id);
+            roles.insert(role.id.into());
         }
     }
 
@@ -71,7 +71,7 @@ impl PartyStructure {
         let roles = self.roles.get_mut();
 
         for role in new_roles.iter() {
-            roles.insert(role.id);
+            roles.insert(role.id.into());
         }
     }
 }
@@ -93,23 +93,26 @@ impl StructureCache {
             let _guard = scc::ebr::Guard::new();
 
             for new_room in ready.rooms.iter() {
-                if let Some(room) = self.rooms.peek(&new_room.id, &_guard) {
+                let new_room_id = new_room.id.into();
+
+                if let Some(room) = self.rooms.peek(&new_room_id, &_guard) {
                     if room.is_same(new_room) {
                         continue;
                     }
                 }
 
                 let room = RoomStructure {
-                    party_id: new_room.party_id,
+                    party_id: new_room.party_id.into(),
                     // slice::Iter.map should be exact-size and thus only incur one allocation
-                    overwrites: Arc::from_iter(new_room.overwrites.iter().map(|overwrite| Overwrite {
-                        id: overwrite.id,
-                        allow: overwrite.allow,
-                        deny: overwrite.deny,
-                    })),
+                    overwrites: Arc::from_iter(
+                        new_room
+                            .overwrites
+                            .iter()
+                            .map(|overwrite| rkyv::deserialize::<_, rkyv::rancor::Failure>(overwrite).unwrap()),
+                    ),
                 };
 
-                match self.rooms.entry_async(new_room.id).await {
+                match self.rooms.entry_async(new_room_id).await {
                     Entry::Occupied(entry) => {
                         if !entry.get().is_same(new_room) {
                             entry.update(room);
@@ -124,40 +127,42 @@ impl StructureCache {
             let _guard = scc::ebr::Guard::new();
 
             for new_party in ready.parties.iter() {
-                if let Some(party) = self.parties.peek_with(&new_party.id, |_, party| party.clone()) {
+                let new_party_id = new_party.id.into();
+
+                if let Some(party) = self.parties.peek_with(&new_party_id, |_, party| party.clone()) {
                     if party.owner_id != new_party.owner {
                         // owner changed, regen party
-                        self.parties.remove_async(&new_party.id).await;
+                        self.parties.remove_async(&new_party_id).await;
                     } else {
                         tokio::join! {
                             party.add_roles(&new_party.roles),
-                            party.add_rooms(new_party.id, &ready.rooms),
+                            party.add_rooms(new_party_id, &ready.rooms),
                         };
                     }
                 }
 
-                match self.parties.entry_async(new_party.id).await {
+                match self.parties.entry_async(new_party_id).await {
                     Entry::Occupied(mut entry) => {
                         // TODO: Could use a mut ref here to avoid locking the inner RwLock twice
                         let party = unsafe { entry.get_mut() };
 
                         if let Some(party) = Arc::get_mut(party) {
                             party.add_roles_mut(&new_party.roles);
-                            party.add_rooms_mut(new_party.id, &ready.rooms);
+                            party.add_rooms_mut(new_party_id, &ready.rooms);
                         } else {
                             tokio::join! {
                                 party.add_roles(&new_party.roles),
-                                party.add_rooms(new_party.id, &ready.rooms),
+                                party.add_rooms(new_party_id, &ready.rooms),
                             };
                         }
                     }
                     Entry::Vacant(entry) => {
                         entry.insert_entry(Arc::new(PartyStructure {
-                            owner_id: new_party.owner,
+                            owner_id: new_party.owner.into(),
                             rooms: AsyncRwLock::new(VecSet::from_iter_ordered(
-                                ready.rooms.iter().filter(|room| room.party_id == new_party.id).map(|room| room.id),
+                                ready.rooms.iter().filter(|room| room.party_id == new_party_id).map(|room| room.id.into()),
                             )),
-                            roles: AsyncRwLock::new(VecSet::from_iter_ordered(new_party.roles.iter().map(|role| role.id))),
+                            roles: AsyncRwLock::new(VecSet::from_iter_ordered(new_party.roles.iter().map(|role| role.id.into()))),
                         }));
                     }
                 }

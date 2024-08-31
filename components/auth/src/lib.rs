@@ -67,7 +67,7 @@ impl From<RawAuthToken> for AuthToken {
         // SAFETY: sizes are asserted above and in debug
         match token {
             RawAuthToken::Bearer(bytes) => unsafe {
-                let mut s = BearerToken::zeroized();
+                let mut s = BearerToken::repeat_ascii('\0');
                 if Ok(BearerToken::LEN) != STANDARD_NO_PAD.encode_slice(bytes, s.as_bytes_mut()) {
                     unreachable!("Could not encode auth token to base64");
                 };

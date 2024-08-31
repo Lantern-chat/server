@@ -21,7 +21,7 @@ pub mod prelude {
     pub use crate::error::Error;
     pub use crate::state::ServerState;
 
-    pub use rpc::{auth::Authorization, event::ServerEvent, simple_de};
+    pub use rpc::{auth::Authorization, event::ServerEvent};
     pub use sdk::models::{aliases::*, Nullable, SmolStr, Snowflake, Timestamp};
 
     pub type EventId = sdk::Snowflake;

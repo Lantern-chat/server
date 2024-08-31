@@ -12,12 +12,13 @@ use parking_lot::RwLock;
 
 use quinn::{Connection, Endpoint};
 use sdk::{api::error::ApiError, Snowflake};
-use tokio::io::AsyncWriteExt;
 
 use framed::tokio::AsyncFramedWriter;
 
-use rkyv::{result::ArchivedResult, ser::serializers::AllocSerializer};
-use rkyv::{ser::Serializer, Serialize};
+use rkyv::{
+    api::high::HighSerializer, rancor::Error as RancorError, result::ArchivedResult, ser::allocator::ArenaHandle,
+    util::AlignedVec, Archived, Serialize,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Resolve {
@@ -225,13 +226,15 @@ impl RpcManager {
     pub async fn set_party<'a, 'b>(
         &'a self,
         faction_id: Snowflake,
-        party_id: Snowflake,
-        room_ids: &'b [Snowflake],
+        party_id: Archived<Snowflake>,
+        room_ids: &'b [Archived<Snowflake>],
     ) -> Result<RpcClient, RpcClientError>
     where
         'a: 'b, // don't let the room_ids reference outlive the party_id
     {
         use scc::hash_index::Entry;
+
+        let party_id = party_id.into();
 
         let client = match self.factions.get_async(&faction_id).await {
             Some(faction_client) => faction_client.get().clone(),
@@ -249,7 +252,7 @@ impl RpcManager {
             async {
                 futures_util::stream::iter(room_ids)
                     .for_each_concurrent(16, |&room_id| async move {
-                        _ = self.rooms.insert_async(room_id, party_id).await;
+                        _ = self.rooms.insert_async(room_id.into(), party_id).await;
                     })
                     .await;
             },
@@ -367,26 +370,24 @@ impl RpcClient {
         let conn = self.get_connection().await?;
         let (send, recv) = conn.conn.open_bi().await?;
 
-        let mut out = AsyncFramedWriter::new(send);
-
-        let mut msg = out.new_message();
-        msg.write_all(value.as_ref()).await?;
-        AsyncFramedWriter::dispose_msg(msg).await?;
+        AsyncFramedWriter::new(send).write_msg(value.as_ref()).await?;
 
         Ok(recv)
     }
+}
 
+impl RpcClient {
     pub async fn send<T>(&self, value: &T) -> Result<quinn::RecvStream, RpcClientError>
     where
-        T: Serialize<AllocSerializer<512>>,
+        T: for<'a> Serialize<HighSerializer<'a, AlignedVec, ArenaHandle<'a>, RancorError>>,
     {
-        let mut serializer = AllocSerializer::default();
-        if let Err(e) = serializer.serialize_value(value) {
-            log::error!("Error serializing RPC message: {e}");
-            return Err(RpcClientError::EncodingError);
+        match rkyv::to_bytes::<RancorError>(value) {
+            Err(e) => {
+                log::error!("Error serializing RPC message: {e}");
+                Err(RpcClientError::EncodingError)
+            }
+            Ok(bytes) => self.send_raw(&bytes).await,
         }
-
-        self.send_raw(serializer.into_serializer().into_inner()).await
     }
 }
 

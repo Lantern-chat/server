@@ -3,19 +3,13 @@
 use crate::client::Resolve;
 use sdk::api::commands::all::*;
 
-const fn mirror_tag(t: u16) -> u32 {
-    let le = t.to_le_bytes();
-    u32::from_le_bytes([le[0], le[1], le[1], le[0]])
-}
-
 macro_rules! decl_procs {
     ($($code:literal = $cmd:ident $(@ $kind:ident $(.$path:ident)+)?),*$(,)?) => {
-        pub use proc_impl::{ArchivedProcedure, ProcedureResolver};
-
-        #[derive(Debug)]
-        #[repr(u16)]
-        pub enum Procedure {
-            $($cmd(Box<$cmd>) = $code,)*
+        rkyv_rpc::tuple_enum! {
+            #[derive(Debug)]
+            pub enum Box<Procedure>: u16 {
+                $($code = $cmd($cmd),)*
+            }
         }
 
         impl Procedure {
@@ -36,141 +30,6 @@ macro_rules! decl_procs {
                 }
             }
         }
-
-        $(
-            impl From<$cmd> for Procedure {
-                #[inline]
-                fn from(cmd: $cmd) -> Procedure {
-                    Procedure::$cmd(Box::new(cmd))
-                }
-            }
-
-            impl From<Box<$cmd>> for Procedure {
-                #[inline]
-                fn from(cmd: Box<$cmd>) -> Procedure {
-                    Procedure::$cmd(cmd)
-                }
-            }
-        )*
-
-        #[cfg(test)]
-        mod decl_procs_tests {
-            use super::*;
-
-            #[test]
-            fn test_mirror_tag() {$(
-                println!("0x{:04X} -> 0x{:08X} <-> 0x{:08X}", $code, mirror_tag($code), mirror_tag($code).swap_bytes());
-                assert_eq!(mirror_tag($code), mirror_tag($code).swap_bytes());
-            )*}
-        }
-
-        mod proc_impl {paste::paste! {
-            use super::*;
-
-            #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-            #[repr(u32, align(4))]
-            enum ArchivedTag {
-                $($cmd = mirror_tag($code),)*
-            }
-
-            #[repr(u32, align(4))]
-            pub enum ArchivedProcedure {
-                $($cmd(rkyv::Archived<Box<$cmd>>) = ArchivedTag::$cmd as u32,)*
-            }
-
-            #[repr(u16)]
-            pub enum ProcedureResolver {
-                $($cmd(rkyv::Resolver<Box<$cmd>>) = $code,)*
-            }
-
-            use core::marker::PhantomData;
-            use rkyv::{Archive, Archived, Serialize, Fallible, Deserialize};
-
-            $(
-                #[repr(C)]
-                struct [<Archived $cmd Variant>] {
-                    tag: ArchivedTag,
-                    cmd: Archived<Box<$cmd>>,
-                    mkr: PhantomData<Procedure>,
-                }
-            )*
-
-            impl Archive for Procedure {
-                type Archived = ArchivedProcedure;
-                type Resolver = ProcedureResolver;
-
-                unsafe fn resolve(&self, pos: usize, resolver: ProcedureResolver, out: *mut ArchivedProcedure) {
-                    match resolver {$(
-                        ProcedureResolver::$cmd(resolver_0) => match self {
-                            Procedure::$cmd(self_0) => {
-                                let out = out.cast::<[<Archived $cmd Variant>]>();
-                                core::ptr::addr_of_mut!((*out).tag).write(ArchivedTag::$cmd);
-                                let (fp, fo) = rkyv::out_field!(out.cmd);
-                                rkyv::Archive::resolve(self_0, pos + fp, resolver_0, fo);
-                            },
-                            _ => core::hint::unreachable_unchecked(),
-                        },
-                    )*}
-                }
-            }
-
-            impl<S: Fallible + ?Sized> Serialize<S> for Procedure
-                where $(Box<$cmd>: Serialize<S>,)*
-            {
-                fn serialize(&self, serializer: &mut S) -> Result<ProcedureResolver, S::Error> {
-                    Ok(match self {
-                        $(Procedure::$cmd(cmd) => ProcedureResolver::$cmd(Serialize::serialize(cmd, serializer)?),)*
-                    })
-                }
-            }
-
-            impl<D: Fallible + ?Sized> Deserialize<Procedure, D> for ArchivedProcedure
-                where $(Archived<Box<$cmd>>: Deserialize<Box<$cmd>, D>,)*
-            {
-                fn deserialize(&self, deserializer: &mut D) -> Result<Procedure, D::Error> {
-                    Ok(match self {$(
-                        ArchivedProcedure::$cmd(cmd) => Procedure::$cmd(Deserialize::deserialize(cmd, deserializer)?),
-                    )*})
-                }
-            }
-
-            use rkyv::bytecheck::{CheckBytes, EnumCheckError, ErrorBox, TupleStructCheckError};
-
-            impl<C: ?Sized> CheckBytes<C> for ArchivedProcedure
-                where $(Archived<Box<$cmd>>: CheckBytes<C>,)*
-            {
-                type Error = EnumCheckError<u32>;
-
-                unsafe fn check_bytes<'a>(value: *const Self, context: &mut C) -> Result<&'a Self, Self::Error> {
-                    let tag = *value.cast::<u32>();
-
-                    struct Discriminant;
-
-                    #[allow(non_upper_case_globals)]
-                    impl Discriminant {
-                        $(pub const $cmd: u32 = ArchivedTag::$cmd as u32;)*
-                    }
-
-                    match tag {
-                    $(
-                        Discriminant::$cmd => {
-                            let value = value.cast::<[<Archived $cmd Variant>]>();
-
-                            if let Err(e) = <Archived<Box<$cmd>> as CheckBytes<C>>::check_bytes(core::ptr::addr_of!((*value).cmd), context) {
-                                return Err(EnumCheckError::InvalidTuple {
-                                    variant_name: stringify!($cmd),
-                                    inner: TupleStructCheckError { field_index: 0, inner: ErrorBox::new(e) }
-                                });
-                            }
-                        }
-                    )*
-                        _ => return Err(EnumCheckError::InvalidTag(tag)),
-                    }
-
-                    Ok(&*value)
-                }
-            }
-        }}
     };
 }
 
@@ -245,8 +104,7 @@ decl_procs! {
     518 = GetRoom               @ room.room_id,
 }
 
-use futures_util::future::BoxFuture;
-use futures_util::{FutureExt, StreamExt};
+use futures_util::{future::BoxFuture, FutureExt, StreamExt};
 
 use sdk::api::error::ApiError;
 use sdk::{api::Command, driver::Encoding};
@@ -255,22 +113,26 @@ use tokio::io::AsyncRead;
 use crate::stream::RpcRecvReader;
 
 #[cfg(feature = "ftl")]
+use rkyv::{
+    api::high::{HighDeserializer, HighValidator},
+    bytecheck::CheckBytes,
+    rancor::{Error as RancorError, Source, Strategy},
+    Archive, Archived, Deserialize,
+};
+
+#[cfg(feature = "ftl")]
 pub async fn stream_response<S, P, T, E>(recv: S, encoding: Encoding) -> Result<ftl::Response, E>
 where
     S: Send + AsyncRead + Unpin + 'static,
     P: Command<Item = T>,
-    T: 'static + serde::Serialize + rkyv::Archive + Send + Sync,
-    rkyv::Archived<T>: rkyv::Deserialize<T, rkyv::de::deserializers::SharedDeserializeMap>,
-    rkyv::Archived<T>: for<'b> rkyv::CheckBytes<rkyv::validation::validators::DefaultValidator<'b>>,
+    T: 'static + serde::Serialize + Archive + Send + Sync,
+    Archived<T>: Deserialize<T, HighDeserializer<RancorError>>,
+    Archived<T>: for<'b> CheckBytes<HighValidator<'b, RancorError>>,
     E: From<std::io::Error> + From<ApiError> + 'static,
 {
     use ftl::Reply;
 
-    let mut stream = Box::pin(
-        RpcRecvReader::new(recv).recv_stream_deserialized::<Result<T, ApiError>, _, _>(
-            rkyv::de::deserializers::SharedDeserializeMap::new,
-        ),
-    );
+    let mut stream = Box::pin(RpcRecvReader::new(recv).recv_stream_deserialized::<Result<T, ApiError>>());
 
     let Some(first) = stream.next().await else {
         return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "No Response").into());
@@ -302,15 +164,16 @@ where
 
 #[cfg(test)]
 mod tests {
-    use rkyv::Deserialize;
+    use rkyv::{access, rancor::Error as RancorError, Deserialize};
 
     use super::*;
 
     #[test]
     fn test_rkyv() {
-        let p = rkyv::to_bytes::<_, 256>(&Procedure::from(GetServerConfig::new())).unwrap();
-        let a = rkyv::check_archived_root::<Procedure>(&p).unwrap();
-        let Procedure::GetServerConfig(_) = a.deserialize(&mut rkyv::Infallible).unwrap() else {
+        let p = rkyv::to_bytes::<RancorError>(&Procedure::from(GetServerConfig::new())).unwrap();
+        let a = rkyv::access::<Archived<Procedure>, RancorError>(&p).unwrap();
+
+        let Procedure::GetServerConfig(_) = rkyv::deserialize::<_, RancorError>(a).unwrap() else {
             panic!("Wrong variant");
         };
     }

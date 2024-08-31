@@ -11,7 +11,7 @@ parking_lot.workspace = true
 smol_str.workspace = true
 serde.workspace = true
 rkyv = { workspace = true, features = ["smallvec"] }
-bytecheck.workspace = true
+rkyv_rpc.workspace = true
 auth.workspace = true
 thiserror = "1"
 paste = "1"
