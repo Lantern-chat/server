@@ -26,7 +26,7 @@ pub async fn create_invite(
 
     #[rustfmt::skip]
     let row = state.db.write.get().await?.query_one2(schema::sql! {
-        const ${ assert!(!Columns::IS_DYNAMIC); }
+        const_assert!(!Columns::IS_DYNAMIC);
 
         tables! {
             struct Checked {

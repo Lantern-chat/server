@@ -24,7 +24,7 @@ pub async fn create_room(
     // check permissions AND check for the room limit at the same time.
     #[rustfmt::skip]
     let Some(row) = state.db.read.get().await?.query_opt2(schema::sql! {
-        const ${ assert!(!Columns::IS_DYNAMIC); }
+        const_assert!(!Columns::IS_DYNAMIC);
 
         SELECT
             COUNT(Rooms.Id)::int4 AS @TotalRooms,
@@ -34,7 +34,7 @@ pub async fn create_room(
         AND PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
 
         const PERMS: [i64; 2] = Permissions::MANAGE_ROOMS.to_i64();
-        const ${ assert!(PERMS[1] == 0); }
+        const_assert!(PERMS[1] == 0);
 
         AND PartyMembers.Permissions1 & const {PERMS[0]} = const {PERMS[0]}
     }).await? else {
@@ -56,7 +56,7 @@ pub async fn create_room(
         CreateRoomKind::UserForum => RoomFlags::from(RoomKind::UserForum),
     };
 
-    let raw = RawOverwrites::new(simple_de(&form.overwrites));
+    let raw = RawOverwrites::new(form.overwrites.simple_deserialize().expect("Unable to deserialize overwrites"));
     let room_id = state.sf.gen();
 
     let mut db = state.db.write.get().await?;

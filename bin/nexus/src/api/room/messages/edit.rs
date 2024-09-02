@@ -50,15 +50,12 @@ pub async fn edit_message(
     };
 
     // first read-only query is not within the transaction because without repeatable-read it doesn't matter anyway
+    // TODO: Check if this can be optimized to not use a LATERAL
     #[rustfmt::skip]
     let prev = db.query_opt2(schema::sql! {
-        const ${ assert!(!Columns::IS_DYNAMIC); }
+        const_assert!(!Columns::IS_DYNAMIC);
 
-        tables! {
-            struct AggFileIds {
-                FileIds: SNOWFLAKE_ARRAY,
-            }
-        }
+        tables! { struct AggFileIds { FileIds: SNOWFLAKE_ARRAY } }
 
         SELECT
             Messages.UserId     AS @UserId,
@@ -66,7 +63,6 @@ pub async fn edit_message(
             Messages.Content    AS @Content,
             AggFileIds.FileIds  AS @FileIds
 
-        // TODO: Check if this can be optimized to not use a LATERAL
         FROM Messages LEFT JOIN LATERAL (
             SELECT ARRAY_AGG(Attachments.FileId) AS AggFileIds.FileIds
             FROM Attachments
@@ -134,7 +130,7 @@ pub async fn edit_message(
 
         // attachments may be unordered, so a Set is required
         let pre_set: HashSet<FileId> = HashSet::from_iter(prev_files.unwrap_or_default());
-        let new_set: HashSet<FileId> = HashSet::from_iter(body.attachments.as_slice().iter().copied());
+        let new_set: HashSet<FileId> = HashSet::from_iter(body.attachments.as_slice().iter().map(|s| (*s).into()));
 
         // if the sets are identical, skip the attachment processing
         if pre_set == new_set {
@@ -169,7 +165,7 @@ pub async fn edit_message(
             orphan_attachments = Either::Right(async move {
                 // mark removed attachments as orphaned
                 t.execute2(schema::sql! {
-                    const ${ assert!(!Columns::IS_DYNAMIC); }
+                    const_assert!(!Columns::IS_DYNAMIC);
 
                     UPDATE Attachments SET (Flags) = (Attachments.Flags | const {flags::AttachmentFlags::ORPHANED.bits()})
                      WHERE Attachments.FileId = ANY(#{&removed as SNOWFLAKE_ARRAY})

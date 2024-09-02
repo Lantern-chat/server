@@ -12,7 +12,7 @@ pub async fn get_relationships(
     let stream = db.query_stream2(schema::sql! {
         use sdk::models::UserRelationship;
 
-        const ${ assert!(!Columns::IS_DYNAMIC); }
+        const_assert!(!Columns::IS_DYNAMIC);
 
         SELECT
             AggRelationships.FriendId AS @FriendId,

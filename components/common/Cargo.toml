@@ -6,7 +6,7 @@ publish = false
 
 [dependencies]
 tokio = { workspace = true, features = ["full"] }
-sdk = { workspace = true, default-features = false }
+sdk = { workspace = true, default-features = false, features = ["rkyv"] }
 emoji.workspace = true
 
 scc.workspace = true

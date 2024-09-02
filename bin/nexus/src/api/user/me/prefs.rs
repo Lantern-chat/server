@@ -7,7 +7,7 @@ pub async fn update_prefs(
     auth: Authorization,
     prefs: &Archived<UserPreferences>,
 ) -> Result<(), Error> {
-    let mut prefs = simple_de::<UserPreferences>(prefs);
+    let mut prefs: UserPreferences = prefs.full_deserialize().expect("Unable to deserialize prefs");
 
     prefs.clean();
 

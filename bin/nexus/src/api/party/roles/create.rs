@@ -23,7 +23,7 @@ pub async fn create_role(
 
     #[rustfmt::skip]
     let row = t.query_one2(schema::sql! {
-        const ${ assert!(!Columns::IS_DYNAMIC); }
+        const_assert!(!Columns::IS_DYNAMIC);
 
         tables! {
             struct TempRole {
@@ -49,7 +49,7 @@ pub async fn create_role(
               AND PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
 
             const PERMS: [i64; 2] = Permissions::MANAGE_ROLES.to_i64();
-            const ${ assert!(PERMS[1] == 0); }
+            const_assert!(PERMS[1] == 0);
 
             AND PartyMembers.Permissions1 & const {PERMS[0]} = const {PERMS[0]}
         ), Inserted AS (

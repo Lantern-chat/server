@@ -1,6 +1,8 @@
 use futures::TryFutureExt;
 use schema::roles::RoleChange;
-use sdk::{api::commands::party::PatchRoleForm, models::*};
+
+use sdk::api::commands::all::{PatchRole, PatchRoleForm};
+use sdk::models::*;
 
 use crate::{
     asset::{maybe_add_asset, AssetMode},
@@ -11,10 +13,12 @@ use crate::{
 pub async fn modify_role(
     state: ServerState,
     auth: Authorization,
-    party_id: PartyId,
-    role_id: RoleId,
-    form: &Archived<PatchRoleForm>,
+    cmd: &Archived<PatchRole>,
 ) -> Result<Role, Error> {
+    let party_id = cmd.party_id.into();
+    let role_id = cmd.role_id.into();
+    let form = &cmd.body;
+
     // TODO: Maybe change this?
     if *form == PatchRoleForm::default() {
         return Err(Error::BadRequest);
@@ -81,10 +85,12 @@ pub async fn modify_role(
         }
     }
 
+    let permissions = form.permissions.simple_deserialize().expect("Unable to deserialize permissions");
+
     let checker = RoleChecker::new(party_id, roles);
 
     let role_change = RoleChange {
-        permissions: form.permissions.as_ref().copied(),
+        permissions,
         position: form.position.as_ref().copied(),
     };
 
@@ -121,9 +127,9 @@ pub async fn modify_role(
     //     return Err(Error::BadRequest);
     // }
 
-    let color = form.color.as_ref().map(|c| *c as i32);
-    let avatar_id = maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), new_avatar).await?;
-    let [perms1, perms2] = match form.permissions.as_ref() {
+    let color = form.color.as_ref().map(|c| c.to_native() as i32);
+    let avatar_id = maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), new_avatar.map(Into::into)).await?;
+    let [perms1, perms2] = match permissions.as_ref() {
         Some(perms) => perms.to_i64(),
         None => [0, 0], // unused
     };
@@ -138,7 +144,7 @@ pub async fn modify_role(
             if !avatar_id.is_undefined()  { Roles./AvatarId = #{&avatar_id as Roles::AvatarId}, }
             if color.is_some()            { Roles./Color    = #{&color as Roles::Color}, }
             if form.flags.is_some()       { Roles./Flags    = #{&form.flags as Roles::Flags}, }
-            if form.permissions.is_some() {
+            if permissions.is_some() {
                 Roles./Permissions1 = #{&perms1 as Roles::Permissions1},
                 Roles./Permissions2 = #{&perms2 as Roles::Permissions2}
             }

@@ -1,14 +1,17 @@
 use crate::asset::{maybe_add_asset, AssetMode};
 use crate::prelude::*;
-use sdk::api::commands::party::PatchPartyForm;
+
+use sdk::api::commands::all::{PatchParty, PatchPartyForm};
 use sdk::models::*;
 
 pub async fn modify_party(
     state: ServerState,
     auth: Authorization,
-    party_id: PartyId,
-    form: &Archived<PatchPartyForm>,
+    cmd: &Archived<PatchParty>,
 ) -> Result<Party, Error> {
+    let party_id = cmd.party_id.into();
+    let form = &cmd.body;
+
     if *form == PatchPartyForm::default() {
         return Err(Error::BadRequest);
     }
@@ -75,8 +78,8 @@ pub async fn modify_party(
         }
 
         tokio::try_join!(
-            maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), new_avatar),
-            maybe_add_asset(&state, AssetMode::Banner, auth.user_id(), new_banner),
+            maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), new_avatar.map(Into::into)),
+            maybe_add_asset(&state, AssetMode::Banner, auth.user_id(), new_banner.map(Into::into)),
         )?
     };
 

@@ -1,14 +1,18 @@
 use futures::future::Either;
-use sdk::{api::commands::party::CreatePartyForm, models::*};
 use smol_str::SmolStr;
+
+use sdk::api::commands::all::CreateParty;
+use sdk::models::*;
 
 use crate::prelude::*;
 
 pub async fn create_party(
     state: ServerState,
     auth: Authorization,
-    form: &Archived<CreatePartyForm>,
+    cmd: &Archived<CreateParty>,
 ) -> Result<Party, Error> {
+    let form = &cmd.body;
+
     if !schema::validation::validate_name(&form.name, state.config().shared.party_name_length.clone()) {
         return Err(Error::InvalidName);
     }
@@ -34,7 +38,7 @@ pub async fn create_party(
             name: SmolStr::from(&*form.name),
             description: form.description.as_deref().map(SmolStr::from),
         },
-        flags: form.flags,
+        flags: form.flags.simple_deserialize().expect("Unable to deserialize party flags"),
         avatar: None,
         banner: Nullable::Null,
         default_room: room_id,

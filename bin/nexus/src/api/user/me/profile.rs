@@ -1,4 +1,6 @@
-use sdk::{api::commands::user::UpdateUserProfileBody, models::*};
+use sdk::models::*;
+
+use sdk::api::commands::all::UpdateUserProfileBody;
 
 use crate::{
     asset::{maybe_add_asset, AssetMode},
@@ -92,8 +94,8 @@ pub async fn patch_profile(
         }
 
         tokio::try_join!(
-            maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), new_avatar),
-            maybe_add_asset(&state, AssetMode::Banner, auth.user_id(), new_banner),
+            maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), new_avatar.map(Into::into)),
+            maybe_add_asset(&state, AssetMode::Banner, auth.user_id(), new_banner.map(Into::into)),
         )?
     };
 
@@ -124,11 +126,11 @@ pub async fn patch_profile(
     }
 
     Ok(UserProfile {
-        bits: profile.bits,
+        bits: profile.bits.to_native_truncate(),
         extra: Default::default(),
-        nick: simple_de(&profile.nick),
-        status: simple_de(&profile.status),
-        bio: simple_de(&profile.bio),
+        nick: profile.nick.simple_deserialize().expect("Unable to deserialize nick"),
+        status: profile.status.simple_deserialize().expect("Unable to deserialize status"),
+        bio: profile.bio.simple_deserialize().expect("Unable to deserialize bio"),
         avatar: avatar_id.map(|id| encrypt_snowflake(&state, id)),
         banner: banner_id.map(|id| encrypt_snowflake(&state, id)),
     })

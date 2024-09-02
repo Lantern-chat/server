@@ -50,7 +50,7 @@ pub async fn delete_msg(
             }
             None => {
                 const M: [i64; 2] = Permissions::MANAGE_MESSAGES.to_i64();
-                const ${ assert!(M[1] == 0); }
+                const_assert!(M[1] == 0);
 
                 AND ((
                     // if the user has permissions to manage messages

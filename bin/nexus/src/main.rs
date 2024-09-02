@@ -26,7 +26,7 @@ pub mod prelude {
 
     pub use futures::stream::{Stream, StreamExt};
 
-    pub use rpc::{auth::Authorization, event::ServerEvent, simple_de};
+    pub use rpc::{auth::Authorization, event::ServerEvent, DeserializeExt};
     pub use sdk::models::{aliases::*, Nullable, SmolStr, Snowflake, Timestamp};
 
     pub type ConnectionId = Snowflake;

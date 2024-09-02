@@ -3,15 +3,17 @@ use sdk::models::*;
 use crate::prelude::*;
 use crate::util::encrypted_asset::encrypt_snowflake_opt;
 
+use sdk::api::commands::all::StartTyping;
 use sdk::api::commands::room::StartTypingBody;
 use sdk::models::gateway::message::ServerMsg;
 
 pub async fn trigger_typing(
     state: ServerState,
     auth: Authorization,
-    room_id: RoomId,
-    body: &Archived<StartTypingBody>,
+    cmd: &Archived<StartTyping>,
 ) -> Result<(), Error> {
+    let room_id = cmd.room_id.into();
+
     let has_perms = match state.perm_cache.get(auth.user_id(), room_id).await {
         Some(perms) => {
             if !perms.contains(Permissions::SEND_MESSAGES) {
@@ -117,7 +119,7 @@ pub async fn trigger_typing(
         room_id,
         user_id: auth.user_id(),
         member,
-        parent: body.parent.as_ref().copied(),
+        parent: cmd.body.parent.simple_deserialize().expect("Unable to deserialize parent"),
     });
 
     state.gateway.events.send_simple(&ServerEvent::party(party_id, Some(room_id), event)).await;

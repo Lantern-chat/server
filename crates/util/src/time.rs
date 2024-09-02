@@ -11,8 +11,11 @@ fn leap_years_before1(year: i32) -> i32 {
     year / 4 - year / 100 + year / 400
 }
 
-pub const fn is_leap_year(year: i32) -> bool {
-    (year % 4 == 0) & ((year % 100 != 0) | (year % 400 == 0))
+const fn is_leap_year(y: i32) -> bool {
+    //(y % 4 == 0) & ((y % 25 != 0) | (y % 16 == 0)) // old version
+
+    // ternary compiles to cmov
+    y & (if y % 25 == 0 { 15 } else { 3 }) == 0
 }
 
 // https://stackoverflow.com/a/4587611/2083075

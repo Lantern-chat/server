@@ -44,6 +44,11 @@ pub fn has_all_permission_bits(
     cols.0.has_all_bits(perms[0].lit()).and(cols.1.has_all_bits(perms[1].lit()))
 }
 
+#[macro_export]
+macro_rules! const_assert {
+    ($($tt:tt)*) => { const _: () = assert!($($tt)*); };
+}
+
 /// Wrapper around [`thorn::sql!`] which injects `use schema::*` ahead of the declaration
 #[macro_export]
 macro_rules! sql {

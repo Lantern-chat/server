@@ -7,3 +7,5 @@ pub mod event;
 pub mod procedure;
 pub mod request;
 pub mod stream;
+
+pub use rkyv_rpc::DeserializeExt;

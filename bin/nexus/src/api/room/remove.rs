@@ -1,13 +1,20 @@
 use crate::prelude::*;
+use sdk::api::commands::all::DeleteRoom;
 use sdk::models::*;
 
-pub async fn remove_room(state: ServerState, auth: Authorization, room_id: RoomId) -> Result<(), Error> {
+pub async fn remove_room(
+    state: ServerState,
+    auth: Authorization,
+    cmd: &Archived<DeleteRoom>,
+) -> Result<(), Error> {
+    let room_id: RoomId = cmd.room_id.into();
+
     let mut db = state.db.write.get().await?;
     let t = db.transaction().await?;
 
     #[rustfmt::skip]
     let res = t.execute2(schema::sql! {
-        const ${ assert!(!Columns::IS_DYNAMIC); }
+        const_assert!(!Columns::IS_DYNAMIC);
 
         tables! { struct PendingRoom { Id: Rooms::Id } };
 
@@ -18,7 +25,7 @@ pub async fn remove_room(state: ServerState, auth: Authorization, room_id: RoomI
                AND PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
 
             const PERMS: [i64; 2] = Permissions::MANAGE_ROOMS.to_i64();
-            const ${ assert!(PERMS[1] == 0); }
+            const_assert!(PERMS[1] == 0);
 
             AND PartyMembers.Permissions1 & const {PERMS[0]} = const {PERMS[0]}
         )

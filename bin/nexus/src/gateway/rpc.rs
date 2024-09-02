@@ -12,13 +12,13 @@ where
     // avoid inlining every async state machine by boxing them inside a lazy future/async block
     macro_rules! c {
         ($([$size:literal])? $first:ident$(::$frag:ident)+($($args:expr),*)) => {
-            Box::pin(async move { ::rpc::stream::encode_item::<_, Error, _, {512 $(* 0 + $size)?}>(
+            Box::pin(async move { ::rpc::stream::encode_item::<_, Error, _>(
                 out, crate::api::$first$(::$frag)+($($args),*).await).await.map_err(Error::from) })
         };
     }
     macro_rules! s {
         ($([$size:literal])? $first:ident$(::$frag:ident)+($($args:expr),*)) => {
-            Box::pin(async move { ::rpc::stream::encode_stream::<_, Error, _, {512 $(* 0 + $size)?}>(
+            Box::pin(async move { ::rpc::stream::encode_stream::<_, Error, _>(
                 out, crate::api::$first$(::$frag)+($($args),*).await).await.map_err(Error::from) })
         };
     }
@@ -30,7 +30,7 @@ where
     // prepare fields
     let addr = addr.as_socket_addr();
     let auth = || match auth.as_ref() {
-        Some(auth) => Ok(simple_de::<Authorization>(auth)),
+        Some(auth) => Ok(auth.simple_deserialize().expect("Unable to deserialize auth")),
         None => Err(Error::Unauthorized),
     };
 
@@ -53,7 +53,7 @@ where
         Proc::GetRelationships(form) => todo!("GetRelationships"),
         Proc::PatchRelationship(form) => todo!("PatchRelationship"),
         Proc::UpdateUserProfile(form) => c!(user::me::profile::patch_profile(state, auth()?, None, &form.body)),
-        Proc::GetUser(form) => c!(user::get::get_full_user(state, auth()?, form.user_id)),
+        Proc::GetUser(form) => c!(user::get::get_full_user(state, auth()?, form)),
         Proc::UpdateUserPrefs(form) => c!(user::me::prefs::update_prefs(state, auth()?, &form.body.inner)),
         Proc::CreateFile(form) => todo!("CreateFile"),
         Proc::GetFilesystemStatus(form) => todo!("GetFilesystemStatus"),

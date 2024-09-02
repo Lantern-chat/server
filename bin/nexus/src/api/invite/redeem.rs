@@ -82,7 +82,7 @@ pub async fn redeem_invite(
         let msg_id = state.sf.gen();
 
         t.execute2(schema::sql! {
-            const ${ assert!(!Columns::IS_DYNAMIC); }
+            const_assert!(!Columns::IS_DYNAMIC);
 
             INSERT INTO Messages (Id, UserId, RoomId, Kind) (
                 SELECT

@@ -4,15 +4,19 @@ use crate::api::party::rooms::create::RawOverwrites;
 use crate::asset::{maybe_add_asset, AssetMode};
 use crate::prelude::*;
 
-use sdk::api::commands::room::PatchRoomForm;
 use sdk::models::*;
+
+use sdk::api::commands::all::PatchRoom;
+use sdk::api::commands::room::PatchRoomForm;
 
 pub async fn modify_room(
     state: ServerState,
     auth: Authorization,
-    room_id: RoomId,
-    form: &Archived<PatchRoomForm>,
+    cmd: &Archived<PatchRoom>,
 ) -> Result<FullRoom, Error> {
+    let room_id = cmd.room_id.into();
+    let form = &cmd.body;
+
     // TODO: Maybe change this?
     if *form == PatchRoomForm::default() {
         return Err(Error::BadRequest);
@@ -78,20 +82,23 @@ pub async fn modify_room(
             break 'avatar Nullable::Undefined;
         }
 
-        maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), form.avatar).await?
+        maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), form.avatar.map(Into::into)).await?
     };
 
+    let overwrites: ThinVec<Overwrite> =
+        form.overwrites.simple_deserialize().expect("Unable to deserialize overwrites");
+
     let mut remove_overwrites: HashSet<Snowflake> =
-        HashSet::from_iter(form.remove_overwrites.as_slice().iter().copied());
+        HashSet::from_iter(form.remove_overwrites.as_slice().iter().copied().map(From::from));
 
     // unique + avoiding conflicts
-    if !form.remove_overwrites.is_empty() {
-        for ow in form.overwrites.as_slice() {
+    if !remove_overwrites.is_empty() {
+        for ow in overwrites.as_slice() {
             remove_overwrites.remove(&ow.id);
         }
     }
 
-    let raw = RawOverwrites::new(simple_de(&form.overwrites));
+    let raw = RawOverwrites::new(overwrites);
 
     let mut db = state.db.write.get().await?;
     let t = db.transaction().await?;

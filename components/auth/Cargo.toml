@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 sdk = { workspace = true, features = ["rkyv"] }
-rkyv = { workspace = true }
+rkyv.workspace = true
 
 aes = "0.8"
 base64 = "0.22"

@@ -15,8 +15,9 @@ built.workspace = true
 [dependencies]
 sdk = { workspace = true }
 rpc.workspace = true
-smol_str = { version = "0.2", features = ["serde", "pg"] }
-rkyv = { workspace = true, features = ["pg"] }
+smol_str = { workspace = true, features = ["serde"] }
+rkyv = { workspace = true }
+postgres-types.workspace = true
 
 quinn.workspace = true
 reqwest.workspace = true

@@ -10,7 +10,7 @@ pub async fn remove_own_reaction(
     msg_id: MessageId,
     emote: &Archived<EmoteOrEmoji>,
 ) -> Result<(), Error> {
-    let Some(emote) = state.emoji.resolve(simple_de(emote)) else {
+    let Some(emote) = state.emoji.resolve_archived(emote) else {
         return Err(Error::BadRequest);
     };
 

@@ -8,7 +8,7 @@ pub async fn revoke_invite(state: ServerState, auth: Authorization, code: SmolSt
 
     #[rustfmt::skip]
     state.db.write.get().await?.execute2(schema::sql! {
-        const ${ assert!(!Columns::IS_DYNAMIC); }
+        const_assert!(!Columns::IS_DYNAMIC);
 
         tables! {
             struct Perms {

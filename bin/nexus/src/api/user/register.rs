@@ -25,7 +25,7 @@ pub async fn register_user(
         return Err(Error::InvalidPassword);
     }
 
-    let dob = simple_de::<Timestamp>(&form.dob).date();
+    let dob = Timestamp::from(form.dob).date();
 
     let now = SystemTime::now();
 

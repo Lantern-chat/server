@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use arc_swap::ArcSwap;
-use sdk::{models::EmoteOrEmoji, Snowflake};
+use sdk::{
+    models::{ArchivedEmoteOrEmoji, EmoteOrEmoji},
+    Snowflake,
+};
 use smol_str::SmolStr;
 use std::collections::HashMap;
 
@@ -77,6 +80,15 @@ impl EmojiMap {
         match e {
             EmoteOrEmoji::Emote { emote } => Some(EmoteOrEmojiId::Emote(emote)),
             EmoteOrEmoji::Emoji { emoji } => self.any_emoji_to_id(&emoji).map(EmoteOrEmojiId::Emoji),
+        }
+    }
+
+    pub fn resolve_archived(&self, e: &ArchivedEmoteOrEmoji) -> Option<EmoteOrEmojiId> {
+        match e {
+            ArchivedEmoteOrEmoji::Emote { emote } => Some(EmoteOrEmojiId::Emote((*emote).into())),
+            ArchivedEmoteOrEmoji::Emoji { emoji } => {
+                self.any_emoji_to_id(emoji.as_str()).map(EmoteOrEmojiId::Emoji)
+            }
         }
     }
 
