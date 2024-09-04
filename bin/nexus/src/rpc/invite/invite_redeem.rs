@@ -1,10 +1,11 @@
-use db::pg::error::SqlState;
-use futures::{future::Either, FutureExt, TryFutureExt};
-
-use smol_str::SmolStr;
-
 use crate::prelude::*;
-use sdk::{api::commands::invite::RedeemInviteBody, models::*};
+
+use db::pg::error::SqlState;
+use futures::FutureExt;
+
+use sdk::models::*;
+
+use sdk::api::commands::invite::RedeemInvite;
 
 /*
  * Process:
@@ -16,9 +17,11 @@ use sdk::{api::commands::invite::RedeemInviteBody, models::*};
 pub async fn redeem_invite(
     state: ServerState,
     auth: Authorization,
-    code: SmolStr,
-    body: RedeemInviteBody,
+    cmd: &Archived<RedeemInvite>,
 ) -> Result<(), Error> {
+    let code = &cmd.code;
+    let body = &cmd.body;
+
     let maybe_id = crate::util::encrypted_asset::decrypt_snowflake(&state, &code);
 
     let mut db = state.db.write.get().await?;
@@ -28,9 +31,9 @@ pub async fn redeem_invite(
     // redeem the invite and add user to party_member
     let row = t.query_one2(schema::sql! {
         CALL .redeem_invite(
-            #{auth.user_id_ref() as Users::Id},
-            #{&maybe_id as Invite::Id},
-            #{&code as Invite::Vanity}
+            #{auth.user_id_ref()    as Users::Id},
+            #{&maybe_id             as Invite::Id},
+            #{&code                 as Invite::Vanity}
         )
     });
 
@@ -60,15 +63,17 @@ pub async fn redeem_invite(
     let party_id: PartyId = row.try_get(1)?;
 
     let update_member = async {
-        if let Some(nickname) = body.nickname {
-            crate::rpc::user::me::user_profile::patch_profile(
+        if let Some(nickname) = body.nickname.as_ref() {
+            use crate::internal::user_profile::{patch_profile, PatchProfile};
+
+            patch_profile(
                 state.clone(),
-                auth,
+                auth.user_id(),
                 Some(party_id),
-                todo!(), //TODO: sdk::api::commands::user::UpdateUserProfileBody {
-                         //    nick: Nullable::Some(nickname),
-                         //    ..Default::default()
-                         //},
+                PatchProfile {
+                    nick: Nullable::Some(nickname.as_str()),
+                    ..Default::default()
+                },
             )
             // avoid inlining this future
             .boxed()
