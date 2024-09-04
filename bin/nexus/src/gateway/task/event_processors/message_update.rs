@@ -4,11 +4,11 @@ pub async fn message_update(state: &ServerState, db: &db::Client, id: MessageId)
     let msg = crate::rpc::room::messages::get_messages::get_one(state.clone(), db, id).await?;
 
     #[rustfmt::skip]
-    state.gateway.events.send_simple(&ServerEvent::party(
+    state.gateway.events.send(&ServerEvent::party(
         msg.party_id,
         Some(msg.room_id),
         ServerMsg::new_message_update(msg),
-    )).await;
+    )).await?;
 
     Ok(())
 }

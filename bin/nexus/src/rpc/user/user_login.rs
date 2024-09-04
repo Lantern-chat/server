@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use crate::prelude::*;
 
 use sdk::{
-    api::commands::user::UserLoginForm,
+    api::commands::user::UserLogin,
     models::{ElevationLevel, Session, UserFlags},
 };
 
@@ -13,11 +13,9 @@ use crate::internal::{
     password::verify_password,
 };
 
-pub async fn login(
-    state: ServerState,
-    addr: SocketAddr,
-    form: &Archived<UserLoginForm>,
-) -> Result<Session, Error> {
+pub async fn login(state: ServerState, addr: SocketAddr, cmd: &Archived<UserLogin>) -> Result<Session, Error> {
+    let form = &cmd.body;
+
     if form.password.len() < 8 {
         return Err(Error::InvalidCredentials);
     }

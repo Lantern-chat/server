@@ -4,15 +4,17 @@ use sdk::models::*;
 
 use crate::{prelude::*, state::permission_cache::PermMute};
 
-use sdk::api::commands::room::EditMessageBody;
+use sdk::api::commands::room::EditMessage;
 
 pub async fn edit_message(
     state: ServerState,
     auth: Authorization,
-    room_id: RoomId,
-    msg_id: MessageId,
-    body: &Archived<EditMessageBody>,
+    cmd: &Archived<EditMessage>,
 ) -> Result<Option<Message>, Error> {
+    let room_id = cmd.room_id.into();
+    let msg_id = cmd.msg_id.into();
+    let body = &cmd.body;
+
     // fast-path for if the perm_cache does contain a value
     let perms = match state.perm_cache.get(auth.user_id(), room_id).await {
         Some(PermMute { perms, .. }) => {

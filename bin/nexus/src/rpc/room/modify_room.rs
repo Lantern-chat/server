@@ -194,5 +194,5 @@ pub async fn modify_room(
 
     t.commit().await?;
 
-    crate::rpc::room::get_room::get_room(state, auth, room_id).await
+    crate::internal::get_rooms::get_room(state, auth, room_id).await
 }

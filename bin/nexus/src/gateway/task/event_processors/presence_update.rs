@@ -64,12 +64,12 @@ pub async fn presence_updated(
             };
 
             #[rustfmt::skip]
-            state.gateway.events.send_simple(&ServerEvent::new_iter(
+            state.gateway.events.send(&ServerEvent::new_iter(
                 [], // TODO: Also send to friends
                 party_id,
                 None,
                 ServerMsg::new_presence_update(inner),
-            )).await;
+            )).await?;
         }
 
         Ok(())

@@ -1,13 +1,15 @@
-use sdk::{api::commands::party::CreateRoleForm, models::*};
+use sdk::{api::commands::party::CreateRole, models::*};
 
 use crate::prelude::*;
 
 pub async fn create_role(
     state: ServerState,
     auth: Authorization,
-    party_id: PartyId,
-    form: &Archived<CreateRoleForm>,
+    cmd: &Archived<CreateRole>,
 ) -> Result<Role, Error> {
+    let party_id: PartyId = cmd.party_id.into();
+    let form = &cmd.body;
+
     {
         let config = state.config();
 

@@ -19,11 +19,11 @@ pub async fn role_event(
         };
 
         #[rustfmt::skip]
-        state.gateway.events.send_simple(&ServerEvent::party(
+        state.gateway.events.send(&ServerEvent::party(
             party_id,
             None,
             ServerMsg::new_role_delete(RoleDeleteEvent { id: role_id, party_id }),
-        )).await;
+        )).await?;
 
         return Ok(());
     }
@@ -63,7 +63,7 @@ pub async fn role_event(
         _ => unreachable!(),
     };
 
-    state.gateway.events.send_simple(&ServerEvent::party(party_id, None, event)).await;
+    state.gateway.events.send(&ServerEvent::party(party_id, None, event)).await?;
 
     Ok(())
 }

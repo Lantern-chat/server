@@ -116,7 +116,7 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
                                 super::event_processors::process(state, db, event, Some(party_id)).await
                             {
                                 log::error!("Error processing party event: {event:?} {e}");
-                                // TODO: Disconnect party
+                                // TODO: Disconnect party? might have only been an rkyv error
                             }
                         }
                     })
@@ -135,7 +135,7 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
                         for event in events {
                             if let Err(e) = super::event_processors::process(state, db, event, None).await {
                                 log::error!("Error processing direct event: {event:?} {e}");
-                                // TODO: Disconnect users
+                                // TODO: Disconnect users? same as above
                             }
                         }
                     })
@@ -148,7 +148,7 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
                     .for_each_concurrent(None, |event| async move {
                         if let Err(e) = super::event_processors::process(state, db, event, None).await {
                             log::error!("Error processing user event: {event:?} {e}");
-                            // TODO: Disconnect users
+                            // TODO: Disconnect users? same as above
                         }
                     })
                     .await

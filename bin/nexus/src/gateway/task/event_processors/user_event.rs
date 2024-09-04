@@ -72,16 +72,14 @@ pub async fn user_update(state: &ServerState, db: &db::Client, user_id: UserId) 
         tokio::try_join!(self_future, user_future, friends_future, parties_future)?;
 
     // shotgun the event to every relevant parties and users
-    state
-        .gateway
-        .events
-        .send::<_, 1024>(&ServerEvent::new(
-            friend_ids.into(),
-            party_ids.into(),
-            None,
-            ServerMsg::new_user_update(user),
-        ))
-        .await;
+    #[rustfmt::skip]
+    state.gateway.events.send(&ServerEvent::new(
+        friend_ids.into(),
+        party_ids.into(),
+        None,
+        ServerMsg::new_user_update(user),
+    ))
+    .await?;
 
     // TODO: Also include open DMs
 
@@ -99,10 +97,11 @@ pub async fn self_update(
         return party_position_update(state, db, user_id, party_id).await;
     }
 
-    let user = crate::rpc::user::user_get::get_full_self(state, user_id).await?;
+    // TODO: Move this into internal
+    let user = crate::rpc::user::me::user_get_self::get_full_self(state, user_id).await?;
 
     #[rustfmt::skip]
-    state.gateway.events.send_simple(&ServerEvent::user(user_id, None, ServerMsg::new_user_update(user))).await;
+    state.gateway.events.send(&ServerEvent::user(user_id, None, ServerMsg::new_user_update(user))).await?;
 
     Ok(())
 }
@@ -128,7 +127,7 @@ async fn party_position_update(
         id: party_id,
     }));
 
-    state.gateway.events.send_simple(&ServerEvent::user(user_id, None, event)).await;
+    state.gateway.events.send(&ServerEvent::user(user_id, None, event)).await?;
 
     Ok(())
 }

@@ -1,7 +1,7 @@
 use std::time::{Duration, SystemTime};
 
 use mfa_totp::{totp::TOTP6, MFA};
-use sdk::api::commands::user::{Added2FA, Confirm2FAForm, Enable2FAForm, Remove2FAForm};
+use sdk::api::commands::user::{Added2FA, Confirm2FA, Enable2FA, Remove2FA};
 use sdk::models::{ElevationLevel, UserFlags};
 
 use crate::prelude::*;
@@ -14,9 +14,12 @@ use crate::util::encrypt::nonce_from_user_id;
 
 pub async fn enable_2fa(
     state: ServerState,
-    user_id: UserId,
-    form: &Archived<Enable2FAForm>,
+    auth: Authorization,
+    cmd: &Archived<Enable2FA>,
 ) -> Result<Added2FA, Error> {
+    let user_id = auth.user_id();
+    let form = &cmd.body;
+
     let config = state.config_full();
 
     if !config.shared.password_length.contains(&form.password.len()) {
@@ -90,9 +93,12 @@ pub async fn enable_2fa(
 
 pub async fn confirm_2fa(
     state: ServerState,
-    user_id: UserId,
-    form: &Archived<Confirm2FAForm>,
+    auth: Authorization,
+    cmd: &Archived<Confirm2FA>,
 ) -> Result<(), Error> {
+    let user_id = auth.user_id();
+    let form = &cmd.body;
+
     if form.totp.len() != 6 {
         return Err(Error::TOTPRequired);
     }
@@ -148,7 +154,10 @@ pub async fn confirm_2fa(
     Ok(())
 }
 
-pub async fn remove_2fa(state: ServerState, user_id: UserId, form: &Archived<Remove2FAForm>) -> Result<(), Error> {
+pub async fn remove_2fa(state: ServerState, auth: Authorization, cmd: &Archived<Remove2FA>) -> Result<(), Error> {
+    let user_id = auth.user_id();
+    let form = &cmd.body;
+
     if !state.config().shared.password_length.contains(&form.password.len()) {
         return Err(Error::InvalidCredentials);
     }

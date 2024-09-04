@@ -4,14 +4,16 @@ use thorn::pg::Json;
 
 use crate::{prelude::*, util::encrypted_asset::encrypt_snowflake_opt};
 
-use sdk::api::commands::room::GetMessagesQuery;
+use sdk::api::commands::room::GetMessages;
 
 pub async fn get_many(
     state: ServerState,
     auth: Authorization,
-    room_id: RoomId,
-    form: &Archived<GetMessagesQuery>,
+    cmd: &Archived<GetMessages>,
 ) -> Result<impl Stream<Item = Result<Message, Error>> + '_, Error> {
+    let room_id = cmd.room_id.into();
+    let form = &cmd.body;
+
     let needs_perms = match state.perm_cache.get(auth.user_id(), room_id).await {
         None => true,
         Some(perms) => {
@@ -28,19 +30,24 @@ pub async fn get_many(
         _ => 100,
     };
 
-    let req = GetMsgRequest::Many {
-        user_id: auth.user_id(),
-        room_id,
-        needs_perms,
-        cursor: match form.query.simple_deserialize() {
-            Ok(Some(query)) => query,
-            _ => Cursor::Before(MessageId::max_safe_value()),
+    let cursor = match form.query.simple_deserialize() {
+        Ok(Some(query)) => query,
+        _ => Cursor::Before(MessageId::max_safe_value()),
+    };
+
+    let req = match cursor {
+        Cursor::Exact(msg_id) => GetMsgRequest::Single { msg_id },
+        cursor => GetMsgRequest::Many {
+            user_id: auth.user_id(),
+            room_id,
+            needs_perms,
+            cursor,
+            parent: form.parent.simple_deserialize().expect("Unable to deserialize parent"),
+            limit,
+            pins: form.pinned.as_slice(),
+            starred: form.starred,
+            recurse: form.recurse.min(5) as i16,
         },
-        parent: form.parent.simple_deserialize().expect("Unable to deserialize parent"),
-        limit,
-        pins: form.pinned.as_slice(),
-        starred: form.starred,
-        recurse: form.recurse.min(5) as i16,
     };
 
     let db = state.db.read.get().await?;

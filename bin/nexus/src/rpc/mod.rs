@@ -11,7 +11,7 @@ pub enum SearchMode<'a> {
 }
 
 pub mod user {
-    pub mod user_get;
+    pub mod user_get_user;
     pub mod user_login;
     pub mod user_register;
 
@@ -19,6 +19,7 @@ pub mod user {
         pub mod user_account;
         pub mod user_change_password;
 
+        pub mod user_get_self;
         pub mod user_logout;
         pub mod user_mfa;
         pub mod user_prefs;
@@ -36,6 +37,7 @@ pub mod party {
     pub mod party_create;
     pub mod party_emotes;
     pub mod party_get;
+    pub mod party_member_profile;
     pub mod party_members;
     pub mod party_modify;
     pub mod party_remove;
@@ -110,8 +112,6 @@ pub async fn dispatch<W>(state: ServerState, out: W, cmd: &ArchivedRpcRequest) -
 where
     W: AsyncWrite + Unpin + Send,
 {
-    use crate::rpc::party::{members::MemberMode, rooms::get::RoomScope};
-
     // avoid inlining every async state machine by boxing them inside a lazy future/async block
     macro_rules! c {
         ($([$size:literal])? $first:ident$(::$frag:ident)+($($args:expr),*)) => {
@@ -143,63 +143,63 @@ where
     #[allow(unused_variables)]
     #[rustfmt::skip]
     let running: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> = match proc {
-        Proc::GetServerConfig(form) => todo!("GetServerConfig"),
-        Proc::UserRegister(form) => c!(user::register::register_user(state, addr, &form.body)),
-        Proc::UserLogin(form) => c!(user::me::login::login(state, addr, &form.body)),
-        Proc::UserLogout(_) => c!(user::me::logout::logout_user(state, auth()?)),
-        Proc::Enable2FA(form) => c!(user::me::mfa::enable_2fa(state, auth()?.user_id(), &form.body)),
-        Proc::Confirm2FA(form) => c!(user::me::mfa::confirm_2fa(state, auth()?.user_id(), &form.body)),
-        Proc::Remove2FA(form) => c!(user::me::mfa::remove_2fa(state, auth()?.user_id(), &form.body)),
-        Proc::ChangePassword(form) => todo!("ChangePassword"),
-        Proc::GetSessions(form) => s!(user::me::sessions::list_sessions(state, auth()?)),
-        Proc::ClearSessions(form) => c!(user::me::sessions::clear_other_sessions(state, auth()?)),
-        Proc::GetRelationships(form) => todo!("GetRelationships"),
-        Proc::PatchRelationship(form) => todo!("PatchRelationship"),
-        Proc::UpdateUserProfile(form) => c!(user::me::profile::patch_profile(state, auth()?, None, &form.body)),
-        Proc::GetUser(form) => c!(user::get::get_full_user(state, auth()?, form)),
-        Proc::UpdateUserPrefs(form) => c!(user::me::prefs::update_prefs(state, auth()?, &form.body.inner)),
-        Proc::CreateFile(form) => todo!("CreateFile"),
-        Proc::GetFilesystemStatus(form) => todo!("GetFilesystemStatus"),
-        Proc::GetFileStatus(form) => todo!("GetFileStatus"),
-        Proc::GetInvite(form) => todo!("GetInvite"),
-        Proc::RevokeInvite(form) => todo!("RevokeInvite"),
-        Proc::RedeemInvite(form) => todo!("RedeemInvite"),
-        Proc::CreateParty(form) => c!(party::create::create_party(state, auth()?, &form.body)),
-        Proc::GetParty(form) => c!(party::get::get_party(state, auth()?, form.party_id)),
-        Proc::PatchParty(form) => c!(party::modify::modify_party(state, auth()?, form.party_id, &form.body)),
-        Proc::DeleteParty(form) => todo!("DeleteParty"),
-        Proc::TransferOwnership(form) => todo!("TransferOwnership"),
-        Proc::CreateRole(form) => c!(party::roles::create_role::create_role(state, auth()?, form.party_id, &form.body)),
-        Proc::PatchRole(form) => c!(party::roles::modify_role::modify_role(state, auth()?, form.party_id, form.role_id, &form.body)),
-        Proc::DeleteRole(form) => todo!("DeleteRole"),
-        Proc::GetPartyMembers(form) => s!(party::members::get_many(state, auth()?, form.party_id)),
-        Proc::GetPartyMember(form) => c!(party::members::get_one(state, auth()?.user_id(), form.party_id, form.member_id, MemberMode::Full)),
-        Proc::GetPartyRooms(form) => s!(party::rooms::get::get_rooms(state, auth()?, RoomScope::Party(form.party_id))),
-        Proc::GetPartyInvites(form) => todo!("GetPartyInvites"),
-        Proc::GetMemberProfile(form) => todo!("GetMemberProfile"),
-        Proc::UpdateMemberProfile(form) => c!(user::me::profile::patch_profile(state, auth()?, Some(form.party_id), &form.body.profile)),
-        Proc::CreatePartyInvite(form) => todo!("CreatePartyInvite"),
-        Proc::CreatePinFolder(form) => todo!("CreatePinFolder"),
-        Proc::CreateRoom(form) => c!(party::rooms::create::create_room(state, auth()?, form.party_id, &form.body)),
-        Proc::SearchParty(form) => todo!("SearchParty"),
-        Proc::CreateMessage(form) => c!(room::messages::create_message::create_message(state, auth()?, form.room_id, &form.body)),
-        Proc::EditMessage(form) => c!(room::messages::edit_message::edit_message(state, auth()?, form.room_id, form.msg_id, &form.body)),
-        Proc::GetMessage(form) => todo!("GetMessage"),
-        Proc::DeleteMessage(form) => c!(room::messages::delete_message::delete_msg(state, auth()?, form.room_id, form.msg_id)),
-        Proc::StartTyping(form) => c!(room::start_typing::trigger_typing(state, auth()?, form.room_id, &form.body)),
-        Proc::GetMessages(form) => s!([1024] room::messages::get_messages::get_many(state, auth()?, form.room_id, &form.body)),
-        Proc::PinMessage(form) => todo!("PinMessage"),
-        Proc::UnpinMessage(form) => todo!("UnpinMessage"),
-        Proc::StarMessage(form) => todo!("StarMessage"),
-        Proc::UnstarMessage(form) => todo!("UnstarMessage"),
-        Proc::PutReaction(form) => c!(room::messages::reaction::add_reaction::add_reaction(state, auth()?, form.room_id, form.msg_id, &form.emote_id)),
-        Proc::DeleteOwnReaction(form) => c!(room::messages::reaction::remove_reaction::remove_own_reaction(state, auth()?, form.room_id, form.msg_id, &form.emote_id)),
-        Proc::DeleteUserReaction(form) => todo!("DeleteUserReaction"),
-        Proc::DeleteAllReactions(form) => todo!("DeleteAllReactions"),
-        Proc::GetReactions(form) => todo!("GetReactions"),
-        Proc::PatchRoom(form) => c!(room::modify_room::modify_room(state, auth()?, form.room_id, &form.body)),
-        Proc::DeleteRoom(form) => c!(room::remove_room::remove_room(state, auth()?, form.room_id)),
-        Proc::GetRoom(form) => c!(room::get_room::get_room(state, auth()?, form.room_id)),
+        Proc::GetServerConfig(cmd) => todo!("GetServerConfig"),
+        Proc::UserRegister(cmd) => c!(user::user_register::register_user(state, addr, cmd)),
+        Proc::UserLogin(cmd) => c!(user::user_login::login(state, addr, cmd)),
+        Proc::UserLogout(_) => c!(user::me::user_logout::logout_user(state, auth()?)),
+        Proc::Enable2FA(cmd) => c!(user::me::user_mfa::enable_2fa(state, auth()?, cmd)),
+        Proc::Confirm2FA(cmd) => c!(user::me::user_mfa::confirm_2fa(state, auth()?, cmd)),
+        Proc::Remove2FA(cmd) => c!(user::me::user_mfa::remove_2fa(state, auth()?, cmd)),
+        Proc::ChangePassword(cmd) => todo!("ChangePassword"),
+        Proc::GetSessions(cmd) => s!(user::me::user_sessions::list_sessions(state, auth()?)),
+        Proc::ClearSessions(cmd) => c!(user::me::user_sessions::clear_other_sessions(state, auth()?)),
+        Proc::GetRelationships(cmd) => todo!("GetRelationships"),
+        Proc::PatchRelationship(cmd) => todo!("PatchRelationship"),
+        Proc::UpdateUserProfile(cmd) => c!(user::me::user_profile::patch_user_profile(state, auth()?, cmd)),
+        Proc::GetUser(cmd) => c!(user::user_get_user::get_full_user(state, auth()?, cmd)),
+        Proc::UpdateUserPrefs(cmd) => c!(user::me::user_prefs::update_prefs(state, auth()?, cmd)),
+        Proc::CreateFile(cmd) => todo!("CreateFile"),
+        Proc::GetFilesystemStatus(cmd) => todo!("GetFilesystemStatus"),
+        Proc::GetFileStatus(cmd) => todo!("GetFileStatus"),
+        Proc::GetInvite(cmd) => todo!("GetInvite"),
+        Proc::RevokeInvite(cmd) => todo!("RevokeInvite"),
+        Proc::RedeemInvite(cmd) => todo!("RedeemInvite"),
+        Proc::CreateParty(cmd) => c!(party::party_create::create_party(state, auth()?, cmd)),
+        Proc::GetParty(cmd) => c!(party::party_get::get_party(state, auth()?, cmd)),
+        Proc::PatchParty(cmd) => c!(party::party_modify::modify_party(state, auth()?, cmd)),
+        Proc::DeleteParty(cmd) => todo!("DeleteParty"),
+        Proc::TransferOwnership(cmd) => todo!("TransferOwnership"),
+        Proc::CreateRole(cmd) => c!(party::roles::create_role::create_role(state, auth()?, cmd)),
+        Proc::PatchRole(cmd) => c!(party::roles::modify_role::modify_role(state, auth()?, cmd)),
+        Proc::DeleteRole(cmd) => todo!("DeleteRole"),
+        Proc::GetPartyMembers(cmd) => s!(party::party_members::get_many(state, auth()?, cmd)),
+        Proc::GetPartyMember(cmd) => c!(party::party_members::get_one(state, auth()?, cmd)),
+        Proc::GetPartyRooms(cmd) => s!(party::rooms::get_rooms::get_party_rooms(state, auth()?, cmd)),
+        Proc::GetPartyInvites(cmd) => todo!("GetPartyInvites"),
+        Proc::GetMemberProfile(cmd) => todo!("GetMemberProfile"),
+        Proc::UpdateMemberProfile(cmd) => c!(party::party_member_profile::patch_member_profile(state, auth()?, cmd)),
+        Proc::CreatePartyInvite(cmd) => todo!("CreatePartyInvite"),
+        Proc::CreatePinFolder(cmd) => todo!("CreatePinFolder"),
+        Proc::CreateRoom(cmd) => c!(party::rooms::create_room::create_room(state, auth()?, cmd)),
+        Proc::SearchParty(cmd) => todo!("SearchParty"),
+        Proc::CreateMessage(cmd) => c!(room::messages::create_message::create_message(state, auth()?, cmd)),
+        Proc::EditMessage(cmd) => c!(room::messages::edit_message::edit_message(state, auth()?, cmd)),
+        Proc::GetMessage(cmd) => todo!("GetMessage"),
+        Proc::DeleteMessage(cmd) => c!(room::messages::delete_message::delete_msg(state, auth()?, cmd)),
+        Proc::StartTyping(cmd) => c!(room::start_typing::trigger_typing(state, auth()?, cmd)),
+        Proc::GetMessages(cmd) => s!([1024] room::messages::get_messages::get_many(state, auth()?, cmd)),
+        Proc::PinMessage(cmd) => todo!("PinMessage"),
+        Proc::UnpinMessage(cmd) => todo!("UnpinMessage"),
+        Proc::StarMessage(cmd) => todo!("StarMessage"),
+        Proc::UnstarMessage(cmd) => todo!("UnstarMessage"),
+        Proc::PutReaction(cmd) => c!(room::messages::reactions::add_reaction::add_reaction(state, auth()?, cmd)),
+        Proc::DeleteOwnReaction(cmd) => c!(room::messages::reactions::remove_reaction::remove_own_reaction(state, auth()?, cmd)),
+        Proc::DeleteUserReaction(cmd) => todo!("DeleteUserReaction"),
+        Proc::DeleteAllReactions(cmd) => todo!("DeleteAllReactions"),
+        Proc::GetReactions(cmd) => todo!("GetReactions"),
+        Proc::PatchRoom(cmd) => c!(room::modify_room::modify_room(state, auth()?, cmd)),
+        Proc::DeleteRoom(cmd) => c!(room::remove_room::remove_room(state, auth()?, cmd)),
+        Proc::GetRoom(cmd) => c!(room::get_room::get_room(state, auth()?, cmd)),
     };
 
     running.await

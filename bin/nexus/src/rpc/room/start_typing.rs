@@ -4,7 +4,6 @@ use crate::prelude::*;
 use crate::util::encrypted_asset::encrypt_snowflake_opt;
 
 use sdk::api::commands::all::StartTyping;
-use sdk::api::commands::room::StartTypingBody;
 use sdk::models::gateway::message::ServerMsg;
 
 pub async fn trigger_typing(
@@ -122,7 +121,7 @@ pub async fn trigger_typing(
         parent: cmd.body.parent.simple_deserialize().expect("Unable to deserialize parent"),
     });
 
-    state.gateway.events.send_simple(&ServerEvent::party(party_id, Some(room_id), event)).await;
+    state.gateway.events.send(&ServerEvent::party(party_id, Some(room_id), event)).await?;
 
     Ok(())
 }

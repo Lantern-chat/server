@@ -11,15 +11,13 @@ pub async fn message_delete(
         return Ok(());
     };
 
-    state
-        .gateway
-        .events
-        .send_simple(&ServerEvent::party(
-            party_id,
-            Some(room_id),
-            ServerMsg::new_message_delete(MessageDeleteEvent { id, room_id, party_id }),
-        ))
-        .await;
+    #[rustfmt::skip]
+    state.gateway.events.send(&ServerEvent::party(
+        party_id,
+        Some(room_id),
+        ServerMsg::new_message_delete(MessageDeleteEvent { id, room_id, party_id }),
+    ))
+    .await?;
 
     Ok(())
 }

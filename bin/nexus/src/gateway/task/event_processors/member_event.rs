@@ -63,7 +63,7 @@ pub async fn member_event(
             }))
         }),
         EventCode::MemberJoined | EventCode::MemberUpdated => Either::Right({
-            use crate::rpc::party::party_members::{get_one_anonymous, MemberMode};
+            use crate::internal::get_members::{get_one_anonymous, MemberMode};
             get_one_anonymous(state, db, party_id, user_id, MemberMode::Simple).map_ok(Some)
         }),
         _ => unreachable!(),
@@ -96,21 +96,21 @@ pub async fn member_event(
             };
 
             // Send user the party information
-            state.gateway.events.send_simple(&ServerEvent::user(user_id, None, ServerMsg::new_party_create(party))).await;
+            state.gateway.events.send(&ServerEvent::user(user_id, None, ServerMsg::new_party_create(party))).await?;
 
             ServerMsg::new_member_add(inner)
         }
         EventCode::MemberLeft | EventCode::MemberBan => {
             let inner: Arc<PartyMemberEvent> = Arc::new(inner);
 
-            state.gateway.events.send_simple(&ServerEvent::user(user_id, None, ServerMsg::new_party_delete(party_id))).await;
+            state.gateway.events.send(&ServerEvent::user(user_id, None, ServerMsg::new_party_delete(party_id))).await?;
 
             if event == EventCode::MemberBan {
-                state.gateway.events.send_simple(&ServerEvent::party(
+                state.gateway.events.send(&ServerEvent::party(
                     party_id,
                     None,
                     ServerMsg::new_member_ban(inner.clone()),
-                )).await;
+                )).await?;
             }
 
             ServerMsg::new_member_remove(inner)
@@ -119,7 +119,7 @@ pub async fn member_event(
         _ => unreachable!(),
     };
 
-    state.gateway.events.send_simple(&ServerEvent::party(party_id, None, msg)).await;
+    state.gateway.events.send(&ServerEvent::party(party_id, None, msg)).await?;
 
     Ok(())
 }

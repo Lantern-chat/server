@@ -1,4 +1,5 @@
 use futures::FutureExt;
+use sdk::api::commands::all::CreateMessage;
 
 use crate::{prelude::*, state::permission_cache::PermMute};
 
@@ -14,9 +15,10 @@ use sdk::api::commands::room::CreateMessageBody;
 pub async fn create_message(
     state: ServerState,
     auth: Authorization,
-    room_id: RoomId,
-    body: &Archived<CreateMessageBody>,
+    cmd: &Archived<CreateMessage>,
 ) -> Result<Option<Message>, Error> {
+    let room_id: RoomId = cmd.room_id.into();
+
     // fast-path for if the perm_cache does contain a value, otherwise defer until content is checked
     let perms = match state.perm_cache.get(auth.user_id(), room_id).await {
         Some(PermMute { perms, .. }) => {
@@ -28,6 +30,8 @@ pub async fn create_message(
         }
         None => None,
     };
+
+    let body = &cmd.body;
 
     let trimmed_content = body.content.as_str().trim();
 

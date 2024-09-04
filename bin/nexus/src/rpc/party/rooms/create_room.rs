@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use sdk::api::commands::party::{CreateRoomForm, CreateRoomKind};
+use sdk::api::commands::party::{CreateRoom, CreateRoomKind};
 use sdk::models::*;
 
 use crate::internal::role_overwrites::RawOverwrites;
@@ -8,9 +8,11 @@ use crate::internal::role_overwrites::RawOverwrites;
 pub async fn create_room(
     state: ServerState,
     auth: Authorization,
-    party_id: PartyId,
-    form: &Archived<CreateRoomForm>,
+    cmd: &Archived<CreateRoom>,
 ) -> Result<FullRoom, Error> {
+    let party_id: PartyId = cmd.party_id.into();
+    let form = &cmd.body;
+
     let config = state.config_full();
 
     if matches!(form.topic.as_deref(), Some(topic) if !config.shared.room_topic_length.contains(&topic.len())) {
@@ -120,6 +122,6 @@ pub async fn create_room(
 
     t.commit().await?;
 
-    // should really reuse the db conn, but this api is called so infrequently that I don't care
-    crate::rpc::room::get_room::get_room(state, auth, room_id).await
+    // TODO: should really reuse the db conn, but this api is called so infrequently that I don't care
+    crate::internal::get_rooms::get_room(state, auth, room_id).await
 }

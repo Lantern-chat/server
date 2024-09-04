@@ -1,12 +1,14 @@
 use crate::prelude::*;
-use sdk::models::*;
+use sdk::{api::commands::all::DeleteMessage, models::*};
 
 pub async fn delete_msg(
     state: ServerState,
     auth: Authorization,
-    room_id: RoomId,
-    msg_id: MessageId,
+    cmd: &Archived<DeleteMessage>,
 ) -> Result<(), Error> {
+    let room_id: RoomId = cmd.room_id.into();
+    let msg_id: MessageId = cmd.msg_id.into();
+
     let perms = state.perm_cache.get(auth.user_id(), room_id).await;
 
     if let Some(ref perms) = perms {

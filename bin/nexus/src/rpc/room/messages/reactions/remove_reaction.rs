@@ -1,18 +1,22 @@
 use crate::prelude::*;
 
 use common::emoji::EmoteOrEmojiId;
-use sdk::models::{events::UserReactionEvent, gateway::message::ServerMsg, *};
+use sdk::{
+    api::commands::all::DeleteOwnReaction,
+    models::{events::UserReactionEvent, gateway::message::ServerMsg, *},
+};
 
 pub async fn remove_own_reaction(
     state: ServerState,
     auth: Authorization,
-    room_id: RoomId,
-    msg_id: MessageId,
-    emote: &Archived<EmoteOrEmoji>,
+    cmd: &Archived<DeleteOwnReaction>,
 ) -> Result<(), Error> {
-    let Some(emote) = state.emoji.resolve_archived(emote) else {
+    let Some(emote) = state.emoji.resolve_archived(&cmd.emote_id) else {
         return Err(Error::BadRequest);
     };
+
+    let room_id: RoomId = cmd.room_id.into();
+    let msg_id: MessageId = cmd.msg_id.into();
 
     let perms = state.perm_cache.get(auth.user_id(), room_id).await;
 
@@ -87,14 +91,14 @@ pub async fn remove_own_reaction(
     };
 
     #[rustfmt::skip]
-    state.gateway.events.send_simple(&ServerEvent::party(party_id, Some(room_id), ServerMsg::new_message_reaction_remove(UserReactionEvent {
+    state.gateway.events.send(&ServerEvent::party(party_id, Some(room_id), ServerMsg::new_message_reaction_remove(UserReactionEvent {
         emote,
         msg_id,
         room_id,
         party_id,
         user_id: auth.user_id(),
         member: None,
-    }))).await;
+    }))).await?;
 
     Ok(())
 }

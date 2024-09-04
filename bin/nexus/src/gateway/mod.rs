@@ -13,8 +13,8 @@ use triomphe::Arc;
 
 use framed::tokio::AsyncFramedWriter;
 use rkyv::{
-    ser::{serializers::AllocSerializer, Serializer},
-    AlignedVec, Archive, Serialize,
+    api::high::HighSerializer, rancor::Error as RancorError, ser::allocator::ArenaHandle, util::AlignedVec,
+    Serialize,
 };
 
 use quinn::{Connection, ConnectionError, RecvStream, SendStream, VarInt};
@@ -63,33 +63,24 @@ impl EventQueue {
             .take(EVENT_BATCH_SIZE).map(|(&k, v)| (k, v.clone())).collect()
     }
 
-    pub async fn send_simple<T>(&self, event: &T)
+    pub async fn send<T>(&self, event: &T) -> Result<(), Error>
     where
-        T: Archive + Serialize<AllocSerializer<512>>,
+        T: for<'a> Serialize<HighSerializer<'a, AlignedVec, ArenaHandle<'a>, RancorError>>,
     {
-        self.send::<T, 512>(event).await
-    }
-
-    pub async fn send<T, const N: usize>(&self, event: &T)
-    where
-        T: Archive + Serialize<AllocSerializer<N>>,
-    {
-        let mut serializer = AllocSerializer::<N>::default();
-
-        if let Err(e) = serializer.serialize_value(event) {
-            log::error!("Rkyv Encoding Error: {e}");
-        }
+        let event = match rkyv::to_bytes(event) {
+            Ok(event) => event,
+            Err(e) => {
+                log::error!("Rkyv Encoding Error: {e}");
+                return Err(Error::RkyvEncodingError);
+            }
+        };
 
         // TODO: Compression?
-        _ = self
-            .queue
-            .insert_async(
-                self.counter.fetch_add(1, Ordering::SeqCst),
-                Arc::new(serializer.into_serializer().into_inner()),
-            )
-            .await;
+        _ = self.queue.insert_async(self.counter.fetch_add(1, Ordering::SeqCst), Arc::new(event)).await;
 
         self.notify.notify_waiters();
+
+        Ok(())
     }
 }
 
@@ -172,7 +163,7 @@ impl RpcConnection {
         let mut stream = ::rpc::stream::RpcRecvReader::new(recv);
 
         match stream.recv::<Result<::rpc::request::RpcRequest, ApiError>>().await? {
-            Some(ArchivedResult::Ok(msg)) => return self::rpc::dispatch(state, send, msg).await,
+            Some(ArchivedResult::Ok(msg)) => return crate::rpc::dispatch(state, send, msg).await,
             Some(ArchivedResult::Err(e)) => log::warn!("Received error from gateway via RPC: {:?}", e.code()),
             None => log::warn!("Empty message from gateway"),
         }

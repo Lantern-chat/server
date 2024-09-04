@@ -90,9 +90,7 @@ pub async fn profile_updated(
             let event = ServerMsg::new_profile_update(ProfileUpdateEvent { party_id, user });
 
             match party_id {
-                Some(party_id) => {
-                    state.gateway.events.send_simple(&ServerEvent::party(party_id, None, event)).await
-                }
+                Some(party_id) => state.gateway.events.send(&ServerEvent::party(party_id, None, event)).await?,
                 None => log::error!("Unimplemented profile event"),
             }
         }

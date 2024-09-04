@@ -2,12 +2,12 @@ use futures::TryStreamExt;
 
 use crate::{prelude::*, rpc::SearchMode, util::encrypted_asset::encrypt_snowflake_opt};
 
-use sdk::models::*;
+use sdk::{api::commands::all::GetParty, models::*};
 
-pub async fn get_party(state: ServerState, auth: Authorization, party_id: PartyId) -> Result<Party, Error> {
+pub async fn get_party(state: ServerState, auth: Authorization, cmd: &Archived<GetParty>) -> Result<Party, Error> {
     let db = state.db.read.get().await?;
 
-    get_party_inner(state, &db, auth.user_id(), party_id).await
+    get_party_inner(state, &db, auth.user_id(), cmd.party_id.into()).await
 }
 
 pub async fn get_party_inner(

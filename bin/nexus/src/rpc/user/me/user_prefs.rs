@@ -1,13 +1,13 @@
 use crate::prelude::*;
-use sdk::models::UserPreferences;
+use sdk::{api::commands::all::UpdateUserPrefs, models::UserPreferences};
 use thorn::pg::Json;
 
 pub async fn update_prefs(
     state: ServerState,
     auth: Authorization,
-    prefs: &Archived<UserPreferences>,
+    cmd: &Archived<UpdateUserPrefs>,
 ) -> Result<(), Error> {
-    let mut prefs: UserPreferences = prefs.full_deserialize().expect("Unable to deserialize prefs");
+    let mut prefs: UserPreferences = cmd.body.inner.full_deserialize().expect("Unable to deserialize prefs");
 
     prefs.clean();
 

@@ -2,19 +2,19 @@ use crate::prelude::*;
 
 use sdk::models::*;
 
-use sdk::api::commands::all::UpdateUserProfile;
+use sdk::api::commands::all::UpdateMemberProfile;
 
-pub async fn patch_user_profile(
+pub async fn patch_member_profile(
     state: ServerState,
     auth: Authorization,
-    cmd: &Archived<UpdateUserProfile>,
+    cmd: &Archived<UpdateMemberProfile>,
 ) -> Result<UserProfile, Error> {
-    let profile = &cmd.body;
+    let profile = &cmd.body.profile;
 
     crate::internal::user_profile::patch_profile(
         state,
         auth.user_id(),
-        None,
+        Some(cmd.party_id.into()),
         crate::internal::user_profile::PatchProfile {
             bits: profile.bits.to_native_truncate(),
             extra: profile.extra.to_native_truncate(),

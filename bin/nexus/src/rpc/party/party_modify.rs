@@ -9,7 +9,7 @@ pub async fn modify_party(
     auth: Authorization,
     cmd: &Archived<PatchParty>,
 ) -> Result<Party, Error> {
-    let party_id = cmd.party_id.into();
+    let party_id: PartyId = cmd.party_id.into();
     let form = &cmd.body;
 
     if *form == PatchPartyForm::default() {
@@ -124,5 +124,5 @@ pub async fn modify_party(
 
     t.commit().await?;
 
-    super::party_get::get_party(state, auth, party_id).await
+    super::party_get::get_party_inner(state, &db, auth.user_id(), party_id).await
 }
