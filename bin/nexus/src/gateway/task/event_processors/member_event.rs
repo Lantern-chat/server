@@ -62,16 +62,10 @@ pub async fn member_event(
                 flags: PartyMemberFlags::empty(),
             }))
         }),
-        EventCode::MemberJoined | EventCode::MemberUpdated => Either::Right(
-            crate::api::party::members::get_one_anonymous(
-                state,
-                db,
-                party_id,
-                user_id,
-                crate::api::party::members::MemberMode::Simple,
-            )
-            .map_ok(Some),
-        ),
+        EventCode::MemberJoined | EventCode::MemberUpdated => Either::Right({
+            use crate::rpc::party::party_members::{get_one_anonymous, MemberMode};
+            get_one_anonymous(state, db, party_id, user_id, MemberMode::Simple).map_ok(Some)
+        }),
         _ => unreachable!(),
     };
 
@@ -81,7 +75,7 @@ pub async fn member_event(
             return Ok(None);
         }
 
-        crate::api::party::get::get_party_inner(state.clone(), db, user_id, party_id).await.map(Some)
+        crate::rpc::party::party_get::get_party_inner(state.clone(), db, user_id, party_id).await.map(Some)
     };
 
     let (member, party): (Option<PartyMember>, _) = tokio::try_join!(member_future, party_future)?;

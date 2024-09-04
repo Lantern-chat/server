@@ -8,13 +8,14 @@ extern crate serde;
 extern crate tracing as log;
 
 pub mod allocator;
-pub mod api;
 pub mod asset;
 pub mod cli;
 pub mod config;
 pub mod error;
 pub mod gateway;
+pub mod internal;
 pub mod queues;
+pub mod rpc;
 pub mod services;
 pub mod state;
 pub mod tasks;
@@ -52,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
         unimplemented!()
     }
 
-    _ = gateway::rpc::dispatch(get(), tokio::io::empty(), get()).await;
+    _ = rpc::dispatch(get(), tokio::io::empty(), get()).await;
 
     Ok(())
 }

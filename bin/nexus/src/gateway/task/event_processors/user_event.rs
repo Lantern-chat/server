@@ -99,7 +99,7 @@ pub async fn self_update(
         return party_position_update(state, db, user_id, party_id).await;
     }
 
-    let user = crate::api::user::me::get::get_full_self(state, user_id).await?;
+    let user = crate::rpc::user::user_get::get_full_self(state, user_id).await?;
 
     #[rustfmt::skip]
     state.gateway.events.send_simple(&ServerEvent::user(user_id, None, ServerMsg::new_user_update(user))).await;

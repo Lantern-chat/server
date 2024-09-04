@@ -19,7 +19,6 @@ use rkyv::{
 
 use quinn::{Connection, ConnectionError, RecvStream, SendStream, VarInt};
 
-pub mod rpc;
 pub mod task;
 
 #[derive(Clone)]
