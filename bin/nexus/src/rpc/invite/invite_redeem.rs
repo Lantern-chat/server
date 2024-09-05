@@ -22,7 +22,7 @@ pub async fn redeem_invite(
     let code = &cmd.code;
     let body = &cmd.body;
 
-    let maybe_id = crate::util::encrypted_asset::decrypt_snowflake(&state, &code);
+    let maybe_id = crate::util::encrypted_asset::decrypt_snowflake(&state, code);
 
     let mut db = state.db.write.get().await?;
 

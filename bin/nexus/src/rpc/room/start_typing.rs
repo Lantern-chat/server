@@ -118,7 +118,7 @@ pub async fn trigger_typing(
         room_id,
         user_id: auth.user_id(),
         member,
-        parent: cmd.body.parent.simple_deserialize().expect("Unable to deserialize parent"),
+        parent: cmd.body.parent.deserialize_simple().expect("Unable to deserialize parent"),
     });
 
     state.gateway.events.send(&ServerEvent::party(party_id, Some(room_id), event)).await?;

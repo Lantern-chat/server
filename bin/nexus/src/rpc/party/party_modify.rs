@@ -78,8 +78,13 @@ pub async fn modify_party(
         }
 
         tokio::try_join!(
-            maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), new_avatar.map(Into::into)),
-            maybe_add_asset(&state, AssetMode::Banner, auth.user_id(), new_banner.map(Into::into)),
+            maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), new_avatar.map_into()),
+            maybe_add_asset(
+                &state,
+                AssetMode::Banner(form.banner_align),
+                auth.user_id(),
+                new_banner.map_into()
+            ),
         )?
     };
 

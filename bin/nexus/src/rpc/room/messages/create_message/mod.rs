@@ -165,7 +165,7 @@ pub(crate) async fn insert_message(
         }
     }
 
-    let msg = super::get_messages::get_one(state, &t, msg_id).await?;
+    let msg = crate::internal::get_messages::get_one(state, &t, msg_id).await?;
 
     t.commit().await?;
 

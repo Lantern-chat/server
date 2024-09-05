@@ -63,7 +63,7 @@ pub async fn get_members_inner(
                 AggMembersFull.AvatarId             AS @AvatarId,
                 AggMembersFull.CustomStatus         AS @CustomStatus,
                 AggMembersFull.RoleIds              AS @RoleIds,
-                AggMembersFull.PresenceActivity     AS @PresenceActivity,
+                //AggMembersFull.PresenceActivity     AS @PresenceActivity,
 
                 // AggRelationships is not included if None
                 match user_id {

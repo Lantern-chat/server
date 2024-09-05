@@ -1,7 +1,7 @@
 use super::prelude::*;
 
 pub async fn message_update(state: &ServerState, db: &db::Client, id: MessageId) -> Result<(), Error> {
-    let msg = crate::rpc::room::messages::get_messages::get_one(state.clone(), db, id).await?;
+    let msg = crate::internal::get_messages::get_one(state.clone(), db, id).await?;
 
     #[rustfmt::skip]
     state.gateway.events.send(&ServerEvent::party(

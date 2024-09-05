@@ -1,6 +1,9 @@
 use crate::prelude::*;
 
-use sdk::models::*;
+use sdk::{
+    api::commands::all::{ArchivedUpdateUserProfileBody, BannerAlign},
+    models::*,
+};
 
 use crate::{
     asset::{maybe_add_asset, AssetMode},
@@ -16,6 +19,34 @@ pub struct PatchProfile<'a> {
     pub bio: Nullable<&'a str>,
     pub avatar: Nullable<FileId>,
     pub banner: Nullable<FileId>,
+    pub banner_align: BannerAlign,
+}
+
+impl<'a> From<&'a ArchivedUpdateUserProfileBody> for PatchProfile<'a> {
+    fn from(profile: &'a ArchivedUpdateUserProfileBody) -> PatchProfile<'a> {
+        // destructured to ensure all fields are present
+        let ArchivedUpdateUserProfileBody {
+            bits,
+            extra,
+            nick,
+            avatar,
+            banner,
+            banner_align,
+            status,
+            bio,
+        } = profile;
+
+        PatchProfile {
+            bits: bits.to_native_truncate(),
+            extra: extra.to_native_truncate(),
+            nick: nick.as_ref().map(|s| s.as_str()),
+            status: status.as_ref().map(|s| s.as_str()),
+            bio: bio.as_ref().map(|s| s.as_str()),
+            avatar: avatar.map_into(),
+            banner: banner.map_into(),
+            banner_align: *banner_align,
+        }
+    }
 }
 
 pub async fn patch_profile(
@@ -27,11 +58,11 @@ pub async fn patch_profile(
     {
         // TODO: Better errors here
         let config = state.config();
-        if matches!(profile.status, Nullable::Some(ref status) if status.len() > config.shared.max_status_length) {
+        if matches!(profile.status, Nullable::Some(status) if status.len() > config.shared.max_status_length) {
             return Err(Error::BadRequest);
         }
 
-        if matches!(profile.bio, Nullable::Some(ref bio) if bio.len() > config.shared.max_bio_length) {
+        if matches!(profile.bio, Nullable::Some(bio) if bio.len() > config.shared.max_bio_length) {
             return Err(Error::BadRequest);
         }
     }
@@ -105,7 +136,7 @@ pub async fn patch_profile(
 
         tokio::try_join!(
             maybe_add_asset(&state, AssetMode::Avatar, user_id, new_avatar),
-            maybe_add_asset(&state, AssetMode::Banner, user_id, new_banner),
+            maybe_add_asset(&state, AssetMode::Banner(profile.banner_align), user_id, new_banner),
         )?
     };
 
@@ -138,9 +169,9 @@ pub async fn patch_profile(
     Ok(UserProfile {
         bits: profile.bits,
         extra: Default::default(),
-        nick: profile.nick.map(From::from),
-        status: profile.status.map(From::from),
-        bio: profile.bio.map(From::from),
+        nick: profile.nick.map_into(),
+        status: profile.status.map_into(),
+        bio: profile.bio.map_into(),
         avatar: avatar_id.map(|id| encrypt_snowflake(&state, id)),
         banner: banner_id.map(|id| encrypt_snowflake(&state, id)),
     })

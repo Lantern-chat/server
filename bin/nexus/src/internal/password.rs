@@ -51,7 +51,7 @@ pub async fn hash_password(state: &ServerState, password: &str) -> Result<String
         use rand::Rng;
 
         let salt: [u8; 16] = util::rng::crypto_thread_rng().gen();
-        let res = argon2::hash_encoded(password.as_bytes(), &salt, &*HASH_CONFIG);
+        let res = argon2::hash_encoded(password.as_bytes(), &salt, &HASH_CONFIG);
 
         res
     });

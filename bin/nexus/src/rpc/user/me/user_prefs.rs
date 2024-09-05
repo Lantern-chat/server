@@ -7,7 +7,7 @@ pub async fn update_prefs(
     auth: Authorization,
     cmd: &Archived<UpdateUserPrefs>,
 ) -> Result<(), Error> {
-    let mut prefs: UserPreferences = cmd.body.inner.full_deserialize().expect("Unable to deserialize prefs");
+    let mut prefs: UserPreferences = cmd.body.inner.deserialize_full().expect("Unable to deserialize prefs");
 
     prefs.clean();
 

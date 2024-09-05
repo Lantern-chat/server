@@ -38,7 +38,7 @@ pub async fn create_party(
             name: SmolStr::from(&*form.name),
             description: form.description.as_deref().map(SmolStr::from),
         },
-        flags: form.flags.simple_deserialize().expect("Unable to deserialize party flags"),
+        flags: form.flags.deserialize_simple().expect("Unable to deserialize party flags"),
         avatar: None,
         banner: Nullable::Null,
         default_room: room_id,

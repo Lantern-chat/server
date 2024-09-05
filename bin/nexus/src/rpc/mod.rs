@@ -133,7 +133,7 @@ where
     // prepare fields
     let addr = addr.as_socket_addr();
     let auth = || match auth.as_ref() {
-        Some(auth) => Ok(auth.simple_deserialize().expect("Unable to deserialize auth")),
+        Some(auth) => Ok(auth.deserialize_simple().expect("Unable to deserialize auth")),
         None => Err(Error::Unauthorized),
     };
 

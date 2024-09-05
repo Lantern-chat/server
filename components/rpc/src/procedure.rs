@@ -164,7 +164,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use rkyv::{access, rancor::Error as RancorError, Deserialize};
+    use rkyv::{access, rancor::Error as RancorError, Archived, Deserialize};
 
     use super::*;
 

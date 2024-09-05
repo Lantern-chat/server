@@ -60,7 +60,7 @@ pub async fn create_room(
         CreateRoomKind::UserForum => RoomFlags::from(RoomKind::UserForum),
     };
 
-    let raw = RawOverwrites::new(form.overwrites.simple_deserialize().expect("Unable to deserialize overwrites"));
+    let raw = RawOverwrites::new(form.overwrites.deserialize_simple().expect("Unable to deserialize overwrites"));
     let room_id = state.sf.gen();
 
     let mut db = state.db.write.get().await?;

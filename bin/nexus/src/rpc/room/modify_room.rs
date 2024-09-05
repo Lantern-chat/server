@@ -83,11 +83,11 @@ pub async fn modify_room(
             break 'avatar Nullable::Undefined;
         }
 
-        maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), form.avatar.map(Into::into)).await?
+        maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), form.avatar.map_into()).await?
     };
 
     let overwrites: ThinVec<Overwrite> =
-        form.overwrites.simple_deserialize().expect("Unable to deserialize overwrites");
+        form.overwrites.deserialize_simple().expect("Unable to deserialize overwrites");
 
     let mut remove_overwrites: HashSet<Snowflake> =
         HashSet::from_iter(form.remove_overwrites.as_slice().iter().copied().map(From::from));

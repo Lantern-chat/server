@@ -22,7 +22,7 @@ pub struct ModifyAccountForm {
 pub async fn modify_account(
     state: ServerState,
     auth: Authorization,
-    mut form: ModifyAccountForm,
+    form: ModifyAccountForm,
 ) -> Result<(), Error> {
     let mut num_fields = 0;
 
