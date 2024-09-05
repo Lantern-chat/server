@@ -16,7 +16,11 @@ pub struct Counter(AtomicU64);
 pub struct PaddedCounter(CachePadded<Counter>);
 
 pub struct LatencyHistogram {
-    h: [u64; 1000],
+    /// 1024 buckets for latency histogram. `LatencyHistogram` has to be 128-bit aligned
+    /// on x86 and aarch64 anyway so fill the rest of the space with counters,
+    /// even if it'll look weird to have up to 1024ms latency. On platforms
+    /// with smaller alignment requirements, whatever.
+    h: [Counter; 1024],
     c: PaddedCounter,
 }
 
@@ -68,18 +72,11 @@ impl PaddedCounter {
     }
 }
 
-impl AsRef<[Counter]> for LatencyHistogram {
-    #[inline(always)]
-    fn as_ref(&self) -> &[Counter] {
-        unsafe { core::mem::transmute::<&[u64], &[Counter]>(self.h.as_ref()) }
-    }
-}
-
 impl LatencyHistogram {
     #[inline]
     pub const fn new() -> Self {
         LatencyHistogram {
-            h: [0u64; 1000],
+            h: [const { Counter::new() }; 1024],
             c: PaddedCounter::new(),
         }
     }
@@ -92,13 +89,13 @@ impl LatencyHistogram {
     #[inline]
     pub fn add(&self, ms: usize) {
         self.c.add(1);
-        unsafe { self.as_ref().get_unchecked(ms.min(999)).add(1) };
+        self.h[ms.min(1023)].add(1);
     }
 
     // compute latency percentiles `[0.5, 0.95, 0.99]`
     pub fn percentiles(&self) -> (u64, [u16; 3]) {
         let count = self.count();
-        let histogram = self.as_ref();
+        let histogram = &self.h;
 
         let countf = count as f64;
 
