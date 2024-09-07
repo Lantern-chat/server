@@ -110,7 +110,7 @@ pub struct CacheEntry {
 
 #[derive(Default)]
 pub struct MainFileCache {
-    map: scc::HashMap<PathBuf, CacheEntry, ahash::RandomState>,
+    map: scc::HashMap<PathBuf, CacheEntry, sdk::FxRandomState2>,
 }
 
 impl MainFileCache {

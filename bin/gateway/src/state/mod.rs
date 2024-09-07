@@ -23,7 +23,7 @@ pub struct InnerServerState {
     pub session_cache: session_cache::AuthCache,
     pub rate_limit: RateLimitTable,
     pub file_cache: MainFileCache,
-    pub hasher: ahash::RandomState,
+    pub hasher: sdk::FxRandomState2,
     pub emoji: common::emoji::EmojiMap,
 
     pub rpc: rpc::client::RpcManager,

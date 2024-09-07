@@ -19,8 +19,8 @@ struct PartialBotAuthorization {
 
 #[derive(Default)]
 pub struct AuthCache {
-    users: scc::HashIndex<UserToken, PartialUserAuthorization, ahash::RandomState>,
-    bots: scc::HashIndex<UserId, PartialBotAuthorization, ahash::RandomState>,
+    users: scc::HashIndex<UserToken, PartialUserAuthorization, sdk::FxRandomState2>,
+    bots: scc::HashIndex<UserId, PartialBotAuthorization, sdk::FxRandomState2>,
 }
 
 impl AuthCache {

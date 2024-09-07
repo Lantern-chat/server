@@ -22,4 +22,3 @@ tracing.workspace = true
 smallvec = "1"
 indexmap = "2"
 scc = "2"
-ahash = "0.8"

@@ -20,8 +20,8 @@ pub struct EmojiEntry {
 
 #[derive(Debug, Default, Clone)]
 struct EmojiMapInner {
-    emoji_to_id: HashMap<SmolStr, i32>,
-    id_to_entry: HashMap<i32, EmojiEntry>,
+    emoji_to_id: HashMap<SmolStr, i32, sdk::FxRandomState2>,
+    id_to_entry: HashMap<i32, EmojiEntry, sdk::FxRandomState2>,
 }
 
 #[derive(Debug, Default)]

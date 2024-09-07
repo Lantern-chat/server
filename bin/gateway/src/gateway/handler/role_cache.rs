@@ -4,7 +4,7 @@ use crate::prelude::*;
 
 #[derive(Default)]
 pub struct RoleCache {
-    roles: HashSet<(PartyId, RoleId), ahash::RandomState>,
+    roles: HashSet<(PartyId, RoleId), sdk::FxRandomState2>,
 }
 
 impl RoleCache {

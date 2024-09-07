@@ -58,7 +58,6 @@ hashbrown.workspace = true
 triomphe = "0.1.8"
 aho-corasick = "1"
 scc = "2"
-ahash = "0.8.0"
 arc-swap = "1.2.0"
 num_cpus = "1.13"
 aes = "0.8"

@@ -89,7 +89,7 @@ pub async fn modify_room(
     let overwrites: ThinVec<Overwrite> =
         form.overwrites.deserialize_simple().expect("Unable to deserialize overwrites");
 
-    let mut remove_overwrites: HashSet<Snowflake> =
+    let mut remove_overwrites: HashSet<Snowflake, sdk::FxRandomState2> =
         HashSet::from_iter(form.remove_overwrites.as_slice().iter().copied().map(From::from));
 
     // unique + avoiding conflicts

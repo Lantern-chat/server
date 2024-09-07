@@ -63,7 +63,7 @@ lazy_static::lazy_static! {
     pub static ref INVALID_SESSION: Event = Event::new_compressed(ServerMsg::new_invalid_session(), None, 10).unwrap();
 }
 
-type ListenerTable = HashMap<Snowflake, AbortHandle>;
+type ListenerTable = HashMap<Snowflake, AbortHandle, sdk::FxRandomState2>;
 
 pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, addr: IpAddr, state: ServerState) {
     tokio::spawn(client_connection(ws, query, addr, state));

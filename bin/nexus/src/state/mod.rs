@@ -37,12 +37,12 @@ pub struct ServerStateInner {
     // /// Generic lock for anything with a Snowflake ID
     // pub id_lock: id_lock::IdLockMap,
     ///
-    pub hasher: ahash::RandomState,
+    pub hasher: sdk::FxRandomState2,
 
     pub emoji: EmojiMap,
 
     /// Last timestep used for MFA per-user.
-    pub mfa_last: scc::HashIndex<UserId, u64, ahash::RandomState>,
+    pub mfa_last: scc::HashIndex<UserId, u64, sdk::FxRandomState2>,
 }
 
 #[derive(Clone)]

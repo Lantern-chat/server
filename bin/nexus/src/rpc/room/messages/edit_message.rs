@@ -131,8 +131,9 @@ pub async fn edit_message(
         }
 
         // attachments may be unordered, so a Set is required
-        let pre_set: HashSet<FileId> = HashSet::from_iter(prev_files.unwrap_or_default());
-        let new_set: HashSet<FileId> = HashSet::from_iter(body.attachments.as_slice().iter().map(|s| (*s).into()));
+        let pre_set: HashSet<FileId, sdk::FxRandomState2> = HashSet::from_iter(prev_files.unwrap_or_default());
+        let new_set: HashSet<FileId, sdk::FxRandomState2> =
+            HashSet::from_iter(body.attachments.as_slice().iter().map(|s| (*s).into()));
 
         // if the sets are identical, skip the attachment processing
         if pre_set == new_set {

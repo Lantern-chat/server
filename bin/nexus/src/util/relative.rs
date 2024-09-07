@@ -9,6 +9,8 @@ pub fn approximate_relative_time(
     ts: Option<Timestamp>,
     now: Option<Timestamp>,
 ) -> Option<u64> {
+    use core::hash::BuildHasher;
+
     let ts = ts?;
 
     let elapsed = now.unwrap_or_else(Timestamp::now_utc).duration_since(ts);

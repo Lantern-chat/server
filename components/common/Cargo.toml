@@ -10,7 +10,6 @@ sdk = { workspace = true, default-features = false, features = ["rkyv"] }
 emoji.workspace = true
 
 scc.workspace = true
-ahash.workspace = true
 tracing.workspace = true
 tracing-futures.workspace = true
 tracing-subscriber.workspace = true

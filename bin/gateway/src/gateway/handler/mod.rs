@@ -45,11 +45,11 @@ pub struct ConnectionState {
     /// for each party that is being listened on, keep the associated cancel handle, to kill the stream if we unsub from them
     pub listener_table: listener_table::ListenerTable,
     /// Contains a list of user ids that have blocked the current user of this connection
-    pub blocked_by: HashSet<UserId>,
+    pub blocked_by: HashSet<UserId, sdk::FxRandomState2>,
     pub roles: role_cache::RoleCache,
     pub user_id: Option<UserId>,
     pub intent: sdk::models::Intent,
-    pub perm_cache: HashMap<RoomId, Permissions>,
+    pub perm_cache: HashMap<RoomId, Permissions, sdk::FxRandomState2>,
 }
 
 impl ConnectionState {

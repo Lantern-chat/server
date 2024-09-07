@@ -88,7 +88,7 @@ pub async fn ready(state: ServerState, conn_id: ConnectionId, auth: Authorizatio
             WHERE PartyMembers.UserId = #{auth.user_id_ref() as Users::Id}
         }).await?;
 
-        let mut parties = HashMap::with_capacity(rows.len());
+        let mut parties = HashMap::<_, sdk::FxRandomState2>::with_capacity(rows.len());
         let mut ids = Vec::with_capacity(rows.len());
 
         for row in rows {

@@ -82,15 +82,15 @@ use conn::GatewayConnection;
 #[derive(Default)]
 pub struct Gateway {
     /// per-party emitters that can be subscribed to
-    pub parties: scc::HashIndex<PartyId, GenericEmitter, ahash::RandomState>,
+    pub parties: scc::HashIndex<PartyId, GenericEmitter, sdk::FxRandomState2>,
     /// per-room emitters that can be subscribed to
-    pub rooms: scc::HashIndex<RoomId, GenericEmitter, ahash::RandomState>,
+    pub rooms: scc::HashIndex<RoomId, GenericEmitter, sdk::FxRandomState2>,
 
     /// All gateway connections, even unidentified
-    pub conns: scc::HashIndex<ConnectionId, GatewayConnection, ahash::RandomState>,
+    pub conns: scc::HashIndex<ConnectionId, GatewayConnection, sdk::FxRandomState2>,
 
     /// Identified gateway connections that can targetted by UserId
-    pub users: scc::HashMap<UserId, HashMap<ConnectionId, GatewayConnection>, ahash::RandomState>,
+    pub users: scc::HashMap<UserId, HashMap<ConnectionId, GatewayConnection>, sdk::FxRandomState2>,
 
     /// Tracks connection heartbeats using a monotonic clock
     pub heart: Arc<Heart>,

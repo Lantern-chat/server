@@ -1,33 +1,9 @@
-use std::{
-    hash::BuildHasher,
-    sync::atomic::{AtomicIsize, Ordering},
-};
-
-use triomphe::Arc;
+use std::sync::atomic::{AtomicIsize, Ordering};
 
 use hashbrown::HashMap;
 
-/// Because the permission cache is a nested hashmap, we may as well share hashers.
-#[derive(Default, Clone)]
-#[repr(transparent)]
-struct SharedBuildHasher<S: BuildHasher>(Arc<S>);
-
-impl<S: BuildHasher> BuildHasher for SharedBuildHasher<S> {
-    type Hasher = <S as BuildHasher>::Hasher;
-
-    fn build_hasher(&self) -> Self::Hasher {
-        self.0.build_hasher()
-    }
-}
-
 use schema::flags::RoomMemberFlags;
-use sdk::models::{Permissions, Snowflake};
-
-type UserId = Snowflake;
-type RoomId = Snowflake;
-
-#[allow(clippy::upper_case_acronyms)]
-type SHB = SharedBuildHasher<ahash::RandomState>;
+use sdk::models::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PermMute {
@@ -45,24 +21,22 @@ impl std::ops::Deref for PermMute {
 }
 
 struct UserCache {
-    room: HashMap<RoomId, PermMute, SHB>,
+    room: HashMap<RoomId, PermMute, sdk::FxRandomState2>,
     rc: AtomicIsize,
 }
 
-pub struct PermissionCache {
-    map: scc::HashMap<UserId, UserCache, SHB>,
-    hb: SHB,
-}
-
-impl Default for PermissionCache {
+impl Default for UserCache {
     fn default() -> Self {
-        let hb = SharedBuildHasher(Arc::new(ahash::RandomState::default()));
-
-        PermissionCache {
-            map: scc::HashMap::with_hasher(hb.clone()),
-            hb,
+        Self {
+            room: HashMap::default(),
+            rc: AtomicIsize::new(1),
         }
     }
+}
+
+#[derive(Default)]
+pub struct PermissionCache {
+    map: scc::HashMap<UserId, UserCache, sdk::FxRandomState2>,
 }
 
 impl PermissionCache {
@@ -85,10 +59,7 @@ impl PermissionCache {
     }
 
     async fn with_cache_mut<U>(&self, user_id: UserId, f: impl FnOnce(&mut UserCache) -> U) -> U {
-        let mut entry = self.map.entry_async(user_id).await.or_insert_with(|| UserCache {
-            room: HashMap::with_hasher(self.hb.clone()),
-            rc: AtomicIsize::new(1), // initialize with one reference
-        });
+        let mut entry = self.map.entry_async(user_id).await.or_default();
 
         f(entry.get_mut())
     }

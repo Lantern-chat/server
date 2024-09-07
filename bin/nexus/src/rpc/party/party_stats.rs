@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::prelude::*;
 use sdk::models::*;
 
@@ -84,7 +82,7 @@ pub async fn get_stats(
         GROUP BY Messages.RoomId
     }).await?;
 
-    let mut rooms = HashMap::default();
+    let mut rooms = hashbrown::HashMap::default();
 
     for row in rows {
         rooms.insert(

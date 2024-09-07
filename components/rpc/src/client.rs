@@ -128,13 +128,13 @@ pub struct RpcManager {
     nexus: RpcClient,
 
     /// All configured clients, excluding the nexus.
-    clients: scc::HashSet<RpcClient, ahash::RandomState>,
+    clients: scc::HashSet<RpcClient, sdk::FxRandomState2>,
     /// Faction clients, with party_id as the key.
     ///
     /// There will be a unique entry for the faction server using its own faction_id.
-    factions: scc::HashIndex<Snowflake, RpcClient, ahash::RandomState>,
+    factions: scc::HashIndex<Snowflake, RpcClient, sdk::FxRandomState2>,
     /// Room to party association.
-    rooms: scc::HashIndex<Snowflake, Snowflake, ahash::RandomState>,
+    rooms: scc::HashIndex<Snowflake, Snowflake, sdk::FxRandomState2>,
 }
 
 use crate::request::{PartyInfo, RpcRequest};

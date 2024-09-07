@@ -88,9 +88,9 @@ pub struct Gateway {
     pub events: EventQueue,
 
     /// RPC Connections
-    pub rpcs: scc::HashIndex<ConnectionId, RpcConnection>,
+    pub rpcs: scc::HashIndex<ConnectionId, RpcConnection, sdk::FxRandomState2>,
     /// Gateway Stream Connections
-    pub gateways: scc::HashIndex<ConnectionId, GatewayConnection>,
+    pub gateways: scc::HashIndex<ConnectionId, GatewayConnection, sdk::FxRandomState2>,
 
     /// Triggered by the database listener in the listener task
     pub notifier: Notify,

@@ -37,8 +37,8 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
         let mut sleep = std::pin::pin!(tokio::time::sleep(DEBOUNCE_PERIOD));
         let mut is_sleeping = true;
 
-        let mut party_events: HashMap<Snowflake, Vec<RawEvent>> = HashMap::new();
-        let mut direct_events: HashMap<Snowflake, Vec<RawEvent>> = HashMap::new();
+        let mut party_events: HashMap<Snowflake, Vec<RawEvent>, sdk::FxRandomState2> = HashMap::default();
+        let mut direct_events: HashMap<Snowflake, Vec<RawEvent>, sdk::FxRandomState2> = HashMap::default();
         let mut user_events: Vec<RawEvent> = Vec::new();
 
         loop {
@@ -105,7 +105,7 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
             // process events from each party in parallel,
             // but within each party process them sequentially
             async fn process_party_events(
-                events: &mut HashMap<Snowflake, Vec<RawEvent>>,
+                events: &mut HashMap<Snowflake, Vec<RawEvent>, sdk::FxRandomState2>,
                 state: &ServerState,
                 db: &db::Client,
             ) {
@@ -126,7 +126,7 @@ pub fn add_gateway_processor(state: ServerState, runner: &TaskRunner) {
             // process events from each direct-room in parallel,
             // but within each room process them sequentially
             async fn process_direct_events(
-                events: &mut HashMap<Snowflake, Vec<RawEvent>>,
+                events: &mut HashMap<Snowflake, Vec<RawEvent>, sdk::FxRandomState2>,
                 state: &ServerState,
                 db: &db::Client,
             ) {

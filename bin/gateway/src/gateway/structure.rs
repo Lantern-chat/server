@@ -11,10 +11,10 @@ use rkyv::Archived;
 
 #[derive(Default)]
 pub struct StructureCache {
-    pub role_perms: scc::HashIndex<RoleId, Permissions, ahash::RandomState>,
-    pub user_roles: scc::HashIndex<(PartyId, UserId), Arc<RwLock<VecSet<RoleId>>>, ahash::RandomState>,
-    pub rooms: scc::HashIndex<RoomId, RoomStructure, ahash::RandomState>,
-    pub parties: scc::HashIndex<PartyId, Arc<PartyStructure>, ahash::RandomState>,
+    pub role_perms: scc::HashIndex<RoleId, Permissions, sdk::FxRandomState2>,
+    pub user_roles: scc::HashIndex<(PartyId, UserId), Arc<RwLock<VecSet<RoleId>>>, sdk::FxRandomState2>,
+    pub rooms: scc::HashIndex<RoomId, RoomStructure, sdk::FxRandomState2>,
+    pub parties: scc::HashIndex<PartyId, Arc<PartyStructure>, sdk::FxRandomState2>,
 }
 
 pub struct PartyStructure {

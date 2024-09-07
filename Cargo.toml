@@ -1,5 +1,5 @@
 [patch.crates-io]
-schemars = { git = "https://github.com/Lantern-chat/schemars" }
+# schemars = { git = "https://github.com/Lantern-chat/schemars" }
 postgres-types = { git = "https://github.com/Lantern-chat/rust-postgres" }
 headers = { git = "https://github.com/Lantern-chat/headers" }
 argh = { git = "https://github.com/google/argh" }
@@ -44,13 +44,13 @@ thin-vec = "0.2"
 
 postgres-types = { version = "0.2", features = ["with-rend-0_5", "with-rkyv-0_8", "with-smol_str-03", "with-thin-vec-0_2"] }
 
-hashbrown = { version = "0.14", features = ["inline-more", "ahash"] }
+hashbrown = { version = "0.14", features = ["inline-more"] }
 rkyv = { version = "0.8.0-rc.1", features = ["bytecheck"] }
 rkyv_rpc = { git = "https://github.com/Lantern-chat/rkyv_rpc" }
 serde = { version = "1", features = ["derive"] }
 serde_derive = "1"
 bitflags = "2"
-ahash = "0.8"
+rustc-hash = { version = "2.0", default-features = false }
 scc = "2"
 
 http = "1"

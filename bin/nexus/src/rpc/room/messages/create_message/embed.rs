@@ -11,7 +11,7 @@ pub fn process_embeds(state: ServerState, msg_id: MessageId, msg: &str, spans: &
     let max_embeds = state.config().shared.max_embeds as i16;
 
     // for checking duplicates
-    let mut urls = HashSet::new();
+    let mut urls: HashSet<&str, sdk::FxRandomState2> = HashSet::default();
 
     let embed_tasks = FuturesUnordered::new();
 

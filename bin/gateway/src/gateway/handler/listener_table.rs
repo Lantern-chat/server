@@ -12,11 +12,11 @@ use crate::prelude::*;
 #[repr(transparent)]
 #[derive(Debug, Default)]
 pub struct ListenerTable {
-    table: HashMap<PartyId, AbortHandle>,
+    table: HashMap<PartyId, AbortHandle, sdk::FxRandomState2>,
 }
 
 impl std::ops::Deref for ListenerTable {
-    type Target = HashMap<PartyId, AbortHandle>;
+    type Target = HashMap<PartyId, AbortHandle, sdk::FxRandomState2>;
 
     fn deref(&self) -> &Self::Target {
         &self.table
