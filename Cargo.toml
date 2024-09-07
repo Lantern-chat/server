@@ -1,11 +1,14 @@
 [patch.crates-io]
-postgres-types = { git = "https://github.com/Lantern-chat/rust-postgres" }
 schemars = { git = "https://github.com/Lantern-chat/schemars" }
-
+postgres-types = { git = "https://github.com/Lantern-chat/rust-postgres" }
 headers = { git = "https://github.com/Lantern-chat/headers" }
 argh = { git = "https://github.com/google/argh" }
 
-# postgres-inet = { git = "https://github.com/Lantern-chat/postgres-inet" }
+rkyv = { git = "https://github.com/Lantern-chat/rkyv" }
+bytecheck = { git = "https://github.com/rkyv/bytecheck" }
+ptr_meta = { git = "https://github.com/rkyv/ptr_meta" }
+rancor = { git = "https://github.com/rkyv/rancor" }
+rend = { git = "https://github.com/rkyv/rend" }
 
 [patch."https://github.com/Lantern-chat/client-sdk-rs"]
 client-sdk = { path = "../client-sdk-rs" }
@@ -36,10 +39,10 @@ schema = { path = "components/schema" }
 timestamp = { package = "iso8601-timestamp", version = "0.3.0-beta.1", features = ["pg"] }
 snowflake = { git = "https://github.com/Lantern-chat/snowflake", features = ["timestamp"] }
 sdk = { git = "https://github.com/Lantern-chat/client-sdk-rs", default-features = false, package = "client-sdk" }
-smol_str = "0.2"
+smol_str = "0.3"
 thin-vec = "0.2"
 
-postgres-types = { version = "0.2", features = ["with-rend-0_5", "with-rkyv-0_8", "with-smol_str-02", "with-thin-vec-0_2"] }
+postgres-types = { version = "0.2", features = ["with-rend-0_5", "with-rkyv-0_8", "with-smol_str-03", "with-thin-vec-0_2"] }
 
 hashbrown = { version = "0.14", features = ["inline-more", "ahash"] }
 rkyv = { version = "0.8.0-rc.1", features = ["bytecheck"] }
