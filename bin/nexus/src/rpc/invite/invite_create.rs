@@ -77,7 +77,7 @@ pub async fn create_invite(
     }
 
     Ok(Invite {
-        code: crate::util::encrypted_asset::encrypt_snowflake(&state, id),
+        code: crate::util::encrypted_asset::encrypt_snowflake(&state, id).into(),
         party: PartialParty {
             id: party_id,
             name: row.party_name()?,

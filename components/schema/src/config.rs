@@ -1,8 +1,23 @@
 use std::{ops::RangeInclusive, time::Duration};
 
-use sdk::models::Timestamp;
+use sdk::models::{HCaptchaSiteKey, Timestamp};
 use smol_str::SmolStr;
 use uuid::Uuid;
+
+#[derive(Debug, thiserror::Error)]
+pub enum ConfigError {
+    #[error(transparent)]
+    DbError(#[from] db::Error),
+
+    #[error("Invalid HCaptcha Site Key")]
+    InvalidHCaptchaSiteKey,
+}
+
+impl From<db::pg::Error> for ConfigError {
+    fn from(e: db::pg::Error) -> Self {
+        ConfigError::DbError(e.into())
+    }
+}
 
 #[derive(Clone)]
 pub struct SharedConfig {
@@ -66,7 +81,7 @@ pub struct SharedConfig {
 
     // Service settings
     pub hcaptcha_secret: SmolStr,
-    pub hcaptcha_sitekey: SmolStr,
+    pub hcaptcha_sitekey: HCaptchaSiteKey,
     pub b2_app: SmolStr,
     pub b2_key: SmolStr,
     pub embed_worker_uris: Vec<SmolStr>,
@@ -75,7 +90,7 @@ pub struct SharedConfig {
 use postgres_range::{BoundType, Range as PgRange, RangeBound};
 
 impl SharedConfig {
-    pub async fn save(&self, obj: &db::Object) -> Result<Self, db::Error> {
+    pub async fn save(&self, obj: &db::Object) -> Result<Self, ConfigError> {
         #[inline]
         fn range(range: &RangeInclusive<usize>) -> PgRange<i64> {
             PgRange::new(
@@ -164,7 +179,7 @@ impl SharedConfig {
         Ok(config)
     }
 
-    pub async fn load(obj: &db::Object) -> Result<Self, db::Error> {
+    pub async fn load(obj: &db::Object) -> Result<Self, ConfigError> {
         #[rustfmt::skip]
         let row = obj.query_one2(crate::sql! {
             SELECT
@@ -274,7 +289,8 @@ impl SharedConfig {
             max_avatar_pixels: row.configs_max_avatar_pixels()?,
             max_banner_pixels: row.configs_max_banner_pixels()?,
             hcaptcha_secret: row.configs_hcaptcha_secret()?,
-            hcaptcha_sitekey: row.configs_hcaptcha_sitekey()?,
+            hcaptcha_sitekey: HCaptchaSiteKey::try_from(row.configs_hcaptcha_sitekey::<&str>()?)
+                .ok_or(ConfigError::InvalidHCaptchaSiteKey)?,
             b2_app: row.configs_b2_app()?,
             b2_key: row.configs_b2_key()?,
             embed_worker_uris: row.configs_embed_worker_uris()?,

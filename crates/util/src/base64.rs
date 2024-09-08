@@ -1,13 +1,13 @@
-use smol_str::SmolStr;
+use sdk::models::FixedStr;
 
 use base64::engine::{general_purpose::URL_SAFE_NO_PAD, Engine};
 
-pub fn encode_u128(input: u128) -> SmolStr {
+pub fn encode_u128(input: u128) -> FixedStr<22> {
     let mut buf = [0u8; 22];
     URL_SAFE_NO_PAD
         .encode_slice(input.to_be_bytes(), &mut buf)
         .expect("Unable to encode u128 to base64");
-    SmolStr::new_inline(unsafe { std::str::from_utf8_unchecked(&buf) })
+    unsafe { FixedStr::from_bytes(buf) }
 }
 
 pub fn decode_u128(input: &str) -> Result<u128, base64::DecodeError> {

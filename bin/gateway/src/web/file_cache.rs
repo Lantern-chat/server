@@ -414,8 +414,8 @@ impl MainFileCache {
                     serde_json::to_writer(
                         &mut new_file,
                         &sdk::models::ServerConfig {
-                            hcaptcha_sitekey: c.shared.hcaptcha_sitekey.as_str().to_owned(),
-                            cdn: c.shared.cdn_domain.as_str().to_owned(),
+                            hcaptcha_sitekey: c.shared.hcaptcha_sitekey,
+                            cdn: c.shared.cdn_domain.as_str().into(),
                             min_age: c.shared.minimum_age,
                             secure: c.shared.secure_web,
                             camo: c.shared.camo_enable,

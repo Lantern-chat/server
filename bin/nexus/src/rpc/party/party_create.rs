@@ -36,7 +36,7 @@ pub async fn create_party(
         partial: PartialParty {
             id: party_id,
             name: SmolStr::from(&*form.name),
-            description: form.description.as_deref().map(SmolStr::from),
+            description: form.description.deserialize_simple().expect("Unable to deserialize party description"),
         },
         flags: form.flags.deserialize_simple().expect("Unable to deserialize party flags"),
         avatar: None,

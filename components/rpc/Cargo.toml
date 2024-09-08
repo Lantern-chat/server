@@ -10,7 +10,7 @@ quinn.workspace = true
 parking_lot.workspace = true
 smol_str.workspace = true
 serde.workspace = true
-rkyv = { workspace = true, features = ["smallvec"] }
+rkyv = { workspace = true, features = ["smallvec-1"] }
 rkyv_rpc.workspace = true
 auth.workspace = true
 thiserror = "1"

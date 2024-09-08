@@ -1,7 +1,12 @@
 // Based on rustc_serialize::base64
 // and also ZeroMQ's reference implementation
 
-use std::fmt;
+#![no_std]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
+use core::fmt::{self, Error as FmtError, Write};
 
 const CHARS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-:+=^!/*?&<>()[]{}@%$#";
 
@@ -26,6 +31,15 @@ pub enum FromZ85Error {
 pub enum ToZ85Error {
     /// The input had an invalid length
     InvalidZ85InputSize(usize),
+
+    /// An error occurred while writing the output
+    FmtError(FmtError),
+}
+
+impl From<FmtError> for ToZ85Error {
+    fn from(e: FmtError) -> Self {
+        ToZ85Error::FmtError(e)
+    }
 }
 
 impl fmt::Display for FromZ85Error {
@@ -43,45 +57,65 @@ impl fmt::Display for ToZ85Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             ToZ85Error::InvalidZ85InputSize(len) => write!(f, "Invalid input size {len}."),
+            ToZ85Error::FmtError(ref e) => e.fmt(f),
         }
     }
 }
 
-impl std::error::Error for FromZ85Error {}
-impl std::error::Error for ToZ85Error {}
+impl core::error::Error for FromZ85Error {}
+impl core::error::Error for ToZ85Error {}
+
+#[cfg(feature = "alloc")]
+use alloc::{string::String, vec::Vec};
 
 /// A trait for converting from z85 encoded values.
 pub trait ParseZ85 {
     /// Converts the value of `self`, interpreted as z85 encoded data,
     /// into an owned vector of bytes, returning the vector.
-    fn parse_z85(&self) -> Result<Vec<u8>, FromZ85Error>;
+    #[cfg(feature = "alloc")]
+    fn parse_z85(&self) -> Result<Vec<u8>, FromZ85Error> {
+        let mut out = Vec::with_capacity(self.estimate_z85_decoded_size());
+        self.parse_z85_to(&mut out)?;
+        Ok(out)
+    }
+
+    fn parse_z85_to<W: Extend<u8>>(&self, writer: &mut W) -> Result<(), FromZ85Error>;
+
+    fn estimate_z85_decoded_size(&self) -> usize;
 }
 
 /// A trait for converting a value to z85 encoding.
 pub trait ToZ85 {
     /// Converts the value of `self` into a z85 encoded string,
     /// returning the owned string.
-    fn to_z85(&self) -> Result<String, ToZ85Error>;
+    #[cfg(feature = "alloc")]
+    fn to_z85(&self) -> Result<String, ToZ85Error> {
+        let mut out = String::with_capacity(self.estimate_z85_encoded_size());
+        self.to_z85_in(&mut out)?;
+        Ok(out)
+    }
+
+    fn to_z85_in<W: Write>(&self, writer: W) -> Result<(), ToZ85Error>;
+
+    fn estimate_z85_encoded_size(&self) -> usize;
 }
 
 impl ParseZ85 for str {
-    /// Convert any z85 encoded string
-    /// to the byte values it encodes.
-    /// You can use the `String::from_utf8` function to turn a `Vec<u8>` into a
-    /// string with characters corresponding to those values.
-    fn parse_z85(&self) -> Result<Vec<u8>, FromZ85Error> {
-        self.as_bytes().parse_z85()
+    fn parse_z85_to<W: Extend<u8>>(&self, writer: &mut W) -> Result<(), FromZ85Error> {
+        self.as_bytes().parse_z85_to(writer)
+    }
+
+    fn estimate_z85_decoded_size(&self) -> usize {
+        self.as_bytes().estimate_z85_decoded_size()
     }
 }
 
 impl ParseZ85 for [u8] {
-    fn parse_z85(&self) -> Result<Vec<u8>, FromZ85Error> {
+    fn parse_z85_to<W: Extend<u8>>(&self, writer: &mut W) -> Result<(), FromZ85Error> {
         let len = self.len();
         if len == 0 || len % 5 != 0 {
             return Err(FromZ85Error::InvalidZ85Length(len));
         }
-
-        let mut out_vec: Vec<u8> = Vec::with_capacity(len / 5 * 4);
 
         let mut pos: usize = 0;
         while pos < len {
@@ -98,24 +132,30 @@ impl ParseZ85 for [u8] {
                 block_num = block_num * 85 + kar as u32;
             }
             // reverse block_num bytes
-            out_vec.extend_from_slice(&block_num.swap_bytes().to_ne_bytes());
+            writer.extend(block_num.swap_bytes().to_ne_bytes());
             pos = next_pos;
         }
 
-        Ok(out_vec)
+        Ok(())
+    }
+
+    fn estimate_z85_decoded_size(&self) -> usize {
+        self.len() / 5 * 4
     }
 }
 
 impl ToZ85 for [u8] {
+    fn estimate_z85_encoded_size(&self) -> usize {
+        self.len() * 5 / 4
+    }
+
     /// Turn a vector of `u8` bytes into a base64 string.
-    fn to_z85(&self) -> Result<String, ToZ85Error> {
+    fn to_z85_in<W: Write>(&self, mut writer: W) -> Result<(), ToZ85Error> {
         let len = self.len();
 
         if len == 0 || len % 4 != 0 {
             return Err(ToZ85Error::InvalidZ85InputSize(len));
         }
-
-        let mut out_vec: Vec<u8> = Vec::with_capacity(len / 4 * 5);
 
         for in_chunk in self.chunks(4) {
             let mut block_num: u32 = 0;
@@ -128,10 +168,9 @@ impl ToZ85 for [u8] {
                 block_num /= 85;
             }
             out_chunk.reverse();
-            out_vec.extend_from_slice(&out_chunk);
+            writer.write_str(unsafe { core::str::from_utf8_unchecked(&out_chunk) })?;
         }
 
-        let out_st = unsafe { String::from_utf8_unchecked(out_vec) };
-        Ok(out_st)
+        Ok(())
     }
 }

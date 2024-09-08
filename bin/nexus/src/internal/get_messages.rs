@@ -425,8 +425,6 @@ pub async fn get_messages<'a>(
                     attachments.reserve(meta.len());
 
                     for (meta, preview) in meta.into_iter().zip(previews) {
-                        use z85::ToZ85;
-
                         // NOTE: This filtering is done in the application layer because it
                         // produces sub-optimal query-plans in Postgres.
                         //
@@ -445,7 +443,13 @@ pub async fn get_messages<'a>(
                                 mime: meta.mime,
                                 width: meta.width,
                                 height: meta.height,
-                                preview: preview.and_then(|p| p.to_z85().ok()),
+                                preview: preview.and_then(|p| {
+                                    use z85::ToZ85;
+
+                                    let mut out = ThinString::with_capacity(p.estimate_z85_encoded_size());
+                                    p.to_z85_in(&mut out).ok()?;
+                                    Some(out)
+                                }),
                             },
                         })
                     }

@@ -50,7 +50,7 @@ pub async fn get_invite(state: &ServerState, auth: Authorization, code: SmolStr)
         },
         code: match row.vanity()? {
             Some(vanity) => vanity,
-            None => encrypt_snowflake(state, row.invite_id()?),
+            None => encrypt_snowflake(state, row.invite_id()?).into(),
         },
         description: row.invite_description()?,
         inviter: can_view_metadata.then_some(inviter),

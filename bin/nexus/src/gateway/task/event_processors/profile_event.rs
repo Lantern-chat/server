@@ -44,7 +44,7 @@ pub async fn profile_updated(
             AND PartyMembers.PartyId = #{&party_id as Party::Id}
         }).await?);
 
-        let mut last_avatar: Option<(FileId, SmolStr)> = None;
+        let mut last_avatar: Option<(FileId, EncryptedSnowflake)> = None;
 
         while let Some(row_res) = stream.next().await {
             let row = row_res?;
@@ -74,7 +74,7 @@ pub async fn profile_updated(
                                 }
                                 _ => {
                                     let newly_encrypted = encrypt_snowflake(state, avatar_id);
-                                    last_avatar = Some((avatar_id, newly_encrypted.clone()));
+                                    last_avatar = Some((avatar_id, newly_encrypted));
                                     newly_encrypted
                                 }
                             }),
