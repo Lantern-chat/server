@@ -8,19 +8,17 @@ use smallvec::{smallvec, SmallVec};
 pub type SmallSnowflakeVec = SmallVec<[Snowflake; 1]>;
 
 #[derive(Debug, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
-#[archive(check_bytes)]
 pub enum ClientCommand {
     /// Regular client message/command
     Regular(ClientMsg),
 }
 
 #[derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
-#[archive(check_bytes)]
 pub enum ServerEvent {
     Regular {
         msg: ServerMsg,
 
-        #[with(NicheSnowflake)]
+        #[rkyv(with = NicheSnowflake)]
         room_id: Option<Snowflake>,
 
         user_ids: SmallSnowflakeVec,

@@ -69,7 +69,7 @@ where
 
         let mut ser = Serializer::new(&mut buffer, arena.acquire(), &mut share);
 
-        if let Err(e) = rkyv::api::serialize_with(&item, &mut ser) {
+        if let Err(e) = rkyv::api::serialize_using(&item, &mut ser) {
             log::error!("Error serializing streamed item: {e}");
             continue;
         }

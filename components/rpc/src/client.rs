@@ -379,7 +379,7 @@ impl RpcClient {
 impl RpcClient {
     pub async fn send<T>(&self, value: &T) -> Result<quinn::RecvStream, RpcClientError>
     where
-        T: for<'a> Serialize<HighSerializer<'a, AlignedVec, ArenaHandle<'a>, RancorError>>,
+        T: for<'a> Serialize<HighSerializer<AlignedVec, ArenaHandle<'a>, RancorError>>,
     {
         match rkyv::to_bytes::<RancorError>(value) {
             Err(e) => {
