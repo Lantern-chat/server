@@ -4,12 +4,6 @@ postgres-types = { git = "https://github.com/Lantern-chat/rust-postgres" }
 headers = { git = "https://github.com/Lantern-chat/headers" }
 argh = { git = "https://github.com/google/argh" }
 
-rkyv = { git = "https://github.com/Lantern-chat/rkyv" }
-bytecheck = { git = "https://github.com/rkyv/bytecheck" }
-ptr_meta = { git = "https://github.com/rkyv/ptr_meta" }
-rancor = { git = "https://github.com/rkyv/rancor" }
-rend = { git = "https://github.com/rkyv/rend" }
-
 [patch."https://github.com/Lantern-chat/client-sdk-rs"]
 client-sdk = { path = "../client-sdk-rs" }
 
@@ -36,7 +30,7 @@ auth = { path = "components/auth" }
 rpc = { path = "components/rpc" }
 schema = { path = "components/schema" }
 
-timestamp = { package = "iso8601-timestamp", version = "0.3.0-beta.1", features = ["pg"] }
+timestamp = { package = "iso8601-timestamp", version = "0.3.0-rc.1", features = ["pg"] }
 snowflake = { git = "https://github.com/Lantern-chat/snowflake", features = ["timestamp"] }
 sdk = { git = "https://github.com/Lantern-chat/client-sdk-rs", default-features = false, package = "client-sdk" }
 smol_str = "0.3"
@@ -45,7 +39,7 @@ thin-vec = "0.2"
 postgres-types = { version = "0.2", features = ["with-rend-0_5", "with-rkyv-0_8", "with-smol_str-03", "with-thin-vec-0_2"] }
 
 hashbrown = { version = "0.14", features = ["inline-more"] }
-rkyv = { version = "0.8.0-rc.1", features = ["bytecheck"] }
+rkyv = { version = "0.8", features = ["bytecheck"] }
 rkyv_rpc = { git = "https://github.com/Lantern-chat/rkyv_rpc" }
 serde = { version = "1", features = ["derive"] }
 serde_derive = "1"
@@ -57,10 +51,9 @@ http = "1"
 headers = "0.4"
 quinn = "0.11"
 
-ftl = { git = "https://github.com/Lantern-chat/ftl", features = ["json", "cbor"] }
+ftl = { git = "https://github.com/Lantern-chat/ftl2", default-features = false, features = ["json", "cbor", "gcra"] }
 mime_db = { git = "https://github.com/Lantern-chat/mime_db" }
 thorn = { git = "https://github.com/Lantern-chat/thorn" }
-async-chashmap = { git = "https://github.com/novacrazy/async-chashmap" }
 
 argh = { version = "0.1", default-features = false, features = ["help"] }
 dotenv = "0.15.0"
