@@ -12,7 +12,6 @@ built.workspace = true
 [dependencies]
 tokio = { workspace = true, features = ["full"] }
 quinn.workspace = true
-axum = { version = "0.7", features = ["http1", "http2", "json"] }
 serde.workspace = true
 
 futures.workspace = true

@@ -20,13 +20,13 @@ macro_rules! decl_procs {
             }
 
             #[cfg(feature = "ftl")]
-            pub fn stream_response<S, E>(&self, recv: S, encoding: Encoding) -> BoxFuture<Result<ftl::Response, E>>
+            pub fn stream_response<S, E>(&self, recv: S) -> BoxFuture<Result<ftl::Response, E>>
             where
                 S: Send + AsyncRead + Unpin + 'static,
                 E: From<std::io::Error> + From<ApiError> + 'static,
             {
                 match self {
-                    $(Self::$cmd(_) => stream_response::<_, $cmd, _, _>(recv, encoding).boxed()),*
+                    $(Self::$cmd(_) => stream_response::<_, $cmd, _, _>(recv).boxed()),*
                 }
             }
         }
@@ -121,7 +121,7 @@ use rkyv::{
 };
 
 #[cfg(feature = "ftl")]
-pub async fn stream_response<S, P, T, E>(recv: S, encoding: Encoding) -> Result<ftl::Response, E>
+pub async fn stream_response<S, P, T, E>(recv: S) -> Result<ftl::Response, E>
 where
     S: Send + AsyncRead + Unpin + 'static,
     P: Command<Item = T>,
@@ -130,7 +130,7 @@ where
     Archived<T>: for<'b> CheckBytes<HighValidator<'b, RancorError>>,
     E: From<std::io::Error> + From<ApiError> + 'static,
 {
-    use ftl::Reply;
+    use ftl::{body::deferred::Deferred, IntoResponse};
 
     let mut stream = Box::pin(RpcRecvReader::new(recv).recv_stream_deserialized::<Result<T, ApiError>>());
 
@@ -141,10 +141,7 @@ where
     let first = first??;
 
     if !P::STREAM {
-        return Ok(match encoding {
-            Encoding::JSON => ftl::reply::json::json(first).into_response(),
-            Encoding::CBOR => ftl::reply::cbor::cbor(first).into_response(),
-        });
+        return Ok(Deferred::new(first).into_response());
     }
 
     // put the first item back into the stream and merge additional errors into IO errors
@@ -156,10 +153,7 @@ where
         Err(err) => Err(err),
     }));
 
-    Ok(match encoding {
-        Encoding::JSON => ftl::reply::json::array_stream(stream).into_response(),
-        Encoding::CBOR => ftl::reply::cbor::array_stream(stream).into_response(),
-    })
+    Ok(Deferred::stream(stream).into_response())
 }
 
 #[cfg(test)]

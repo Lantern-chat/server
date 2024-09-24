@@ -4,7 +4,7 @@ use triomphe::Arc;
 use crate::{
     config::Config,
     gateway::{Gateway, Heart},
-    web::{file_cache::MainFileCache, rate_limit::RateLimitTable},
+    //web::{file_cache::MainFileCache, rate_limit::RateLimitTable},
 };
 
 use arc_swap::ArcSwap;
@@ -21,8 +21,8 @@ pub struct InnerServerState {
     pub config: config::Config<Config>,
 
     pub session_cache: session_cache::AuthCache,
-    pub rate_limit: RateLimitTable,
-    pub file_cache: MainFileCache,
+    //pub rate_limit: RateLimitTable,
+    //pub file_cache: MainFileCache,
     pub hasher: sdk::FxRandomState2,
     pub emoji: common::emoji::EmojiMap,
 

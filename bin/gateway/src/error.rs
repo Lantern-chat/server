@@ -1,8 +1,8 @@
-use std::{borrow::Cow, str::Utf8Error, string::FromUtf8Error};
+use std::{borrow::Cow, str::Utf8Error, string::FromUtf8Error, time::Duration};
 
 use db::Error as DbError;
-use ftl::{body::BodyDeserializeError, reply::WithStatus, ws::WsError, *};
-use http::header::InvalidHeaderValue;
+use ftl::{body::BodyError, ws::WsRejection};
+use http::{header::InvalidHeaderValue, StatusCode};
 use sdk::{
     api::error::{ApiError, ApiErrorCode},
     driver::Encoding,
@@ -79,9 +79,8 @@ pub enum Error {
     #[error("Header Parse Error")]
     HeaderParseError(#[from] http::header::ToStrError),
 
-    #[error("Body Deserialization Error: {0}")]
-    BodyDeserializeError(#[from] BodyDeserializeError),
-
+    //#[error("Body Deserialization Error: {0}")]
+    //BodyDeserializeError(#[from] BodyDeserializeError),
     #[error("Query Parse Error: {0}")]
     QueryParseError(#[from] serde_urlencoded::de::Error),
 
@@ -100,9 +99,8 @@ pub enum Error {
     #[error("Mime Parse Error: {0}")]
     MimeParseError(#[from] mime::FromStrError),
 
-    #[error("Websocket Error: {0}")]
-    WsError(#[from] ftl::ws::WsError),
-
+    //#[error("Websocket Error: {0}")]
+    //WsError(#[from] ftl::ws::WsError),
     #[error("Search Error: {0}")]
     SearchError(#[from] schema::search::SearchError),
 }
@@ -122,16 +120,16 @@ pub static REQUEST_ENTITY_TOO_LARGE: LazyLock<StatusCode> = LazyLock::new(|| Sta
 
 impl Error {
     /// Rate-limiting penalty in milliseconds
-    pub fn penalty(&self) -> u64 {
+    pub fn penalty(&self) -> Duration {
         // TODO: Make this configurable or find better values
-        match self {
+        Duration::from_millis(match self {
             Error::NotFoundSignaling => 100,
             Error::NotFoundHighPenalty => 500,
             Error::BadRequest => 200,
             Error::Unauthorized => 200,
             Error::MethodNotAllowed => 200,
             _ => 0,
-        }
+        })
     }
 
     /// Returns whether the error is fatal and should be logged as an error
@@ -225,10 +223,10 @@ impl From<Error> for sdk::api::error::ApiError {
             Error::JsonError(_)             => ApiErrorCode::JsonError,
 
             Error::HeaderParseError(_)      => ApiErrorCode::HeaderParseError,
-            Error::BodyDeserializeError(_)  => ApiErrorCode::BodyDeserializeError,
+            //Error::BodyDeserializeError(_)  => ApiErrorCode::BodyDeserializeError,
 
-            Error::WsError(WsError::MethodNotAllowed)   => ApiErrorCode::MethodNotAllowed,
-            Error::WsError(_)                           => ApiErrorCode::WebsocketError,
+            //Error::WsError(WsError::MethodNotAllowed)   => ApiErrorCode::MethodNotAllowed,
+            //Error::WsError(_)                           => ApiErrorCode::WebsocketError,
 
             | Error::InternalError(_)
             | Error::InternalErrorStatic(_)
@@ -241,6 +239,15 @@ impl From<Error> for sdk::api::error::ApiError {
     }
 }
 
+impl ftl::IntoResponse for Error {
+    // TODO: Choose format based on the deferred response system
+    fn into_response(self) -> ftl::Response {
+        let err = ApiError::from(self);
+        let status = err.code.http_status();
+        ftl::IntoResponse::into_response((ftl::body::deferred::Deferred::new(err), status))
+    }
+}
+
 impl Error {
     fn log(&self) {
         if self.is_fatal() {
@@ -250,53 +257,53 @@ impl Error {
         }
     }
 
-    fn into_json(self) -> WithStatus<reply::Json> {
-        let err = ApiError::from(self);
-        reply::json(&err).with_status(err.code.http_status())
-    }
+    // fn into_json(self) -> WithStatus<reply::Json> {
+    //     let err = ApiError::from(self);
+    //     reply::json(&err).with_status(err.code.http_status())
+    // }
 
-    fn into_cbor(self) -> WithStatus<reply::cbor::Cbor> {
-        let err = ApiError::from(self);
-        reply::cbor::cbor(&err).with_status(err.code.http_status())
-    }
+    // fn into_cbor(self) -> WithStatus<reply::cbor::Cbor> {
+    //     let err = ApiError::from(self);
+    //     reply::cbor::cbor(&err).with_status(err.code.http_status())
+    // }
 
-    #[allow(non_upper_case_globals)]
-    fn into_cached_json(self) -> WithStatus<reply::Json> {
-        use reply::Json;
+    // #[allow(non_upper_case_globals)]
+    // fn into_cached_json(self) -> WithStatus<reply::Json> {
+    //     use reply::Json;
 
-        macro_rules! impl_cached {
-            ($($name:ident),*) => {{
-                $(static $name: LazyLock<WithStatus<Json>> = LazyLock::new(|| Error::$name.into_json());)*
+    //     macro_rules! impl_cached {
+    //         ($($name:ident),*) => {{
+    //             $(static $name: LazyLock<WithStatus<Json>> = LazyLock::new(|| Error::$name.into_json());)*
 
-                match self {
-                    $(Self::$name => $name.clone(),)*
-                    _ => self.into_json(),
-                }
-            }}
-        }
+    //             match self {
+    //                 $(Self::$name => $name.clone(),)*
+    //                 _ => self.into_json(),
+    //             }
+    //         }}
+    //     }
 
-        impl_cached! {
-            NotFound,
-            NotFoundSignaling,
-            NotFoundHighPenalty,
-            BadRequest,
-            MethodNotAllowed,
-            Unimplemented,
-            RequestEntityTooLarge,
-            MissingAuthorizationHeader,
-            Unauthorized,
-            NoSession
-        }
-    }
+    //     impl_cached! {
+    //         NotFound,
+    //         NotFoundSignaling,
+    //         NotFoundHighPenalty,
+    //         BadRequest,
+    //         MethodNotAllowed,
+    //         Unimplemented,
+    //         RequestEntityTooLarge,
+    //         MissingAuthorizationHeader,
+    //         Unauthorized,
+    //         NoSession
+    //     }
+    // }
 
-    pub(crate) fn into_encoding(self, encoding: Encoding) -> Response {
-        self.log();
+    // pub(crate) fn into_encoding(self, encoding: Encoding) -> Response {
+    //     self.log();
 
-        match encoding {
-            Encoding::JSON => self.into_cached_json().into_response(),
-            Encoding::CBOR => self.into_cbor().into_response(),
-        }
-    }
+    //     match encoding {
+    //         Encoding::JSON => self.into_cached_json().into_response(),
+    //         Encoding::CBOR => self.into_cbor().into_response(),
+    //     }
+    // }
 }
 
 impl From<DbError> for Error {
@@ -333,5 +340,12 @@ impl From<ApiError> for Error {
             ApiErrorCode::NoSession => Error::NoSession,
             _ => Error::ApiError(e),
         }
+    }
+}
+
+impl From<core::convert::Infallible> for Error {
+    #[inline(always)]
+    fn from(e: core::convert::Infallible) -> Self {
+        match e {}
     }
 }

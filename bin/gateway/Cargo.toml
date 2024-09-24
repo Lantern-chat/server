@@ -7,14 +7,14 @@ publish = false
 
 [features]
 memory_metrics = []
-brotli = ["sdk/brotli", "reqwest/brotli", "async-compression/brotli", "ftl/brotli"]
-default = ["memory_metrics", "brotli"]
+# brotli = ["sdk/brotli", "reqwest/brotli", "async-compression/brotli", "ftl/brotli"]
+default = ["memory_metrics"] # , "brotli"]
 
 [build-dependencies]
 built.workspace = true
 
 [dependencies]
-sdk = { workspace = true, features = ["driver", "cbor", "gateway"] }
+sdk = { workspace = true, features = ["driver", "cbor", "gateway", "ftl"] }
 rpc = { workspace = true, features = ["ftl"] }
 rkyv.workspace = true
 smol_str = { workspace = true, features = ["serde"] }
@@ -29,7 +29,7 @@ async-compression = { version = "0.4", features = ["deflate", "gzip", "tokio"] }
 hyper = { version = "1", features = ["http1", "http2", "server"] }
 hyper-util = { version = "0.1.2", features = ["tokio"] }
 http-body-util = "0.1.0"
-tokio-tungstenite = { version = "0.23", default-features = false, features = ["connect"] }
+tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 http.workspace = true
 headers.workspace = true
