@@ -15,7 +15,7 @@ use ftl::{
     IntoResponse, Request, Response,
 };
 
-type Return = Result<Procedure, Response>;
+type Return = Result<Result<Procedure, Error>, Response>;
 
 type InnerHandlerService = HandlerService<ServerState, Return>;
 type RateLimitKey = (RealIpPrivacyMask,);
@@ -51,7 +51,7 @@ impl ApiV1Service {
         // call the router and unpack all the possible results
         let proc = match self.api.call_opt(Request::from_parts(parts, body)).await {
             Ok(Some(resp)) => match resp {
-                Ok(proc) => proc,
+                Ok(proc) => proc?,
                 Err(e) => return Ok(e), // Okay in the sense that it's a response
             },
             Ok(None) => return Err(Error::NotFound),
@@ -101,52 +101,118 @@ impl ApiV1Service {
     pub fn new(state: ServerState) -> Self {
         use ftl::router::GenericRouter;
         use rate_limit::gcra::Quota;
-        use sdk::api::{commands::all as cmds, Command};
+        use sdk::api::{commands::all as cmds, Command, CommandFlags};
 
         let mut rl = rate_limit::RateLimitLayerBuilder::new();
         let mut api = Router::<_, Return>::with_state(state);
 
         macro_rules! add_cmds {
-            ($($cmd:ty: $handler:expr),* $(,)?) => {
-                $(
-                    GenericRouter::on(&mut api,
-                        &[<$cmd as Command>::HTTP_METHOD],
-                        <$cmd as Command>::ROUTE_PATTERN,
-                        $handler
-                    );
+            ($($cmd:ty: $handler:expr),* $(,)?) => {$(
+                GenericRouter::on(&mut api,
+                    &[<$cmd as Command>::HTTP_METHOD],
+                    <$cmd as Command>::ROUTE_PATTERN,
+                    $handler,
+                );
 
-                    rl.add_route(
-                        (<$cmd as Command>::HTTP_METHOD, <$cmd as Command>::ROUTE_PATTERN),
-                        {
-                            let rl = <$cmd as Command>::RATE_LIMIT;
-
-                            Quota::new(rl.emission_interval, rl.burst_size)
-                        },
-                    );
-                )*
-            };
+                rl.add_route(
+                    (<$cmd as Command>::HTTP_METHOD, <$cmd as Command>::ROUTE_PATTERN), {
+                        let rl = <$cmd as Command>::RATE_LIMIT;
+                        Quota::new(rl.emission_interval, rl.burst_size)
+                    },
+                );
+            )*};
 
             // trivial handlers that just convert the extracted command to a procedure
             (@TRIVIAL $($cmd:ty),* $(,)?) => {$({
-                add_cmds!($cmd: |cmd: $cmd| core::future::ready(Procedure::from(cmd)));
+                add_cmds!($cmd: |auth: Option<Auth>, cmd: $cmd| {
+                    use core::future::ready;
+
+                    // some routes don't need auth, some do, but that's checked in the command
+                    if let Some(auth) = auth {
+                        const FLAGS: CommandFlags = <$cmd as Command>::FLAGS;
+
+                        if FLAGS.contains(CommandFlags::USERS_ONLY) && auth.is_bot() {
+                            return ready(Err(Error::Unauthorized));
+                        }
+
+                        if FLAGS.contains(CommandFlags::BOTS_ONLY) && auth.is_user() {
+                            return ready(Err(Error::Unauthorized));
+                        }
+
+                        if FLAGS.contains(CommandFlags::ADMIN_ONLY) && !auth.is_admin() {
+                            return ready(Err(Error::Unauthorized));
+                        }
+                    }
+
+                    ready(Ok(Procedure::from(cmd)))
+                });
             })*};
         }
 
         add_cmds! { @TRIVIAL
+            cmds::GetServerConfig,
+
             cmds::UserRegister,
             cmds::UserLogin,
-            cmds::UserLogout,
             cmds::Enable2FA,
             cmds::Confirm2FA,
             cmds::Remove2FA,
+            cmds::ChangePassword,
+            cmds::GetSessions,
+            cmds::ClearSessions,
+            cmds::GetRelationships,
+            cmds::PatchRelationship,
+            cmds::UpdateUserProfile,
+            cmds::GetUser,
+            cmds::UpdateUserPrefs,
+            cmds::UserLogout,
+
+            cmds::CreateFile,
+            cmds::GetFilesystemStatus,
+            cmds::GetFileStatus,
+
+            cmds::GetInvite,
+            cmds::RevokeInvite,
+            cmds::RedeemInvite,
+
+            cmds::CreateParty,
+            cmds::GetParty,
+            cmds::PatchParty,
+            cmds::DeleteParty,
+            cmds::TransferOwnership,
+            cmds::CreateRole,
+            cmds::PatchRole,
+            cmds::DeleteRole,
+            cmds::GetPartyMembers,
+            cmds::GetPartyMember,
+            cmds::GetPartyRooms,
+            cmds::GetPartyInvites,
+            cmds::GetMemberProfile,
+            cmds::UpdateMemberProfile,
+            cmds::CreatePartyInvite,
+            cmds::CreatePinFolder,
+            cmds::CreateRoom,
+            cmds::SearchParty,
+
+            cmds::CreateMessage,
+            cmds::EditMessage,
+            cmds::GetMessage,
+            cmds::DeleteMessage,
+            cmds::StartTyping,
+            cmds::GetMessages,
+            cmds::PinMessage,
+            cmds::UnpinMessage,
+            cmds::StarMessage,
+            cmds::UnstarMessage,
+            cmds::PutReaction,
+            cmds::DeleteOwnReaction,
+            cmds::DeleteUserReaction,
+            cmds::DeleteAllReactions,
+            cmds::GetReactions,
+            cmds::PatchRoom,
+            cmds::DeleteRoom,
+            cmds::GetRoom,
         }
-
-        // add_cmds! {
-        //     cmds::UserRegister: eps::register,
-        // };
-
-        // api.add("/auth", auth::auth);
-        // api.add("/build", build::build);
 
         Self {
             api: api.route_layer(rl.build()),

@@ -126,7 +126,7 @@ impl Error {
             Error::NotFoundSignaling => 100,
             Error::NotFoundHighPenalty => 500,
             Error::BadRequest => 200,
-            Error::Unauthorized => 200,
+            Error::Unauthorized => 300,
             Error::MethodNotAllowed => 200,
             _ => 0,
         })
