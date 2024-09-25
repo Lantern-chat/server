@@ -1,7 +1,8 @@
 use std::{borrow::Cow, str::Utf8Error, string::FromUtf8Error, time::Duration};
 
 use db::Error as DbError;
-use ftl::{body::BodyError, ws::WsRejection};
+use ftl::ws::WsError;
+//use ftl::{body::BodyError, ws::WsRejection};
 use http::{header::InvalidHeaderValue, StatusCode};
 use sdk::{
     api::error::{ApiError, ApiErrorCode},
@@ -96,13 +97,15 @@ pub enum Error {
     #[error("Unsupported Media Type: {0}")]
     UnsupportedMediaType(headers::ContentType),
 
+    #[error("Unsupported Media Type")]
+    UnsupportedMediaTypeGeneric,
+
     #[error("Mime Parse Error: {0}")]
     MimeParseError(#[from] mime::FromStrError),
-
-    //#[error("Websocket Error: {0}")]
-    //WsError(#[from] ftl::ws::WsError),
-    #[error("Search Error: {0}")]
-    SearchError(#[from] schema::search::SearchError),
+    #[error("Websocket Error: {0}")]
+    WsError(#[from] ftl::ws::WsError),
+    // #[error("Search Error: {0}")]
+    // SearchError(#[from] schema::search::SearchError),
 }
 
 impl From<db::pg::Error> for Error {
@@ -211,9 +214,10 @@ impl From<Error> for sdk::api::error::ApiError {
             Error::InvalidHeaderValue(_)    => ApiErrorCode::InvalidHeaderValue,
             Error::QueryParseError(_)       => ApiErrorCode::QueryParseError,
             Error::MimeParseError(_)        => ApiErrorCode::MimeParseError,
-            Error::SearchError(_)           => ApiErrorCode::SearchError,
+            //Error::SearchError(_)           => ApiErrorCode::SearchError,
 
             Error::UnsupportedMediaType(_)  => ApiErrorCode::UnsupportedMediaType,
+            Error::UnsupportedMediaTypeGeneric => ApiErrorCode::UnsupportedMediaType,
 
             Error::AuthTokenError(_)        => ApiErrorCode::AuthTokenError,
             Error::Base64DecodeError(_)     => ApiErrorCode::Base64DecodeError,
@@ -225,8 +229,18 @@ impl From<Error> for sdk::api::error::ApiError {
             Error::HeaderParseError(_)      => ApiErrorCode::HeaderParseError,
             //Error::BodyDeserializeError(_)  => ApiErrorCode::BodyDeserializeError,
 
-            //Error::WsError(WsError::MethodNotAllowed)   => ApiErrorCode::MethodNotAllowed,
-            //Error::WsError(_)                           => ApiErrorCode::WebsocketError,
+            Error::WsError(
+                | WsError::MethodNotConnect
+                | WsError::MethodNotGet
+            ) => ApiErrorCode::MethodNotAllowed,
+
+            Error::WsError(
+                | WsError::IncorrectWebSocketVersion
+                | WsError::InvalidProtocolPsuedoHeader
+                | WsError::MissingWebSocketKey
+            ) => ApiErrorCode::BadRequest,
+
+            Error::WsError(_)               => ApiErrorCode::WebsocketError,
 
             | Error::InternalError(_)
             | Error::InternalErrorStatic(_)
@@ -347,5 +361,53 @@ impl From<core::convert::Infallible> for Error {
     #[inline(always)]
     fn from(e: core::convert::Infallible) -> Self {
         match e {}
+    }
+}
+
+impl From<ftl::Error> for Error {
+    fn from(value: ftl::Error) -> Self {
+        match value {
+            ftl::Error::Unauthorized => Error::MissingAuthorizationHeader, // the only way this occurs is if the auth header is missing
+
+            ftl::Error::HyperError(_) => Error::InternalErrorStatic("HTTP Transport Error"),
+            ftl::Error::BodyError(body_error) => match body_error {
+                ftl::body::BodyError::HyperError(error) => Error::InternalErrorStatic("Error Reading Body"),
+                ftl::body::BodyError::Io(error) => Error::IOError(error),
+                ftl::body::BodyError::StreamAborted => Error::BadRequest,
+                ftl::body::BodyError::LengthLimitError(_) => Error::RequestEntityTooLarge,
+                ftl::body::BodyError::Generic(error) => unimplemented!(),
+                ftl::body::BodyError::DeferredNotConverted => {
+                    Error::InternalErrorStatic("Deferred Body Not Converted")
+                }
+                ftl::body::BodyError::ArbitraryBodyPolled => Error::InternalErrorStatic("Arbitrary Body Polled"),
+            },
+            ftl::Error::Utf8Error(_) => todo!(),
+            ftl::Error::StreamAborted => todo!(),
+            ftl::Error::BadRequest => Error::BadRequest,
+            ftl::Error::MissingHeader(h) => match h {
+                "Authorization" => Error::MissingAuthorizationHeader,
+                _ => Error::BadRequest,
+            },
+            ftl::Error::InvalidHeader(_, error) => Error::BadRequest,
+            ftl::Error::NotFound => Error::NotFound,
+            ftl::Error::MethodNotAllowed => Error::MethodNotAllowed,
+            ftl::Error::UnsupportedMediaType => Error::UnsupportedMediaTypeGeneric,
+            ftl::Error::PayloadTooLarge => Error::RequestEntityTooLarge,
+            ftl::Error::MissingExtension => Error::InternalErrorStatic("Missing Extension in API Service"),
+            ftl::Error::MissingQuery => Error::BadRequest,
+            ftl::Error::MissingMatchedPath => Error::InternalErrorStatic("Missing Matched Path in API Service"),
+            // TODO: Improve these error messages
+            ftl::Error::Form(_error) => Error::BadRequest,
+            ftl::Error::Cbor(_error) => Error::BadRequest,
+            ftl::Error::Json(_error) => Error::BadRequest,
+
+            ftl::Error::Path(_) => Error::BadRequest,
+            ftl::Error::Scheme(_) => Error::BadRequest,
+            ftl::Error::Authority(_) => Error::BadRequest,
+            ftl::Error::WebsocketError(ws_error) => ws_error.into(),
+
+            // currently unused
+            ftl::Error::Custom(_error) => todo!(),
+        }
     }
 }

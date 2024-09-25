@@ -10,12 +10,12 @@ use schema::auth::RawAuthToken;
 
 use ftl::{
     extract::real_ip::RealIpPrivacyMask,
-    layers::rate_limit,
+    layers::rate_limit::{self, extensions::RateLimiterCallback},
     router::{HandlerService, Router},
     IntoResponse, Request, Response,
 };
 
-type Return = Result<Result<Procedure, Error>, Response>;
+type Return = Result<Result<Procedure, Error>, ftl::Error>;
 
 type InnerHandlerService = HandlerService<ServerState, Return>;
 type RateLimitKey = (RealIpPrivacyMask,);
@@ -26,65 +26,95 @@ pub struct ApiV1Service {
 
 use self::auth::Auth;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ReadyMarker;
+
 impl ApiV1Service {
     pub async fn call(&self, req: Request) -> Result<Response, Error> {
         let (mut parts, body) = req.into_parts();
 
         let state = self.api.state();
 
+        let mut auth_err: Option<Error> = None;
+
         let auth = match parts.headers.get(http::header::AUTHORIZATION) {
-            Some(header) => {
-                let auth = crate::auth::do_auth(state, &RawAuthToken::from_header(header.to_str()?)?).await?;
+            Some(header) => match crate::auth::do_auth(state, &RawAuthToken::from_header(header.to_str()?)?).await
+            {
+                Ok(auth) => {
+                    parts.extensions.insert(Auth(auth));
+                    parts.extensions.insert(sdk::api::AuthMarker);
 
-                parts.extensions.insert(Auth(auth));
-                parts.extensions.insert(sdk::api::AuthMarker);
-
-                Some(auth)
-            }
+                    Some(auth)
+                }
+                Err(e) => {
+                    /*
+                        Avoid actually routing the request if the auth failed, but
+                        fallback to the global rate-limiter and still invoke the router
+                        to access the rate-limiter callback, then penalize later.
+                    */
+                    parts.uri = http::uri::Uri::from_static("/");
+                    auth_err = Some(e);
+                    None
+                }
+            },
             None => None,
         };
 
-        let rl = rate_limit::extensions::RateLimiterCallback::<RateLimitKey>::default();
+        if auth_err.is_none() {
+            // use this to fail early if the user isn't authorized, since the absense
+            // of this marker will cause the handlers to exit early.
+            parts.extensions.insert(ReadyMarker);
+        }
 
+        let rl = RateLimiterCallback::<RateLimitKey>::default();
         parts.extensions.insert(rl.clone());
 
-        // call the router and unpack all the possible results
         let proc = match self.api.call_opt(Request::from_parts(parts, body)).await {
-            Ok(Some(resp)) => match resp {
-                Ok(proc) => proc?,
-                Err(e) => return Ok(e), // Okay in the sense that it's a response
-            },
-            Ok(None) => return Err(Error::NotFound),
+            // Rate-limit error is the only one allowed through directly as a response
             Err(rate_limit::Error::RateLimit(rate_limit_error)) => return Ok(rate_limit_error.into_response()),
+            // if not found, signal a penalty to the rate-limiter as they should know better
+            // and because it's not found, this will apply to their global rate-limit
+            Ok(None) => Err(Error::NotFoundSignaling),
+
+            Ok(Some(resp)) => match resp {
+                Ok(proc) => proc,
+                Err(e) => Err(e.into()),
+            },
         };
 
         let Some(rl) = rl.get() else {
             return Err(Error::InternalErrorStatic("RateLimiterCallback not set"));
         };
 
-        let cmd = RpcRequest::Procedure {
-            proc,
-            addr: rl.key().0.into(), // hijack the rate-limiter key to get the IP address
-            auth,
+        let try_proc = move || async move {
+            if let Some(e) = auth_err {
+                return Err(e);
+            }
+
+            let cmd = RpcRequest::Procedure {
+                proc: proc?,
+                addr: rl.key().0.into(), // hijack the rate-limiter key to get the IP address
+                auth,
+            };
+
+            match state.rpc.send(&cmd).await {
+                // penalize for non-existent resources
+                Err(RpcClientError::DoesNotExist) => Err(Error::NotFoundHighPenalty),
+                Err(e) => {
+                    log::error!("Error sending RPC request: {:?}", e);
+                    Err(Error::InternalErrorStatic("RPC Error"))
+                }
+                Ok(recv) => {
+                    let RpcRequest::Procedure { ref proc, .. } = cmd else {
+                        unreachable!()
+                    };
+
+                    proc.stream_response::<_, Error>(recv).await
+                }
+            }
         };
 
-        let res = match state.rpc.send(&cmd).await {
-            // penalize for non-existent resources
-            Err(RpcClientError::DoesNotExist) => Err(Error::NotFoundHighPenalty),
-            Err(e) => {
-                log::error!("Error sending RPC request: {:?}", e);
-                Err(Error::InternalErrorStatic("RPC Error"))
-            }
-            Ok(recv) => {
-                let RpcRequest::Procedure { ref proc, .. } = cmd else {
-                    unreachable!()
-                };
-
-                proc.stream_response::<_, Error>(recv).await
-            }
-        };
-
-        match res {
+        match try_proc().await {
             Ok(resp) => Ok(resp),
             Err(e) => {
                 let penalty = e.penalty();
@@ -115,7 +145,7 @@ impl ApiV1Service {
                 );
 
                 rl.add_route(
-                    (<$cmd as Command>::HTTP_METHOD, <$cmd as Command>::ROUTE_PATTERN), {
+                    (<$cmd as Command>::HTTP_METHOD, <$cmd as Command>::ROUTE_PATTERN), const {
                         let rl = <$cmd as Command>::RATE_LIMIT;
                         Quota::new(rl.emission_interval, rl.burst_size)
                     },
@@ -124,7 +154,8 @@ impl ApiV1Service {
 
             // trivial handlers that just convert the extracted command to a procedure
             (@TRIVIAL $($cmd:ty),* $(,)?) => {$({
-                add_cmds!($cmd: |auth: Option<Auth>, cmd: $cmd| {
+                add_cmds!($cmd: |_ready: ftl::extract::Extension<ReadyMarker>, auth: Option<Auth>, cmd: $cmd| {
+                    // use generic ready future to avoid overhead from many near-duplicate async-block types
                     use core::future::ready;
 
                     // some routes don't need auth, some do, but that's checked in the command
@@ -214,8 +245,15 @@ impl ApiV1Service {
             cmds::GetRoom,
         }
 
+        let default_quota = const {
+            let rl = sdk::api::RateLimit::DEFAULT;
+            Quota::new(rl.emission_interval, rl.burst_size)
+        };
+
         Self {
-            api: api.route_layer(rl.build()),
+            api: api.route_layer(
+                rl.with_global_fallback(true).with_extension(true).with_default_quota(default_quota).build(),
+            ),
         }
     }
 }

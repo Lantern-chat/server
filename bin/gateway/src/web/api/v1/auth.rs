@@ -18,7 +18,7 @@ impl core::ops::Deref for Auth {
 }
 
 impl<S> FromRequestParts<S> for Auth {
-    type Rejection = Error;
+    type Rejection = ftl::Error;
 
     fn from_request_parts(
         parts: &mut RequestParts,
@@ -26,7 +26,7 @@ impl<S> FromRequestParts<S> for Auth {
     ) -> impl core::future::Future<Output = Result<Self, Self::Rejection>> + Send {
         core::future::ready(match parts.extensions.get::<Auth>() {
             Some(auth) => Ok(*auth),
-            None => Err(Error::MissingAuthorizationHeader),
+            None => Err(ftl::Error::MissingHeader("Authorization")),
         })
     }
 }

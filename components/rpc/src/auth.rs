@@ -1,4 +1,4 @@
-use sdk::models::{Snowflake, Timestamp, UserFlags};
+use sdk::models::{ElevationLevel, Snowflake, Timestamp, UserFlags};
 
 use auth::UserToken;
 
@@ -29,6 +29,10 @@ impl Authorization {
     #[inline(always)]
     pub const fn is_user(&self) -> bool {
         matches!(self, Authorization::User { .. })
+    }
+
+    pub const fn is_admin(&self) -> bool {
+        matches!(self, Authorization::User { flags, .. } if matches!(flags.elevation(), ElevationLevel::Staff | ElevationLevel::System))
     }
 
     #[inline(always)]
