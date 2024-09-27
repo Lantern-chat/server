@@ -370,12 +370,13 @@ impl From<ftl::Error> for Error {
             ftl::Error::Unauthorized => Error::MissingAuthorizationHeader, // the only way this occurs is if the auth header is missing
 
             ftl::Error::HyperError(_) => Error::InternalErrorStatic("HTTP Transport Error"),
+            ftl::Error::IoError(error) => Error::IOError(error),
             ftl::Error::BodyError(body_error) => match body_error {
-                ftl::body::BodyError::HyperError(error) => Error::InternalErrorStatic("Error Reading Body"),
+                ftl::body::BodyError::HyperError(_error) => Error::InternalErrorStatic("Error Reading Body"),
                 ftl::body::BodyError::Io(error) => Error::IOError(error),
                 ftl::body::BodyError::StreamAborted => Error::BadRequest,
                 ftl::body::BodyError::LengthLimitError(_) => Error::RequestEntityTooLarge,
-                ftl::body::BodyError::Generic(error) => unimplemented!(),
+                ftl::body::BodyError::Generic(_error) => unimplemented!(),
                 ftl::body::BodyError::DeferredNotConverted => {
                     Error::InternalErrorStatic("Deferred Body Not Converted")
                 }
@@ -388,7 +389,7 @@ impl From<ftl::Error> for Error {
                 "Authorization" => Error::MissingAuthorizationHeader,
                 _ => Error::BadRequest,
             },
-            ftl::Error::InvalidHeader(_, error) => Error::BadRequest,
+            ftl::Error::InvalidHeader(_, _error) => Error::BadRequest,
             ftl::Error::NotFound => Error::NotFound,
             ftl::Error::MethodNotAllowed => Error::MethodNotAllowed,
             ftl::Error::UnsupportedMediaType => Error::UnsupportedMediaTypeGeneric,
