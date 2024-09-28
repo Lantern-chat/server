@@ -9,8 +9,10 @@ use ::rpc::{client::RpcClientError, procedure::Procedure, request::RpcRequest};
 use schema::auth::RawAuthToken;
 
 use ftl::{
-    extract::real_ip::RealIpPrivacyMask,
-    layers::rate_limit::{self, extensions::RateLimiterCallback},
+    extract::{real_ip::RealIpPrivacyMask, Extension},
+    layers::rate_limit::{
+        extensions::RateLimiterCallback, Error as RateLimitError, RateLimitLayerBuilder, RateLimitService,
+    },
     router::{HandlerService, Router},
     IntoResponse, Request, Response,
 };
@@ -21,7 +23,7 @@ type InnerHandlerService = HandlerService<ServerState, Return>;
 type RateLimitKey = (RealIpPrivacyMask,);
 
 pub struct ApiV1Service {
-    api: Router<ServerState, Return, rate_limit::RateLimitService<InnerHandlerService>>,
+    api: Router<ServerState, Return, RateLimitService<InnerHandlerService>>,
 }
 
 use self::auth::Auth;
@@ -71,7 +73,7 @@ impl ApiV1Service {
 
         let proc = match self.api.call_opt(Request::from_parts(parts, body)).await {
             // Rate-limit error is the only one allowed through directly as a response
-            Err(rate_limit::Error::RateLimit(rate_limit_error)) => return Ok(rate_limit_error.into_response()),
+            Err(RateLimitError::RateLimit(rate_limit_error)) => return Ok(rate_limit_error.into_response()),
             // if not found, signal a penalty to the rate-limiter as they should know better
             // and because it's not found, this will apply to their global rate-limit
             Ok(None) => Err(Error::NotFoundSignaling),
@@ -129,11 +131,20 @@ impl ApiV1Service {
     }
 
     pub fn new(state: ServerState) -> Self {
+        use ftl::layers::rate_limit::gcra::Quota;
         use ftl::router::GenericRouter;
-        use rate_limit::gcra::Quota;
         use sdk::api::{commands::all as cmds, Command, CommandFlags};
 
-        let mut rl = rate_limit::RateLimitLayerBuilder::new();
+        let default_quota = const {
+            let rl = sdk::api::RateLimit::DEFAULT;
+            Quota::new(rl.emission_interval, rl.burst_size)
+        };
+
+        let mut rl = RateLimitLayerBuilder::new()
+            .with_global_fallback(true)
+            .with_extension(true)
+            .with_default_quota(default_quota);
+
         let mut api = Router::<_, Return>::with_state(state);
 
         macro_rules! add_cmds {
@@ -154,7 +165,7 @@ impl ApiV1Service {
 
             // trivial handlers that just convert the extracted command to a procedure
             (@TRIVIAL $($cmd:ty),* $(,)?) => {$({
-                add_cmds!($cmd: |_ready: ftl::extract::Extension<ReadyMarker>, auth: Option<Auth>, cmd: $cmd| {
+                add_cmds!($cmd: |_ready: Extension<ReadyMarker>, auth: Option<Auth>, cmd: $cmd| {
                     // use generic ready future to avoid overhead from many near-duplicate async-block types
                     use core::future::ready;
 
@@ -245,15 +256,8 @@ impl ApiV1Service {
             cmds::GetRoom,
         }
 
-        let default_quota = const {
-            let rl = sdk::api::RateLimit::DEFAULT;
-            Quota::new(rl.emission_interval, rl.burst_size)
-        };
-
         Self {
-            api: api.route_layer(
-                rl.with_global_fallback(true).with_extension(true).with_default_quota(default_quota).build(),
-            ),
+            api: api.route_layer(rl.build()),
         }
     }
 }

@@ -1,10 +1,14 @@
+use std::time::Duration;
+
 use http::{HeaderName, HeaderValue, Method, StatusCode};
 
 use ftl::{
     body::deferred::Deferred,
     extract::{MatchedPath, State},
+    layers::rate_limit::{Error as RateLimitError, RateLimitLayerBuilder, RateLimitService},
+    router::{HandlerService, Router},
     service::{Service, ServiceFuture},
-    IntoResponse, Request, RequestParts, Response, Router,
+    IntoResponse, Request, RequestParts, Response,
 };
 
 use crate::prelude::*;
@@ -16,8 +20,10 @@ pub mod api {
     pub mod v1;
 }
 
+type InnerWebService = HandlerService<ServerState, Response>;
+
 pub struct WebService {
-    pub web: Router<ServerState, Response>,
+    pub web: Router<ServerState, Response, RateLimitService<InnerWebService>>,
     pub api_v1: api::v1::ApiV1Service,
 }
 
@@ -37,9 +43,10 @@ impl Service<Request> for WebService {
                 return self.api_v1.call(req).await;
             }
 
-            match self.web.call(req).await {
-                Ok(resp) => Ok(resp),
-                Err(e) => Ok(e.into_response()),
+            match self.web.call_opt(req).await {
+                Ok(Some(resp)) => Ok(resp),
+                Ok(None) => Ok(StatusCode::NOT_FOUND.into_response()),
+                Err(RateLimitError::RateLimit(err)) => Ok(err.into_response()),
             }
         }
     }
@@ -47,27 +54,53 @@ impl Service<Request> for WebService {
 
 impl WebService {
     pub fn new(state: ServerState) -> Self {
+        use ftl::layers::rate_limit::gcra::Quota;
+
+        // Web routes are primarily used by actual humans, so configure it to be more strict
+        // and disallow burst requests in the default quota.
+        let mut rl = RateLimitLayerBuilder::new()
+            .with_global_fallback(true)
+            .with_default_quota(Duration::from_millis(5).into());
+
         let mut web = Router::with_state(state.clone());
 
-        web.get("/robots.txt", robots);
-        web.get("/build", build::build_info);
+        macro_rules! add_routes {
+            ($($($method:ident)|+ $path:literal $(($emission_interval:expr $(; $burst:expr)?))? => $handler:expr),* $(,)?) => {
+                $({
+                    let methods = [$(Method::$method),+];
 
-        web.on([Method::GET, Method::HEAD], "/favicon.ico", favicon);
-        web.on([Method::GET, Method::HEAD], "/static/{*path}", static_files);
-        web.on([Method::GET, Method::HEAD], "/{*page}", index_file);
+                    $(
+                        let quota = Quota::new(
+                            Duration::from_millis($emission_interval),
+                            ($(core::num::NonZeroU64::new($burst).unwrap(),)? core::num::NonZeroU64::MIN,).0
+                        );
+
+                        for method in &methods {
+                            rl.add_route((method.clone(), $path), quota);
+                        }
+                    )?
+
+                    web.on(methods, $path, $handler);
+                })*
+            };
+        }
+
+        add_routes! {
+            GET "/robots.txt" => || core::future::ready(include_str!("robots.txt")),
+            GET "/build" (50) => build::build_info,
+            GET|HEAD "/favicon.ico" => favicon,
+            GET|HEAD "/static/{*path}" => static_files,
+            GET|HEAD "/{*page}" => index_file,
+        }
 
         // wildcard for GET/HEAD handled by index_file, so any others are simply disallowed
         web.fallback(|| async { StatusCode::METHOD_NOT_ALLOWED });
 
         Self {
-            web,
+            web: web.route_layer(rl.build()),
             api_v1: api::v1::ApiV1Service::new(state.clone()),
         }
     }
-}
-
-async fn robots() -> &'static str {
-    include_str!("robots.txt")
 }
 
 async fn static_files(State(state): State<ServerState>, path: MatchedPath, parts: RequestParts) -> Response {
