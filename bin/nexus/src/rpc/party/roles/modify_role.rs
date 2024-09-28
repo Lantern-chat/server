@@ -128,7 +128,7 @@ pub async fn modify_role(
     // }
 
     let color = form.color.as_ref().map(|c| c.to_native() as i32);
-    let avatar_id = maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), new_avatar.map_into()).await?;
+    let avatar_id = maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), new_avatar.convert()).await?;
     let [perms1, perms2] = match permissions.as_ref() {
         Some(perms) => perms.to_i64(),
         None => [0, 0], // unused

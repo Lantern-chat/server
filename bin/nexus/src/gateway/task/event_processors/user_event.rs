@@ -9,19 +9,6 @@ pub async fn user_update(state: &ServerState, db: &db::Client, user_id: UserId) 
     let self_future = self_update(state, db, user_id, None);
 
     let user_future = async {
-        mod user_query {
-            pub use schema::*;
-            pub use thorn::*;
-
-            indexed_columns! {
-                pub enum UserColumns {
-                    Users::Username,
-                    Users::Discriminator,
-                    Users::Flags,
-                }
-            }
-        }
-
         #[rustfmt::skip]
         let row = db.query_one2(schema::sql! {
             SELECT

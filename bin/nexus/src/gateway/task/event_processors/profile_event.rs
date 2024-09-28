@@ -1,5 +1,4 @@
 use futures::{future::Either, StreamExt};
-use smol_str::SmolStr;
 
 use crate::util::encrypted_asset::encrypt_snowflake;
 
@@ -69,9 +68,7 @@ pub async fn profile_updated(
                         // so try to avoid the encryption work every iteration
                         avatar: match row.avatar_id()? {
                             Some(avatar_id) => Nullable::Some(match last_avatar {
-                                Some((last_id, ref last_encrypted)) if last_id == avatar_id => {
-                                    last_encrypted.clone()
-                                }
+                                Some((last_id, ref last_encrypted)) if last_id == avatar_id => *last_encrypted,
                                 _ => {
                                     let newly_encrypted = encrypt_snowflake(state, avatar_id);
                                     last_avatar = Some((avatar_id, newly_encrypted));

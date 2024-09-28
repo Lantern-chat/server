@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::net::IpAddr;
 
 use crate::prelude::*;
 
@@ -13,7 +13,7 @@ use crate::internal::{
     password::verify_password,
 };
 
-pub async fn login(state: ServerState, addr: SocketAddr, cmd: &Archived<UserLogin>) -> Result<Session, Error> {
+pub async fn login(state: ServerState, addr: IpAddr, cmd: &Archived<UserLogin>) -> Result<Session, Error> {
     let form = &cmd.body;
 
     if form.password.len() < 8 {

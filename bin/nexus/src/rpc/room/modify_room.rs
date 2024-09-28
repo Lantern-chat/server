@@ -83,7 +83,7 @@ pub async fn modify_room(
             break 'avatar Nullable::Undefined;
         }
 
-        maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), form.avatar.map_into()).await?
+        maybe_add_asset(&state, AssetMode::Avatar, auth.user_id(), form.avatar.convert()).await?
     };
 
     let overwrites: ThinVec<Overwrite> =

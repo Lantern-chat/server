@@ -92,151 +92,151 @@ pub async fn get_full_user(
     // })
 }
 
-mod q {
-    use sdk::models::UserPrefsFlags;
+// mod q {
+//     use sdk::models::UserPrefsFlags;
 
-    use crate::prelude::*;
-    use schema::*;
-    pub use thorn::*;
+//     use crate::prelude::*;
+//     use schema::*;
+//     pub use thorn::*;
 
-    thorn::tables! {
-        pub struct TempAllowLastActive {
-            Allowed: Type::BOOL,
-        }
+//     thorn::tables! {
+//         pub struct TempAllowLastActive {
+//             Allowed: Type::BOOL,
+//         }
 
-        pub struct TempAssociated {
-            Associated: Type::BOOL,
-        }
-    }
+//         pub struct TempAssociated {
+//             Associated: Type::BOOL,
+//         }
+//     }
 
-    thorn::decl_alias! {
-        pub BaseProfile = Profiles,
-        pub PartyProfile = Profiles
-    }
+//     thorn::decl_alias! {
+//         pub BaseProfile = Profiles,
+//         pub PartyProfile = Profiles
+//     }
 
-    thorn::params! {
-        pub struct Params {
-            pub self_id: UserId = Users::Id,
-            pub user_id: UserId = Users::Id,
-            pub party_id: Option<PartyId> = Party::Id,
-        }
-    }
+//     thorn::params! {
+//         pub struct Params {
+//             pub self_id: UserId = Users::Id,
+//             pub user_id: UserId = Users::Id,
+//             pub party_id: Option<PartyId> = Party::Id,
+//         }
+//     }
 
-    pub mod columns {
-        use super::*;
+//     pub mod columns {
+//         use super::*;
 
-        thorn::indexed_columns! {
-            pub enum UserColumns {
-                Users::Discriminator,
-                Users::Username,
-                Users::Flags,
-                Users::LastActive,
-            }
+//         thorn::indexed_columns! {
+//             pub enum UserColumns {
+//                 Users::Discriminator,
+//                 Users::Username,
+//                 Users::Flags,
+//                 Users::LastActive,
+//             }
 
-            pub enum PresenceColumns continue UserColumns {
-                AggPresence::UpdatedAt,
-                AggPresence::Flags,
-                //AggPresence::Activity,
-            }
+//             pub enum PresenceColumns continue UserColumns {
+//                 AggPresence::UpdatedAt,
+//                 AggPresence::Flags,
+//                 //AggPresence::Activity,
+//             }
 
-            pub enum AllowLastActiveColumns continue PresenceColumns {
-                TempAllowLastActive::Allowed,
-            }
+//             pub enum AllowLastActiveColumns continue PresenceColumns {
+//                 TempAllowLastActive::Allowed,
+//             }
 
-            pub enum ProfileColumns continue AllowLastActiveColumns {
-                Profiles::Bits,
-                Profiles::AvatarId,
-                Profiles::BannerId,
-                Profiles::Nickname,
-                Profiles::CustomStatus,
-                Profiles::Biography,
-            }
+//             pub enum ProfileColumns continue AllowLastActiveColumns {
+//                 Profiles::Bits,
+//                 Profiles::AvatarId,
+//                 Profiles::BannerId,
+//                 Profiles::Nickname,
+//                 Profiles::CustomStatus,
+//                 Profiles::Biography,
+//             }
 
-            pub enum AssocColumns continue ProfileColumns {
-                TempAssociated::Associated
-            }
-        }
-    }
+//             pub enum AssocColumns continue ProfileColumns {
+//                 TempAssociated::Associated
+//             }
+//         }
+//     }
 
-    use columns::*;
+//     use columns::*;
 
-    pub fn query(member: bool) -> impl AnyQuery {
-        let mut q = Query::select()
-            .cols(UserColumns::default())
-            .cols(PresenceColumns::default())
-            // AllowLastActiveColumns
-            .expr(
-                Users::Preferences
-                    .json_extract("flags".lit())
-                    .cast(Type::INT4)
-                    .has_no_bits(UserPrefsFlags::HIDE_LAST_ACTIVE.bits().lit())
-                    .is_true(),
-            );
+//     pub fn query(member: bool) -> impl AnyQuery {
+//         let mut q = Query::select()
+//             .cols(UserColumns::default())
+//             .cols(PresenceColumns::default())
+//             // AllowLastActiveColumns
+//             .expr(
+//                 Users::Preferences
+//                     .json_extract("flags".lit())
+//                     .cast(Type::INT4)
+//                     .has_no_bits(UserPrefsFlags::HIDE_LAST_ACTIVE.bits().lit())
+//                     .is_true(),
+//             );
 
-        // ProfileColumns, must follow order as listed above
-        q = match member {
-            false => q.cols(ProfileColumns::default()).and_where(Params::party_id().is_null()),
-            true => q
-                .expr(schema::combine_profile_bits::call(
-                    BaseProfile::col(Profiles::Bits),
-                    PartyProfile::col(Profiles::Bits),
-                    PartyProfile::col(Profiles::AvatarId),
-                ))
-                .expr(Builtin::coalesce((
-                    PartyProfile::col(Profiles::AvatarId),
-                    BaseProfile::col(Profiles::AvatarId),
-                )))
-                .expr(Builtin::coalesce((
-                    PartyProfile::col(Profiles::BannerId),
-                    BaseProfile::col(Profiles::BannerId),
-                )))
-                .expr(Builtin::coalesce((
-                    PartyProfile::col(Profiles::Nickname),
-                    BaseProfile::col(Profiles::Nickname),
-                )))
-                .expr(Builtin::coalesce((
-                    PartyProfile::col(Profiles::CustomStatus),
-                    BaseProfile::col(Profiles::CustomStatus),
-                )))
-                .expr(Builtin::coalesce((
-                    PartyProfile::col(Profiles::Biography),
-                    BaseProfile::col(Profiles::Biography),
-                ))),
-        };
+//         // ProfileColumns, must follow order as listed above
+//         q = match member {
+//             false => q.cols(ProfileColumns::default()).and_where(Params::party_id().is_null()),
+//             true => q
+//                 .expr(schema::combine_profile_bits::call(
+//                     BaseProfile::col(Profiles::Bits),
+//                     PartyProfile::col(Profiles::Bits),
+//                     PartyProfile::col(Profiles::AvatarId),
+//                 ))
+//                 .expr(Builtin::coalesce((
+//                     PartyProfile::col(Profiles::AvatarId),
+//                     BaseProfile::col(Profiles::AvatarId),
+//                 )))
+//                 .expr(Builtin::coalesce((
+//                     PartyProfile::col(Profiles::BannerId),
+//                     BaseProfile::col(Profiles::BannerId),
+//                 )))
+//                 .expr(Builtin::coalesce((
+//                     PartyProfile::col(Profiles::Nickname),
+//                     BaseProfile::col(Profiles::Nickname),
+//                 )))
+//                 .expr(Builtin::coalesce((
+//                     PartyProfile::col(Profiles::CustomStatus),
+//                     BaseProfile::col(Profiles::CustomStatus),
+//                 )))
+//                 .expr(Builtin::coalesce((
+//                     PartyProfile::col(Profiles::Biography),
+//                     BaseProfile::col(Profiles::Biography),
+//                 ))),
+//         };
 
-        // AssocColumns
-        q = q.expr(
-            Query::select()
-                .from_table::<AggUserAssociations>()
-                .expr(1.lit())
-                .and_where(AggUserAssociations::UserId.equals(Params::self_id()))
-                .and_where(AggUserAssociations::OtherId.equals(Params::user_id()))
-                .exists(),
-        );
+//         // AssocColumns
+//         q = q.expr(
+//             Query::select()
+//                 .from_table::<AggUserAssociations>()
+//                 .expr(1.lit())
+//                 .and_where(AggUserAssociations::UserId.equals(Params::self_id()))
+//                 .and_where(AggUserAssociations::OtherId.equals(Params::user_id()))
+//                 .exists(),
+//         );
 
-        q = match member {
-            false => q.from(
-                Users::left_join_table::<Profiles>()
-                    .on(Profiles::UserId.equals(Users::Id).and(Profiles::PartyId.is_null()))
-                    .left_join_table::<AggPresence>()
-                    .on(AggPresence::UserId.equals(Users::Id)),
-            ),
-            true => q.from(
-                Users::left_join_table::<BaseProfile>()
-                    .on(BaseProfile::col(Profiles::UserId)
-                        .equals(Users::Id)
-                        .and(BaseProfile::col(Profiles::PartyId).is_null()))
-                    .left_join_table::<PartyProfile>()
-                    .on(PartyProfile::col(Profiles::UserId)
-                        .equals(Users::Id)
-                        .and(PartyProfile::col(Profiles::PartyId).equals(Params::party_id())))
-                    .left_join_table::<AggPresence>()
-                    .on(AggPresence::UserId.equals(Users::Id)),
-            ),
-        };
+//         q = match member {
+//             false => q.from(
+//                 Users::left_join_table::<Profiles>()
+//                     .on(Profiles::UserId.equals(Users::Id).and(Profiles::PartyId.is_null()))
+//                     .left_join_table::<AggPresence>()
+//                     .on(AggPresence::UserId.equals(Users::Id)),
+//             ),
+//             true => q.from(
+//                 Users::left_join_table::<BaseProfile>()
+//                     .on(BaseProfile::col(Profiles::UserId)
+//                         .equals(Users::Id)
+//                         .and(BaseProfile::col(Profiles::PartyId).is_null()))
+//                     .left_join_table::<PartyProfile>()
+//                     .on(PartyProfile::col(Profiles::UserId)
+//                         .equals(Users::Id)
+//                         .and(PartyProfile::col(Profiles::PartyId).equals(Params::party_id())))
+//                     .left_join_table::<AggPresence>()
+//                     .on(AggPresence::UserId.equals(Users::Id)),
+//             ),
+//         };
 
-        q = q.and_where(Users::Id.equals(Params::user_id()));
+//         q = q.and_where(Users::Id.equals(Params::user_id()));
 
-        q
-    }
-}
+//         q
+//     }
+// }

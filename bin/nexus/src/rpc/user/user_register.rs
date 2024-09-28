@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, time::SystemTime};
+use std::{net::IpAddr, time::SystemTime};
 
 use crate::prelude::*;
 
@@ -10,7 +10,7 @@ use sdk::models::Session;
 
 pub async fn register_user(
     state: ServerState,
-    addr: SocketAddr,
+    addr: IpAddr,
     cmd: &Archived<UserRegister>,
 ) -> Result<Session, Error> {
     let form = &cmd.body;

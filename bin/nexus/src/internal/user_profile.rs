@@ -42,8 +42,8 @@ impl<'a> From<&'a ArchivedUpdateUserProfileBody> for PatchProfile<'a> {
             nick: nick.as_ref().map(|s| s.as_str()),
             status: status.as_ref().map(|s| s.as_str()),
             bio: bio.as_ref().map(|s| s.as_str()),
-            avatar: avatar.map_into(),
-            banner: banner.map_into(),
+            avatar: avatar.convert(),
+            banner: banner.convert(),
             banner_align: *banner_align,
         }
     }
@@ -169,9 +169,9 @@ pub async fn patch_profile(
     Ok(UserProfile {
         bits: profile.bits,
         extra: Default::default(),
-        nick: profile.nick.map_into(),
-        status: profile.status.map_into(),
-        bio: profile.bio.map_into(),
+        nick: profile.nick.convert(),
+        status: profile.status.convert(),
+        bio: profile.bio.convert(),
         avatar: avatar_id.map(|id| encrypt_snowflake(&state, id)),
         banner: banner_id.map(|id| encrypt_snowflake(&state, id)),
     })

@@ -1,11 +1,11 @@
-use std::{net::SocketAddr, time::SystemTime};
+use std::{net::IpAddr, time::SystemTime};
 
 use schema::auth::RawAuthToken;
 use sdk::models::Session;
 
 use crate::prelude::*;
 
-pub async fn do_login(state: ServerState, addr: SocketAddr, user_id: UserId) -> Result<Session, Error> {
+pub async fn do_login(state: ServerState, addr: IpAddr, user_id: UserId) -> Result<Session, Error> {
     let now = SystemTime::now();
 
     let token = RawAuthToken::bearer(util::rng::crypto_thread_rng());
@@ -15,7 +15,6 @@ pub async fn do_login(state: ServerState, addr: SocketAddr, user_id: UserId) -> 
     };
 
     let expires = now + state.config().shared.session_duration;
-    let ip = addr.ip();
 
     let db = state.db.write.get().await?;
 
@@ -26,7 +25,7 @@ pub async fn do_login(state: ServerState, addr: SocketAddr, user_id: UserId) -> 
             #{&bytes    as Sessions::Token   },
             #{&user_id  as Sessions::UserId  },
             #{&expires  as Sessions::Expires },
-            #{&ip       as Sessions::Addr    }
+            #{&addr     as Sessions::Addr    }
         )
     })
     .await?;

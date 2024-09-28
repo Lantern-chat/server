@@ -65,7 +65,7 @@ impl EventQueue {
 
     pub async fn send<T>(&self, event: &T) -> Result<(), Error>
     where
-        T: for<'a> Serialize<HighSerializer<'a, AlignedVec, ArenaHandle<'a>, RancorError>>,
+        T: for<'a> Serialize<HighSerializer<AlignedVec, ArenaHandle<'a>, RancorError>>,
     {
         let event = match rkyv::to_bytes(event) {
             Ok(event) => event,
