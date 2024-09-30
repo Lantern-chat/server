@@ -15,6 +15,7 @@ pub mod error;
 pub mod gateway;
 pub mod rpc;
 pub mod state;
+pub mod tasks;
 pub mod web;
 
 pub mod prelude {
