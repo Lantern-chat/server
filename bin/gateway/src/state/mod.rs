@@ -5,7 +5,7 @@ use crate::{
     config::Config,
     gateway::{Gateway, Heart},
     //web::{file_cache::MainFileCache, rate_limit::RateLimitTable},
-    web::file_cache::MainFileCache,
+    web::file_cache::StaticFileCache,
 };
 
 use arc_swap::ArcSwap;
@@ -19,12 +19,17 @@ pub mod session_cache;
 pub struct InnerServerState {
     pub sf: SnowflakeGenerator,
     pub db: db::DatabasePools,
+
     pub config: config::Config<Config>,
 
     pub session_cache: session_cache::AuthCache,
-    //pub rate_limit: RateLimitTable,
-    pub file_cache: MainFileCache,
+
+    /// Static file cache
+    pub file_cache: StaticFileCache,
+
+    /// global hasher for random things
     pub hasher: sdk::FxRandomState2,
+
     pub emoji: common::emoji::EmojiMap,
 
     pub rpc: rpc::client::RpcManager,

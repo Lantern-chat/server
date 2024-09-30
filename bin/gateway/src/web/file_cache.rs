@@ -97,7 +97,7 @@ pub struct CacheEntry {
 }
 
 #[derive(Default)]
-pub struct MainFileCache {
+pub struct StaticFileCache {
     map: scc::HashMap<PathBuf, CacheEntry, sdk::FxRandomState2>,
 }
 
@@ -115,7 +115,7 @@ static VARIABLE_PATTERNS: LazyLock<AhoCorasick> = LazyLock::new(|| {
         .unwrap()
 });
 
-impl MainFileCache {
+impl StaticFileCache {
     pub async fn cleanup(&self, max_age: Duration) {
         let now = SystemTime::now();
 
@@ -195,7 +195,7 @@ impl MainFileCache {
     }
 }
 
-impl FileCache<ServerState> for MainFileCache {
+impl FileCache<ServerState> for StaticFileCache {
     type File = CachedFile;
     type Meta = Metadata;
 

@@ -5,6 +5,7 @@ use http::{HeaderName, HeaderValue, Method, StatusCode};
 use ftl::{
     body::deferred::Deferred,
     extract::{MatchedPath, State},
+    fs::FileCacheExtra,
     layers::rate_limit::{Error as RateLimitError, RateLimitLayerBuilder, RateLimitService},
     router::{HandlerService, Router},
     service::{Service, ServiceFuture},
@@ -14,8 +15,10 @@ use ftl::{
 use crate::prelude::*;
 
 pub mod build;
+pub mod cdn;
 pub mod file_cache;
 pub mod layers;
+
 pub mod api {
     pub mod v1;
 }
@@ -103,13 +106,18 @@ impl WebService {
     }
 }
 
-async fn static_files(State(state): State<ServerState>, path: MatchedPath, parts: RequestParts) -> Response {
+/// Serves static files from the `dist` directory
+async fn static_files(
+    State(state): State<ServerState>,
+    path: MatchedPath,
+    parts: RequestParts,
+) -> impl IntoResponse {
     let base_dir = state.config().local.paths.web_path.join("dist");
-
-    ftl::fs::dir(&parts, &state, &*path, base_dir, &state.file_cache).await
+    state.file_cache.dir(&parts, &state, &*path, base_dir).await
 }
 
-async fn index_file(State(state): State<ServerState>, parts: RequestParts) -> Response {
+/// Serves the index.html file from the `dist` directory, for any allowed path
+async fn index_file(State(state): State<ServerState>, parts: RequestParts) -> impl IntoResponse {
     // either empty path or one of the allowed paths
     #[rustfmt::skip]
     let allowed = matches!(parts.uri.path().split_once('/').map(|x| x.1),
@@ -118,11 +126,11 @@ async fn index_file(State(state): State<ServerState>, parts: RequestParts) -> Re
 
     // NOTE: Whitelisting paths deters a bunch of false requests from bots
     if !allowed {
-        return StatusCode::NOT_FOUND.into_response();
+        return Err(StatusCode::NOT_FOUND);
     }
 
     let path = state.config().local.paths.web_path.join("dist/index.html");
-    let mut resp = ftl::fs::file(&parts, &state, path, &state.file_cache).await;
+    let mut resp = state.file_cache.file(&parts, &state, path).await;
 
     // TODO: Revisit this conclusion?
     // index.html is small, always fetch latest version
@@ -135,14 +143,17 @@ async fn index_file(State(state): State<ServerState>, parts: RequestParts) -> Re
     //     resp.headers_mut().insert(const { HeaderName::from_static("link") }, hvalue);
     // }
 
-    resp
+    Ok(resp)
 }
 
-async fn favicon(State(state): State<ServerState>, parts: RequestParts) -> Response {
+/// Serves the favicon.ico file from the `assets` directory
+async fn favicon(State(state): State<ServerState>, parts: RequestParts) -> impl IntoResponse {
     let path = state.config().local.paths.web_path.join("assets/favicon.ico");
-    ftl::fs::file(&parts, &state, path, &state.file_cache).await
+    state.file_cache.file(&parts, &state, path).await
 }
 
+/// Checks if the path contains a bad pattern, which are typically indicative of malicious requests
+/// or requests that are not meant to be served by the web server.
 fn is_bad_pattern(path: &str) -> bool {
     use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 
@@ -150,6 +161,7 @@ fn is_bad_pattern(path: &str) -> bool {
 
     #[rustfmt::skip]
     static BAD_PATTERNS: LazyLock<AhoCorasick> = LazyLock::new(|| {
+        // We use Aho-Corasick since these can appear anywhere in the path
         AhoCorasickBuilder::new().ascii_case_insensitive(true).build([
             "wp-includes", "wp-admin", "wp-login", "wp-content", "wordpress",
             "wlwmanifest", ".git", ".env", "drupal", "ajax", "claro", "wp-json", "tinymce", "kcfinder",
@@ -157,7 +169,22 @@ fn is_bad_pattern(path: &str) -> bool {
         ]).unwrap()
     });
 
-    path.ends_with(".php") || BAD_PATTERNS.is_match(path)
+    /// List of bad file extensions that cannot be served by the web server, and thus
+    /// trying to access these is indicative of a malicious request.
+    #[rustfmt::skip]
+    static BAD_EXTENSIONS: &[&str] = &[
+        // TODO: Check that these don't conflict with CDN routes
+        "php", "asp", "aspx", "jsp", "py", "pl", "cgi", "rb", "sh", "shtml", "cfm", "htaccess", "htpasswd", "ini",
+        "env", "bak", "sql", "db", "sqlite", "sqlite3", "log", "conf", "json", "yml", "yaml", "toml", "git", "gitignore",
+    ];
+
+    if let Some(ext) = path.rsplit_once(".").map(|(_, ext)| ext) {
+        if BAD_EXTENSIONS.contains(&ext) {
+            return true;
+        }
+    }
+
+    BAD_PATTERNS.is_match(path)
 }
 
 // fn gen_oembed_header_value(route: &Route<ServerState>) -> Option<HeaderValue> {

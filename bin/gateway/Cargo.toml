@@ -23,7 +23,7 @@ quinn.workspace = true
 tokio = { workspace = true, features = ["full"] }
 serde.workspace = true
 
-ftl = { workspace = true, features = ["fs"] }
+ftl = { workspace = true, features = ["fs", "compression-all"] }
 reqwest.workspace = true
 async-compression = { version = "0.4", features = ["tokio", "deflate", "gzip", "brotli", "zstd"] }
 hyper = { version = "1", features = ["http1", "http2", "server"] }
