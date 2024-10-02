@@ -6,11 +6,13 @@ use std::sync::{
 };
 use std::{borrow::Cow, net::SocketAddr};
 
+use auth::RawAuthToken;
 use futures_util::{stream::FuturesUnordered, FutureExt, StreamExt};
 use indexmap::IndexMap;
 use parking_lot::RwLock;
 
 use quinn::{Connection, Endpoint};
+use rkyv_rpc::DeserializeExt;
 use sdk::{api::error::ApiError, Snowflake};
 
 use framed::tokio::AsyncFramedWriter;
@@ -137,7 +139,10 @@ pub struct RpcManager {
     rooms: scc::HashIndex<Snowflake, Snowflake, sdk::FxRandomState2>,
 }
 
-use crate::request::{PartyInfo, RpcRequest};
+use crate::{
+    auth::Authorization,
+    request::{PartyInfo, RpcRequest},
+};
 
 impl RpcManager {
     async fn find_faction(&self, endpoint: Resolve) -> Result<Option<RpcClient>, RpcClientError> {
@@ -194,6 +199,20 @@ impl RpcManager {
         };
 
         client.send(cmd).await
+    }
+
+    pub async fn authorize(&self, token: RawAuthToken) -> Result<Result<Authorization, ApiError>, RpcClientError> {
+        let stream = self.nexus.send(&RpcRequest::Authorize { token }).await?;
+
+        let mut recv = crate::stream::RpcRecvReader::new(stream);
+
+        Ok(match recv.recv::<Result<Authorization, ApiError>>().await? {
+            None => Err(ApiError {
+                message: "Authorization failed".into(),
+                code: sdk::api::error::ApiErrorCode::Unauthorized,
+            }),
+            Some(res) => res.deserialize_simple().unwrap(),
+        })
     }
 }
 

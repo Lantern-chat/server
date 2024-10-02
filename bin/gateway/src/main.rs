@@ -8,7 +8,6 @@ extern crate serde;
 extern crate tracing as log;
 
 pub mod allocator;
-pub mod auth;
 pub mod cli;
 pub mod config;
 pub mod error;
@@ -49,8 +48,6 @@ async fn main() -> anyhow::Result<()> {
     fn get_any<T>() -> T {
         unimplemented!()
     }
-
-    _ = auth::do_auth(get_any(), get_any()).await;
 
     Ok(())
 }

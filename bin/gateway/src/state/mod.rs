@@ -22,7 +22,7 @@ pub struct InnerServerState {
 
     pub config: config::Config<Config>,
 
-    pub session_cache: session_cache::AuthCache,
+    pub auth_cache: session_cache::AuthCache,
 
     /// Static file cache
     pub file_cache: StaticFileCache,

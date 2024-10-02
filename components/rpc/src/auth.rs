@@ -20,6 +20,10 @@ pub enum Authorization {
     },
 }
 
+#[rustfmt::skip]
+impl Clone for ArchivedAuthorization { fn clone(&self) -> Self { *self } }
+impl Copy for ArchivedAuthorization {}
+
 impl Authorization {
     #[inline(always)]
     pub const fn is_bot(&self) -> bool {

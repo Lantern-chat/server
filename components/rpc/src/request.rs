@@ -1,3 +1,4 @@
+use auth::RawAuthToken;
 use sdk::Snowflake;
 
 use crate::{event::ClientCommand, procedure::Procedure};
@@ -7,8 +8,15 @@ pub enum RpcRequest {
     Procedure {
         proc: Procedure,
         addr: std::net::IpAddr,
-        auth: Option<crate::auth::Authorization>,
+
+        #[rkyv(with = rkyv::with::Niche)]
+        auth: Option<Box<crate::auth::Authorization>>,
     },
+
+    Authorize {
+        token: RawAuthToken,
+    },
+
     /// Fetch party info from a party_id
     GetPartyInfoFromPartyId(Snowflake),
     /// Fetch party info from a room_id

@@ -1,21 +1,51 @@
+use std::time::Duration;
+
 use crate::prelude::*;
 
 pub type ApiResult<T> = Result<T, Error>;
-
-pub mod auth;
-pub mod eps;
 
 use ::rpc::{client::RpcClientError, procedure::Procedure, request::RpcRequest};
 use schema::auth::RawAuthToken;
 
 use ftl::{
-    extract::{real_ip::RealIpPrivacyMask, Extension},
-    layers::rate_limit::{
-        extensions::RateLimiterCallback, Error as RateLimitError, RateLimitLayerBuilder, RateLimitService,
+    extract::{real_ip::RealIpPrivacyMask, FromRequestParts},
+    layers::{
+        rate_limit::{
+            extensions::RateLimiterCallback, Error as RateLimitError, RateLimitLayer, RateLimitLayerBuilder,
+            RateLimitService,
+        },
+        resp_timing::StartTime,
     },
     router::{HandlerService, Router},
-    IntoResponse, Request, Response,
+    IntoResponse, Request, RequestParts, Response,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct Auth(pub Authorization);
+
+impl core::ops::Deref for Auth {
+    type Target = Authorization;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<S> FromRequestParts<S> for Auth {
+    type Rejection = ftl::Error;
+
+    fn from_request_parts(
+        parts: &mut RequestParts,
+        _: &S,
+    ) -> impl core::future::Future<Output = Result<Self, Self::Rejection>> + Send {
+        core::future::ready(match parts.extensions.get::<Auth>() {
+            Some(auth) => Ok(*auth),
+            None => Err(ftl::Error::MissingHeader("Authorization")),
+        })
+    }
+}
 
 type Return = Result<Result<Procedure, Error>, ftl::Error>;
 
@@ -23,57 +53,101 @@ type InnerHandlerService = HandlerService<ServerState, Return>;
 type RateLimitKey = (RealIpPrivacyMask,);
 
 pub struct ApiV1Service {
-    api: Router<ServerState, Return, RateLimitService<InnerHandlerService>>,
+    api: Router<ServerState, Return, RateLimitService<InnerHandlerService, RateLimitKey>>,
+    rl: RateLimitLayer<RateLimitKey>,
 }
-
-use self::auth::Auth;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ReadyMarker;
 
 impl ApiV1Service {
     pub async fn call(&self, req: Request) -> Result<Response, Error> {
-        let (mut parts, body) = req.into_parts();
-
         let state = self.api.state();
 
-        let mut auth_err: Option<Error> = None;
+        let (mut parts, body) = req.into_parts();
 
-        let auth = match parts.headers.get(http::header::AUTHORIZATION) {
-            Some(header) => match crate::auth::do_auth(state, &RawAuthToken::from_header(header.to_str()?)?).await
-            {
-                Ok(auth) => {
-                    parts.extensions.insert(Auth(auth));
-                    parts.extensions.insert(sdk::api::AuthMarker);
+        // get the start time for request. This is all guaranteed to be present.
+        let StartTime(start) = *parts.extensions.get::<ftl::layers::resp_timing::StartTime>().unwrap();
 
-                    Some(auth)
-                }
-                Err(e) => {
-                    /*
-                        Avoid actually routing the request if the auth failed, but
-                        fallback to the global rate-limiter and still invoke the router
-                        to access the rate-limiter callback, then penalize later.
-                    */
-                    parts.uri = http::uri::Uri::from_static("/");
-                    auth_err = Some(e);
-                    None
-                }
-            },
-            None => None,
+        // extract rate-limiter key from the request before we start on real work
+        let key = match RateLimitKey::from_request_parts(&mut parts, state).await {
+            Ok(key) => key,
+            Err(e) => return Err(e.into()),
         };
 
-        if auth_err.is_none() {
-            // use this to fail early if the user isn't authorized, since the absense
-            // of this marker will cause the handlers to exit early.
-            parts.extensions.insert(ReadyMarker);
+        parts.extensions.insert(key); // for reuse later by the per-route rate-limiter
+
+        let global_rate_limiter = self.rl.global_fallback(key, None);
+
+        // perform request within the global rate-limiter
+        if let Err(e) = global_rate_limiter.req(start).await {
+            return Ok(e.into_response());
         }
 
-        let rl = RateLimiterCallback::<RateLimitKey>::default();
-        parts.extensions.insert(rl.clone());
+        // if an authorization token is present, perform the full authorization process regardless of the route
+        let auth = match parts.headers.get(http::header::AUTHORIZATION) {
+            None => None,
+            Some(header) => {
+                let raw_token = RawAuthToken::from_header(header.to_str()?)?;
 
+                // wrap in async block for easier error handling
+                let auth = async {
+                    // check the cache first
+                    match state.auth_cache.get(&raw_token) {
+                        // fast path for cached tokens
+                        Ok(Some(auth)) => Ok(auth),
+
+                        // error from cache, such as an invalid token
+                        Err(e) => Err(e),
+
+                        // slow path for uncached tokens, fetch from RPC
+                        Ok(None) => match state.rpc.authorize(raw_token).await {
+                            Ok(Ok(auth)) => {
+                                // insert the token into the cache for future requests
+                                state.auth_cache.set(auth).await;
+
+                                Ok(auth)
+                            }
+                            Ok(Err(e)) => {
+                                // token is invalid or unauthorized, invalidate the cache and penalize the rate-limiter
+                                if e.code == sdk::api::error::ApiErrorCode::Unauthorized {
+                                    tokio::join! {
+                                        // invalidate the token in the cache
+                                        state.auth_cache.set_invalid(raw_token),
+
+                                        // heavy penalty for invalid tokens
+                                        global_rate_limiter.penalize(Duration::from_secs(1)),
+                                    };
+                                }
+
+                                Err(Error::ApiError(e))
+                            }
+                            Err(rpc_error) => {
+                                log::error!("Error authorizing token via RPC: {:?}", rpc_error);
+
+                                Err(Error::InternalErrorStatic("RPC Error"))
+                            }
+                        },
+                    }
+                };
+
+                let auth = auth.await?;
+
+                parts.extensions.insert(Auth(auth));
+                parts.extensions.insert(sdk::api::AuthMarker);
+
+                Some(auth)
+            }
+        };
+
+        // allow us to penalize the rate-limiter later if the request is not found or other errors occur
+        let rlc = RateLimiterCallback::<RateLimitKey>::default();
+        parts.extensions.insert(rlc.clone());
+
+        // call the api router to get the procedure
         let proc = match self.api.call_opt(Request::from_parts(parts, body)).await {
             // Rate-limit error is the only one allowed through directly as a response
             Err(RateLimitError::RateLimit(rate_limit_error)) => return Ok(rate_limit_error.into_response()),
+            // if the key is rejected, it failed to parse from the request
+            // NOTE: Due to the above manual key extraction, this should be impossible
+            Err(RateLimitError::KeyRejection(_)) => return Err(Error::BadRequest),
             // if not found, signal a penalty to the rate-limiter as they should know better
             // and because it's not found, this will apply to their global rate-limit
             Ok(None) => Err(Error::NotFoundSignaling),
@@ -84,19 +158,18 @@ impl ApiV1Service {
             },
         };
 
-        let Some(rl) = rl.get() else {
-            return Err(Error::InternalErrorStatic("RateLimiterCallback not set"));
+        // in potential rare error cases, rlc may not have been set, so fallback to the global rate-limiter
+        let rl = match rlc.get() {
+            Some(rl) => rl,
+            None => &global_rate_limiter,
         };
 
-        let try_proc = move || async move {
-            if let Some(e) = auth_err {
-                return Err(e);
-            }
-
+        let try_proc = async move {
+            // NOTE: This goes here because of proc?, it's just easier with the error handling below
             let cmd = RpcRequest::Procedure {
                 proc: proc?,
                 addr: rl.key().0.into(), // hijack the rate-limiter key to get the IP address
-                auth,
+                auth: auth.map(Box::new),
             };
 
             match state.rpc.send(&cmd).await {
@@ -116,7 +189,7 @@ impl ApiV1Service {
             }
         };
 
-        match try_proc().await {
+        match try_proc.await {
             Ok(resp) => Ok(resp),
             Err(e) => {
                 let penalty = e.penalty();
@@ -165,7 +238,7 @@ impl ApiV1Service {
 
             // trivial handlers that just convert the extracted command to a procedure
             (@TRIVIAL $($cmd:ty),* $(,)?) => {$({
-                add_cmds!($cmd: |_ready: Extension<ReadyMarker>, auth: Option<Auth>, cmd: $cmd| {
+                add_cmds!($cmd: |auth: Option<Auth>, cmd: $cmd| {
                     // use generic ready future to avoid overhead from many near-duplicate async-block types
                     use core::future::ready;
 
@@ -256,8 +329,11 @@ impl ApiV1Service {
             cmds::GetRoom,
         }
 
+        let rl = rl.build();
+
         Self {
-            api: api.route_layer(rl.build()),
+            rl: rl.clone(),
+            api: api.route_layer(rl),
         }
     }
 }

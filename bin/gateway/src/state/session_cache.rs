@@ -4,6 +4,8 @@ use schema::auth::{RawAuthToken, UserToken};
 
 use rpc::auth::Authorization;
 
+use crate::prelude::*;
+
 #[derive(Debug, Clone, Copy)]
 struct PartialUserAuthorization {
     user_id: UserId,
@@ -20,12 +22,17 @@ struct PartialBotAuthorization {
 #[derive(Default)]
 pub struct AuthCache {
     users: scc::HashIndex<UserToken, PartialUserAuthorization, sdk::FxRandomState2>,
+    invalid: scc::HashSet<RawAuthToken, sdk::FxRandomState2>,
     bots: scc::HashIndex<UserId, PartialBotAuthorization, sdk::FxRandomState2>,
 }
 
 impl AuthCache {
-    pub fn get(&self, token: &RawAuthToken) -> Option<Authorization> {
-        match token {
+    pub fn get(&self, token: &RawAuthToken) -> Result<Option<Authorization>, Error> {
+        if self.invalid.contains(token) {
+            return Err(Error::Unauthorized);
+        }
+
+        Ok(match token {
             RawAuthToken::Bearer(token) => self.users.peek_with(token, |_, partial| Authorization::User {
                 token: *token,
                 user_id: partial.user_id,
@@ -36,7 +43,20 @@ impl AuthCache {
                 bot_id: token.id,
                 issued: partial.issued,
             }),
-        }
+        })
+    }
+
+    pub async fn set_invalid(&self, token: RawAuthToken) {
+        _ = tokio::join! {
+            self.invalid.insert_async(token),
+            async {
+                #[allow(clippy::single_match)] // until fixed by adding bot removal
+                match token {
+                    RawAuthToken::Bearer(token) => _ = self.users.remove_async(&token).await,
+                    _ => {} // TODO: Implement bot removal
+                }
+            },
+        };
     }
 
     pub async fn set(&self, auth: Authorization) {
