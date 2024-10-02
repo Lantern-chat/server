@@ -159,10 +159,7 @@ impl ApiV1Service {
         };
 
         // in potential rare error cases, rlc may not have been set, so fallback to the global rate-limiter
-        let rl = match rlc.get() {
-            Some(rl) => rl,
-            None => &global_rate_limiter,
-        };
+        let rl = rlc.get().unwrap_or(&global_rate_limiter);
 
         let try_proc = async move {
             // NOTE: This goes here because of proc?, it's just easier with the error handling below

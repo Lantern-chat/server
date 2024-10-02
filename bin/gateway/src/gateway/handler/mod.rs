@@ -116,7 +116,7 @@ pub async fn client_connection(ws: WebSocket, query: GatewayQueryParams, _addr: 
             Err(_) => WsMessage::close(),
             Ok(event) => match *event {
                 // TODO: Don't unwrap, re-evaluate if the encoded event should even be received here?
-                EventInner::External(ref event) => WsMessage::binary(event.get_encoded(7).unwrap().get(query).clone()),
+                EventInner::External(ref event) => WsMessage::binary(event.get_encoded(7).unwrap().get(query)),
                 _ => unreachable!(),
             },
         })

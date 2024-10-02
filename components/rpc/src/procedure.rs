@@ -138,22 +138,26 @@ where
         return Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "No Response").into());
     };
 
+    // we get the first item to check for an API error immediately
     let first = first??;
 
-    if !P::STREAM {
-        return Ok(Deferred::new(first).into_response());
-    }
+    let resp = if !P::STREAM {
+        // if the command doesn't expect a stream, we can just return the first item
+        Deferred::new(first)
+    } else {
+        // put the first item back into the stream and merge additional errors into IO errors
+        //
+        // In practice, only the first item should be an API error.
+        Deferred::stream(
+            futures_util::stream::iter([Ok(first)]).chain(stream.map(|value| match value {
+                Ok(Ok(item)) => Ok(item),
+                Ok(Err(api_error)) => Err(std::io::Error::new(std::io::ErrorKind::Other, api_error)),
+                Err(err) => Err(err),
+            })),
+        )
+    };
 
-    // put the first item back into the stream and merge additional errors into IO errors
-    //
-    // In practice, only the first item should be an API error.
-    let stream = futures_util::stream::iter([Ok(first)]).chain(stream.map(|value| match value {
-        Ok(Ok(item)) => Ok(item),
-        Ok(Err(api_error)) => Err(std::io::Error::new(std::io::ErrorKind::Other, api_error)),
-        Err(err) => Err(err),
-    }));
-
-    Ok(Deferred::stream(stream).into_response())
+    Ok(resp.into_response())
 }
 
 #[cfg(test)]
