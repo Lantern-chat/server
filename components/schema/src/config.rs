@@ -19,7 +19,7 @@ impl From<db::pg::Error> for ConfigError {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)]
 pub struct SharedConfig {
     // Config settings
     pub config_id: Uuid,
@@ -86,6 +86,11 @@ pub struct SharedConfig {
     pub b2_key: SmolStr,
     pub embed_worker_uris: Vec<SmolStr>,
 }
+
+const _: () = {
+    const fn assert_archive<T: rkyv::Archive>() {}
+    assert_archive::<SharedConfig>();
+};
 
 use postgres_range::{BoundType, Range as PgRange, RangeBound};
 
