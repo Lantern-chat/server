@@ -5,6 +5,7 @@ use crate::prelude::*;
 pub type ApiResult<T> = Result<T, Error>;
 
 use ::rpc::{client::RpcClientError, procedure::Procedure, request::RpcRequest};
+use futures::FutureExt;
 use schema::auth::RawAuthToken;
 
 use ftl::{
@@ -98,7 +99,7 @@ impl ApiV1Service {
                         Err(e) => Err(e),
 
                         // slow path for uncached tokens, fetch from RPC
-                        Ok(None) => match state.rpc.authorize(raw_token).await {
+                        Ok(None) => match state.rpc.authorize(raw_token).boxed().await {
                             Ok(Ok(auth)) => {
                                 // insert the token into the cache for future requests
                                 state.auth_cache.set(auth).await;
@@ -169,7 +170,7 @@ impl ApiV1Service {
                 auth: auth.map(Box::new),
             };
 
-            match state.rpc.send(&cmd).await {
+            match state.rpc.send(&cmd).boxed().await {
                 // penalize for non-existent resources
                 Err(RpcClientError::DoesNotExist) => Err(Error::NotFoundHighPenalty),
                 Err(e) => {
