@@ -32,8 +32,8 @@ where
     E: core::fmt::Debug,
     ApiError: From<E>,
 {
-    // stream::iter is more efficient
-    encode_stream(out, Ok(futures_util::stream::iter([item]))).await
+    // stream::iter is more efficient for non-future values
+    encode_stream(out, Ok(futures_util::stream::iter(Some(item)))).await
 }
 
 pub async fn encode_stream<T, E, W>(
@@ -54,7 +54,7 @@ where
 
     let mut stream = std::pin::pin!(match stream {
         Ok(stream) => Either::Left(stream),
-        Err(err) => Either::Right(futures_util::stream::iter([Err(err)])),
+        Err(err) => Either::Right(futures_util::stream::iter(Some(Err(err)))),
     });
 
     while let Some(item) = stream.next().await {

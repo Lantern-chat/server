@@ -69,7 +69,6 @@ impl SplitBotToken {
     }
 
     pub fn verify(&self, key: &BotTokenKey) -> bool {
-        //token_mac(self, key).verify_slice(&self.hmac).is_ok()
         self.hmac == self.token_mac(key).finalize_fixed().as_slice()
     }
 

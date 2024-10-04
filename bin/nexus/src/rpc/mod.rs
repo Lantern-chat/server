@@ -115,30 +115,28 @@ where
     // avoid inlining every async state machine by boxing them inside a lazy future/async block
     macro_rules! c {
         ($([$size:literal])? $first:ident$(::$frag:ident)+($($args:expr),*)) => {
-            Box::pin(async move { ::rpc::stream::encode_item::<_, Error, _>(
-                out, crate::rpc::$first$(::$frag)+($($args),*).await).await.map_err(Error::from) })
+            return Ok(Box::pin(async move { ::rpc::stream::encode_item::<_, Error, _>(
+                out, crate::rpc::$first$(::$frag)+($($args),*).await).await.map_err(Error::from) }))
         };
     }
     macro_rules! s {
         ($([$size:literal])? $first:ident$(::$frag:ident)+($($args:expr),*)) => {
-            Box::pin(async move { ::rpc::stream::encode_stream::<_, Error, _>(
-                out, crate::rpc::$first$(::$frag)+($($args),*).await).await.map_err(Error::from) })
+            return Ok(Box::pin(async move { ::rpc::stream::encode_stream::<_, Error, _>(
+                out, crate::rpc::$first$(::$frag)+($($args),*).await).await.map_err(Error::from) }))
         };
     }
 
     use core::{future::Future, pin::Pin};
 
-    #[allow(clippy::type_complexity)]
+    #[allow(clippy::type_complexity)] #[rustfmt::skip]
     // using a closure here allows for early returns of the future for auth and others
     let gen_dispatch = move || -> Result<Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>, Error> {
         let (addr, auth, proc) = match cmd {
             ArchivedRpcRequest::Procedure { addr, auth, proc } => (addr, auth, proc),
-            ArchivedRpcRequest::Authorize { token } => return Ok(c!(auth::do_auth(state, token))),
+            ArchivedRpcRequest::Authorize { token } => c!(auth::do_auth(state, token)),
             _ => unimplemented!(),
         };
 
-        // prepare fields
-        let addr = addr.as_ipaddr();
         let auth = || match auth.as_ref() {
             Some(auth) => Ok(auth.get().deserialize_simple().expect("Unable to deserialize auth")),
             None => Err(Error::Unauthorized),
@@ -146,13 +144,11 @@ where
 
         use rpc::procedure::ArchivedProcedure as Proc;
 
-        // assigning to a variable is apparently requires to get the type coalescing to work
         #[allow(unused_variables)]
-        #[rustfmt::skip]
-        let running: Pin<Box<dyn Future<Output = Result<(), Error>> + Send>> = match proc {
+        match proc {
             Proc::GetServerConfig(cmd) => todo!("GetServerConfig"),
-            Proc::UserRegister(cmd) => c!(user::user_register::register_user(state, addr, cmd)),
-            Proc::UserLogin(cmd) => c!(user::user_login::login(state, addr, cmd)),
+            Proc::UserRegister(cmd) => c!(user::user_register::register_user(state, addr.as_ipaddr(), cmd)),
+            Proc::UserLogin(cmd) => c!(user::user_login::login(state, addr.as_ipaddr(), cmd)),
             Proc::UserLogout(_) => c!(user::me::user_logout::logout_user(state, auth()?)),
             Proc::Enable2FA(cmd) => c!(user::me::user_mfa::enable_2fa(state, auth()?, cmd)),
             Proc::Confirm2FA(cmd) => c!(user::me::user_mfa::confirm_2fa(state, auth()?, cmd)),
@@ -207,9 +203,7 @@ where
             Proc::PatchRoom(cmd) => c!(room::modify_room::modify_room(state, auth()?, cmd)),
             Proc::DeleteRoom(cmd) => c!(room::remove_room::remove_room(state, auth()?, cmd)),
             Proc::GetRoom(cmd) => c!(room::get_room::get_room(state, auth()?, cmd)),
-        };
-
-        Ok(running)
+        }
     };
 
     gen_dispatch()?.await

@@ -22,13 +22,7 @@ pub async fn do_auth(state: ServerState, token: &Archived<RawAuthToken>) -> Resu
 
     match auth {
         Some(auth @ Authorization::Bot { .. }) => Ok(auth),
-        Some(auth @ Authorization::User { expires, .. }) => {
-            if expires > Timestamp::now_utc() {
-                Ok(auth)
-            } else {
-                Err(Error::NoSession) // TODO: Better error type for bad bot auth
-            }
-        }
+        Some(auth @ Authorization::User { expires, .. }) if expires > Timestamp::now_utc() => Ok(auth),
         _ => Err(Error::NoSession),
     }
 }

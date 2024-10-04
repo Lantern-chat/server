@@ -64,7 +64,7 @@ decl_procs! {
     303 = RedeemInvite,
 
     // Party stuff, goes to faction servers
-    401 = CreateParty,
+    401 = CreateParty,          // goes to the nexus first
     402 = GetParty              @ party.party_id,
     403 = PatchParty            @ party.party_id,
     404 = DeleteParty           @ party.party_id,
