@@ -27,7 +27,7 @@ pub struct AuthCache {
 }
 
 impl AuthCache {
-    pub fn get(&self, token: &RawAuthToken) -> Result<Option<Authorization>, Error> {
+    pub fn get(&self, token: &RawAuthToken, state: &ServerState) -> Result<Option<Authorization>, Error> {
         if self.invalid.contains(token) {
             return Err(Error::Unauthorized);
         }
@@ -39,10 +39,13 @@ impl AuthCache {
                 expires: partial.expires,
                 flags: partial.flags,
             }),
-            RawAuthToken::Bot(token) => self.bots.peek_with(&token.id, |_, partial| Authorization::Bot {
-                bot_id: token.id,
-                issued: partial.issued,
-            }),
+            RawAuthToken::Bot(token) if token.verify(&state.config().local.keys.bt_key) => {
+                self.bots.peek_with(&token.id, |_, partial| Authorization::Bot {
+                    bot_id: token.id,
+                    issued: partial.issued,
+                })
+            }
+            _ => return Err(Error::Unauthorized),
         })
     }
 

@@ -91,7 +91,7 @@ impl ApiV1Service {
                 // wrap in async block for easier error handling
                 let auth = async {
                     // check the cache first
-                    match state.auth_cache.get(&raw_token) {
+                    match state.auth_cache.get(&raw_token, state) {
                         // fast path for cached tokens
                         Ok(Some(auth)) => Ok(auth),
 
