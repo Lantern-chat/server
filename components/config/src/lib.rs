@@ -101,7 +101,6 @@ pub trait Configuration {
     fn configure(&mut self);
 }
 
-use futures::{Stream, StreamExt};
 use std::sync::Arc;
 use tokio::sync::Notify;
 
@@ -146,27 +145,39 @@ pub trait HasConfig<C> {
     fn config_full(&self) -> Arc<C> {
         self.raw().load_full()
     }
-}
 
-/// Returns an infinite stream that yields a reference to the config only when it changes
-///
-/// The first value returns immediately
-pub fn config_stream<C, I>(state: &C) -> impl Stream<Item = arc_swap::Guard<Arc<I>>>
-where
-    C: Clone + HasConfig<I>,
-    I: Configuration + 'static,
-{
-    use futures::stream::{iter, repeat};
+    /// Returns an infinite stream that yields a reference to the config only when it changes.
+    ///
+    /// The first value returns immediately, but subsequent values will only be yielded when the config changes.
+    ///
+    /// The reference returned is intended to be temporary but lightweight, so use it immediately then drop it.
+    /// Use `config_full_stream` if you need a full long-lived `Arc` to the current config.
+    fn config_stream(self) -> impl futures::Stream<Item = arc_swap::Guard<Arc<C>>>
+    where
+        Self: Sized,
+    {
+        futures::stream::unfold((true, self), |(first, state)| async move {
+            if !first {
+                state.raw().config_change.notified().await;
+            }
 
-    // NOTE: `iter` has less overhead than `once`
-    let first = iter([state.raw().config.load()]);
+            Some((state.config(), (false, state)))
+        })
+    }
 
-    // TODO: Figure out how to avoid cloning on every item, maybe convert to stream::poll_fn
-    let rest = repeat(state.clone()).then(|state| async move {
-        let raw = state.raw();
-        raw.config_change.notified().await;
-        raw.load()
-    });
+    /// Returns an infinite stream that yields an `Arc` to the config only when it changes.
+    ///
+    /// The first value returns immediately, but subsequent values will only be yielded when the config changes.
+    fn config_full_stream(self) -> impl futures::Stream<Item = Arc<C>>
+    where
+        Self: Sized,
+    {
+        futures::stream::unfold((true, self), |(first, state)| async move {
+            if !first {
+                state.raw().config_change.notified().await;
+            }
 
-    first.chain(rest)
+            Some((state.config_full(), (false, state)))
+        })
+    }
 }
