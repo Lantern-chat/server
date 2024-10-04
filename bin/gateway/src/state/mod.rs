@@ -14,27 +14,15 @@ use tokio::sync::{Notify, Semaphore};
 
 use schema::sf::SnowflakeGenerator;
 
-pub mod session_cache;
+pub mod auth_cache;
 
 pub struct InnerServerState {
     pub sf: SnowflakeGenerator,
-    pub db: db::DatabasePools,
-
     pub config: config::Config<Config>,
-
-    pub auth_cache: session_cache::AuthCache,
-
-    /// Static file cache
+    pub auth_cache: auth_cache::AuthCache,
     pub file_cache: StaticFileCache,
-
-    /// global hasher for random things
-    pub hasher: sdk::FxRandomState2,
-
     pub emoji: common::emoji::EmojiMap,
-
     pub rpc: rpc::client::RpcManager,
-
-    pub heart: Arc<Heart>,
     pub gateway: Gateway,
 }
 

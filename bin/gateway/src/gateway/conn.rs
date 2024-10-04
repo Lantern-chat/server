@@ -39,7 +39,7 @@ impl Deref for GatewayConnection {
 
 impl GatewayConnection {
     pub fn new(state: &ServerState) -> (Self, mpsc::Receiver<Event>) {
-        let heart = state.heart.clone();
+        let heart = state.gateway.heart.clone();
         let (tx, rx) = mpsc::channel(16);
         let conn = GatewayConnection(Arc::new(GatewayConnectionInner {
             id: state.sf.gen(),

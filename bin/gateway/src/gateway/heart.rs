@@ -1,5 +1,7 @@
 /// Heartbeat struct to keep track of the time since the gateway started
-/// and calculate the current elapsed time in seconds. This is used to determine
+/// and calculate the current elapsed time in seconds.
+///
+/// This is used to determine
 /// if a connection has timed out, e.g. missed a heartbeat.
 ///
 /// The times are not guaranteed to be accurate to real time, but are
