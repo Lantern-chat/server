@@ -48,8 +48,11 @@ pub struct EncodedEvent {
 #[derive(Debug)]
 pub struct ExternalEvent {
     pub msg: ServerMsg,
-    pub encoded: OnceCell<EncodedEvent>,
     pub room_id: Option<RoomId>,
+
+    // TODO: Replace with std OnceLock when get_or_try_init is stabilized
+    // https://github.com/rust-lang/rust/issues/109737
+    pub encoded: OnceCell<EncodedEvent>,
 }
 
 /// Actual event enum
