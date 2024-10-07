@@ -2,12 +2,12 @@ use ftl::serve::{accept::NoDelayAcceptor, Server};
 
 use super::*;
 
-pub fn add_http_server_task(state: &ServerState, runner: &TaskRunner) {
+pub fn add_http_server_task(state: &GatewayServerState, runner: &TaskRunner) {
     runner.add(RetryTask::new(HttpServer(state.clone())));
 }
 
 #[derive(Clone)]
-struct HttpServer(ServerState);
+struct HttpServer(GatewayServerState);
 
 impl task_runner::Task for HttpServer {
     fn start(self, alive: Alive) -> tokio::task::JoinHandle<()> {

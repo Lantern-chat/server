@@ -106,7 +106,7 @@ pub struct Gateway {
     pub structure: structure::StructureCache,
 }
 
-impl ServerState {
+impl GatewayServerState {
     pub async fn new_gateway_connection(&self) -> (GatewayConnection, mpsc::Receiver<Event>) {
         let (conn, rx) = GatewayConnection::new(self);
 

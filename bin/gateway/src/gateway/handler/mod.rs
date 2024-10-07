@@ -35,12 +35,12 @@ pub mod util;
 
 use item::{Item, MessageIncomingError, MessageOutgoingError};
 
-pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, addr: IpAddr, state: ServerState) {
+pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, addr: IpAddr, state: GatewayServerState) {
     tokio::spawn(client_connection(ws, query, addr, state));
 }
 
 pub struct ConnectionState {
-    pub state: ServerState,
+    pub state: GatewayServerState,
     pub conn: GatewayConnection,
     /// for each party that is being listened on, keep the associated cancel handle, to kill the stream if we unsub from them
     pub listener_table: listener_table::ListenerTable,
@@ -71,7 +71,7 @@ pub enum Loop<T> {
     Break,
 }
 
-pub async fn client_connection(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr, state: ServerState) {
+pub async fn client_connection(ws: WebSocket, query: GatewayQueryParams, _addr: IpAddr, state: GatewayServerState) {
     let (ws_tx, ws_rx) = ws.split();
 
     let (conn, conn_rx) = state.new_gateway_connection().await;

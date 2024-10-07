@@ -19,7 +19,7 @@ pub mod web;
 
 pub mod prelude {
     pub use crate::error::Error;
-    pub use crate::state::ServerState;
+    pub use crate::state::GatewayServerState;
 
     pub use rpc::{auth::Authorization, event::ServerEvent};
     pub use sdk::models::{aliases::*, Nullable, SmolStr, Snowflake, Timestamp};

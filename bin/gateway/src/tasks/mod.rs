@@ -5,7 +5,7 @@ type Alive = tokio::sync::watch::Receiver<bool>;
 
 use crate::prelude::*;
 
-pub fn add_tasks(state: &ServerState, runner: &TaskRunner) {
+pub fn add_tasks(state: &GatewayServerState, runner: &TaskRunner) {
     http_server::add_http_server_task(state, runner);
     https_server::add_https_server_task(state, runner);
 }

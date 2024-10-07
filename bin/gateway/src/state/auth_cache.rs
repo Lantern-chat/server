@@ -27,7 +27,7 @@ pub struct AuthCache {
 }
 
 impl AuthCache {
-    pub fn get(&self, token: &RawAuthToken, state: &ServerState) -> Result<Option<Authorization>, Error> {
+    pub fn get(&self, token: &RawAuthToken, state: &GatewayServerState) -> Result<Option<Authorization>, Error> {
         if self.invalid.contains(token) {
             return Err(Error::Unauthorized);
         }

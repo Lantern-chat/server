@@ -28,9 +28,9 @@ pub struct InnerServerState {
 
 #[derive(Clone)]
 #[repr(transparent)]
-pub struct ServerState(triomphe::Arc<InnerServerState>);
+pub struct GatewayServerState(triomphe::Arc<InnerServerState>);
 
-impl Deref for ServerState {
+impl Deref for GatewayServerState {
     type Target = InnerServerState;
 
     #[inline(always)]
@@ -39,7 +39,7 @@ impl Deref for ServerState {
     }
 }
 
-impl config::HasConfig<Config> for ServerState {
+impl config::HasConfig<Config> for GatewayServerState {
     #[inline(always)]
     fn raw(&self) -> &config::Config<Config> {
         &self.config

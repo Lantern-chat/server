@@ -50,11 +50,11 @@ impl<S> FromRequestParts<S> for Auth {
 
 type Return = Result<Result<Procedure, Error>, ftl::Error>;
 
-type InnerHandlerService = HandlerService<ServerState, Return>;
+type InnerHandlerService = HandlerService<GatewayServerState, Return>;
 type RateLimitKey = (RealIpPrivacyMask,);
 
 pub struct ApiV1Service {
-    api: Router<ServerState, Return, RateLimitService<InnerHandlerService, RateLimitKey>>,
+    api: Router<GatewayServerState, Return, RateLimitService<InnerHandlerService, RateLimitKey>>,
     rl: RateLimitLayer<RateLimitKey>,
 }
 
@@ -201,7 +201,7 @@ impl ApiV1Service {
         }
     }
 
-    pub fn new(state: ServerState) -> Self {
+    pub fn new(state: GatewayServerState) -> Self {
         use ftl::layers::rate_limit::gcra::Quota;
         use ftl::router::GenericRouter;
         use sdk::api::{commands::all as cmds, Command, CommandFlags};

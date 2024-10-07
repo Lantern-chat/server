@@ -138,7 +138,7 @@ impl StaticFileCache {
             .await;
     }
 
-    pub async fn process(&self, state: &ServerState, path: &Path, mut file: Vec<u8>) -> Vec<u8> {
+    pub async fn process(&self, state: &GatewayServerState, path: &Path, mut file: Vec<u8>) -> Vec<u8> {
         // if HTML file *or* manifest.json
         if matches!((path.extension(), path.file_stem()), (Some(ext), Some(stem)) if ext == "html" || (ext == "json" && stem == "manifest"))
         {
@@ -148,7 +148,7 @@ impl StaticFileCache {
         file
     }
 
-    pub fn do_process(&self, state: &ServerState, mut file: Vec<u8>) -> Vec<u8> {
+    pub fn do_process(&self, state: &GatewayServerState, mut file: Vec<u8>) -> Vec<u8> {
         let mut new_file = Vec::new();
 
         let c = state.config_full();
@@ -205,15 +205,15 @@ impl StaticFileCache {
     }
 }
 
-impl FileCache<ServerState> for StaticFileCache {
+impl FileCache<GatewayServerState> for StaticFileCache {
     type File = CachedFile;
     type Meta = Metadata;
 
-    async fn clear(&self, _state: &ServerState) {
+    async fn clear(&self, _state: &GatewayServerState) {
         self.map.clear_async().await;
     }
 
-    async fn metadata(&self, path: &Path, _state: &ServerState) -> io::Result<Self::Meta> {
+    async fn metadata(&self, path: &Path, _state: &GatewayServerState) -> io::Result<Self::Meta> {
         match self
             .map
             .read_async(path, |_, file| Metadata {
@@ -237,7 +237,7 @@ impl FileCache<ServerState> for StaticFileCache {
     }
 
     #[inline]
-    async fn file_metadata(&self, file: &Self::File, _state: &ServerState) -> io::Result<Self::Meta> {
+    async fn file_metadata(&self, file: &Self::File, _state: &GatewayServerState) -> io::Result<Self::Meta> {
         Ok(Metadata {
             len: file.buf.len() as u64,
             last_modified: file.last_modified,
@@ -249,7 +249,7 @@ impl FileCache<ServerState> for StaticFileCache {
         &self,
         path: &Path,
         accepts: Option<AcceptEncoding>,
-        state: &ServerState,
+        state: &GatewayServerState,
     ) -> io::Result<Self::File> {
         loop {
             let mut last_modified = None;
@@ -308,7 +308,7 @@ impl FileCache<ServerState> for StaticFileCache {
 impl StaticFileCache {
     pub async fn do_open(
         &self,
-        state: &ServerState,
+        state: &GatewayServerState,
         path: &Path,
         prev_last_modified: Option<SystemTime>,
     ) -> io::Result<()> {

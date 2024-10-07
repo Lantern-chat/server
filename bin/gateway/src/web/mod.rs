@@ -15,7 +15,6 @@ use ftl::{
 use crate::prelude::*;
 
 pub mod build;
-pub mod cdn;
 pub mod file_cache;
 pub mod layers;
 
@@ -23,10 +22,10 @@ pub mod api {
     pub mod v1;
 }
 
-type InnerWebService = HandlerService<ServerState, Response>;
+type InnerWebService = HandlerService<GatewayServerState, Response>;
 
 pub struct WebService {
-    pub web: Router<ServerState, Response, RateLimitService<InnerWebService>>,
+    pub web: Router<GatewayServerState, Response, RateLimitService<InnerWebService>>,
     pub api_v1: api::v1::ApiV1Service,
 }
 
@@ -56,7 +55,7 @@ impl Service<Request> for WebService {
 }
 
 impl WebService {
-    pub fn new(state: ServerState) -> Self {
+    pub fn new(state: GatewayServerState) -> Self {
         use ftl::layers::rate_limit::gcra::Quota;
 
         // Web routes are primarily used by actual humans, so configure it to be more strict
@@ -108,7 +107,7 @@ impl WebService {
 
 /// Serves static files from the `dist` directory
 async fn static_files(
-    State(state): State<ServerState>,
+    State(state): State<GatewayServerState>,
     path: MatchedPath,
     parts: RequestParts,
 ) -> impl IntoResponse {
@@ -117,7 +116,7 @@ async fn static_files(
 }
 
 /// Serves the index.html file from the `dist` directory, for any allowed path
-async fn index_file(State(state): State<ServerState>, parts: RequestParts) -> impl IntoResponse {
+async fn index_file(State(state): State<GatewayServerState>, parts: RequestParts) -> impl IntoResponse {
     // either empty path or one of the allowed paths
     #[rustfmt::skip]
     let allowed = matches!(parts.uri.path().split_once('/').map(|x| x.1),
@@ -147,7 +146,7 @@ async fn index_file(State(state): State<ServerState>, parts: RequestParts) -> im
 }
 
 /// Serves the favicon.ico file from the `assets` directory
-async fn favicon(State(state): State<ServerState>, parts: RequestParts) -> impl IntoResponse {
+async fn favicon(State(state): State<GatewayServerState>, parts: RequestParts) -> impl IntoResponse {
     let path = state.config().local.paths.web_path.join("assets/favicon.ico");
     state.file_cache.file(&parts, &state, path).await
 }
