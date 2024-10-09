@@ -8,17 +8,16 @@ use crossbeam_utils::CachePadded;
 
 use alloc::alloc::{GlobalAlloc, Layout};
 
-#[cfg(feature = "enable")]
-#[repr(C)]
+// if enabled, the struct is C-representable, because we
+// want the `allocated` field to be at the end
+#[cfg_attr(feature = "enable", repr(C))]
+// if not enabled, the struct is transparent
+#[cfg_attr(not(feature = "enable"), repr(transparent))]
 pub struct TrackingAllocator<A> {
     allocator: A,
-    allocated: CachePadded<AtomicUsize>,
-}
 
-#[cfg(not(feature = "enable"))]
-#[repr(transparent)]
-pub struct TrackingAllocator<A> {
-    allocator: A,
+    #[cfg(feature = "enable")]
+    allocated: CachePadded<AtomicUsize>,
 }
 
 impl<A> TrackingAllocator<A> {
@@ -42,6 +41,7 @@ impl<A> TrackingAllocator<A> {
 }
 
 unsafe impl<A: GlobalAlloc> GlobalAlloc for TrackingAllocator<A> {
+    #[cfg_attr(not(feature = "enable"), inline)]
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let ret = self.allocator.alloc(layout);
 
@@ -53,13 +53,15 @@ unsafe impl<A: GlobalAlloc> GlobalAlloc for TrackingAllocator<A> {
         ret
     }
 
+    #[cfg_attr(not(feature = "enable"), inline)]
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        self.allocator.dealloc(ptr, layout);
+
         #[cfg(feature = "enable")]
         self.allocated.fetch_sub(layout.size(), Relaxed);
-
-        self.allocator.dealloc(ptr, layout)
     }
 
+    #[cfg_attr(not(feature = "enable"), inline)]
     unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
         let ret = self.allocator.alloc_zeroed(layout);
 
@@ -71,11 +73,12 @@ unsafe impl<A: GlobalAlloc> GlobalAlloc for TrackingAllocator<A> {
         ret
     }
 
+    #[cfg_attr(not(feature = "enable"), inline)]
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+        let ret = self.allocator.realloc(ptr, layout, new_size);
+
         #[cfg(feature = "enable")]
         self.allocated.fetch_sub(layout.size(), Relaxed);
-
-        let ret = self.allocator.realloc(ptr, layout, new_size);
 
         #[cfg(feature = "enable")]
         if likely(!ret.is_null()) {
@@ -89,9 +92,6 @@ unsafe impl<A: GlobalAlloc> GlobalAlloc for TrackingAllocator<A> {
 #[rustfmt::skip]
 #[inline(always)]
 pub fn likely(b: bool) -> bool {
-    #[inline]
-    #[cold]
-    fn cold() {}
-
+    #[inline] #[cold] fn cold() {}
     if !b { cold() } b
 }
