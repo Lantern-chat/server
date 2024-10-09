@@ -33,10 +33,17 @@ pub struct IpList {
 
 impl IpIndex {
     fn decode(self) -> (Kind, usize) {
-        let kind = (self.0 >> 62) as u8;
+        let kind = match (self.0 >> 62) as u8 {
+            0 => Kind::Ipv4,
+            1 => Kind::Ipv6,
+            2 => Kind::Ipv4Range,
+            3 => Kind::Ipv6Range,
+            _ => unreachable!(),
+        };
+
         let index = self.0 & (0b11 << 62);
 
-        (unsafe { std::mem::transmute(kind) }, index as usize)
+        (kind, index as usize)
     }
 
     fn encode(kind: Kind, index: usize) -> IpIndex {
@@ -140,9 +147,7 @@ impl IpList {
     }
 
     pub fn contains(&self, ip: IpAddr) -> bool {
-        self.sorted
-            .binary_search_by(|idx| self.values.compare_ip(*idx, ip))
-            .is_ok()
+        self.sorted.binary_search_by(|idx| self.values.compare_ip(*idx, ip)).is_ok()
     }
 
     pub fn insert(&mut self, ip: IpAddr) {
@@ -152,14 +157,14 @@ impl IpList {
     }
 }
 
-use hashbrown::{hash_map::DefaultHashBuilder, raw::RawTable};
+use hashbrown::raw::RawTable;
 
 #[derive(Default, Clone)]
 pub struct IpSet {
     ipv4: Vec<Ipv4Addr>,
     ipv6: Vec<Ipv6Addr>,
     set: RawTable<u32>,
-    hash_builder: DefaultHashBuilder,
+    hash_builder: foldhash::fast::RandomState,
 }
 
 const MAX_LEN: usize = 1 << 31;
@@ -171,7 +176,7 @@ impl IpSet {
             ipv4: Vec::new(),
             ipv6: Vec::new(),
             set: RawTable::new(),
-            hash_builder: DefaultHashBuilder::default(),
+            hash_builder: foldhash::fast::RandomState::default(),
         };
 
         this.refresh(ips);
@@ -245,9 +250,7 @@ impl IpSet {
     //}
 
     pub fn contains(&self, ip: &IpAddr) -> bool {
-        self.set
-            .find(self.hash(ip), |idx| unsafe { self.cmp_eq(*idx, ip) })
-            .is_some()
+        self.set.find(self.hash(ip), |idx| unsafe { self.cmp_eq(*idx, ip) }).is_some()
     }
 
     pub fn add(&mut self, ip: IpAddr) {

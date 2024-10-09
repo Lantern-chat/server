@@ -8,4 +8,5 @@ publish = false
 
 [dependencies]
 ipnet = "2.3.1"
-hashbrown = { version = "0.14", features = ["raw", "inline-more"] }
+hashbrown = { version = "0.14", default-features = false, features = ["raw", "inline-more"] }
+foldhash = "0.1"
