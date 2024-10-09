@@ -37,6 +37,7 @@ headers.workspace = true
 schema.workspace = true
 
 common.workspace = true
+common_web.workspace = true
 config.workspace = true
 task_runner.workspace = true
 db.workspace = true
@@ -67,12 +68,12 @@ thiserror = "1"
 uuid = { version = "1.1.2", features = ["v4", "serde"] }
 nohash-hasher = "0.2.0"
 async-trait = "0.1"
-serde_json = "1.0.108"
-ciborium = "0.2.1"
-# quick-xml = "0.31.0"
-serde_urlencoded = "0.7.1"
-base64 = "0.22"
-mime = "0.3.17"
+serde_json.workspace = true
+ciborium.workspace = true
+# quick-xml.workspace = true
+serde_urlencoded.workspace = true
+base64.workspace = true
+mime.workspace = true
 bytes = "1.5.0"
 urlencoding = "2.1.3"
 async-recursion = "1"
