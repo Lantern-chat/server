@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{sync::atomic::Ordering, time::Duration};
 use task_runner::{AsyncFnTask, IntervalFnTask, RetryTask, TaskRunner};
 
 type Alive = tokio::sync::watch::Receiver<bool>;

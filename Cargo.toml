@@ -25,6 +25,7 @@ tracking_allocator = { path = "crates/tracking_allocator" }
 
 db = { path = "components/db" }
 common = { path = "components/common" }
+common_web = { path = "components/common_web" }
 config = { path = "components/config" }
 auth = { path = "components/auth" }
 rpc = { path = "components/rpc" }
@@ -38,17 +39,25 @@ thin-vec = "0.2"
 
 postgres-types = { version = "0.2", features = ["with-rend-0_5", "with-rkyv-0_8", "with-smol_str-03", "with-thin-vec-0_2"] }
 
-hashbrown = { version = "0.14", features = ["inline-more"] }
-rkyv = { version = "0.8", features = ["bytecheck"] }
-rkyv_rpc = { git = "https://github.com/Lantern-chat/rkyv_rpc" }
+base64 = "0.22"
 serde = { version = "1", features = ["derive"] }
 serde_derive = "1"
+serde_json = "1.0.108"
+ciborium = "0.2.1"
+serde_urlencoded = "0.7.1"
+# quick-xml = "0.31.0"
+
+hashbrown = { version = "0.15", features = ["inline-more"] }
+rkyv = { version = "0.8", features = ["bytecheck"] }
+rkyv_rpc = { git = "https://github.com/Lantern-chat/rkyv_rpc" }
+
 bitflags = "2"
 rustc-hash = { version = "2.0", default-features = false }
 scc = "2"
 
 http = "1"
 headers = "0.4"
+mime = "0.3.17"
 quinn = "0.11"
 
 ftl = { git = "https://github.com/Lantern-chat/ftl2", default-features = false, features = ["json", "cbor", "gcra"] }

@@ -1,8 +1,8 @@
 pub mod sections {
-    use uuid::Uuid;
     use aes::{cipher::Key, Aes128, Aes256};
     use schema::auth::BotTokenKey;
     use std::{net::SocketAddr, path::PathBuf};
+    use uuid::Uuid;
 
     config::section! {
         #[serde(default)]
@@ -22,7 +22,11 @@ pub mod sections {
         }
 
         pub fn faction_id(&self) -> Option<Uuid> {
-            if self.is_user_nexus() { None } else { Some(self.faction) }
+            if self.is_user_nexus() {
+                None
+            } else {
+                Some(self.faction)
+            }
         }
     }
 
@@ -32,32 +36,29 @@ pub mod sections {
             /// Path to SSL Certificates
             ///
             /// Defualts to the current directory
-            pub cert_path: PathBuf = PathBuf::default() => "CERT_PATH",
+            pub cert_path: PathBuf = PathBuf::default() => "LANTERN_RPC_CERT_PATH",
 
             /// Path to SSL Key file
             ///
             /// Defualts to the current directory
-            pub key_path: PathBuf = PathBuf::default() => "KEY_PATH",
-
-            /// Path to static frontend files (typically `./frontend`)
-            pub web_path: PathBuf = "./frontend".into() => "WEB_PATH",
+            pub key_path: PathBuf = PathBuf::default() => "LANTERN_RPC_KEY_PATH",
 
             /// Where to write logfiles to. Automatically rotated.
-            pub log_dir: PathBuf = "./logs".into() => "LANTERN_LOG_DIR",
+            pub log_dir: PathBuf = "./logs".into() => "LANTERN_RPC_LOG_DIR",
         }
     }
 
     config::section! {
         pub struct Database {
-            /// Database connection string
-            pub db_str: String = "postgresql://postgres:password@localhost:5432/lantern".to_owned() => "DB_STR",
+            /// Database connection string, can also be a unix socket.
+            pub db_str: String = "postgresql://postgres:password@localhost:5432/lantern".to_owned() => "LANTERN_RPC_DB_STR",
         }
     }
 
     config::section! {
-        pub struct Web {
+        pub struct Rpc {
             /// Bind address
-            pub bind: SocketAddr = SocketAddr::from(([127, 0, 0, 1], 8080)) => "LANTERN_BIND" | config::util::parse_address,
+            pub bind: SocketAddr = SocketAddr::from(([127, 0, 0, 1], 8080)) => "LANTERN_RPC_BIND" | config::util::parse_address,
         }
     }
 
@@ -92,8 +93,8 @@ config::config! {
         db: sections::Database,
         /// Cryptographic keys
         keys: sections::Keys,
-        /// Web/HTTP Configuration
-        web: sections::Web,
+        /// RPC Configuration
+        rpc: sections::Rpc,
     }
 }
 

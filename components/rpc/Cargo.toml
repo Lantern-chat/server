@@ -16,9 +16,11 @@ auth.workspace = true
 thiserror = "1"
 paste = "1"
 framed.workspace = true
-tokio = { workspace = true, features = ["macros"] }
+tokio = { workspace = true, features = ["macros", "fs"] }
 futures-util = "0.3"
 tracing.workspace = true
 smallvec = "1"
 indexmap = "2"
 scc = "2"
+rustls = { version = "0.23" }
+rustls-pemfile = "2.2"
