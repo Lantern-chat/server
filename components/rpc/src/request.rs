@@ -5,7 +5,7 @@ use crate::{event::ClientCommand, procedure::Procedure};
 
 #[derive(Debug, rkyv::Archive, rkyv::Serialize)]
 pub enum RpcRequest {
-    Procedure {
+    ApiProcedure {
         proc: Procedure,
         addr: std::net::IpAddr,
 

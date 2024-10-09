@@ -24,13 +24,6 @@ pub mod sections {
     }
 
     config::section! {
-        pub struct Database {
-            /// Database connection string
-            pub db_str: String = "postgresql://postgres:password@localhost:5432/lantern".to_owned() => "DB_STR",
-        }
-    }
-
-    config::section! {
         pub struct Web {
             /// Bind address
             pub bind: SocketAddr = SocketAddr::from(([127, 0, 0, 1], 8080)) => "LANTERN_BIND" | config::util::parse_address,
@@ -52,12 +45,13 @@ config::config! {
     pub struct LocalConfig {
         /// Overall server configuration
         general: config::general::General,
+
         /// Filesystem paths
         paths: sections::Paths,
-        /// Database configuration
-        db: sections::Database,
+
         /// Cryptographic keys
         keys: sections::Keys,
+
         /// Web/HTTP Configuration
         web: sections::Web,
     }

@@ -1,0 +1,26 @@
+[package]
+name = "common_web"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+thiserror = "1"
+serde.workspace = true
+smol_str.workspace = true
+tokio.workspace = true
+sdk.workspace = true
+db.workspace = true
+ftl.workspace = true
+ciborium.workspace = true
+serde_json.workspace = true
+http.workspace = true
+serde_urlencoded.workspace = true
+schema.workspace = true
+base64.workspace = true
+z85.workspace = true
+headers.workspace = true
+reqwest.workspace = true
+mime.workspace = true
+
+[lints]
+workspace = true

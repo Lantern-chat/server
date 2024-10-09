@@ -6,7 +6,7 @@ use ftl::ws::WsError;
 use http::{header::InvalidHeaderValue, StatusCode};
 use sdk::{
     api::error::{ApiError, ApiErrorCode},
-    driver::Encoding,
+    //driver::Encoding,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -262,70 +262,70 @@ impl ftl::IntoResponse for Error {
     }
 }
 
-impl Error {
-    fn log(&self) {
-        if self.is_fatal() {
-            log::error!("Fatal error: {self}");
-        } else if cfg!(debug_assertions) {
-            log::warn!("Non-fatal error: {self}");
-        }
-    }
+// impl Error {
+// fn log(&self) {
+//     if self.is_fatal() {
+//         log::error!("Fatal error: {self}");
+//     } else if cfg!(debug_assertions) {
+//         log::warn!("Non-fatal error: {self}");
+//     }
+// }
 
-    // fn into_json(self) -> WithStatus<reply::Json> {
-    //     let err = ApiError::from(self);
-    //     reply::json(&err).with_status(err.code.http_status())
-    // }
+// fn into_json(self) -> WithStatus<reply::Json> {
+//     let err = ApiError::from(self);
+//     reply::json(&err).with_status(err.code.http_status())
+// }
 
-    // fn into_cbor(self) -> WithStatus<reply::cbor::Cbor> {
-    //     let err = ApiError::from(self);
-    //     reply::cbor::cbor(&err).with_status(err.code.http_status())
-    // }
+// fn into_cbor(self) -> WithStatus<reply::cbor::Cbor> {
+//     let err = ApiError::from(self);
+//     reply::cbor::cbor(&err).with_status(err.code.http_status())
+// }
 
-    // #[allow(non_upper_case_globals)]
-    // fn into_cached_json(self) -> WithStatus<reply::Json> {
-    //     use reply::Json;
+// #[allow(non_upper_case_globals)]
+// fn into_cached_json(self) -> WithStatus<reply::Json> {
+//     use reply::Json;
 
-    //     macro_rules! impl_cached {
-    //         ($($name:ident),*) => {{
-    //             $(static $name: LazyLock<WithStatus<Json>> = LazyLock::new(|| Error::$name.into_json());)*
+//     macro_rules! impl_cached {
+//         ($($name:ident),*) => {{
+//             $(static $name: LazyLock<WithStatus<Json>> = LazyLock::new(|| Error::$name.into_json());)*
 
-    //             match self {
-    //                 $(Self::$name => $name.clone(),)*
-    //                 _ => self.into_json(),
-    //             }
-    //         }}
-    //     }
+//             match self {
+//                 $(Self::$name => $name.clone(),)*
+//                 _ => self.into_json(),
+//             }
+//         }}
+//     }
 
-    //     impl_cached! {
-    //         NotFound,
-    //         NotFoundSignaling,
-    //         NotFoundHighPenalty,
-    //         BadRequest,
-    //         MethodNotAllowed,
-    //         Unimplemented,
-    //         RequestEntityTooLarge,
-    //         MissingAuthorizationHeader,
-    //         Unauthorized,
-    //         NoSession
-    //     }
-    // }
+//     impl_cached! {
+//         NotFound,
+//         NotFoundSignaling,
+//         NotFoundHighPenalty,
+//         BadRequest,
+//         MethodNotAllowed,
+//         Unimplemented,
+//         RequestEntityTooLarge,
+//         MissingAuthorizationHeader,
+//         Unauthorized,
+//         NoSession
+//     }
+// }
 
-    // pub(crate) fn into_encoding(self, encoding: Encoding) -> Response {
-    //     self.log();
+// pub(crate) fn into_encoding(self, encoding: Encoding) -> Response {
+//     self.log();
 
-    //     match encoding {
-    //         Encoding::JSON => self.into_cached_json().into_response(),
-    //         Encoding::CBOR => self.into_cbor().into_response(),
-    //     }
-    // }
-}
+//     match encoding {
+//         Encoding::JSON => self.into_cached_json().into_response(),
+//         Encoding::CBOR => self.into_cbor().into_response(),
+//     }
+// }
+// }
 
 impl From<DbError> for Error {
     fn from(e: DbError) -> Self {
         if let Some(e) = e.as_db_error() {
             use db::pg::error::SqlState;
 
-            log::warn!("DATABASE ERROR: {e}");
+            //log::warn!("DATABASE ERROR: {e}");
 
             // TODO: Improve this with names of specific constraints
             match *e.code() {

@@ -10,7 +10,6 @@ extern crate tracing as log;
 pub mod allocator;
 pub mod cli;
 pub mod config;
-pub mod error;
 pub mod gateway;
 pub mod rpc;
 pub mod state;
@@ -18,8 +17,8 @@ pub mod tasks;
 pub mod web;
 
 pub mod prelude {
-    pub use crate::error::Error;
     pub use crate::state::GatewayServerState;
+    pub use common_web::error::Error;
 
     pub use rpc::{auth::Authorization, event::ServerEvent};
     pub use sdk::models::{aliases::*, Nullable, SmolStr, Snowflake, Timestamp};

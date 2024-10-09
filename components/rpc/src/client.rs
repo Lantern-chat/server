@@ -131,10 +131,12 @@ pub struct RpcManager {
 
     /// All configured clients, excluding the nexus.
     clients: scc::HashSet<RpcClient, sdk::FxRandomState2>,
+
     /// Faction clients, with party_id as the key.
     ///
     /// There will be a unique entry for the faction server using its own faction_id.
     factions: scc::HashIndex<Snowflake, RpcClient, sdk::FxRandomState2>,
+
     /// Room to party association.
     rooms: scc::HashIndex<Snowflake, Snowflake, sdk::FxRandomState2>,
 }
@@ -181,7 +183,7 @@ impl RpcManager {
 
     pub async fn send(&self, cmd: &RpcRequest) -> Result<quinn::RecvStream, RpcClientError> {
         let client = match cmd {
-            RpcRequest::Procedure { proc, .. } => {
+            RpcRequest::ApiProcedure { proc, .. } => {
                 let endpoint = proc.endpoint();
 
                 match self.get_client(endpoint) {

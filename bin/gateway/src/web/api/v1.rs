@@ -164,7 +164,7 @@ impl ApiV1Service {
 
         let try_proc = async move {
             // NOTE: This goes here because of proc?, it's just easier with the error handling below
-            let cmd = RpcRequest::Procedure {
+            let cmd = RpcRequest::ApiProcedure {
                 proc: proc?,
                 addr: rl.key().0.into(), // hijack the rate-limiter key to get the IP address
                 auth: auth.map(Box::new),
@@ -178,7 +178,7 @@ impl ApiV1Service {
                     Err(Error::InternalErrorStatic("RPC Error"))
                 }
                 Ok(recv) => {
-                    let RpcRequest::Procedure { ref proc, .. } = cmd else {
+                    let RpcRequest::ApiProcedure { ref proc, .. } = cmd else {
                         unreachable!()
                     };
 

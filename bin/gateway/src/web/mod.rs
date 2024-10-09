@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{future, time::Duration};
 
 use http::{HeaderName, HeaderValue, Method, StatusCode};
 
@@ -14,7 +14,6 @@ use ftl::{
 
 use crate::prelude::*;
 
-pub mod build;
 pub mod file_cache;
 pub mod layers;
 
@@ -41,7 +40,7 @@ impl Service<Request> for WebService {
                 return Ok(StatusCode::IM_A_TEAPOT.into_response());
             }
 
-            if path.starts_with("/api/v1/") {
+            if path.starts_with("/api/") {
                 return self.api_v1.call(req).await;
             }
 
@@ -88,8 +87,11 @@ impl WebService {
         }
 
         add_routes! {
-            GET "/robots.txt" => || core::future::ready(include_str!("robots.txt")),
-            GET "/build" (50) => build::build_info,
+            GET "/robots.txt" => || future::ready(include_str!("robots.txt")),
+            GET "/build" (50) => || {
+                common_web::decl_build_info!(BuildInfo);
+                future::ready(Deferred::new_static::<BuildInfo>())
+            },
             GET|HEAD "/favicon.ico" => favicon,
             GET|HEAD "/static/{*path}" => static_files,
             GET|HEAD "/{*page}" => index_file,
