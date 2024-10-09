@@ -127,15 +127,31 @@ where
     }
 
     use core::{future::Future, pin::Pin};
+    use rpc::client::Resolve;
 
     #[allow(clippy::type_complexity)] #[rustfmt::skip]
     // using a closure here allows for early returns of the future for auth and others
     let gen_dispatch = move || -> Result<Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>, Error> {
+        let is_nexus = state.config().local.node.is_user_nexus();
+
         let (addr, auth, proc) = match cmd {
-            ArchivedRpcRequest::Procedure { addr, auth, proc } => (addr, auth, proc),
-            ArchivedRpcRequest::Authorize { token } => c!(auth::do_auth(state, token)),
-            _ => unimplemented!(),
+            ArchivedRpcRequest::ApiProcedure { addr, auth, proc } => (addr, auth, proc),
+
+            // auth requests are only allowed on the nexus
+            ArchivedRpcRequest::Authorize { token } if is_nexus => c!(auth::do_auth(state, token)),
+
+            // all other requests are invalid or unimplemented
+            _ => return Err(Error::BadRequest),
         };
+
+        // check if the RPC request is valid for the current node type,
+        // otherwise pretend it doesn't exist
+        if match proc.endpoint() {
+            Resolve::Nexus => !is_nexus,
+            Resolve::Party(_) | Resolve::Room(_) => is_nexus,
+        } {
+            return Err(Error::NotFound);
+        }
 
         let auth = || match auth.as_ref() {
             Some(auth) => Ok(auth.get().deserialize_simple().expect("Unable to deserialize auth")),

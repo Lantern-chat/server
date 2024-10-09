@@ -12,6 +12,14 @@ macro_rules! decl_procs {
             }
         }
 
+        impl ArchivedProcedure {
+            pub fn endpoint(&self) -> Resolve {
+                match self {
+                    $(Self::$cmd(_cmd) => Resolve::Nexus $(.$kind(_cmd $(.$path)+.into()))?),*
+                }
+            }
+        }
+
         impl Procedure {
             pub fn endpoint(&self) -> Resolve {
                 match self {
