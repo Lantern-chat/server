@@ -1,22 +1,22 @@
 #![allow(clippy::single_char_add_str)]
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io,
     path::{Path, PathBuf},
 };
 
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum ErrorKind {
     #[error("{0}")]
     IoError(#[from] io::Error),
 
     #[error("Unexpected Eof")]
     UnexpectedEof,
-    #[error("Unexpected Endif on line {0}")]
-    UnexpectedEndif(usize),
-    #[error("Unexpected Else on line {0}")]
-    UnexpectedElse(usize),
+    #[error("Unexpected Endif")]
+    UnexpectedEndif,
+    #[error("Unexpected Else")]
+    UnexpectedElse,
 
     #[error("Max Substitution Depth Reached")]
     MaxSubstitutionDepthReached,
@@ -26,6 +26,12 @@ pub enum Error {
 
     #[error("Undefined Symbol: \"{0}\"")]
     UndefinedSymbol(String),
+
+    #[error("Invalid Pragma: \"{0}\"")]
+    InvalidPragma(String),
+
+    #[error("Only defines are allowed in this context")]
+    OnlyDefinesAllowed,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,24 +42,50 @@ enum Item {
 
 pub type Defines = HashMap<String, String>;
 
-pub struct Context {
+pub struct Preprocessor {
     pub defines: Defines,
     include: Vec<PathBuf>,
     out: String,
     stack: Vec<Item>,
     pub max_substitution_depth: usize,
     single_line_comment: &'static str,
+    onces: HashSet<PathBuf>,
 }
 
-impl Context {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Context<'a> {
+    file: &'a Path,
+    line: usize,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Error at {file}:{line}: {kind}")]
+pub struct Error {
+    kind: ErrorKind,
+    file: PathBuf,
+    line: usize,
+}
+
+impl Error {
+    pub fn new(ctx: Context, kind: ErrorKind) -> Self {
+        Error {
+            kind,
+            file: ctx.file.to_owned(),
+            line: ctx.line,
+        }
+    }
+}
+
+impl Preprocessor {
     pub fn new(include: Vec<PathBuf>) -> Self {
-        Context {
+        Preprocessor {
             defines: HashMap::new(),
             include,
             out: String::new(),
             stack: Vec::new(),
             max_substitution_depth: 32,
             single_line_comment: "//",
+            onces: HashSet::new(),
         }
     }
 
@@ -68,14 +100,22 @@ impl Context {
     }
 
     pub fn process_file(&mut self, path: impl AsRef<Path>) -> Result<String, Error> {
-        self.process(&std::fs::read_to_string(path)?)
+        let ctx = Context {
+            file: path.as_ref(),
+            line: 0,
+        };
+
+        match std::fs::read_to_string(ctx.file) {
+            Ok(src) => self.process(ctx, &src),
+            Err(e) => Err(Error::new(ctx, ErrorKind::IoError(e))),
+        }
     }
 
-    pub fn process(&mut self, src: &str) -> Result<String, Error> {
-        self.process_inner("./".as_ref(), src)?;
+    pub fn process(&mut self, mut ctx: Context, src: &str) -> Result<String, Error> {
+        self.process_inner(&mut ctx, "./".as_ref(), src)?;
 
         if !self.stack.is_empty() {
-            return Err(Error::UnexpectedEof);
+            return Err(Error::new(ctx, ErrorKind::UnexpectedEof));
         }
 
         Ok(std::mem::take(&mut self.out))
@@ -85,19 +125,33 @@ impl Context {
         self.stack.last() != Some(&Item::Inactive)
     }
 
-    fn process_inner(&mut self, cwd: &Path, src: &str) -> Result<(), Error> {
-        let mut ln = 0;
+    fn process_inner(&mut self, ctx: &mut Context, cwd: &Path, src: &str) -> Result<(), Error> {
+        let mut define_only = false;
 
         for line in src.lines() {
-            ln += 1;
+            ctx.line += 1;
 
+            // skip comments
             let Some(mut t) = line.trim_start().split(self.single_line_comment).next() else {
                 continue; // split() will always succeed once
             };
 
             if !t.starts_with('#') {
                 if self.active() {
-                    Self::substitute_append(0, self.max_substitution_depth, &self.defines, &mut self.out, line)?;
+                    // only check for defines if we're active, since define-only is only activated when active as well
+                    if define_only && !t.trim().is_empty() {
+                        return Err(Error::new(*ctx, ErrorKind::OnlyDefinesAllowed));
+                    }
+
+                    Self::substitute_append(
+                        ctx,
+                        0,
+                        self.max_substitution_depth,
+                        &self.defines,
+                        &mut self.out,
+                        line,
+                    )?;
+
                     self.out.push_str("\n");
                 }
 
@@ -109,8 +163,19 @@ impl Context {
 
             // split on first whitespace, or if no whitespace pass whole token
             match t.split_once(char::is_whitespace).unwrap_or((t, "")) {
-                ("include", path) if self.active() => self.process_include(cwd, path)?,
+                ("include", path) if self.active() => self.process_include(ctx, cwd, path)?,
                 ("define", define) if self.active() => self.process_define(define.trim()),
+                ("pragma", pragma) if self.active() => match pragma {
+                    "define-only" => define_only = true,
+                    "once" => {
+                        if self.onces.contains(ctx.file) {
+                            return Ok(()); // skip this file
+                        }
+
+                        self.onces.insert(ctx.file.to_owned());
+                    }
+                    _ => return Err(Error::new(*ctx, ErrorKind::InvalidPragma(pragma.to_owned()))),
+                },
                 ("undef", define) if self.active() => {
                     self.defines.remove(define.trim());
                 }
@@ -126,7 +191,7 @@ impl Context {
                     }
                 }
                 ("if", cond) => {
-                    if self.active() && self.eval_if(cond)? {
+                    if self.active() && self.eval_if(ctx, cond)? {
                         self.stack.push(Item::Active);
                     } else {
                         self.stack.push(Item::Inactive);
@@ -138,12 +203,12 @@ impl Context {
                     self.stack.push(match last {
                         Some(Item::Active) => Item::Inactive,
                         Some(Item::Inactive) => Item::Active,
-                        None => return Err(Error::UnexpectedElse(ln)),
+                        None => return Err(Error::new(*ctx, ErrorKind::UnexpectedElse)),
                     });
                 }
                 ("endif", _) => match self.stack.pop() {
                     Some(_) => {}
-                    None => return Err(Error::UnexpectedEndif(ln)),
+                    None => return Err(Error::new(*ctx, ErrorKind::UnexpectedEndif)),
                 },
                 _ => {}
             }
@@ -152,24 +217,29 @@ impl Context {
         Ok(())
     }
 
-    fn process_include(&mut self, cwd: &Path, path: &str) -> Result<(), Error> {
+    fn process_include(&mut self, ctx: &Context, cwd: &Path, path: &str) -> Result<(), Error> {
         let path = path.trim_matches(|c: char| c.is_whitespace() || matches!(c, '<' | '"'));
 
         let include_paths = self.include.iter().map(|p| p.as_path()).chain(std::iter::once(cwd));
 
         for base in include_paths {
-            let full_path = base.join(path);
+            let full_path = base.join(path).canonicalize().map_err(|e| Error::new(*ctx, ErrorKind::IoError(e)))?;
 
             let src = match std::fs::read_to_string(&full_path) {
                 Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
-                Err(e) => return Err(e.into()),
+                Err(e) => return Err(Error::new(*ctx, ErrorKind::IoError(e))),
                 Ok(file) => file,
             };
 
-            return self.process_inner(full_path.parent().unwrap_or("./".as_ref()), &src);
+            let mut ctx = Context {
+                file: &full_path,
+                line: 0,
+            };
+
+            return self.process_inner(&mut ctx, full_path.parent().unwrap_or("./".as_ref()), &src);
         }
 
-        Err(Error::IncludeNotFound(path.to_owned()))
+        Err(Error::new(*ctx, ErrorKind::IncludeNotFound(path.to_owned())))
     }
 
     fn process_define(&mut self, define: &str) {
@@ -182,6 +252,7 @@ impl Context {
     }
 
     fn substitute_append(
+        ctx: &Context,
         depth: usize,
         max_depth: usize,
         defines: &Defines,
@@ -189,16 +260,16 @@ impl Context {
         line: &str,
     ) -> Result<(), Error> {
         if depth > max_depth {
-            return Err(Error::MaxSubstitutionDepthReached);
+            return Err(Error::new(*ctx, ErrorKind::MaxSubstitutionDepthReached));
         }
 
         use unicode_segmentation::UnicodeSegmentation;
 
         for word in line.split_word_bounds() {
-            if word.starts_with(char::is_alphabetic) {
+            if word.starts_with(|c: char| c.is_alphabetic() || c == '_') {
                 if let Some(replacement) = defines.get(word) {
                     // recurse to replace any replacements
-                    Self::substitute_append(depth + 1, max_depth, defines, out, replacement)?;
+                    Self::substitute_append(ctx, depth + 1, max_depth, defines, out, replacement)?;
                     continue;
                 }
             }
@@ -209,10 +280,17 @@ impl Context {
         Ok(())
     }
 
-    fn eval_if(&mut self, cond: &str) -> Result<bool, Error> {
+    fn eval_if(&mut self, ctx: &Context, cond: &str) -> Result<bool, Error> {
         let mut resolved_cond = String::with_capacity(cond.len());
 
-        Self::substitute_append(0, self.max_substitution_depth, &self.defines, &mut resolved_cond, cond)?;
+        Self::substitute_append(
+            ctx,
+            0,
+            self.max_substitution_depth,
+            &self.defines,
+            &mut resolved_cond,
+            cond,
+        )?;
 
         use unicode_segmentation::UnicodeSegmentation;
 
@@ -254,10 +332,12 @@ impl Context {
                 "&" => Symbol::And,
                 _ if word.starts_with(char::is_numeric) => match word.parse() {
                     Ok(num) => Symbol::Number(num),
-                    Err(_) => return Err(Error::UndefinedSymbol(word.to_owned())),
+                    Err(_) => {
+                        return Err(Error::new(*ctx, ErrorKind::UndefinedSymbol(word.to_owned())));
+                    }
                 },
                 _ if !word.chars().all(char::is_whitespace) => {
-                    return Err(Error::UndefinedSymbol(word.to_owned()));
+                    return Err(Error::new(*ctx, ErrorKind::UndefinedSymbol(word.to_owned())));
                 }
                 _ => Symbol::Whitespace,
             });
