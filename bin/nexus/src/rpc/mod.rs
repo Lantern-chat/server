@@ -113,52 +113,63 @@ where
     W: AsyncWrite + Unpin + Send,
 {
     // avoid inlining every async state machine by boxing them inside a lazy future/async block
-    macro_rules! c {
-        ($([$size:literal])? $first:ident$(::$frag:ident)+($($args:expr),*)) => {
-            return Ok(Box::pin(async move { ::rpc::stream::encode_item::<_, Error, _>(
-                out, crate::rpc::$first$(::$frag)+($($args),*).await).await.map_err(Error::from) }))
+    macro_rules! c0 {
+        ($call:expr) => {
+            return Ok(Box::pin(async move {
+                ::rpc::stream::encode_item::<_, Error, _>(out, $call.await).await.map_err(Error::from)
+            }))
         };
     }
-    macro_rules! s {
-        ($([$size:literal])? $first:ident$(::$frag:ident)+($($args:expr),*)) => {
-            return Ok(Box::pin(async move { ::rpc::stream::encode_stream::<_, Error, _>(
-                out, crate::rpc::$first$(::$frag)+($($args),*).await).await.map_err(Error::from) }))
+    macro_rules! s0 {
+        ($call:expr) => {
+            return Ok(Box::pin(async move {
+                ::rpc::stream::encode_stream::<_, Error, _>(out, $call.await).await.map_err(Error::from)
+            }))
         };
     }
 
-    use core::{future::Future, pin::Pin};
-    use rpc::client::Resolve;
+    use core::{
+        future::{self, Future},
+        pin::Pin,
+    };
 
     #[allow(clippy::type_complexity)] #[rustfmt::skip]
     // using a closure here allows for early returns of the future for auth and others
     let gen_dispatch = move || -> Result<Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>, Error> {
         let is_nexus = state.config().local.node.is_user_nexus();
 
+
         let (addr, auth, proc) = match cmd {
             ArchivedRpcRequest::ApiProcedure { addr, auth, proc } => (addr, auth, proc),
 
+            // just returns a `Result<(), Error>`
+            ArchivedRpcRequest::OpenGateway => c0!(future::ready(Ok(()))),
+
             // auth requests are only allowed on the nexus
-            ArchivedRpcRequest::Authorize { token } if is_nexus => c!(auth::do_auth(state, token)),
+            ArchivedRpcRequest::Authorize { token } if is_nexus => c0!(auth::do_auth(state, token)),
 
             // all other requests are invalid or unimplemented
             _ => return Err(Error::BadRequest),
         };
 
-        // check if the RPC request is valid for the current node type,
-        // otherwise pretend it doesn't exist
-        if match proc.endpoint() {
-            Resolve::Nexus => !is_nexus,
-            Resolve::Party(_) | Resolve::Room(_) => is_nexus,
-        } {
-            return Err(Error::NotFound);
-        }
+        use rpc::{client::Resolve, procedure::ArchivedProcedure as Proc};
 
+        // defer auth checking to the individual procedures
         let auth = || match auth.as_ref() {
             Some(auth) => Ok(auth.get().deserialize_simple().expect("Unable to deserialize auth")),
             None => Err(Error::Unauthorized),
         };
 
-        use rpc::procedure::ArchivedProcedure as Proc;
+        // pre-check the endpoint to avoid unnecessary processing on each branch
+        let endpoint = match proc.endpoint() {
+            Resolve::Nexus if !is_nexus => Err(Error::NotFound),
+            Resolve::Party(_) | Resolve::Room(_) if is_nexus => Err(Error::NotFound),
+            _ => Ok(()),
+        };
+
+        // wraps the c0!/s0! macros to handle endpoint resolution and any other error checks
+        macro_rules! c { ($call:expr) => { c0!(async move { endpoint?; $call.await }) }; }
+        macro_rules! s { ($call:expr) => { s0!(async move { endpoint?; $call.await }) }; }
 
         #[allow(unused_variables)]
         match proc {
@@ -206,7 +217,7 @@ where
             Proc::GetMessage(cmd) => todo!("GetMessage"),
             Proc::DeleteMessage(cmd) => c!(room::messages::delete_message::delete_msg(state, auth()?, cmd)),
             Proc::StartTyping(cmd) => c!(room::start_typing::trigger_typing(state, auth()?, cmd)),
-            Proc::GetMessages(cmd) => s!([1024] room::messages::get_messages::get_many(state, auth()?, cmd)),
+            Proc::GetMessages(cmd) => s!(room::messages::get_messages::get_many(state, auth()?, cmd)),
             Proc::PinMessage(cmd) => todo!("PinMessage"),
             Proc::UnpinMessage(cmd) => todo!("UnpinMessage"),
             Proc::StarMessage(cmd) => todo!("StarMessage"),
