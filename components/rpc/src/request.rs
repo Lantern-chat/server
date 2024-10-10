@@ -13,6 +13,9 @@ pub enum RpcRequest {
         auth: Option<Box<crate::auth::Authorization>>,
     },
 
+    /// Open a gateway connection on this same RPC connection
+    OpenGateway,
+
     Authorize {
         token: RawAuthToken,
     },

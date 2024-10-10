@@ -17,7 +17,8 @@ impl task_runner::Task for RpcServer {
         tokio::spawn(async move {
             while *alive.borrow() {
                 if let Err(e) = self.clone().run(alive.clone()).await {
-                    log::error!("rpc server error: {}", e);
+                    // required to trigger the retrytask logic
+                    panic!("rpc server error: {e}");
                 }
             }
         })
@@ -70,10 +71,7 @@ impl RpcServer {
                     }
                 };
 
-                tokio::join! {
-                    state.gateway.insert_gateway_connection(state.clone(), connection.clone()),
-                    state.gateway.insert_rpc_connection(state.clone(), connection.clone()),
-                };
+                state.gateway.insert_rpc_connection(state.clone(), connection).await;
             });
         }
 

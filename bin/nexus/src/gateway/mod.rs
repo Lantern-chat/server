@@ -151,19 +151,49 @@ impl Gateway {
 
         _ = self.gateways.insert_async(conn.id, conn).await;
     }
+
+    pub async fn insert_gateway_connection_from_rpc(&self, state: ServerState, conn: RpcConnection) {
+        let conn = GatewayConnection(Arc::new(GatewayConnectionInner {
+            id: conn.id,
+            conn: conn.conn,
+            last_event: AtomicU64::new(0),
+        }));
+
+        tokio::spawn(conn.clone().run_gateway(state));
+
+        _ = self.gateways.insert_async(conn.id, conn).await;
+    }
 }
 
 use failsafe::{futures::CircuitBreaker as _, Config as CircuitBreaker, Error as Break};
 
 impl RpcConnection {
     /// For a single RPC request, read the message, process it, then reply
-    async fn handle_rpc(send: SendStream, recv: RecvStream, state: ServerState) -> Result<(), Error> {
+    async fn handle_rpc(
+        send: SendStream,
+        recv: RecvStream,
+        state: ServerState,
+        conn_id: ConnectionId,
+    ) -> Result<(), Error> {
         use rkyv::result::ArchivedResult;
 
         let mut stream = ::rpc::stream::RpcRecvReader::new(recv);
 
         match stream.recv::<Result<::rpc::request::RpcRequest, ApiError>>().await? {
-            Some(ArchivedResult::Ok(msg)) => return crate::rpc::dispatch(state, send, msg).await,
+            Some(ArchivedResult::Ok(msg)) => {
+                use ::rpc::request::ArchivedRpcRequest;
+
+                if matches!(msg, ArchivedRpcRequest::OpenGateway) {
+                    let Some(conn) = state.gateway.rpcs.peek_with(&conn_id, |_, conn| conn.clone()) else {
+                        log::warn!("RPC Connection not found for gateway connection: {conn_id}");
+                        return Ok(()); // connection was closed?
+                    };
+
+                    state.gateway.insert_gateway_connection_from_rpc(state.clone(), conn).await;
+                }
+
+                return crate::rpc::dispatch(state, send, msg).await;
+            }
             Some(ArchivedResult::Err(e)) => log::warn!("Received error from gateway via RPC: {:?}", e.code()),
             None => log::warn!("Empty message from gateway"),
         }
@@ -202,9 +232,9 @@ impl RpcConnection {
                 }
             };
 
-            let state = state.clone();
+            let (state, conn_id) = (state.clone(), self.id);
             tokio::spawn(async move {
-                if let Err(e) = Self::handle_rpc(send, recv, state).await {
+                if let Err(e) = Self::handle_rpc(send, recv, state, conn_id).await {
                     // TODO: Add to metrics
                     log::error!("Error handling RPC request: {e}");
                 }
