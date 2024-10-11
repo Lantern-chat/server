@@ -162,8 +162,8 @@ where
 
         // pre-check the endpoint to avoid unnecessary processing on each branch
         let endpoint = match proc.endpoint() {
-            Resolve::Nexus if !is_nexus => Err(Error::NotFound),
-            Resolve::Party(_) | Resolve::Room(_) if is_nexus => Err(Error::NotFound),
+            Resolve::Nexus if !is_nexus => Err(Error::InvalidRpcEndpoint),
+            Resolve::Party(_) | Resolve::Room(_) if is_nexus => Err(Error::InvalidRpcEndpoint),
             _ => Ok(()),
         };
 

@@ -154,6 +154,9 @@ pub enum Error {
 
     #[error("Rkyv Encoding Error")]
     RkyvEncodingError,
+
+    #[error("Invalid RPC Endpoint")]
+    InvalidRpcEndpoint,
 }
 
 impl From<db::pg::Error> for Error {
@@ -230,6 +233,7 @@ impl From<Error> for sdk::api::error::ApiError {
                 Error::Unauthorized => "Unauthorized",
                 Error::ChecksumMismatch => "Checksum Mismatch",
                 Error::RkyvEncodingError => "Rkyv Encoding Error",
+                Error::InvalidRpcEndpoint => "Invalid RPC Endpoint",
 
                 _ => break 'msg value.to_string().into(),
             })
@@ -289,6 +293,7 @@ impl From<Error> for sdk::api::error::ApiError {
             Error::TemporarilyDisabled          => ApiErrorCode::TemporarilyDisabled,
             Error::Blocked                      => ApiErrorCode::Blocked,
             Error::Banned                       => ApiErrorCode::Banned,
+            Error::InvalidRpcEndpoint           => ApiErrorCode::NotFound,
 
             // HTTP-like error codes
             Error::BadRequest               => ApiErrorCode::BadRequest,
