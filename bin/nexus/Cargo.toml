@@ -7,7 +7,7 @@ publish = false
 
 [features]
 memory_metrics = ["tracking_allocator/enable"]
-default = ["memory_metrics"]
+default = ["memory_metrics", "rustcrypto-argon2"]
 
 [build-dependencies]
 built.workspace = true
@@ -63,7 +63,8 @@ sha1 = "0.10.5"
 hmac = "0.12.1"
 thiserror = "1"
 uuid = { version = "1.1.2", features = ["v4", "serde"] }
-rust-argon2 = "2"
+rust-argon2 = { package = "rust-argon2", version = "2", optional = true }
+rustcrypto-argon2 = { package = "argon2", version = "0.5.3", features = ["std"], optional = true }
 aes-gcm-siv = "0.11"
 base32 = "0.5.0"
 aho-corasick = "1"

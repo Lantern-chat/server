@@ -29,8 +29,16 @@ pub enum Error {
     #[error("UTF8 Error: {0}")]
     Utf8CheckError(#[from] std::str::Utf8Error),
 
+    #[cfg(feature = "rust-argon2")]
     #[error("Password Hash Error {0}")]
-    HashError(#[from] argon2::Error),
+    RustArgon2HashError(#[from] rust_argon2::Error),
+
+    #[cfg(feature = "rustcrypto-argon2")]
+    #[error("Password Hash Error: {0}")]
+    RustCryptoArgon2HashError(#[from] rustcrypto_argon2::Error),
+    #[cfg(feature = "rustcrypto-argon2")]
+    #[error("Password Hash Error: {0}")]
+    RustCryptoArgon2PasswordHashError(#[from] rustcrypto_argon2::password_hash::Error),
 
     #[error("Request Error: {0}")]
     RequestError(#[from] reqwest::Error),
@@ -157,19 +165,26 @@ impl From<db::pg::Error> for Error {
 impl Error {
     #[rustfmt::skip]
     pub fn is_fatal(&self) -> bool {
-        matches!(self,
+        match self {
             | Error::Unimplemented
             | Error::InternalError(_)
             | Error::InternalErrorSmol(_)
             | Error::InternalErrorStatic(_)
             | Error::RkyvEncodingError
-
             | Error::DbError(_)
             | Error::JoinError(_)
             | Error::SemaphoreError(_)
-            | Error::HashError(_)
-            | Error::RequestError(_)
-        )
+            | Error::RequestError(_) => true,
+
+            #[cfg(feature = "rust-argon2")]
+            | Error::RustArgon2HashError(_) => true,
+
+            #[cfg(feature = "rustcrypto-argon2")]
+            | Error::RustCryptoArgon2HashError(_)
+            | Error::RustCryptoArgon2PasswordHashError(_) => true,
+
+            _ => false,
+        }
     }
 }
 
@@ -229,7 +244,14 @@ impl From<Error> for sdk::api::error::ApiError {
             Error::DbError(_)               => ApiErrorCode::DbError,
             Error::JoinError(_)             => ApiErrorCode::JoinError,
             Error::SemaphoreError(_)        => ApiErrorCode::SemaphoreError,
-            Error::HashError(_)             => ApiErrorCode::HashError,
+
+            #[cfg(feature = "rust-argon2")]
+            Error::RustArgon2HashError(_)   => ApiErrorCode::HashError,
+
+            #[cfg(feature = "rustcrypto-argon2")]
+            Error::RustCryptoArgon2HashError(_) => ApiErrorCode::HashError,
+            #[cfg(feature = "rustcrypto-argon2")]
+            Error::RustCryptoArgon2PasswordHashError(_) => ApiErrorCode::HashError,
             Error::RequestError(_)          => ApiErrorCode::RequestError,
             Error::IOError(_)               => ApiErrorCode::IOError,
 
