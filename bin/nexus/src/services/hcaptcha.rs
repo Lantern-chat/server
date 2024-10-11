@@ -1,3 +1,5 @@
+use reqwest::Url;
+use std::sync::LazyLock;
 use tokio::sync::Semaphore;
 
 use crate::prelude::*;
@@ -5,6 +7,8 @@ use crate::prelude::*;
 /// https://docs.hcaptcha.com/
 pub struct HCaptchaClient {
     client: reqwest::Client,
+
+    /// Maximum number of concurrent requests to hCaptcha
     limit: Semaphore,
 }
 
@@ -84,7 +88,11 @@ impl HCaptchaClient {
 
         log::debug!("Sending hCaptcha verification");
 
-        let res = self.client.post("https://hcaptcha.com/siteverify").form(&params).send().await?;
+        // NOTE: reqwest::Url doesn't actually have an efficient `clone` impl, so this is really annoying,
+        // but at least it saves time parsing the url every request.
+        static URL: LazyLock<Url> = LazyLock::new(|| Url::parse("https://hcaptcha.com/siteverify").unwrap());
+
+        let res = self.client.post(URL.clone()).form(&params).send().await?;
 
         let full = res.bytes().await?;
 
