@@ -1,4 +1,5 @@
 use std::time::SystemTime;
+use tokio::task::spawn_blocking;
 
 use crate::prelude::*;
 
@@ -75,10 +76,16 @@ pub async fn process_2fa<'a>(
 
     let mfa = match mfa {
         ProvidedMfa::Plain(mfa) => *mfa,
-        ProvidedMfa::Encrypted(encrypted_mfa) => match MFA::decrypt(&mfa_key, &nonce, password, encrypted_mfa) {
-            Ok(mfa) => mfa,
-            Err(_) => return Err(Error::InternalErrorStatic("Decrypt Error")),
-        },
+        ProvidedMfa::Encrypted(encrypted_mfa) => {
+            // SAFETY: These are only used within the following spawn_blocking block
+            let password: &'static str = unsafe { std::mem::transmute(password) };
+            let encrypted_mfa: &'static [u8] = unsafe { std::mem::transmute(encrypted_mfa) };
+
+            match spawn_blocking(move || MFA::decrypt(&mfa_key, &nonce, password, encrypted_mfa)).await? {
+                Ok(mfa) => mfa,
+                Err(_) => return Err(Error::InternalErrorStatic("Decrypt Error")),
+            }
+        }
     };
 
     match token {
@@ -116,7 +123,10 @@ pub async fn process_2fa<'a>(
             // set old backup code to random value to prevent reuse
             mfa.backups[idx] = util::rng::crypto_thread_rng().gen();
 
-            let Ok(encrypted_mfa) = mfa.encrypt(&mfa_key, &nonce, password) else {
+            // SAFETY: This is only used within the following spawn_blocking block
+            let password: &'static str = unsafe { std::mem::transmute(password) };
+
+            let Ok(encrypted_mfa) = spawn_blocking(move || mfa.encrypt(&mfa_key, &nonce, password)).await? else {
                 return Err(Error::InternalErrorStatic("Encrypt error"));
             };
 
