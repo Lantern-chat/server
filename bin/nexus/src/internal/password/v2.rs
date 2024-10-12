@@ -22,7 +22,7 @@ static HASHER: LazyLock<Argon2<'static>> = LazyLock::new(|| {
         .build()
         .expect("Invalid Argon2 configuration");
 
-    argon2::Argon2::new(ALGORITHM, VERSION, params)
+    Argon2::new(ALGORITHM, VERSION, params)
 });
 
 static PARAM_STRING: LazyLock<ParamsString> = LazyLock::new(|| ParamsString::try_from(HASHER.params()).unwrap());
