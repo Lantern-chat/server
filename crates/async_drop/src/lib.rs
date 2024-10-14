@@ -9,12 +9,12 @@
 //! to tokio that this thread will be occupied for a bit. This may force tokio to move work
 //! to other threads, so be careful of executor thrashing with small workloads.
 
-use futures::future::{BoxFuture, Future};
+use std::future::Future;
 use std::ops::{Deref, DerefMut};
 use std::time::Duration;
 
 pub trait AsyncDrop: 'static {
-    fn async_drop(&mut self) -> BoxFuture<()>;
+    fn async_drop(&mut self) -> impl Future<Output = ()> + Send;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -73,7 +73,7 @@ impl<T: AsyncDrop> DerefMut for AsyncDropperTimeout<T> {
 impl<T: AsyncDrop> Drop for AsyncDropper<T> {
     fn drop(&mut self) {
         if let Some(mut task) = self.0.take() {
-            block_local(async move { task.async_drop().await });
+            block_local(task.async_drop());
         }
     }
 }
@@ -92,11 +92,9 @@ impl<T: AsyncDrop> Drop for AsyncDropperTimeout<T> {
 
 fn block_local<F>(f: F)
 where
-    F: Future<Output = ()> + 'static,
+    F: Future<Output = ()>,
 {
-    let task = tokio::task::spawn_local(f);
-
     tokio::task::block_in_place(move || {
-        _ = futures::executor::block_on(task);
+        tokio::runtime::Handle::current().block_on(f);
     });
 }

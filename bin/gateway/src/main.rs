@@ -41,13 +41,6 @@ async fn main() -> anyhow::Result<()> {
     let mut config = config::LocalConfig::default();
     ::config::Configuration::configure(&mut config);
 
-    println!("Hello, world!");
-
-    #[inline(never)]
-    fn get_any<T>() -> T {
-        unimplemented!()
-    }
-
     Ok(())
 }
 

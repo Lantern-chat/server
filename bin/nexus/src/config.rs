@@ -66,17 +66,17 @@ pub mod sections {
         pub struct Keys {
             /// Multi-factor authentication encryption key
             #[serde(with = "config::util::hex_key")]
-            pub mfa_key: Key<Aes256> = util::rng::gen_crypto_bytes().into() => "MFA_KEY" | config::util::parse_hex_key[true],
+            pub mfa_key: Key<Aes256> = util::rng::crypto_thread_rng().gen_bytes().into() => "MFA_KEY" | config::util::parse_hex_key[true],
 
             /// Some snowflakes are encrypted as a form of reversable obfuscation.
             #[serde(with = "config::util::hex_key")]
-            pub sf_key: Key<Aes128> = util::rng::gen_crypto_bytes().into() => "SF_KEY" | config::util::parse_hex_key[true],
+            pub sf_key: Key<Aes128> = util::rng::crypto_thread_rng().gen_bytes().into() => "SF_KEY" | config::util::parse_hex_key[true],
 
             /// Bot Token Key (padded)
             ///
             /// Used for signing bot tokens
             #[serde(with = "config::util::hex_key::loose")]
-            pub bt_key: BotTokenKey = util::rng::gen_crypto_bytes().into() => "BT_KEY" | config::util::parse_hex_key[false],
+            pub bt_key: BotTokenKey = util::rng::crypto_thread_rng().gen_bytes().into() => "BT_KEY" | config::util::parse_hex_key[false],
         }
     }
 }

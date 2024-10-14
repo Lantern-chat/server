@@ -2,7 +2,7 @@ use std::cell::UnsafeCell;
 use std::rc::Rc;
 
 use rand::rngs::{adapter::ReseedingRng, OsRng};
-use rand::{Rng, RngCore, SeedableRng};
+use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha20Core;
 
 #[derive(Clone, Debug)]
@@ -36,42 +36,41 @@ impl Default for CryptoThreadRng {
     }
 }
 
+impl CryptoThreadRng {
+    #[inline(always)]
+    fn rng(&mut self) -> &mut ReseedingRng<ChaCha20Core, OsRng> {
+        // SAFETY: We must make sure to stop using `rng` before anyone else
+        // creates another mutable reference
+        unsafe { &mut *self.rng.get() }
+    }
+
+    pub fn gen_bytes<const N: usize>(&mut self) -> [u8; N] {
+        let mut bytes = [0; N];
+        self.rng().fill_bytes(&mut bytes);
+        bytes
+    }
+}
+
 impl RngCore for CryptoThreadRng {
     #[inline(always)]
     fn next_u32(&mut self) -> u32 {
-        // SAFETY: We must make sure to stop using `rng` before anyone else
-        // creates another mutable reference
-        let rng = unsafe { &mut *self.rng.get() };
-        rng.next_u32()
+        self.rng().next_u32()
     }
 
     #[inline(always)]
     fn next_u64(&mut self) -> u64 {
-        // SAFETY: We must make sure to stop using `rng` before anyone else
-        // creates another mutable reference
-        let rng = unsafe { &mut *self.rng.get() };
-        rng.next_u64()
+        self.rng().next_u64()
     }
 
+    #[inline(always)]
     fn fill_bytes(&mut self, dest: &mut [u8]) {
-        // SAFETY: We must make sure to stop using `rng` before anyone else
-        // creates another mutable reference
-        let rng = unsafe { &mut *self.rng.get() };
-        rng.fill_bytes(dest)
+        self.rng().fill_bytes(dest)
     }
 
+    #[inline(always)]
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
-        // SAFETY: We must make sure to stop using `rng` before anyone else
-        // creates another mutable reference
-        let rng = unsafe { &mut *self.rng.get() };
-        rng.try_fill_bytes(dest)
+        self.rng().try_fill_bytes(dest)
     }
 }
 
 impl rand::CryptoRng for CryptoThreadRng {}
-
-pub fn gen_crypto_bytes<const N: usize>() -> [u8; N] {
-    let mut bytes = [0; N];
-    crypto_thread_rng().fill(bytes.as_mut_slice());
-    bytes
-}

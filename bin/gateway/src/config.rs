@@ -5,6 +5,16 @@ pub mod sections {
     config::section! {
         #[serde(default)]
         pub struct Paths {
+            /// Where to write logfiles to. Automatically rotated.
+            pub log_dir: PathBuf = "./logs".into() => "LANTERN_LOG_DIR",
+        }
+    }
+
+    config::section! {
+        pub struct Web {
+            /// Bind address
+            pub bind: SocketAddr = SocketAddr::from(([127, 0, 0, 1], 8080)) => "LANTERN_BIND" | config::util::parse_address,
+
             /// Path to SSL Certificates
             ///
             /// Defualts to the current directory
@@ -17,16 +27,6 @@ pub mod sections {
 
             /// Path to static frontend files (typically `./frontend`)
             pub web_path: PathBuf = "./frontend".into() => "WEB_PATH",
-
-            /// Where to write logfiles to. Automatically rotated.
-            pub log_dir: PathBuf = "./logs".into() => "LANTERN_LOG_DIR",
-        }
-    }
-
-    config::section! {
-        pub struct Web {
-            /// Bind address
-            pub bind: SocketAddr = SocketAddr::from(([127, 0, 0, 1], 8080)) => "LANTERN_BIND" | config::util::parse_address,
         }
     }
 
@@ -36,7 +36,17 @@ pub mod sections {
             ///
             /// Used for signing bot tokens
             #[serde(with = "config::util::hex_key::loose")]
-            pub bt_key: BotTokenKey = util::rng::gen_crypto_bytes().into() => "BT_KEY" | config::util::parse_hex_key[false],
+            pub bt_key: BotTokenKey = util::rng::crypto_thread_rng().gen_bytes().into() => "BT_KEY" | config::util::parse_hex_key[false],
+        }
+    }
+
+    config::section! {
+        pub struct Rpc {
+            /// RPC Client certification path
+            pub cert_path: PathBuf = PathBuf::default() => "RPC_CERT_PATH",
+
+            /// RPC Nexus address, from which all other RPC endpoints will be fetched
+            pub nexus_addr: SocketAddr = SocketAddr::from(([127, 0, 0, 1], 8083)) => "NEXUS_ADDR" | config::util::parse_address,
         }
     }
 }
@@ -54,6 +64,9 @@ config::config! {
 
         /// Web/HTTP Configuration
         web: sections::Web,
+
+        /// RPC Configuration
+        rpc: sections::Rpc,
     }
 }
 

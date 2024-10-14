@@ -30,7 +30,6 @@ pub struct ServerStateInner {
 
     pub gateway: Gateway,
 
-    // TODO
     pub services: Services,
     pub queues: Queues,
 
@@ -66,17 +65,26 @@ impl config::HasConfig<Config> for ServerState {
 }
 
 impl ServerState {
-    // pub fn new(config: Config, db: db::DatabasePools) -> Self {
-    //     ServerState(triomphe::Arc::new(ServerStateInner {
-    //         db,
-    //         id_lock: Default::default(),
-    //         mem_semaphore: Semaphore::new(config.general.memory_limit as usize),
-    //         cpu_semaphore: Semaphore::new(config.general.cpu_limit as usize),
-    //         perm_cache: PermissionCache::default(),
-    //         emoji: Default::default(),
-    //         hasher: ahash::RandomState::new(),
+    pub fn new(config: Config, db: db::DatabasePools) -> Self {
+        ServerState(triomphe::Arc::new(ServerStateInner {
+            db,
 
-    //         mfa_last: Default::default(),
-    //     }))
-    // }
+            id_lock: Default::default(),
+            mem_semaphore: Semaphore::new(config.local.general.memory_limit as usize),
+            cpu_semaphore: Semaphore::new(config.local.general.cpu_limit as usize),
+            perm_cache: PermissionCache::default(),
+            emoji: Default::default(),
+            hasher: sdk::FxRandomState2::default(),
+
+            mfa_last: Default::default(),
+
+            sf: SnowflakeGenerator::new(sdk::models::sf::LANTERN_EPOCH, 0),
+
+            gateway: Gateway::default(),
+            services: Services::start().expect("Failed to start services"),
+            queues: Queues::default(),
+
+            config: config::Config::new(config),
+        }))
+    }
 }

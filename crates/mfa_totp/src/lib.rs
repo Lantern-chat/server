@@ -21,6 +21,10 @@ pub struct MFA {
     pub backups: [u64; NUM_BACKUPS],
 }
 
+impl MFA {
+    pub const MEM_COST: u32 = 1024 * 12;
+}
+
 const MFA_LENGTH: usize = size_of::<MFA>();
 
 // total length of the final encrypted data
@@ -69,7 +73,7 @@ impl MFA {
         // initialize with the data we're going to encrypt
         let mut buf = {
             let mut tmp = [0u8; ENCRYPTED_LENGTH];
-            tmp[..MFA_LENGTH].copy_from_slice(unsafe { std::mem::transmute::<&MFA, &[u8; MFA_LENGTH]>(self) });
+            tmp[..MFA_LENGTH].copy_from_slice(unsafe { &std::mem::transmute::<MFA, [u8; MFA_LENGTH]>(*self) });
             tmp
         };
 
@@ -116,7 +120,7 @@ pub fn compute_2fa_key(mfa_key: &Key<Aes256GcmSiv>, password: &str, salt: &[u8])
     static HASHER: LazyLock<Argon2<'static>> = LazyLock::new(|| {
         let params = ParamsBuilder::new()
             .data(AssociatedData::new(b"LanternMFA").unwrap())
-            .m_cost(1024 * 12)
+            .m_cost(MFA::MEM_COST)
             .p_cost(1)
             .t_cost(3)
             .output_len(KEY_LENGTH)
