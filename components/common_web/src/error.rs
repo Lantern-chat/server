@@ -23,6 +23,8 @@ pub enum Error {
     #[error("Not Found")]
     NotFoundHighPenalty,
 
+    #[error("Timeout")]
+    Timeout,
     #[error("Bad Request")]
     BadRequest,
     #[error("Method Not Allowed")]
@@ -131,6 +133,7 @@ impl Error {
             Error::BadRequest => 200,
             Error::Unauthorized => 300,
             Error::MethodNotAllowed => 200,
+            Error::Timeout => 100,
             _ => 0,
         })
     }
@@ -170,6 +173,7 @@ impl From<Error> for sdk::api::error::ApiError {
                 Error::Base64DecodeError(_)         => "Base64 Decode Error",
                 Error::Base85DecodeError(_)         => "Base85 Decode Error",
                 Error::InvalidHeaderValue(_)        => "Invalid Header Value",
+                Error::Timeout                      => "Request Timed Out",
                 Error::NotFound                     => "Not Found",
                 Error::NotFoundSignaling            => "Not Found",
                 Error::BadRequest                   => "Bad Request",
@@ -192,6 +196,7 @@ impl From<Error> for sdk::api::error::ApiError {
         };
 
         let code = match value {
+            Error::Timeout                      => ApiErrorCode::RequestTimeout,
             Error::NotFound                     => ApiErrorCode::NotFound,
             Error::NotFoundSignaling            => ApiErrorCode::NotFound,
             Error::NotFoundHighPenalty          => ApiErrorCode::NotFound,
@@ -391,6 +396,7 @@ impl From<ftl::Error> for Error {
             },
             ftl::Error::InvalidHeader(_, _error) => Error::BadRequest,
             ftl::Error::NotFound => Error::NotFound,
+            ftl::Error::TimedOut => Error::Timeout,
             ftl::Error::MethodNotAllowed => Error::MethodNotAllowed,
             ftl::Error::UnsupportedMediaType => Error::UnsupportedMediaTypeGeneric,
             ftl::Error::PayloadTooLarge => Error::RequestEntityTooLarge,

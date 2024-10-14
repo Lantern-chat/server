@@ -115,6 +115,14 @@ pub struct Config<C> {
 }
 
 impl<C> Config<C> {
+    pub fn new(config: C) -> Self {
+        Self {
+            config: arc_swap::ArcSwap::from_pointee(config),
+            config_change: Notify::new(),
+            config_reload: Notify::new(),
+        }
+    }
+
     pub fn trigger_reload(&self) {
         self.config_reload.notify_waiters();
     }
