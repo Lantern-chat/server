@@ -81,6 +81,8 @@ pub async fn process_2fa<'a>(
             let password: &'static str = unsafe { std::mem::transmute(password) };
             let encrypted_mfa: &'static [u8] = unsafe { std::mem::transmute(encrypted_mfa) };
 
+            let _permit = state.mem_semaphore.acquire_many(MFA::MEM_COST).await?;
+
             match spawn_blocking(move || MFA::decrypt(&mfa_key, &nonce, password, encrypted_mfa)).await? {
                 Ok(mfa) => mfa,
                 Err(_) => return Err(Error::InternalErrorStatic("Decrypt Error")),
@@ -126,9 +128,13 @@ pub async fn process_2fa<'a>(
             // SAFETY: This is only used within the following spawn_blocking block
             let password: &'static str = unsafe { std::mem::transmute(password) };
 
+            let _permit = state.mem_semaphore.acquire_many(MFA::MEM_COST).await?;
+
             let Ok(encrypted_mfa) = spawn_blocking(move || mfa.encrypt(&mfa_key, &nonce, password)).await? else {
                 return Err(Error::InternalErrorStatic("Encrypt error"));
             };
+
+            drop(_permit);
 
             #[rustfmt::skip]
             state.db.write.get().await?.execute2(schema::sql! {
