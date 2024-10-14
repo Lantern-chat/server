@@ -1,4 +1,5 @@
-use ftl::serve::{accept::NoDelayAcceptor, Server};
+use ftl::serve::accept::{limited::LimitedTcpAcceptor, NoDelayAcceptor, PeekingAcceptor, TimeoutAcceptor};
+use ftl::serve::Server;
 
 use super::*;
 
@@ -88,8 +89,23 @@ impl HttpsServer {
 
         let handle = server.handle();
 
+        #[rustfmt::skip]
+        let acceptor = TimeoutAcceptor::new(
+            // 10 second timeout for the entire connection accept process
+            Duration::from_secs(10),
+            // Accept TLS connections with rustls
+            //RustlsAcceptor::new(tls_config).acceptor(
+                // limit the number of connections per IP to 50
+                LimitedTcpAcceptor::new(
+                    // TCP_NODELAY, and peek at the first byte of the stream
+                    PeekingAcceptor(NoDelayAcceptor),
+                    50,
+                )
+            //),
+        );
+
         // spawn the server
-        tokio::spawn(server.acceptor(NoDelayAcceptor).serve(service));
+        tokio::spawn(server.acceptor(acceptor).serve(service));
 
         // wait for the server to shutdown
         handle.wait().await;

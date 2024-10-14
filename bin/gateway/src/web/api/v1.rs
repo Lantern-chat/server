@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{marker::PhantomData, time::Duration};
 
 use crate::prelude::*;
 
@@ -202,6 +202,7 @@ impl ApiV1Service {
     }
 
     pub fn new(state: GatewayServerState) -> Self {
+        use ftl::extract::timeout::{Timeout, TimeoutFactory};
         use ftl::layers::rate_limit::gcra::Quota;
         use ftl::router::GenericRouter;
         use sdk::api::{commands::all as cmds, Command, CommandFlags};
@@ -217,6 +218,18 @@ impl ApiV1Service {
             .with_default_quota(default_quota);
 
         let mut api = Router::<_, Return>::with_state(state);
+
+        #[derive(Clone, Copy)]
+        struct CommandTimeout<C>(PhantomData<fn() -> C>);
+
+        impl<C> TimeoutFactory for CommandTimeout<C>
+        where
+            C: Command + 'static,
+        {
+            fn timeout(_parts: &RequestParts) -> Duration {
+                C::SERVER_TIMEOUT
+            }
+        }
 
         macro_rules! add_cmds {
             ($($cmd:ty: $handler:expr),* $(,)?) => {$(
@@ -236,7 +249,7 @@ impl ApiV1Service {
 
             // trivial handlers that just convert the extracted command to a procedure
             (@TRIVIAL $($cmd:ty),* $(,)?) => {$({
-                add_cmds!($cmd: |auth: Option<Auth>, cmd: $cmd| {
+                add_cmds!($cmd: |auth: Option<Auth>, cmd: Timeout<$cmd, CommandTimeout<$cmd>>| {
                     // use generic ready future to avoid overhead from many near-duplicate async-block types
                     use core::future::ready;
 
@@ -257,7 +270,7 @@ impl ApiV1Service {
                         }
                     }
 
-                    ready(Ok(Procedure::from(cmd)))
+                    ready(Ok(Procedure::from(cmd.value)))
                 });
             })*};
         }
