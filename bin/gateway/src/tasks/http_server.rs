@@ -96,7 +96,7 @@ impl HttpServer {
                 // TCP_NODELAY, and peek at the first byte of the stream
                 PeekingAcceptor(NoDelayAcceptor),
                 10,
-            )
+            ).with_privacy_mask(true)
         );
 
         // spawn the server
