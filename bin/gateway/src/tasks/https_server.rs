@@ -1,5 +1,6 @@
 use ftl::serve::accept::{limited::LimitedTcpAcceptor, NoDelayAcceptor, PeekingAcceptor, TimeoutAcceptor};
-use ftl::serve::Server;
+use ftl::serve::tls_rustls::{RustlsAcceptor, RustlsConfig};
+use ftl::serve::{Server, TlsConfig as _};
 
 use super::*;
 
@@ -25,6 +26,10 @@ impl HttpsServer {
         let HttpsServer(state) = self;
 
         let config = state.config();
+
+        let tls_config = RustlsConfig::from_pem_file(&config.local.web.cert_path, &config.local.web.key_path)
+            .await
+            .expect("failed to load TLS config");
 
         let bind_addr = config.local.web.bind;
 
@@ -94,14 +99,14 @@ impl HttpsServer {
             // 10 second timeout for the entire connection accept process
             Duration::from_secs(10),
             // Accept TLS connections with rustls
-            //RustlsAcceptor::new(tls_config).acceptor(
+            RustlsAcceptor::new(tls_config).acceptor(
                 // limit the number of connections per IP to 50
                 LimitedTcpAcceptor::new(
                     // TCP_NODELAY, and peek at the first byte of the stream
                     PeekingAcceptor(NoDelayAcceptor),
                     50,
                 ).with_privacy_mask(true)
-            //),
+            ),
         );
 
         // spawn the server

@@ -47,6 +47,11 @@ pub mod sections {
 
             /// RPC Nexus address, from which all other RPC endpoints will be fetched
             pub nexus_addr: SocketAddr = SocketAddr::from(([127, 0, 0, 1], 8083)) => "NEXUS_ADDR" | config::util::parse_address,
+
+            /// Maximum number of concurrent RPC connections per endpoint
+            ///
+            /// Defaults to 10
+            pub max_conns: usize = 10 => "MAX_RPC_CONNS" | config::util::parse[10usize],
         }
     }
 }
@@ -70,7 +75,9 @@ config::config! {
     }
 }
 
+pub use schema::config::SharedConfig;
+
 pub struct Config {
     pub local: LocalConfig,
-    pub shared: schema::config::SharedConfig,
+    pub shared: SharedConfig,
 }

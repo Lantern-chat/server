@@ -395,19 +395,17 @@ impl RpcClient {
 
         Ok(recv)
     }
-}
 
-impl RpcClient {
     pub async fn send<T>(&self, value: &T) -> Result<quinn::RecvStream, RpcClientError>
     where
         T: for<'a> Serialize<HighSerializer<AlignedVec, ArenaHandle<'a>, RancorError>>,
     {
         match rkyv::to_bytes::<RancorError>(value) {
+            Ok(bytes) => self.send_raw(&bytes).await,
             Err(e) => {
                 log::error!("Error serializing RPC message: {e}");
                 Err(RpcClientError::EncodingError)
             }
-            Ok(bytes) => self.send_raw(&bytes).await,
         }
     }
 }

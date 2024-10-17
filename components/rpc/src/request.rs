@@ -16,6 +16,9 @@ pub enum RpcRequest {
     /// Open a gateway connection on this same RPC connection
     OpenGateway,
 
+    /// Fetch the shared config from the Nexus server
+    GetSharedConfig,
+
     Authorize {
         token: RawAuthToken,
     },

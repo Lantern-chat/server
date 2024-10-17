@@ -82,7 +82,7 @@ async fn main() -> anyhow::Result<()> {
 
     let state = state::ServerState::new(config::Config { local, shared }, db);
 
-    log::info!("Running startup task...");
+    log::info!("Running startup tasks...");
     // todo
 
     log::info!("Starting tasks...");
@@ -96,6 +96,7 @@ async fn main() -> anyhow::Result<()> {
         shutdown.stop();
     });
 
+    log::info!("Nexus server started");
     runner.wait().await?;
 
     println!("Flushing logs...");

@@ -22,7 +22,7 @@ pub struct InnerServerState {
     pub auth_cache: auth_cache::AuthCache,
     pub file_cache: StaticFileCache,
     pub emoji: common::emoji::EmojiMap,
-    pub rpc: rpc::client::RpcManager,
+    pub rpc: ::rpc::client::RpcManager,
     pub gateway: Gateway,
 }
 
@@ -43,5 +43,19 @@ impl config::HasConfig<Config> for GatewayServerState {
     #[inline(always)]
     fn raw(&self) -> &config::Config<Config> {
         &self.config
+    }
+}
+
+impl GatewayServerState {
+    pub fn new(config: crate::config::Config, nexus: ::rpc::client::RpcClient) -> Self {
+        Self(Arc::new(InnerServerState {
+            sf: SnowflakeGenerator::new(sdk::models::sf::LANTERN_EPOCH, 0),
+            config: config::Config::new(config),
+            auth_cache: auth_cache::AuthCache::default(),
+            file_cache: StaticFileCache::default(),
+            emoji: common::emoji::EmojiMap::default(),
+            rpc: ::rpc::client::RpcManager::new(nexus),
+            gateway: Gateway::default(),
+        }))
     }
 }

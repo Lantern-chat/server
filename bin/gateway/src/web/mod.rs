@@ -113,7 +113,7 @@ async fn static_files(
     path: MatchedPath,
     parts: RequestParts,
 ) -> impl IntoResponse {
-    let base_dir = state.config().local.paths.web_path.join("dist");
+    let base_dir = state.config().local.web.web_path.join("dist");
     state.file_cache.dir(&parts, &state, &*path, base_dir).await
 }
 
@@ -130,7 +130,7 @@ async fn index_file(State(state): State<GatewayServerState>, parts: RequestParts
         return Err(StatusCode::NOT_FOUND);
     }
 
-    let path = state.config().local.paths.web_path.join("dist/index.html");
+    let path = state.config().local.web.web_path.join("dist/index.html");
     let mut resp = state.file_cache.file(&parts, &state, path).await;
 
     // TODO: Revisit this conclusion?
@@ -149,7 +149,7 @@ async fn index_file(State(state): State<GatewayServerState>, parts: RequestParts
 
 /// Serves the favicon.ico file from the `assets` directory
 async fn favicon(State(state): State<GatewayServerState>, parts: RequestParts) -> impl IntoResponse {
-    let path = state.config().local.paths.web_path.join("assets/favicon.ico");
+    let path = state.config().local.web.web_path.join("assets/favicon.ico");
     state.file_cache.file(&parts, &state, path).await
 }
 

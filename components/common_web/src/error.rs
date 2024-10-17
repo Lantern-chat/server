@@ -23,6 +23,9 @@ pub enum Error {
     #[error("Not Found")]
     NotFoundHighPenalty,
 
+    #[error("RPC Client Error: {0}")]
+    RpcClientError(#[from] rpc::client::RpcClientError),
+
     #[error("Timeout")]
     Timeout,
     #[error("Bad Request")]
@@ -150,6 +153,7 @@ impl Error {
             | Error::CborEncodingError(_)
             //| Error::XMLError(_)
             | Error::IOError(_)
+            | Error::RpcClientError(_)
             | Error::RequestError(_) => true,
 
             Error::ApiError(e) if e.code == ApiErrorCode::InternalError => true,
@@ -208,6 +212,7 @@ impl From<Error> for sdk::api::error::ApiError {
             Error::NoSession                    => ApiErrorCode::NoSession,
             Error::Unimplemented                => ApiErrorCode::Unimplemented,
 
+            Error::RpcClientError(_)        => ApiErrorCode::RpcClientError,
             Error::IOError(_)               => ApiErrorCode::IOError,
             Error::DbError(_)               => ApiErrorCode::DbError,
             Error::JoinError(_)             => ApiErrorCode::JoinError,

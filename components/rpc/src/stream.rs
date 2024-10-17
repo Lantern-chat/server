@@ -105,7 +105,7 @@ impl<R: AsyncRead + Unpin> RpcRecvReader<R> {
 
 impl<R: AsyncRead + Unpin> RpcRecvReader<R> {
     /// Reads from the underlying stream and returns the next message.
-    pub async fn recv<'a, T>(&'a mut self) -> Result<Option<&'a Archived<T>>, io::Error>
+    pub async fn recv<'a, T>(&'a mut self) -> io::Result<Option<&'a Archived<T>>>
     where
         T: Archive + 'a,
         Archived<T>: Portable + for<'b> CheckBytes<HighValidator<'b, RancorError>>,
@@ -127,7 +127,7 @@ impl<R: AsyncRead + Unpin> RpcRecvReader<R> {
     }
 
     /// Converts the reader into a stream of deserialized values.
-    pub fn recv_stream_deserialized<T>(self) -> impl Stream<Item = Result<T, io::Error>>
+    pub fn recv_stream_deserialized<T>(self) -> impl Stream<Item = io::Result<T>>
     where
         T: Archive,
         Archived<T>: Portable + for<'b> CheckBytes<HighValidator<'b, RancorError>>,
