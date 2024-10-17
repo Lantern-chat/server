@@ -27,9 +27,11 @@ impl HttpsServer {
 
         let config = state.config();
 
-        let tls_config = RustlsConfig::from_pem_file(&config.local.web.cert_path, &config.local.web.key_path)
-            .await
-            .expect("failed to load TLS config");
+        let mut cert_path = config.local.web.cert_path.clone();
+        let mut key_path = config.local.web.key_path.clone();
+
+        let tls_config =
+            RustlsConfig::from_pem_file(&cert_path, &key_path).await.expect("failed to load TLS config");
 
         let bind_addr = config.local.web.bind;
 
@@ -39,17 +41,31 @@ impl HttpsServer {
         // spawn a task to shutdown the server when the config changes or the server is no longer alive
         // if the config changes, the server will shutdown gracefully and restart
         tokio::spawn({
-            let mut alive = alive.clone();
-            let handle = server.handle();
-            let state = state.clone();
+            let (handle, mut alive, state, tls_config) =
+                (server.handle(), alive.clone(), state.clone(), tls_config.clone());
 
             async move {
                 loop {
                     tokio::select! {
                         _ = alive.changed() => break,
-                        _ = state.config.config_change.notified() => {
-                            todo!("TLS reload");
-                        }
+                        _ = state.config.config_change.notified() => {/*reload tls config*/}
+                    }
+
+                    let config = state.config();
+
+                    if config.local.web.cert_path != cert_path || config.local.web.key_path != key_path {
+                        cert_path = config.local.web.cert_path.clone();
+                        key_path = config.local.web.key_path.clone();
+
+                        let new_config = match RustlsConfig::from_pem_file(&cert_path, &key_path).await {
+                            Ok(config) => config,
+                            Err(e) => {
+                                log::error!("failed to reload TLS config: {e}");
+                                continue;
+                            }
+                        };
+
+                        tls_config.reload_from_config(new_config.get_inner());
                     }
                 }
 

@@ -36,16 +36,15 @@ impl HttpServer {
         // spawn a task to shutdown the server when the config changes or the server is no longer alive
         // if the config changes, the server will shutdown gracefully and restart
         tokio::spawn({
-            let mut alive = alive.clone();
-            let handle = server.handle();
-            let state = state.clone();
+            let (handle, mut alive, state) = (server.handle(), alive.clone(), state.clone());
 
             async move {
-                futures::future::select(
-                    std::pin::pin!(alive.changed()),
-                    std::pin::pin!(state.config.config_change.notified()),
-                )
-                .await;
+                tokio::select! {
+                    _ = alive.changed() => {},
+                    _ = state.config.config_change.notified() => {
+                        // TODO: Do we even need to restart the server?
+                    },
+                }
 
                 handle.shutdown();
             }
