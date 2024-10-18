@@ -31,7 +31,7 @@ auth = { path = "components/auth" }
 rpc = { path = "components/rpc" }
 schema = { path = "components/schema" }
 
-timestamp = { package = "iso8601-timestamp", version = "0.3.0-rc.1", features = ["pg"] }
+timestamp = { package = "iso8601-timestamp", version = "0.3.0", features = ["pg"] }
 snowflake = { git = "https://github.com/Lantern-chat/snowflake", features = ["timestamp"] }
 sdk = { git = "https://github.com/Lantern-chat/client-sdk-rs", default-features = false, package = "client-sdk" }
 smol_str = "0.3"
@@ -77,7 +77,7 @@ tracing-futures = { version = "0.2.4", default-features = false, features = ["st
 tracing-subscriber = { version = "0.3", features = ["env-filter", "parking_lot", "registry"] }
 tracing-appender = { version = "0.2", features = ["parking_lot"] }
 
-reqwest = { version = "0.12", default-features = false, features = ["gzip", "deflate", "rustls-tls", "http2", "json"] }
+reqwest = { version = "0.12", default-features = false, features = ["gzip", "deflate", "rustls-tls", "http2", "json", "brotli", "zstd"] }
 
 [profile.dev]
 # debug = 1
