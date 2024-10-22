@@ -54,10 +54,7 @@ impl HttpServer {
         server.handle().set_shutdown_timeout(Duration::from_secs(0));
 
         // and configure HTTP parameters
-        server
-            .http1()
-            .writev(true) // helps with TLS performance
-            .pipeline_flush(true);
+        server.http1().pipeline_flush(true);
 
         // create the service stack
         let service = {
@@ -84,8 +81,6 @@ impl HttpServer {
             }))
         };
 
-        let handle = server.handle();
-
         #[rustfmt::skip]
         let acceptor = TimeoutAcceptor::new(
             // 5 second timeout for the entire connection accept process
@@ -98,10 +93,7 @@ impl HttpServer {
             ).with_privacy_mask(true)
         );
 
-        // spawn the server
-        tokio::spawn(server.acceptor(acceptor).serve(service));
-
-        // wait for the server to shutdown
-        handle.wait().await;
+        // run the server
+        server.acceptor(acceptor).serve(service).await.expect("HTTP server failed");
     }
 }

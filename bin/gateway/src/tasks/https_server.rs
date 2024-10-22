@@ -38,8 +38,6 @@ impl HttpsServer {
         // setup server with bind address
         let mut server = Server::bind([bind_addr]);
 
-        // spawn a task to shutdown the server when the config changes or the server is no longer alive
-        // if the config changes, the server will shutdown gracefully and restart
         tokio::spawn({
             let (handle, mut alive, state, tls_config) =
                 (server.handle(), alive.clone(), state.clone(), tls_config.clone());
@@ -90,8 +88,8 @@ impl HttpsServer {
         let service = {
             use ftl::layers::{
                 catch_panic::CatchPanic, cloneable::Cloneable, compression::CompressionLayer,
-                convert_body::ConvertBody, deferred::DeferredEncoding, normalize::Normalize,
-                resp_timing::RespTimingLayer, Layer, RealIpLayer,
+                convert_body::ConvertBody, deferred::DeferredEncoding, limit_req_body::LimitReqBody,
+                normalize::Normalize, resp_timing::RespTimingLayer, Layer, RealIpLayer,
             };
 
             let layer_stack = (
@@ -99,6 +97,7 @@ impl HttpsServer {
                 CatchPanic::default(),       // spawns each request in a separate task and catches panics
                 Cloneable::default(),        // makes the service layered below it cloneable
                 RealIpLayer::default(),      // extracts the real ip from the request
+                LimitReqBody::new(10 << 20), // limits the request body to 10MiB and rejects large bodies
                 CompressionLayer::default(), // compresses responses
                 Normalize::default(),        // normalizes the response structure
                 ConvertBody::default(),      // converts the body to the correct type
@@ -107,8 +106,6 @@ impl HttpsServer {
 
             layer_stack.layer(crate::web::WebService::new(state.clone()))
         };
-
-        let handle = server.handle();
 
         #[rustfmt::skip]
         let acceptor = TimeoutAcceptor::new(
@@ -125,10 +122,7 @@ impl HttpsServer {
             ),
         );
 
-        // spawn the server
-        tokio::spawn(server.acceptor(acceptor).serve(service));
-
-        // wait for the server to shutdown
-        handle.wait().await;
+        // run the server
+        server.acceptor(acceptor).serve(service).await.expect("HTTPS server failed");
     }
 }
