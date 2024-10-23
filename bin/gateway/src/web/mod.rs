@@ -1,4 +1,4 @@
-use std::{future, time::Duration};
+use std::{future, num::NonZeroU64, time::Duration};
 
 use http::{HeaderName, HeaderValue, Method, StatusCode};
 
@@ -57,11 +57,10 @@ impl WebService {
     pub fn new(state: GatewayServerState) -> Self {
         use ftl::layers::rate_limit::gcra::Quota;
 
-        // Web routes are primarily used by actual humans, so configure it to be more strict
-        // and disallow burst requests in the default quota.
+        // Web routes are primarily used by actual humans, so configure it to work better for web browsing
         let mut rl = RateLimitLayerBuilder::new()
             .with_global_fallback(true)
-            .with_default_quota(Duration::from_millis(5).into());
+            .with_default_quota(Quota::new(Duration::from_millis(25), NonZeroU64::new(5).unwrap()));
 
         let mut web = Router::with_state(state.clone());
 
