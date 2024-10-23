@@ -87,20 +87,38 @@ impl HttpsServer {
         // create the service stack
         let service = {
             use ftl::layers::{
-                catch_panic::CatchPanic, cloneable::Cloneable, compression::CompressionLayer,
-                convert_body::ConvertBody, deferred::DeferredEncoding, limit_req_body::LimitReqBody,
-                normalize::Normalize, resp_timing::RespTimingLayer, Layer, RealIpLayer,
+                catch_panic::CatchPanic,
+                cloneable::Cloneable,
+                compression::CompressionLayer,
+                convert_body::ConvertBody,
+                deferred::DeferredEncoding,
+                handle_error::HandleErrorLayer,
+                limit_req_body::{LimitBodyError, LimitReqBody},
+                normalize::Normalize,
+                resp_timing::RespTimingLayer,
+                Layer, RealIpLayer,
             };
 
             let layer_stack = (
-                RespTimingLayer::default(),  // logs the time taken to process each request
-                CatchPanic::default(),       // spawns each request in a separate task and catches panics
-                Cloneable::default(),        // makes the service layered below it cloneable
-                RealIpLayer::default(),      // extracts the real ip from the request
-                LimitReqBody::new(10 << 20), // limits the request body to 10MiB and rejects large bodies
+                RespTimingLayer::default(), // logs the time taken to process each request
+                CatchPanic::default(),      // spawns each request in a separate task and catches panics
+                Cloneable::default(),       // makes the service layered below it cloneable
+                RealIpLayer::default(),     // extracts the real ip from the request
+                ConvertBody::default(),     // converts the body to the correct type
+                // limits the request body to 10MiB and rejects large bodies
+                // and also handles the error by converting it to a response
+                (
+                    HandleErrorLayer::new(|err| {
+                        use ftl::IntoResponse;
+
+                        core::future::ready(match err {
+                            LimitBodyError::BodyError(e) => e.into_response(),
+                        })
+                    }),
+                    LimitReqBody::new(10 << 20),
+                ),
                 CompressionLayer::default(), // compresses responses
                 Normalize::default(),        // normalizes the response structure
-                ConvertBody::default(),      // converts the body to the correct type
                 DeferredEncoding::default(), // encodes deferred responses
             );
 
