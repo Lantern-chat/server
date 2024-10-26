@@ -26,7 +26,7 @@ pub async fn trigger_typing(
 
     #[rustfmt::skip]
     let row = state.db.read.get().await?.query_opt2(schema::sql! {
-        tables! { pub struct AggRoom { PartyId: Rooms::PartyId } };
+        struct AggRoom { PartyId: Rooms::PartyId }
 
         WITH AggRoom AS (
             if has_perms {

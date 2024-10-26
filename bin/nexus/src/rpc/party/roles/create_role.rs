@@ -27,15 +27,14 @@ pub async fn create_role(
     let row = t.query_one2(schema::sql! {
         const_assert!(!Columns::IS_DYNAMIC);
 
-        tables! {
-            struct TempRole {
-                Id: Roles::Id,
-                Position: Roles::Position,
-                Perms1: Roles::Permissions1,
-                Perms2: Roles::Permissions2,
-            }
-            struct Inserted { Position: Roles::Position }
-        };
+        struct TempRole {
+            Id: Roles::Id,
+            Position: Roles::Position,
+            Perms1: Roles::Permissions1,
+            Perms2: Roles::Permissions2,
+        }
+
+        struct Inserted { Position: Roles::Position }
 
         WITH TempRole AS (
             SELECT

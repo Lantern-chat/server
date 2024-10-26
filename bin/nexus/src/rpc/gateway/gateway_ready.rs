@@ -43,7 +43,7 @@ pub async fn ready(state: ServerState, conn_id: ConnectionId, auth: Authorizatio
         let rows = db.query2(schema::sql! {
             const_assert!(!Columns::IS_DYNAMIC);
 
-            tables! { struct AggRoles { RoleIds: SNOWFLAKE_ARRAY } };
+            struct AggRoles { RoleIds: SNOWFLAKE_ARRAY }
 
             SELECT
                 Party.Id                AS @Id,

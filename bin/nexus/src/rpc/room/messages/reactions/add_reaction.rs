@@ -28,39 +28,37 @@ pub async fn add_reaction(
 
     #[rustfmt::skip]
     let row = state.db.write.get().await?.query_opt2(schema::sql! {
-        tables! {
-            pub struct Checked {
-                MsgId: Reactions::MsgId,
-                PartyId: Rooms::PartyId,
-            }
+        struct Checked {
+            MsgId: Reactions::MsgId,
+            PartyId: Rooms::PartyId,
+        }
 
-            pub struct SelectedReaction {
-                ReactionId: Reactions::Id,
-                Count: Reactions::Count,
-            }
+        struct SelectedReaction {
+            ReactionId: Reactions::Id,
+            Count: Reactions::Count,
+        }
 
-            pub struct InsertedReaction {
-                ReactionId: Reactions::Id,
-            }
+        struct InsertedReaction {
+            ReactionId: Reactions::Id,
+        }
 
-            pub struct InsertedReactionUser {
-                UserId: ReactionUsers::UserId,
-                ReactionId: ReactionUsers::ReactionId,
-            }
+        struct InsertedReactionUser {
+            UserId: ReactionUsers::UserId,
+            ReactionId: ReactionUsers::ReactionId,
+        }
 
-            pub struct ReactionEvent {
-                MsgId: Checked::MsgId,
-                PartyId: Rooms::PartyId,
-                Nickname: Profiles::Nickname,
-                Username: Users::Username,
-                Discriminator: Users::Discriminator,
-                UserFlags: Users::Flags,
-                AvatarId: Profiles::AvatarId,
-                ProfileBits: Profiles::Bits,
-                RoleIds: AggMembers::RoleIds,
-                JoinedAt: AggMembers::JoinedAt,
-            }
-        };
+        struct ReactionEvent {
+            MsgId: Checked::MsgId,
+            PartyId: Rooms::PartyId,
+            Nickname: Profiles::Nickname,
+            Username: Users::Username,
+            Discriminator: Users::Discriminator,
+            UserFlags: Users::Flags,
+            AvatarId: Profiles::AvatarId,
+            ProfileBits: Profiles::Bits,
+            RoleIds: AggMembers::RoleIds,
+            JoinedAt: AggMembers::JoinedAt,
+        }
 
         // these CTEs rely on the previous ones to succeed, so msg id and
         // reaction ids are passed through them, becoming NULL if not forwarded

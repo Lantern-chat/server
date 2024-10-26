@@ -16,7 +16,7 @@ pub async fn remove_room(
     let res = t.execute2(schema::sql! {
         const_assert!(!Columns::IS_DYNAMIC);
 
-        tables! { struct PendingRoom { Id: Rooms::Id } };
+        struct PendingRoom { Id: Rooms::Id }
 
         WITH PendingRoom AS (
             SELECT Rooms.Id AS PendingRoom.Id

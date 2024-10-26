@@ -28,17 +28,13 @@ pub async fn create_invite(
     let row = state.db.write.get().await?.query_one2(schema::sql! {
         const_assert!(!Columns::IS_DYNAMIC);
 
-        tables! {
-            struct Checked {
-                Allowed: Type::BOOL,
-                PartyName: Party::Name,
-                PartyDesc: Party::Description,
-            }
+        struct Checked {
+            Allowed: Type::BOOL,
+            PartyName: Party::Name,
+            PartyDesc: Party::Description,
+        }
 
-            struct Inserted {
-                InviteId: Invite::Id,
-            }
-        };
+        struct Inserted { InviteId: Invite::Id }
 
         WITH Checked AS (
             SELECT

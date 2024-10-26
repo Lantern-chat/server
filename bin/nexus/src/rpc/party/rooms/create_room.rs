@@ -69,15 +69,13 @@ pub async fn create_room(
 
     #[rustfmt::skip]
     let num_inserted = t.execute2(schema::sql! {
-        tables! {
-            struct Ow {
-                Id: SNOWFLAKE,
-                Allow1: Type::INT8,
-                Allow2: Type::INT8,
-                Deny1:  Type::INT8,
-                Deny2:  Type::INT8,
-            }
-        };
+        struct Ow {
+            Id: SNOWFLAKE,
+            Allow1: Type::INT8,
+            Allow2: Type::INT8,
+            Deny1:  Type::INT8,
+            Deny2:  Type::INT8,
+        }
 
         WITH Ow AS (
             SELECT

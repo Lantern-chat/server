@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::prelude::*;
 use sdk::models::*;
 
@@ -21,11 +23,7 @@ pub async fn get_stats(
 ) -> Result<Statistics, Error> {
     #[rustfmt::skip]
     let rows = state.db.read.get().await?.query2(schema::sql! {
-        tables! {
-            struct AllowedRooms {
-                RoomId: SNOWFLAKE_ARRAY,
-            }
-        };
+        struct AllowedRooms { RoomId: SNOWFLAKE_ARRAY }
 
         WITH AllowedRooms AS (
             SELECT AggRoomPerms.Id AS AllowedRooms.RoomId
@@ -82,7 +80,7 @@ pub async fn get_stats(
         GROUP BY Messages.RoomId
     }).await?;
 
-    let mut rooms = hashbrown::HashMap::default();
+    let mut rooms = HashMap::default();
 
     for row in rows {
         rooms.insert(

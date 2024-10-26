@@ -116,20 +116,18 @@ pub async fn get_metrics(
 
     #[rustfmt::skip]
     let stream = state.db.read.get().await?.query_stream2(schema::sql! {
-        tables! {
-            struct RoundedMetrics {
-                RoundedTs: Type::INT8,
-                Mem: Metrics::Mem,
-                Upload: Metrics::Upload,
-                Reqs: Metrics::Reqs,
-                Errs: Metrics::Errs,
-                Conns: Metrics::Conns,
-                Events: Metrics::Events,
-                P50: Metrics::P50,
-                P95: Metrics::P95,
-                P99: Metrics::P99,
-            }
-        };
+        struct RoundedMetrics {
+            RoundedTs: Type::INT8,
+            Mem: Metrics::Mem,
+            Upload: Metrics::Upload,
+            Reqs: Metrics::Reqs,
+            Errs: Metrics::Errs,
+            Conns: Metrics::Conns,
+            Events: Metrics::Events,
+            P50: Metrics::P50,
+            P95: Metrics::P95,
+            P99: Metrics::P99,
+        }
 
         WITH RoundedMetrics AS (
             SELECT

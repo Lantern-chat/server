@@ -95,11 +95,7 @@ pub async fn modify_party(
 
     #[rustfmt::skip]
     let res = t.execute2(schema::sql! {
-        tables! {
-            struct TempDefaultRoom {
-                Id: Rooms::Id,
-            }
-        };
+        struct TempDefaultRoom { Id: Rooms::Id }
 
         if set_room {
             // verify the room is within this party

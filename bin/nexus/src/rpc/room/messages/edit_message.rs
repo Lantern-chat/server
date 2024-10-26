@@ -57,7 +57,7 @@ pub async fn edit_message(
     let prev = db.query_opt2(schema::sql! {
         const_assert!(!Columns::IS_DYNAMIC);
 
-        tables! { struct AggFileIds { FileIds: SNOWFLAKE_ARRAY } }
+        struct AggFileIds { FileIds: SNOWFLAKE_ARRAY }
 
         SELECT
             Messages.UserId     AS @UserId,

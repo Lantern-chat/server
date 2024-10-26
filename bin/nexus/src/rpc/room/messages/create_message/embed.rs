@@ -136,14 +136,8 @@ pub async fn run_embed(
         // NOTE: The original URL should be used, not embed.url(), do to potential odd duplicates
         #[rustfmt::skip]
         let row = db.query_one2(schema::sql! {
-            tables! {
-                pub struct TempEmbed {
-                    Id: Embeds::Id,
-                }
-                pub struct ExistingEmbed {
-                    Id: Embeds::Id,
-                }
-            };
+            struct TempEmbed { Id: Embeds::Id }
+            struct ExistingEmbed { Id: Embeds::Id }
 
             WITH ExistingEmbed AS (
                 SELECT Embeds.Id AS ExistingEmbed.Id

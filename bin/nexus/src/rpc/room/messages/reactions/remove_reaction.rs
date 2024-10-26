@@ -26,16 +26,14 @@ pub async fn remove_own_reaction(
 
     #[rustfmt::skip]
     let res = state.db.write.get().await?.query_opt2(schema::sql! {
-        tables! {
-            struct SelectedReaction {
-                ReactionId: Reactions::Id,
-                MsgId: Reactions::MsgId,
-            }
+        struct SelectedReaction {
+            ReactionId: Reactions::Id,
+            MsgId: Reactions::MsgId,
+        }
 
-            struct DeletedReactionUser {
-                ReactionId: Reactions::Id,
-            }
-        };
+        struct DeletedReactionUser {
+            ReactionId: Reactions::Id,
+        }
 
         WITH SelectedReaction AS (
             SELECT

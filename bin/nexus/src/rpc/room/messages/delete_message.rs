@@ -20,7 +20,7 @@ pub async fn delete_msg(
 
     #[rustfmt::skip]
     let res = state.db.write.get().await?.execute2(schema::sql! {
-        tables! { struct TempPerms { Permissions1: AggRoomPerms::Permissions1 } };
+        struct TempPerms { Permissions1: AggRoomPerms::Permissions1 }
 
         if perms.is_none() {
             WITH TempPerms AS (

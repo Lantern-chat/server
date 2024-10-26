@@ -10,12 +10,10 @@ pub async fn revoke_invite(state: ServerState, auth: Authorization, code: SmolSt
     state.db.write.get().await?.execute2(schema::sql! {
         const_assert!(!Columns::IS_DYNAMIC);
 
-        tables! {
-            struct Perms {
-                InviteId: Invite::Id,
-                Allowed: Type::BOOL,
-            }
-        };
+        struct Perms {
+            InviteId: Invite::Id,
+            Allowed: Type::BOOL,
+        }
 
         WITH Perms AS (
             SELECT
