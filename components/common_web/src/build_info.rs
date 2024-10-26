@@ -8,6 +8,7 @@ pub struct GenericBuildInfo {
     //pub authors: &'static str,
 }
 
+#[allow(clippy::crate_in_macro_def)] // intentional
 #[macro_export]
 macro_rules! decl_build_info {
     ($name:ident) => {

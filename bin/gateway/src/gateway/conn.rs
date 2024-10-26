@@ -32,6 +32,7 @@ pub struct GatewayConnection(Arc<GatewayConnectionInner>);
 impl Deref for GatewayConnection {
     type Target = GatewayConnectionInner;
 
+    #[inline(always)]
     fn deref(&self) -> &Self::Target {
         &self.0
     }

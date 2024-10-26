@@ -1,4 +1,4 @@
-use smol_str::SmolStr;
+use sdk::models::{FixedStr, SmolStr};
 use util::hex::HexidecimalInt;
 
 #[inline(never)]
@@ -27,7 +27,7 @@ pub fn test128_to_hex(x: u128) -> SmolStr {
 
 #[inline(never)]
 #[no_mangle]
-pub fn test128_to_b64(x: u128) -> SmolStr {
+pub fn test128_to_b64(x: u128) -> FixedStr<22> {
     util::base64::encode_u128(x)
 }
 

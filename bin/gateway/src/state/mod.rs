@@ -3,12 +3,11 @@ use triomphe::Arc;
 
 use crate::{
     config::Config,
-    gateway::{Gateway, Heart},
+    gateway::Gateway,
     //web::{file_cache::MainFileCache, rate_limit::RateLimitTable},
     web::file_cache::StaticFileCache,
 };
 
-use arc_swap::ArcSwap;
 use futures::{Stream, StreamExt};
 use tokio::sync::{Notify, Semaphore};
 

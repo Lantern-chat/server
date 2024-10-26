@@ -119,10 +119,10 @@ pub trait IntervalStream<S>: Send + 'static {
 
 // yields once and then forever pending
 impl<S> IntervalStream<S> for Duration {
-    type Stream = stream::Chain<stream::Once<futures::future::Ready<Duration>>, stream::Pending<Duration>>;
+    type Stream = stream::Chain<stream::Iter<core::option::IntoIter<Duration>>, stream::Pending<Duration>>;
 
     fn interval(self, _: &S) -> Self::Stream {
-        stream::once(futures::future::ready(self)).chain(stream::pending())
+        stream::iter(Some(self)).chain(stream::pending())
     }
 }
 
@@ -173,7 +173,7 @@ where
             let IntervalFnTask(state, i, f) = self;
 
             let mut interval = std::pin::pin!(i.interval(&state));
-            let mut current_interval = interval.next().await.unwrap_or_default();
+            let mut current_interval = interval.next().await.unwrap_or(Duration::from_secs(1));
             let mut sleep = std::pin::pin!(tokio::time::sleep(clean_interval(current_interval)));
 
             while *alive.borrow_and_update() {

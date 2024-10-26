@@ -46,22 +46,24 @@ impl GenericEmitter {
         let bc = broadcast::channel(16).0;
         let (tx, mut rx) = mpsc::unbounded_channel();
 
-        let bc2 = bc.clone();
+        // TODO: Replace this mpsc buffering with database pulling?
+        tokio::spawn({
+            let bc = bc.clone();
 
-        // TODO: Replace this mpsc buffering with database pulling
-        tokio::spawn(async move {
-            while let Some(mut event) = rx.recv().await {
-                'try_loop: loop {
-                    event = match bc2.send(event) {
-                        Ok(_) => break 'try_loop,
-                        // If the error was because there are no receivers,
-                        // just ignore the event entirely.
-                        Err(_) if bc2.receiver_count() == 0 => break 'try_loop,
-                        // Move value back and retry
-                        Err(broadcast::error::SendError(event)) => event,
-                    };
+            async move {
+                while let Some(mut event) = rx.recv().await {
+                    'try_loop: loop {
+                        event = match bc.send(event) {
+                            Ok(_) => break 'try_loop,
+                            // If the error was because there are no receivers,
+                            // just ignore the event entirely.
+                            Err(_) if bc.receiver_count() == 0 => break 'try_loop,
+                            // Move value back and retry
+                            Err(broadcast::error::SendError(event)) => event,
+                        };
 
-                    tokio::time::sleep(Duration::from_millis(5)).await;
+                        tokio::time::sleep(Duration::from_millis(5)).await;
+                    }
                 }
             }
         });

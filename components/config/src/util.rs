@@ -81,7 +81,7 @@ pub mod hex_key {
     {
         struct Visitor<T: Default + AsMut<[u8]>>(bool, PhantomData<T>);
 
-        impl<'de, T: Default + AsMut<[u8]>> de::Visitor<'de> for Visitor<T> {
+        impl<T: Default + AsMut<[u8]>> de::Visitor<'_> for Visitor<T> {
             type Value = T;
 
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -236,7 +236,7 @@ pub mod bytes {
     {
         struct Visitor;
 
-        impl<'de> de::Visitor<'de> for Visitor {
+        impl de::Visitor<'_> for Visitor {
             type Value = u64;
 
             fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {

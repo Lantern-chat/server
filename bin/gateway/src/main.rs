@@ -2,9 +2,6 @@
 #![allow(clippy::redundant_pattern_matching, clippy::identity_op, clippy::redundant_closure)]
 #![deny(deprecated)]
 
-#[macro_use]
-extern crate serde;
-
 extern crate tracing as log;
 
 pub mod allocator;

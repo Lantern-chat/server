@@ -25,7 +25,6 @@ use regex_automata::{Regex, RegexBuilder};
 /// NOTE: This will match `^[*#0-9]$` as well, so double-check results
 ///
 /// <https://www.unicode.org/reports/tr51/tr51-22.html#EBNF_and_Regex>
-
 // DEV NOTE: The validity of u16 here is subject to change as the number of emojis increases
 pub static EMOJI_RE: Lazy<Regex<regex_automata::DenseDFA<Vec<u16>, u16>>> = Lazy::new(|| {
     RegexBuilder::new()

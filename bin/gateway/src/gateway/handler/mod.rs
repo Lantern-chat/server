@@ -42,10 +42,13 @@ pub fn client_connected(ws: WebSocket, query: GatewayQueryParams, addr: IpAddr, 
 pub struct ConnectionState {
     pub state: GatewayServerState,
     pub conn: GatewayConnection,
+
     /// for each party that is being listened on, keep the associated cancel handle, to kill the stream if we unsub from them
     pub listener_table: listener_table::ListenerTable,
+
     /// Contains a list of user ids that have blocked the current user of this connection
     pub blocked_by: HashSet<UserId, sdk::FxRandomState2>,
+
     pub roles: role_cache::RoleCache,
     pub user_id: Option<UserId>,
     pub intent: sdk::models::Intent,

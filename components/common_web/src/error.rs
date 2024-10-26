@@ -385,7 +385,7 @@ impl From<ftl::Error> for Error {
                 ftl::body::BodyError::HyperError(_error) => Error::InternalErrorStatic("Error Reading Body"),
                 ftl::body::BodyError::Io(error) => Error::IOError(error),
                 ftl::body::BodyError::StreamAborted => Error::BadRequest,
-                ftl::body::BodyError::LengthLimitError(_) => Error::RequestEntityTooLarge,
+                ftl::body::BodyError::LengthLimitError => Error::RequestEntityTooLarge,
                 ftl::body::BodyError::Generic(_error) => unimplemented!(),
                 ftl::body::BodyError::DeferredNotConverted => {
                     Error::InternalErrorStatic("Deferred Body Not Converted")

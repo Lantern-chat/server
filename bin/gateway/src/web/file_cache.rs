@@ -35,7 +35,7 @@ impl FileMetadata for Metadata {
         if self.len > SMALL_FILE_BLOCK_SIZE {
             LARGE_FILE_BLOCK_SIZE
         } else {
-            SMALL_FILE_BLOCK_SIZE
+            self.len.next_power_of_two().min(SMALL_FILE_BLOCK_SIZE)
         }
     }
 }
