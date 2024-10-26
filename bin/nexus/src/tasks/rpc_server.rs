@@ -32,10 +32,12 @@ impl RpcServer {
         let config = state.config();
 
         let bind_addr = config.local.rpc.bind;
-        let key_path = config.local.paths.key_path.as_path();
-        let cert_path = config.local.paths.cert_path.as_path();
+        let key_path = config.local.paths.key_path.clone();
+        let cert_path = config.local.paths.cert_path.clone();
 
-        let tls_config = rpc::tls::server_config(key_path, cert_path).await?;
+        let tls_config = rpc::tls::server_config(&key_path, &cert_path).await?;
+
+        drop(config); // ensure guard is dropped before we start the server
 
         let server_config =
             ServerConfig::with_crypto(Arc::new(QuicServerConfig::try_from(tls_config).map_err(|e| {
@@ -47,11 +49,33 @@ impl RpcServer {
 
         let endpoint = Endpoint::server(server_config, bind_addr)?;
 
-        while let Some(incoming) = tokio::select! {
-            biased;
-            _ = alive.changed() => None,
-            incoming = endpoint.accept() => incoming,
-        } {
+        loop {
+            let Some(incoming) = tokio::select!(
+                biased;
+
+                // accept incoming connections
+                incoming = endpoint.accept() => incoming,
+
+                // server is shutting down
+                _ = alive.changed() => break,
+
+                // if config changed, end task so it'll be restarted with new config
+                _ = state.config.config_change.notified() => {
+                    let config = state.config();
+
+                    if config.local.rpc.bind != bind_addr
+                        || config.local.paths.key_path != key_path
+                        || config.local.paths.cert_path != cert_path
+                    {
+                        return Ok(());
+                    }
+
+                    continue;
+                },
+            ) else {
+                break;
+            };
+
             let state = state.clone();
 
             tokio::spawn(async move {
