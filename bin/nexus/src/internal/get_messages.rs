@@ -48,27 +48,25 @@ pub async fn get_messages<'a>(
 ) -> Result<impl Stream<Item = Result<Message, Error>> + 'a, Error> {
     #[rustfmt::skip]
     let stream = db.query_stream2(schema::sql! {
-        tables! {
-            struct SelectedMessages {
-                Depth: Type::INT2,
-                Id: Messages::Id,
-                PartyId: Party::Id,
-            }
+        struct SelectedMessages {
+            Depth: Type::INT2,
+            Id: Messages::Id,
+            PartyId: Party::Id,
+        }
 
-            pub struct SortedEmbeds {
-                EmbedId: MessageEmbeds::EmbedId,
-                Flags: MessageEmbeds::Flags,
-            }
+        struct SortedEmbeds {
+            EmbedId: MessageEmbeds::EmbedId,
+            Flags: MessageEmbeds::Flags,
+        }
 
-            pub struct TempAttachments {
-                Meta: Type::JSONB,
-                Preview: Type::BYTEA_ARRAY,
-            }
+        struct TempAttachments {
+            Meta: Type::JSONB,
+            Preview: Type::BYTEA_ARRAY,
+        }
 
-            pub struct Precalculated {
-                Query: Type::TSQUERY,
-            }
-        };
+        struct Precalculated {
+            Query: Type::TSQUERY,
+        }
 
         WITH
 
