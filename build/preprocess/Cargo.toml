@@ -1,0 +1,10 @@
+[package]
+name = "preprocess"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+preprocessor = { path = "../../crates/preprocessor" }
+
+[lints]
+workspace = true
