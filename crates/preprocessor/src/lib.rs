@@ -66,6 +66,16 @@ pub struct Error {
     line: usize,
 }
 
+impl Context<'_> {
+    pub fn new(file: &Path) -> Context {
+        Context { file, line: 0 }
+    }
+
+    pub fn error(&self, kind: ErrorKind) -> Error {
+        Error::new(*self, kind)
+    }
+}
+
 impl Error {
     pub fn new(ctx: Context, kind: ErrorKind) -> Self {
         Error {
@@ -79,14 +89,22 @@ impl Error {
 impl Preprocessor {
     pub fn new(include: Vec<PathBuf>) -> Self {
         Preprocessor {
-            defines: HashMap::new(),
-            include,
-            out: String::new(),
-            stack: Vec::new(),
             max_substitution_depth: 32,
             single_line_comment: "//",
+            include,
+
+            defines: HashMap::new(),
+            out: String::new(),
+            stack: Vec::new(),
             onces: HashSet::new(),
         }
+    }
+
+    pub fn clear(&mut self) {
+        self.defines.clear();
+        self.out.clear();
+        self.stack.clear();
+        self.onces.clear();
     }
 
     pub fn single_line_comment(&mut self, s: &'static str) -> &mut Self {
@@ -99,23 +117,35 @@ impl Preprocessor {
         self
     }
 
+    pub fn remove_define(&mut self, key: &str) -> &mut Self {
+        self.defines.remove(key);
+        self
+    }
+
     pub fn process_file(&mut self, path: impl AsRef<Path>) -> Result<String, Error> {
-        let ctx = Context {
-            file: path.as_ref(),
-            line: 0,
+        let mut ctx = Context::new(path.as_ref());
+
+        let src = match std::fs::read_to_string(ctx.file) {
+            Ok(src) => src,
+            Err(e) => return Err(ctx.error(ErrorKind::IoError(e))),
         };
 
-        match std::fs::read_to_string(ctx.file) {
-            Ok(src) => self.process(ctx, &src),
-            Err(e) => Err(Error::new(ctx, ErrorKind::IoError(e))),
+        let cwd = ctx.file.parent().unwrap_or("./".as_ref());
+
+        self.process_inner(&mut ctx, cwd, &src)?;
+
+        if !self.stack.is_empty() {
+            return Err(ctx.error(ErrorKind::UnexpectedEof));
         }
+
+        Ok(std::mem::take(&mut self.out))
     }
 
     pub fn process(&mut self, mut ctx: Context, src: &str) -> Result<String, Error> {
         self.process_inner(&mut ctx, "./".as_ref(), src)?;
 
         if !self.stack.is_empty() {
-            return Err(Error::new(ctx, ErrorKind::UnexpectedEof));
+            return Err(ctx.error(ErrorKind::UnexpectedEof));
         }
 
         Ok(std::mem::take(&mut self.out))
@@ -140,7 +170,7 @@ impl Preprocessor {
                 if self.active() {
                     // only check for defines if we're active, since define-only is only activated when active as well
                     if define_only && !t.trim().is_empty() {
-                        return Err(Error::new(*ctx, ErrorKind::OnlyDefinesAllowed));
+                        return Err(ctx.error(ErrorKind::OnlyDefinesAllowed));
                     }
 
                     Self::substitute_append(
@@ -174,7 +204,7 @@ impl Preprocessor {
 
                         self.onces.insert(ctx.file.to_owned());
                     }
-                    _ => return Err(Error::new(*ctx, ErrorKind::InvalidPragma(pragma.to_owned()))),
+                    _ => return Err(ctx.error(ErrorKind::InvalidPragma(pragma.to_owned()))),
                 },
                 ("undef", define) if self.active() => {
                     self.defines.remove(define.trim());
@@ -203,12 +233,12 @@ impl Preprocessor {
                     self.stack.push(match last {
                         Some(Item::Active) => Item::Inactive,
                         Some(Item::Inactive) => Item::Active,
-                        None => return Err(Error::new(*ctx, ErrorKind::UnexpectedElse)),
+                        None => return Err(ctx.error(ErrorKind::UnexpectedElse)),
                     });
                 }
                 ("endif", _) => match self.stack.pop() {
                     Some(_) => {}
-                    None => return Err(Error::new(*ctx, ErrorKind::UnexpectedEndif)),
+                    None => return Err(ctx.error(ErrorKind::UnexpectedEndif)),
                 },
                 _ => {}
             }
@@ -223,23 +253,26 @@ impl Preprocessor {
         let include_paths = self.include.iter().map(|p| p.as_path()).chain(std::iter::once(cwd));
 
         for base in include_paths {
-            let full_path = base.join(path).canonicalize().map_err(|e| Error::new(*ctx, ErrorKind::IoError(e)))?;
+            let full_path = match base.join(path).canonicalize() {
+                Ok(p) => p,
+                Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
+                Err(e) => return Err(ctx.error(ErrorKind::IoError(e))),
+            };
 
             let src = match std::fs::read_to_string(&full_path) {
                 Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
-                Err(e) => return Err(Error::new(*ctx, ErrorKind::IoError(e))),
+                Err(e) => return Err(ctx.error(ErrorKind::IoError(e))),
                 Ok(file) => file,
             };
 
-            let mut ctx = Context {
-                file: &full_path,
-                line: 0,
-            };
-
-            return self.process_inner(&mut ctx, full_path.parent().unwrap_or("./".as_ref()), &src);
+            return self.process_inner(
+                &mut Context::new(&full_path),
+                full_path.parent().unwrap_or("./".as_ref()),
+                &src,
+            );
         }
 
-        Err(Error::new(*ctx, ErrorKind::IncludeNotFound(path.to_owned())))
+        Err(ctx.error(ErrorKind::IncludeNotFound(path.to_owned())))
     }
 
     fn process_define(&mut self, define: &str) {
@@ -260,7 +293,7 @@ impl Preprocessor {
         line: &str,
     ) -> Result<(), Error> {
         if depth > max_depth {
-            return Err(Error::new(*ctx, ErrorKind::MaxSubstitutionDepthReached));
+            return Err(ctx.error(ErrorKind::MaxSubstitutionDepthReached));
         }
 
         use unicode_segmentation::UnicodeSegmentation;
@@ -333,11 +366,11 @@ impl Preprocessor {
                 _ if word.starts_with(char::is_numeric) => match word.parse() {
                     Ok(num) => Symbol::Number(num),
                     Err(_) => {
-                        return Err(Error::new(*ctx, ErrorKind::UndefinedSymbol(word.to_owned())));
+                        return Err(ctx.error(ErrorKind::UndefinedSymbol(word.to_owned())));
                     }
                 },
                 _ if !word.chars().all(char::is_whitespace) => {
-                    return Err(Error::new(*ctx, ErrorKind::UndefinedSymbol(word.to_owned())));
+                    return Err(ctx.error(ErrorKind::UndefinedSymbol(word.to_owned())));
                 }
                 _ => Symbol::Whitespace,
             });
