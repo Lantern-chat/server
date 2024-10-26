@@ -2,6 +2,7 @@
 
 //pub mod admin;
 pub mod auth;
+pub mod info;
 pub mod perm;
 
 #[derive(Debug, Clone, Copy)]
@@ -115,14 +116,14 @@ where
     // avoid inlining every async state machine by boxing them inside a lazy future/async block
     macro_rules! c0 {
         ($call:expr) => {
-            return Ok(Box::pin(async move {
+            Ok(Box::pin(async move {
                 ::rpc::stream::encode_item::<_, Error, _>(out, $call.await).await.map_err(Error::from)
             }))
         };
     }
     macro_rules! s0 {
         ($call:expr) => {
-            return Ok(Box::pin(async move {
+            Ok(Box::pin(async move {
                 ::rpc::stream::encode_stream::<_, Error, _>(out, $call.await).await.map_err(Error::from)
             }))
         };
@@ -133,23 +134,47 @@ where
         pin::Pin,
     };
 
-    #[allow(clippy::type_complexity)] #[rustfmt::skip]
+    #[allow(clippy::type_complexity)]
     // using a closure here allows for early returns of the future for auth and others
     let gen_dispatch = move || -> Result<Pin<Box<dyn Future<Output = Result<(), Error>> + Send>>, Error> {
         let is_nexus = state.config().local.node.is_user_nexus();
 
-
         let (addr, auth, proc) = match cmd {
             ArchivedRpcRequest::ApiProcedure { addr, auth, proc } => (addr, auth, proc),
 
-            // just returns a `Result<(), Error>`
-            ArchivedRpcRequest::OpenGateway => c0!(future::ready(Ok(()))),
+            ArchivedRpcRequest::GetSharedConfig => {
+                let config = state.config();
 
-            // auth requests are only allowed on the nexus
-            ArchivedRpcRequest::Authorize { token } if is_nexus => c0!(auth::do_auth(state, token)),
+                return c0!(future::ready(Ok(config.shared.clone())));
+            }
 
-            // all other requests are invalid or unimplemented
-            _ => return Err(Error::BadRequest),
+            // just returns a `Result<(), Error>`, as the action is handled above dispatch
+            // by `RpcConnection::handle_rpc`
+            ArchivedRpcRequest::OpenGateway => return c0!(future::ready(Ok(()))),
+
+            ArchivedRpcRequest::Authorize { token } => {
+                if !is_nexus {
+                    // auth requests are only allowed on the nexus
+                    return Err(Error::BadRequest);
+                }
+
+                return c0!(auth::do_auth(state, token));
+            }
+
+            ArchivedRpcRequest::GetPartyInfoFromPartyId(_) | ArchivedRpcRequest::GetPartyInfoFromRoomId(_) => {
+                use info::InfoRequest;
+
+                #[rustfmt::skip]
+                let req = match *cmd {
+                    ArchivedRpcRequest::GetPartyInfoFromPartyId(id) => InfoRequest::GetPartyInfoFromPartyId(id.into()),
+                    ArchivedRpcRequest::GetPartyInfoFromRoomId(id) => InfoRequest::GetPartyInfoFromRoomId(id.into()),
+                    _ => unreachable!(),
+                };
+
+                return c0!(info::get_party_info(state, req));
+            }
+
+            ArchivedRpcRequest::ForwardedClientCommand(_) => todo!(),
         };
 
         use rpc::{client::Resolve, procedure::ArchivedProcedure as Proc};
@@ -168,11 +193,12 @@ where
         };
 
         // wraps the c0!/s0! macros to handle endpoint resolution and any other error checks
-        macro_rules! c { ($call:expr) => { c0!(async move { endpoint?; $call.await }) }; }
-        macro_rules! s { ($call:expr) => { s0!(async move { endpoint?; $call.await }) }; }
+        #[rustfmt::skip] macro_rules! c { ($call:expr) => { return c0!(async move { endpoint?; $call.await }) }; }
+        #[rustfmt::skip] macro_rules! s { ($call:expr) => { return s0!(async move { endpoint?; $call.await }) }; }
 
-        #[allow(unused_variables)]
-        match proc {
+        // let _ is used to allow rustfmt::skip
+        #[allow(unused_variables, clippy::let_unit_value)] #[rustfmt::skip]
+        let _ = match proc {
             Proc::GetServerConfig(cmd) => todo!("GetServerConfig"),
             Proc::UserRegister(cmd) => c!(user::user_register::register_user(state, addr.as_ipaddr(), cmd)),
             Proc::UserLogin(cmd) => c!(user::user_login::login(state, addr.as_ipaddr(), cmd)),
@@ -230,7 +256,7 @@ where
             Proc::PatchRoom(cmd) => c!(room::modify_room::modify_room(state, auth()?, cmd)),
             Proc::DeleteRoom(cmd) => c!(room::remove_room::remove_room(state, auth()?, cmd)),
             Proc::GetRoom(cmd) => c!(room::get_room::get_room(state, auth()?, cmd)),
-        }
+        };
     };
 
     gen_dispatch()?.await
