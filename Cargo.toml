@@ -9,7 +9,11 @@ client-sdk = { path = "../client-sdk-rs" }
 
 [workspace]
 resolver = "2"
-members = ["crates/*", "components/*", "bin/*", "utilities/*", "make"]
+members = ["crates/*", "components/*", "bin/*", "build/*"]
+
+[workspace.lints.clippy]
+manual_async_fn = "allow"
+
 
 [workspace.dependencies]
 emoji = { path = "crates/emoji" }
