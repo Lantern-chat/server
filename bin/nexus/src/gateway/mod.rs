@@ -55,11 +55,12 @@ pub struct EventQueue {
 }
 
 impl EventQueue {
+    /// Returns a batch of events since the given counter value, up to 64 events.
     #[rustfmt::skip]
-    pub fn batch_since(&self, cnt: u64) -> Vec<(u64, Arc<AlignedVec>)> {
+    pub fn batch_since(&self, counter: u64) -> Vec<(u64, Arc<AlignedVec>)> {
         const EVENT_BATCH_SIZE: usize = 64;
 
-        self.queue.range(cnt.., &scc::ebr::Guard::new())
+        self.queue.range(counter.., &scc::ebr::Guard::new())
             .take(EVENT_BATCH_SIZE).map(|(&k, v)| (k, v.clone())).collect()
     }
 
@@ -125,7 +126,7 @@ impl Default for Gateway {
 
 impl Gateway {
     #[inline]
-    pub fn last_event(&self) -> &AtomicI64 {
+    pub const fn last_event(&self) -> &AtomicI64 {
         &self.last_events[0]
     }
 
@@ -152,6 +153,7 @@ impl Gateway {
         _ = self.gateways.insert_async(conn.id, conn).await;
     }
 
+    /// Like `insert_gateway_connection`, but for when the connection is already established via RPC.
     pub async fn insert_gateway_connection_from_rpc(&self, state: ServerState, conn: RpcConnection) {
         let conn = GatewayConnection(Arc::new(GatewayConnectionInner {
             id: conn.id,
@@ -224,8 +226,8 @@ impl RpcConnection {
                     if tries > 10 {
                         self.conn.close(VarInt::from_u32(405), b"Could Not Accept RPC Stream");
                     } else if matches!(e, Break::Rejected) {
-                        // wait a second in case of something overloading
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        // wait a bit in case of something overloading
+                        tokio::time::sleep(tokio::time::Duration::from_millis(75)).await;
                     }
 
                     continue; // try again to accept a connection

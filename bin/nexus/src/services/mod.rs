@@ -9,15 +9,12 @@ pub fn create_service_client() -> Result<Client, ReqwestError> {
         .user_agent("Lantern/1.0 (bot; +https://github.com/Lantern-chat)")
         .gzip(true)
         .deflate(true)
+        .brotli(true)
+        .zstd(true)
         .redirect(reqwest::redirect::Policy::limited(1))
         .connect_timeout(std::time::Duration::from_secs(10))
         .danger_accept_invalid_certs(false)
         .http2_adaptive_window(true);
-
-    #[cfg(feature = "brotli")]
-    {
-        builder = builder.brotli(true);
-    }
 
     builder.build()
 }

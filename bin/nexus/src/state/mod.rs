@@ -35,7 +35,7 @@ pub struct ServerStateInner {
 
     // /// Generic lock for anything with a Snowflake ID
     // pub id_lock: id_lock::IdLockMap,
-    ///
+    /// Hasher for general use
     pub hasher: sdk::FxRandomState2,
 
     pub emoji: EmojiMap,
