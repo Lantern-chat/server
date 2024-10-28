@@ -10,9 +10,39 @@ built.workspace = true
 
 
 [dependencies]
+sdk = { workspace = true, features = ["driver", "cbor", "gateway", "ftl"] }
+rpc = { workspace = true, features = ["ftl"] }
+rkyv.workspace = true
+smol_str = { workspace = true, features = ["serde"] }
+
+tokio-uring = "0.5.0"
 tokio = { workspace = true, features = ["full"] }
 quinn.workspace = true
 serde.workspace = true
+
+ftl = { workspace = true, features = ["fs", "compression-all"] }
+reqwest.workspace = true
+async-compression = { version = "0.4", features = ["tokio", "deflate", "gzip", "brotli", "zstd"] }
+hyper = { version = "1", features = ["http1", "http2", "server"] }
+hyper-util = { version = "0.1.2", features = ["tokio"] }
+http-body-util = "0.1.0"
+tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+http.workspace = true
+headers.workspace = true
+
+schema.workspace = true
+
+common.workspace = true
+common_web.workspace = true
+config.workspace = true
+task_runner.workspace = true
+db.workspace = true
+util.workspace = true
+process_utils.workspace = true
+tracking_allocator.workspace = true
+z85.workspace = true
+
 
 futures.workspace = true
 tracing.workspace = true
