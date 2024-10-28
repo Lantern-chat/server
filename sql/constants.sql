@@ -1,3 +1,18 @@
+#pragma once
+#pragma define-only -- This file is not meant to be executed, only included in other files
+
+#define MAX_INT4 2147483647
+#define MAX_INT8 9223372036854775807
+
+#define KIBIBYTE 1024
+#define MIBIBYTE (KIBIBYTE * 1024)
+#define GIBIBYTE (MIBIBYTE * 1024)
+
+#define MS_SECOND   1000                -- milliseconds in a second
+#define MS_MINUTE   (MS_SECOND * 60)    -- milliseconds in a minute
+#define MS_HOUR     (MS_MINUTE * 60)    -- milliseconds in an hour
+#define MS_DAY      (MS_HOUR * 24)      -- milliseconds in a day
+#define MS_MONTH    (MS_DAY * 30.44)    -- average milliseconds in a month
 
 ----------------------------------------
 ---------- USER PREFS FLAGS ------------
@@ -8,7 +23,7 @@
 -- Pause animations on window unfocus
 #define USER_PREFS_UNFOCUS_PAUSE            (1 << 1)
 #define USER_PREFS_LIGHT_MODE               (1 << 2)
--- Allow direct messages from shared server memmbers
+-- Allow direct messages from shared server members
 #define USER_PREFS_ALLOW_DMS                (1 << 3)
 -- Show small lines between message groups
 #define USER_PREFS_GROUP_LINES              (1 << 4)
@@ -56,6 +71,14 @@
 #define PROFILE_OVERRIDE_COLOR      128 -- x'80'::int4
 #define PROFILE_PRIMARY_COLOR       x'FFFFFF00'::int4
 #define PROFILE_COLOR_FIELDS        x'FFFFFF80'::int4
+
+----------------------------------------
+------------- ROLE FLAGS ---------------
+----------------------------------------
+
+#define ROLE_LAST_UPDATED_NORMAL    0
+#define ROLE_LAST_UPDATED_MOVED     1
+#define ROLE_LAST_UPDATED_SHIFT     2
 
 ----------------------------------------
 ------------ MESSAGE FLAGS -------------
@@ -136,3 +159,36 @@
 #define PERMISSIONS1_SPEAK                  (1 << 62)
 -- Allows a user to acquire priority speaker
 #define PERMISSIONS1_PRIORITY_SPEAKER       (1 << 63)
+
+
+----------------------------------------
+--------------- EVENTS -----------------
+----------------------------------------
+
+#define MESSAGE_CREATE_EVENT    'message_create'
+#define MESSAGE_UPDATE_EVENT    'message_update'
+#define MESSAGE_DELETE_EVENT    'message_delete'
+#define TYPING_STARTED_EVENT    'typing_started'
+#define USER_UPDATED_EVENT      'user_updated'
+#define SELF_UPDATED_EVENT      'self_updated'
+#define PRESENCE_UPDATED_EVENT  'presence_updated'
+#define PARTY_CREATE_EVENT      'party_create'
+#define PARTY_UPDATE_EVENT      'party_update'
+#define PARTY_DELETE_EVENT      'party_delete'
+#define ROOM_CREATED_EVENT      'room_created'
+#define ROOM_UPDATED_EVENT      'room_updated'
+#define ROOM_DELETED_EVENT      'room_deleted'
+#define MEMBER_UPDATED_EVENT    'member_updated'
+#define MEMBER_JOINED_EVENT     'member_joined'
+#define MEMBER_LEFT_EVENT       'member_left'
+#define MEMBER_BAN_EVENT        'member_ban'
+#define MEMBER_UNBAN_EVENT      'member_unban'
+#define ROLE_CREATED_EVENT      'role_created'
+#define ROLE_UPDATED_EVENT      'role_updated'
+#define ROLE_DELETED_EVENT      'role_deleted'
+#define INVITE_CREATE_EVENT     'invite_create'
+#define MESSAGE_REACT_EVENT     'message_react'
+#define MESSAGE_UNREACT_EVENT   'message_unreact'
+#define PROFILE_UPDATED_EVENT   'profile_updated'
+#define REL_UPDATED_EVENT       'rel_updated'
+#define TOKEN_REFRESH_EVENT     'token_refresh'

@@ -25,6 +25,10 @@ CREATE TABLE lantern.host (
     CONSTRAINT migration_primary_key PRIMARY KEY (migration)
 );
 
+----------------------------------------
+------------- FUNCTIONS ----------------
+----------------------------------------
+
 CREATE OR REPLACE FUNCTION lantern.array_diff(lhs anyarray, rhs anyarray)
     RETURNS anyarray
     LANGUAGE sql immutable
@@ -37,15 +41,13 @@ $$;
 CREATE OR REPLACE FUNCTION lantern.array_uniq(arr anyarray)
     RETURNS anyarray
     LANGUAGE sql immutable
-AS $$
-    SELECT ARRAY( SELECT DISTINCT UNNEST(arr) )
-$$;
+AS $$ SELECT ARRAY( SELECT DISTINCT UNNEST(arr) ) $$;
 
--- IIF is a ternary operator, returns true_result if condition is true, else false_result
+-- IIF is a ternary operator, returns `true_result` if `condition` is true, else `false_result`
 CREATE OR REPLACE FUNCTION IIF(
-    condition boolean,       -- IF condition
-    true_result anyelement,  -- THEN
-    false_result anyelement  -- ELSE
+    condition       boolean,    -- IF condition
+    true_result     anyelement, -- THEN
+    false_result    anyelement  -- ELSE
 ) RETURNS anyelement AS $$
   SELECT CASE WHEN condition THEN true_result ELSE false_result END
 $$ LANGUAGE SQL IMMUTABLE;
@@ -56,18 +58,17 @@ CREATE DOMAIN lantern.uint2 AS int4
 -- THIS MUST MATCH `LanguageCode` in schema crate
 CREATE OR REPLACE FUNCTION lantern.to_language(int2)
 RETURNS regconfig
-AS
-$$
-    SELECT CASE WHEN $1 = 0 THEN 'english'::regconfig
-                WHEN $1 = 1 THEN 'simple'::regconfig
-                WHEN $1 = 2 THEN 'arabic'::regconfig
-                WHEN $1 = 3 THEN 'armenian'::regconfig
-                WHEN $1 = 4 THEN 'basque'::regconfig
-                WHEN $1 = 5 THEN 'catalan'::regconfig
-                WHEN $1 = 6 THEN 'danish'::regconfig
-                WHEN $1 = 7 THEN 'dutch'::regconfig
-                WHEN $1 = 8 THEN 'finnish'::regconfig
-                WHEN $1 = 9 THEN 'french'::regconfig
+AS $$
+    SELECT CASE WHEN $1 = 0  THEN 'english'::regconfig
+                WHEN $1 = 1  THEN 'simple'::regconfig
+                WHEN $1 = 2  THEN 'arabic'::regconfig
+                WHEN $1 = 3  THEN 'armenian'::regconfig
+                WHEN $1 = 4  THEN 'basque'::regconfig
+                WHEN $1 = 5  THEN 'catalan'::regconfig
+                WHEN $1 = 6  THEN 'danish'::regconfig
+                WHEN $1 = 7  THEN 'dutch'::regconfig
+                WHEN $1 = 8  THEN 'finnish'::regconfig
+                WHEN $1 = 9  THEN 'french'::regconfig
                 WHEN $1 = 10 THEN 'german'::regconfig
                 WHEN $1 = 11 THEN 'greek'::regconfig
                 WHEN $1 = 12 THEN 'hindi'::regconfig
@@ -92,34 +93,38 @@ $$
 $$ LANGUAGE SQL IMMUTABLE;
 COMMENT ON FUNCTION lantern.to_language IS 'Converts a language code into the equivalent regconfig language';
 
+----------------------------------------
+------------ SHARED TYPES --------------
+----------------------------------------
+
 CREATE TYPE lantern.event_code AS ENUM (
-    'message_create',
-    'message_update',
-    'message_delete',
-    'typing_started',
-    'user_updated',
-    'self_updated',
-    'presence_updated',
-    'party_create',
-    'party_update',
-    'party_delete',
-    'room_created',
-    'room_updated',
-    'room_deleted',
-    'member_updated',
-    'member_joined',
-    'member_left',
-    'member_ban',
-    'member_unban',
-    'role_created',
-    'role_updated',
-    'role_deleted',
-    'invite_create',
-    'message_react',
-    'message_unreact',
-    'profile_updated',
-    'rel_updated',
-    'token_refresh'
+    MESSAGE_CREATE_EVENT,
+    MESSAGE_UPDATE_EVENT,
+    MESSAGE_DELETE_EVENT,
+    TYPING_STARTED_EVENT,
+    USER_UPDATED_EVENT,
+    SELF_UPDATED_EVENT,
+    PRESENCE_UPDATED_EVENT,
+    PARTY_CREATE_EVENT,
+    PARTY_UPDATE_EVENT,
+    PARTY_DELETE_EVENT,
+    ROOM_CREATED_EVENT,
+    ROOM_UPDATED_EVENT,
+    ROOM_DELETED_EVENT,
+    MEMBER_UPDATED_EVENT,
+    MEMBER_JOINED_EVENT,
+    MEMBER_LEFT_EVENT,
+    MEMBER_BAN_EVENT,
+    MEMBER_UNBAN_EVENT,
+    ROLE_CREATED_EVENT,
+    ROLE_UPDATED_EVENT,
+    ROLE_DELETED_EVENT,
+    INVITE_CREATE_EVENT,
+    MESSAGE_REACT_EVENT,
+    MESSAGE_UNREACT_EVENT,
+    PROFILE_UPDATED_EVENT,
+    REL_UPDATED_EVENT,
+    TOKEN_REFRESH_EVENT
 );
 
 CREATE SEQUENCE lantern.event_id AS bigint;
@@ -142,20 +147,21 @@ CREATE TABLE lantern.config (
     strict_cdn          boolean     NOT NULL DEFAULT TRUE,
     secure_web          boolean     NOT NULL DEFAULT TRUE,
     camo_enable         boolean     NOT NULL DEFAULT TRUE,
-    fs_cache_interval   int8        NOT NULL DEFAULT (2 * MS_MINUTE),
-    fs_cache_max_age    int8        NOT NULL DEFAULT MS_DAY,
+    fs_cache_interval   int8        NOT NULL DEFAULT (2 * MS_MINUTE), -- 2 minutes between checks
+    fs_cache_max_age    int8        NOT NULL DEFAULT MS_DAY, -- 1 day
 
     -- Account settings
-    session_duration    int8        NOT NULL DEFAULT (90 * MS_DAY),
+    session_duration    int8        NOT NULL DEFAULT (90 * MS_DAY), -- 90 days
     minimum_age         int2        NOT NULL DEFAULT 13,
+    -- a max password length is only necessary to prevent abuse from hashing large strings
     password_length     int4range   NOT NULL DEFAULT int4range(8, 9999),
     username_length     int4range   NOT NULL DEFAULT int4range(3, 96),
     mfa_backup_count    int2        NOT NULL DEFAULT 8,
     mfa_pending_time    int8        NOT NULL DEFAULT (30 * MS_MINUTE),
-    registration_token  text,
+    registration_token  text, -- used for closed registration
 
     -- User settings
-    reltime_rnd_factor  float4      NOT NULL DEFAULT 0.1,
+    reltime_rnd_factor  float4      NOT NULL DEFAULT 0.1, -- 10% random factor for relative time
     max_status_len      int2        NOT NULL DEFAULT 128,
     max_bio_len         int2        NOT NULL DEFAULT 1024,
 
@@ -167,22 +173,23 @@ CREATE TABLE lantern.config (
     role_name_len       int4range   NOT NULL DEFAULT int4range(1, 64),
     role_desc_len       int4range   NOT NULL DEFAULT int4range(1, 256),
     max_active_rooms    int2        NOT NULL DEFAULT 128,
-    max_total_rooms     int2        NOT NULL DEFAULT 1024,
+    max_total_rooms     int2        NOT NULL DEFAULT 1024, -- including not-pruned deleted rooms
 
     -- Message settings
     max_newlines        int2        NOT NULL DEFAULT 80,
     message_length      int4range   NOT NULL DEFAULT int4range(1, 2500),
-    max_embeds          int2        NOT NULL DEFAULT 8,
+    max_embeds          int2        NOT NULL DEFAULT 8, -- max embeds per message
     regex_search_len    int2        NOT NULL DEFAULT 128,
 
     -- Upload settings
     max_upload_size     int8        NOT NULL DEFAULT MAX_INT4, -- 2 GiB
     max_upload_chunk    int4        NOT NULL DEFAULT (MIBIBYTE * 8), -- 8 MiB
-    orphan_cleanup      int8        NOT NULL DEFAULT MS_DAY,
+    orphan_cleanup      int8        NOT NULL DEFAULT MS_DAY, -- 1 day
 
     max_avatar_size     int4        NOT NULL DEFAULT (MIBIBYTE * 8),  -- 8 MiB
     max_banner_size     int4        NOT NULL DEFAULT (MIBIBYTE * 16), -- 16 MiB
     avatar_width        int4        NOT NULL DEFAULT 256,
+    -- banners are 16:9 aspect ratio, so 16 * 40 = 640px, 9 * 40 = 360px
     banner_width        int4        NOT NULL DEFAULT (16 * 40),
     banner_height       int4        NOT NULL DEFAULT (9 * 40),
     -- 4-byte/32-bit color * 1024^2 = 4 MiB RAM usage
@@ -202,6 +209,35 @@ CREATE TABLE lantern.config (
 
 INSERT INTO lantern.config (config_name) VALUES ('default');
 
+CREATE TABLE lantern.emotes (
+    id              bigint      NOT NULL,
+    party_id        bigint,
+    asset_id        bigint      NOT NULL,
+    aspect_ratio    real        NOT NULL,
+    flags           smallint    NOT NULL,
+    name            text        NOT NULL,
+    alt             text,
+
+    CONSTRAINT emotes_pk PRIMARY KEY (id)
+);
+
+CREATE SEQUENCE lantern.emoji_id AS int;
+
+CREATE TABLE lantern.emojis (
+    id          int         NOT NULL DEFAULT nextval('lantern.emoji_id'),
+
+    -- like whether it supports skin tones
+    flags       smallint    NOT NULL    DEFAULT 0,
+    emoji       text        NOT NULL,
+    description text                    DEFAULT NULL,
+    aliases     text                    DEFAULT NULL,
+    tags        text                    DEFAULT NULL,
+
+    CONSTRAINT emojis_pk PRIMARY KEY (id)
+);
+
+ALTER SEQUENCE lantern.emoji_id OWNED BY lantern.emojis.id;
+
 CREATE TABLE lantern.factions (
     id          uuid        NOT NULL DEFAULT gen_random_uuid(), -- v4
     addr        inet        NOT NULL,
@@ -211,6 +247,8 @@ CREATE TABLE lantern.factions (
 );
 
 -- NOTE: Keep this under 8 columns
+-- party_id and room_id are always NULL on the Nexus server, so ensure
+-- the 8-column NULL optimization is always valid
 CREATE TABLE lantern.event_log (
     counter     bigint      NOT NULL DEFAULT nextval('lantern.event_id'),
 
@@ -279,7 +317,7 @@ COMMENT ON COLUMN lantern.metrics.reqs IS 'requests since last metric';
 COMMENT ON COLUMN lantern.metrics.errs IS 'errors since last metric';
 COMMENT ON COLUMN lantern.metrics.conns IS 'number of connected gateway users';
 COMMENT ON COLUMN lantern.metrics.events IS 'number of gateway events since last metric';
-COMMENT ON COLUMN lantern.metrics.p50 IS '50th latency percently';
+COMMENT ON COLUMN lantern.metrics.p50 IS '50th latency percentile';
 COMMENT ON COLUMN lantern.metrics.p95 IS '95th latency percentile';
 COMMENT ON COLUMN lantern.metrics.p99 IS '99th latency percentile';
 
@@ -440,7 +478,7 @@ CREATE TABLE lantern.files (
     nonce   bigint,
 
     -- Size of file in bytes
-    size    int         NOT NULL,
+    size    bigint      NOT NULL,
 
     width   int,
     height  int,
@@ -448,18 +486,24 @@ CREATE TABLE lantern.files (
     -- Bitflags for state
     flags   smallint    NOT NULL,
 
-    -- filename given at upload
-    name    text        NOT NULL,
-
     -- MIME type
     mime    text,
 
-    -- SHA-1 hash of completed file
-    sha1    bytea,
+    -- filename given at upload, encrypted
+    name        bytea       NOT NULL,
+
+    -- Encrypted file ID for Backblaze B2
+    b2_file_id  bytea,
+
+    -- SHA-1 hash of encrypted file used for checksum
+    sha1        bytea,
+
+    -- BLAKE3 hash of unencrypted file, encrypted
+    blake3      bytea,
 
     -- blurhash preview (first frame of video if video)
     -- this shouldn't be too large, less than 128 bytes
-    preview bytea,
+    preview     bytea,
 
     CONSTRAINT file_pk PRIMARY KEY (id)
 );
@@ -596,35 +640,6 @@ CREATE TABLE lantern.attachments (
     CONSTRAINT attachments_pk PRIMARY KEY (msg_id, file_id)
 );
 
-CREATE TABLE lantern.emotes (
-    id              bigint      NOT NULL,
-    party_id        bigint,
-    asset_id        bigint      NOT NULL,
-    aspect_ratio    real        NOT NULL,
-    flags           smallint    NOT NULL,
-    name            text        NOT NULL,
-    alt             text,
-
-    CONSTRAINT emotes_pk PRIMARY KEY (id)
-);
-
-CREATE SEQUENCE lantern.emoji_id AS int;
-
-CREATE TABLE lantern.emojis (
-    id          int         NOT NULL DEFAULT nextval('lantern.emoji_id'),
-
-    -- like whether it supports skin tones
-    flags       smallint    NOT NULL    DEFAULT 0,
-    emoji       text        NOT NULL,
-    description text                    DEFAULT NULL,
-    aliases     text                    DEFAULT NULL,
-    tags        text                    DEFAULT NULL,
-
-    CONSTRAINT emojis_pk PRIMARY KEY (id)
-);
-
-ALTER SEQUENCE lantern.emoji_id OWNED BY lantern.emojis.id;
-
 CREATE TABLE lantern.roles (
     id              bigint      NOT NULL,
     party_id        bigint      NOT NULL,
@@ -634,6 +649,7 @@ CREATE TABLE lantern.roles (
     color           integer,
     position        smallint    NOT NULL    DEFAULT 0,
     flags           smallint    NOT NULL    DEFAULT 0,
+    last_update     smallint    NOT NULL    DEFAULT ROLE_LAST_UPDATED_NORMAL,
     name            text        NOT NULL,
 
     CONSTRAINT role_pk PRIMARY KEY (id)
@@ -672,6 +688,7 @@ CREATE TABLE lantern.dms (
     user_id_a   bigint      NOT NULL,
     user_id_b   bigint      NOT NULL,
     room_id     bigint      NOT NULL,
+
     CONSTRAINT dm_pk PRIMARY KEY (user_id_a, user_id_b)
 );
 
@@ -695,7 +712,7 @@ CREATE TABLE lantern.group_members (
 
 --     -- applicable for notifications
 --     last_read   bigint,
---     -- applicable for slowmode
+--     -- applicable for slow-mode
 --     last_sent   bigint,
 --     -- muted users cannot speak
 --     muted       boolean,
@@ -1304,7 +1321,7 @@ $$
 BEGIN
     IF NEW.issued != OLD.issued THEN
         INSERT INTO lantern.event_log (code, id) VALUES (
-            'token_refresh'::lantern.event_code,
+            TOKEN_REFRESH_EVENT::lantern.event_code,
             NEW.id
         );
     END IF;
@@ -1326,13 +1343,13 @@ BEGIN
     INSERT INTO lantern.event_log (code, id, room_id, party_id)
     SELECT
         CASE WHEN (NEW.flags & MESSAGE_DELETED_OR_REMOVED) != 0
-                THEN 'message_delete'::lantern.event_code
+                THEN MESSAGE_DELETE_EVENT::lantern.event_code
 
              WHEN TG_OP = 'INSERT'
-                THEN 'message_create'::lantern.event_code
+                THEN MESSAGE_CREATE_EVENT::lantern.event_code
 
              WHEN TG_OP = 'UPDATE' AND (NEW.flags & MESSAGE_DELETED_OR_REMOVED = 0)
-                THEN 'message_update'::lantern.event_code
+                THEN MESSAGE_UPDATE_EVENT::lantern.event_code
         END,
         COALESCE(OLD.id, NEW.id),
         COALESCE(OLD.room_id, NEW.room_id),
@@ -1353,7 +1370,7 @@ LANGUAGE plpgsql AS
 $$
 BEGIN
     INSERT INTO lantern.event_log (code, id) VALUES (
-        'presence_updated'::lantern.event_code,
+        PRESENCE_UPDATED_EVENT::lantern.event_code,
         -- NOTE: Unsure if IIF would work here due to OLD/NEW maybe being null in some cases
         CASE TG_OP WHEN 'DELETE' THEN OLD.user_id
                                  ELSE NEW.user_id
@@ -1376,7 +1393,7 @@ FOR EACH ROW EXECUTE FUNCTION lantern.presence_trigger();
 
 -- Ban lifecycle:
 -- Start out without a ban
--- Banned, emit memebr_ban and app code also emits member_left
+-- Banned, emit member_ban and app code also emits member_left
 -- Member is no longer visible in party, cannot rejoin
 -- Member unbanned, delete member row and emit member_unban
 
@@ -1387,7 +1404,7 @@ $$
 BEGIN
     INSERT INTO lantern.event_log (code, id, party_id)
     VALUES (
-        'member_joined'::lantern.event_code,
+        MEMBER_JOINED_EVENT::lantern.event_code,
         NEW.user_id,
         NEW.party_id
     );
@@ -1405,8 +1422,8 @@ BEGIN
         -- Deleting a member entry when unbanning signifies the ban has been lifted
         -- but they must rejoin manually
         IIF((OLD.flags & MEMBER_BANNED = 1),
-            'member_unban'::lantern.event_code,
-            'member_left'::lantern.event_code
+            MEMBER_UNBAN_EVENT::lantern.event_code,
+            MEMBER_LEFT_EVENT::lantern.event_code
         ),
         OLD.user_id,
         OLD.party_id;
@@ -1428,13 +1445,13 @@ BEGIN
     ELSEIF OLD.position != NEW.position THEN
         -- Force a self-update to refresh party positions
         INSERT INTO lantern.event_log(code, id, party_id)
-        VALUES('self_updated'::lantern.event_code, NEW.user_id, NEW.party_id);
+        VALUES(SELF_UPDATED_EVENT::lantern.event_code, NEW.user_id, NEW.party_id);
     ELSEIF (OLD.flags != NEW.flags) THEN
         INSERT INTO lantern.event_log (code, id, party_id)
         SELECT
             IIF((OLD.flags & MEMBER_BANNED = 0) AND (NEW.flags & MEMBER_BANNED = 1),
-                'member_ban'::lantern.event_code,
-                'member_updated'::lantern.event_code
+                MEMBER_BAN_EVENT::lantern.event_code,
+                MEMBER_UPDATED_EVENT::lantern.event_code
             ),
             NEW.user_id,
             NEW.party_id;
@@ -1463,7 +1480,7 @@ LANGUAGE plpgsql AS
 $$
 BEGIN
     INSERT INTO lantern.event_log (code, id, party_id)
-    SELECT 'member_updated'::lantern.event_code,
+    SELECT MEMBER_UPDATED_EVENT::lantern.event_code,
         COALESCE(OLD.user_id, NEW.user_id),
         roles.party_id
     FROM lantern.roles WHERE roles.id = COALESCE(OLD.role_id, NEW.role_id);
@@ -1486,14 +1503,13 @@ BEGIN
 
     IF TG_OP = 'DELETE' THEN
         INSERT INTO lantern.event_log (code, id, party_id)
-        VALUES ('role_deleted'::lantern.event_code, OLD.id, OLD.party_id);
-    ELSE
+        VALUES (ROLE_DELETED_EVENT::lantern.event_code, OLD.id, OLD.party_id);
+    ELSIF NEW.last_update != ROLE_LAST_UPDATED_SHIFT
         INSERT INTO lantern.event_log(code, id, party_id)
         SELECT
-            IIF(TG_OP = 'INSERT', 'role_created'::lantern.event_code, 'role_updated'::lantern.event_code),
+            IIF(TG_OP = 'INSERT', ROLE_CREATED_EVENT::lantern.event_code, ROLE_UPDATED_EVENT::lantern.event_code),
             NEW.id,
             NEW.party_id;
-
     END IF;
 
     RETURN NEW;
@@ -1520,14 +1536,14 @@ BEGIN
     THEN
         -- self event when changing private fields
         INSERT INTO lantern.event_log(code, id)
-        VALUES ('self_updated'::lantern.event_code, NEW.id);
+        VALUES (SELF_UPDATED_EVENT::lantern.event_code, NEW.id);
     ELSIF
         OLD.username != NEW.username OR
         OLD.deleted_at IS DISTINCT FROM NEW.deleted_at
     THEN
         -- user event
         INSERT INTO lantern.event_log(code, id)
-        VALUES ('user_updated'::lantern.event_code, NEW.id);
+        VALUES (USER_UPDATED_EVENT::lantern.event_code, NEW.id);
     END IF;
 
     -- ignore any other fields
@@ -1558,7 +1574,7 @@ BEGIN
         VALUES (
             COALESCE(OLD.user_id, NEW.user_id),
             COALESCE(OLD.party_id, NEW.party_id),
-            'profile_updated'::lantern.event_code
+            PROFILE_UPDATED_EVENT::lantern.event_code
         );
     END IF;
 
@@ -1587,7 +1603,7 @@ FOR EACH ROW EXECUTE FUNCTION lantern.party_member_delete_profile_trigger();
 
 --
 
--- ensure referenced pin_tags are removed from the denormalized array.
+-- ensure referenced pin_tags are removed from the de-normalized array.
 -- this acts like a foreign key with ON DELETE CASCADE
 CREATE OR REPLACE FUNCTION lantern.pin_tag_delete_trigger()
 RETURNS trigger
@@ -1637,7 +1653,7 @@ BEGIN
         WHERE rooms.party_id = NEW.id AND rooms.deleted_at IS NULL;
 
         INSERT INTO lantern.event_log (code, id, party_id) VALUES (
-            'party_delete'::lantern.event_code, NEW.id, NEW.id
+            PARTY_DELETE_EVENT::lantern.event_code, NEW.id, NEW.id
         );
     END IF;
 
@@ -1659,7 +1675,7 @@ $$
 BEGIN
     IF NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL THEN
         INSERT INTO lantern.event_log (code, id, party_id) VALUES (
-            'room_delete'::lantern.event_code, NEW.id, NEW.party_id
+            ROOM_DELETE_EVENT::lantern.event_code, NEW.id, NEW.party_id
         );
     END IF;
 
@@ -1678,7 +1694,7 @@ CREATE OR REPLACE PROCEDURE lantern.refresh_all_permissions()
 LANGUAGE plpgsql AS
 $$
 BEGIN
-    -- TODO: See if this can be made more efficient for the conflcit query
+    -- TODO: See if this can be made more efficient for the conflict query
     WITH rm AS (
         SELECT party_members.user_id, rooms.id AS room_id
         FROM lantern.party_members LEFT JOIN lantern.live_rooms rooms ON rooms.party_id = party_members.party_id
@@ -1741,7 +1757,7 @@ END
 $$;
 
 -- When a role updates, the change should cascade down each user's
--- base permissiona and their specific room permissions
+-- base permissions and their specific room permissions
 
 CREATE OR REPLACE FUNCTION lantern.on_role_update_trigger()
 RETURNS trigger
@@ -1752,7 +1768,14 @@ DECLARE
     _role_id bigint;
     _owner_id bigint;
 BEGIN
-    IF OLD.permissions1 = NEW.permissions1 AND OLD.permissions2 = NEW.permissions2 THEN
+    IF NEW.last_update = ROLE_LAST_UPDATED_SHIFT THEN
+        RETURN NEW;
+    END IF;
+
+    IF OLD.permissions1 = NEW.permissions1 AND
+       OLD.permissions2 = NEW.permissions2 AND
+       OLD.position     = NEW.position
+    THEN
         RETURN NEW;
     END IF;
 
