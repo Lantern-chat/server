@@ -62,19 +62,30 @@ pub async fn do_bot_auth(
     state: ServerState,
     token: &Archived<SplitBotToken>,
 ) -> Result<Option<Authorization>, Error> {
+    use std::time::Duration;
+
     let db = state.db.read.get().await?;
 
     #[rustfmt::skip]
     let row = db.query_opt2(schema::sql! {
-        SELECT Apps.Issued AS @Issued
-        FROM Apps WHERE Apps.BotId = #{&token.id as Apps::BotId}
+        SELECT Apps.Issued AS @Issued FROM Apps WHERE Apps.BotId = #{&token.id as Apps::BotId}
     }).await?;
 
     let Some(row) = row else {
-        return Err(Error::NoSession);
+        return Ok(None);
     };
 
-    let issued: u64 = row.issued::<i64>()? as u64;
+    let issued = row.issued::<i64>()? as u64;
 
-    unimplemented!()
+    // Once the token has passed the HMAC check, we know it's genuine, but
+    // it could have still been revoked, so we need to check the issued time
+    // to make sure it's still valid
+    if token.issued != issued {
+        return Ok(None); // interpreted as NoSession by the RPC client
+    }
+
+    Ok(Some(Authorization::Bot {
+        bot_id: token.id.into(),
+        issued: Timestamp::UNIX_EPOCH + Duration::from_secs(issued),
+    }))
 }
