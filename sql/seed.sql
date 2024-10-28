@@ -44,13 +44,15 @@ CREATE OR REPLACE FUNCTION lantern.array_uniq(arr anyarray)
 AS $$ SELECT ARRAY( SELECT DISTINCT UNNEST(arr) ) $$;
 
 -- IIF is a ternary operator, returns `true_result` if `condition` is true, else `false_result`
-CREATE OR REPLACE FUNCTION IIF(
+CREATE OR REPLACE FUNCTION lantern.IIF(
     condition       boolean,    -- IF condition
     true_result     anyelement, -- THEN
     false_result    anyelement  -- ELSE
 ) RETURNS anyelement AS $$
   SELECT CASE WHEN condition THEN true_result ELSE false_result END
 $$ LANGUAGE SQL IMMUTABLE;
+
+#define IIF lantern.IIF -- Simplify usage as if it's a native function
 
 CREATE DOMAIN lantern.uint2 AS int4
    CHECK(VALUE >= 0 AND VALUE < 65536);
@@ -199,7 +201,7 @@ CREATE TABLE lantern.config (
 
     -- Service settings
     hcaptcha_secret     char(42)    NOT NULL DEFAULT '0x0000000000000000000000000000000000000000',
-    hcaptcha_sitekey    char(32)    NOT NULL DEFAULT '10000000-ffff-ffff-ffff-000000000001',
+    hcaptcha_sitekey    char(36)    NOT NULL DEFAULT '10000000-ffff-ffff-ffff-000000000001',
     b2_app              text, -- optional
     b2_key              text, -- optional
     embed_worker_uris   text[], -- uris will be chosen at random for use
@@ -1504,7 +1506,7 @@ BEGIN
     IF TG_OP = 'DELETE' THEN
         INSERT INTO lantern.event_log (code, id, party_id)
         VALUES (ROLE_DELETED_EVENT::lantern.event_code, OLD.id, OLD.party_id);
-    ELSIF NEW.last_update != ROLE_LAST_UPDATED_SHIFT
+    ELSIF NEW.last_update != ROLE_LAST_UPDATED_SHIFT THEN
         INSERT INTO lantern.event_log(code, id, party_id)
         SELECT
             IIF(TG_OP = 'INSERT', ROLE_CREATED_EVENT::lantern.event_code, ROLE_UPDATED_EVENT::lantern.event_code),
@@ -2235,8 +2237,8 @@ CREATE OR REPLACE VIEW lantern.agg_room_perms AS
 SELECT
     rooms.*, party_members.user_id, party_members.joined_at,
     -- if user is admin, return -1, otherwise return the permissions
-    IIF(party_members.permissions1 = -1, -1, COALESCE(allow1, 0) | (party_members.permissions1 & ~COALESCE(deny1, 0))) AS permissions1,
-    IIF(party_members.permissions2 = -1, -1, COALESCE(allow2, 0) | (party_members.permissions2 & ~COALESCE(deny2, 0))) AS permissions2
+    IIF(party_members.permissions1 = -1, -1::bigint, COALESCE(allow1, 0) | (party_members.permissions1 & ~COALESCE(deny1, 0))) AS permissions1,
+    IIF(party_members.permissions2 = -1, -1::bigint, COALESCE(allow2, 0) | (party_members.permissions2 & ~COALESCE(deny2, 0))) AS permissions2
 FROM
     lantern.party_members
         INNER JOIN lantern.live_rooms rooms ON rooms.party_id = party_members.party_id

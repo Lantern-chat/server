@@ -1,18 +1,18 @@
 #pragma once
 #pragma define-only -- This file is not meant to be executed, only included in other files
 
-#define MAX_INT4 2147483647
-#define MAX_INT8 9223372036854775807
+#define MAX_INT4 2147483647::int4
+#define MAX_INT8 9223372036854775807::int8
 
 #define KIBIBYTE 1024
 #define MIBIBYTE (KIBIBYTE * 1024)
 #define GIBIBYTE (MIBIBYTE * 1024)
 
-#define MS_SECOND   1000                -- milliseconds in a second
-#define MS_MINUTE   (MS_SECOND * 60)    -- milliseconds in a minute
-#define MS_HOUR     (MS_MINUTE * 60)    -- milliseconds in an hour
-#define MS_DAY      (MS_HOUR * 24)      -- milliseconds in a day
-#define MS_MONTH    (MS_DAY * 30.44)    -- average milliseconds in a month
+#define MS_SECOND   1000::int8                  -- milliseconds in a second
+#define MS_MINUTE   (MS_SECOND * 60)            -- milliseconds in a minute
+#define MS_HOUR     (MS_MINUTE * 60)            -- milliseconds in an hour
+#define MS_DAY      (MS_HOUR * 24)              -- milliseconds in a day
+#define MS_MONTH    (MS_DAY::float4 * 30.44)    -- average milliseconds in a month
 
 ----------------------------------------
 ---------- USER PREFS FLAGS ------------
