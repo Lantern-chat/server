@@ -14,9 +14,11 @@ fn preprocess_file(pre: &mut Preprocessor, path: &Path) -> Result<(), Preprocess
         ))));
     };
 
-    let out_path = parent.join("out").join(path.file_name().unwrap());
+    let out_path = parent.join("out");
 
-    match std::fs::write(out_path, out) {
+    _ = std::fs::create_dir(&out_path);
+
+    match std::fs::write(out_path.join(path.file_name().unwrap()), out) {
         Ok(_) => Ok(()),
         Err(e) => Err(err_ctx.error(ErrorKind::IoError(e))),
     }
@@ -25,13 +27,10 @@ fn preprocess_file(pre: &mut Preprocessor, path: &Path) -> Result<(), Preprocess
 fn main() {
     let mut pre = Preprocessor::new(Vec::new());
 
-    pre.single_line_comment("--");
+    pre.single_line_comment("--"); // SQL single line comment
 
-    pre.define("GATEWAY".to_owned(), "1".to_owned());
-    preprocess_file(&mut pre, "./sql/seed_gateway.sql".as_ref()).unwrap();
+    preprocess_file(&mut pre, "./sql/seed.sql".as_ref()).unwrap();
     pre.clear();
 
-    pre.define("NEXUS".to_owned(), "1".to_owned());
-    preprocess_file(&mut pre, "./sql/seed_nexus.sql".as_ref()).unwrap();
-    pre.clear();
+    // TODO: More SQL files
 }

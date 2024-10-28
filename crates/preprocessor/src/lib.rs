@@ -191,8 +191,16 @@ impl Preprocessor {
             // skip # and whitespace
             t = t[1..].trim_start();
 
+            // split #cmd and arguments
+            let (cmd, mut args) = t.split_once(char::is_whitespace).unwrap_or((t, ""));
+
+            // trim any single-line comments from args
+            if let Some(args_uncommented) = args.split(self.single_line_comment).next() {
+                args = args_uncommented.trim();
+            }
+
             // split on first whitespace, or if no whitespace pass whole token
-            match t.split_once(char::is_whitespace).unwrap_or((t, "")) {
+            match (cmd, args) {
                 ("include", path) if self.active() => self.process_include(ctx, cwd, path)?,
                 ("define", define) if self.active() => self.process_define(define.trim()),
                 ("pragma", pragma) if self.active() => match pragma {
