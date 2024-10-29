@@ -19,14 +19,14 @@ pub fn iter() -> impl Iterator<Item = &'static str> {
     EMOJI_INDICES.windows(2).map(|i| unsafe { EMOJIS.get_unchecked((i[0] as usize)..(i[1] as usize)) })
 }
 
-use once_cell::sync::Lazy;
 use regex_automata::{Regex, RegexBuilder};
+use std::sync::LazyLock;
 
 /// NOTE: This will match `^[*#0-9]$` as well, so double-check results
 ///
 /// <https://www.unicode.org/reports/tr51/tr51-22.html#EBNF_and_Regex>
 // DEV NOTE: The validity of u16 here is subject to change as the number of emojis increases
-pub static EMOJI_RE: Lazy<Regex<regex_automata::DenseDFA<Vec<u16>, u16>>> = Lazy::new(|| {
+pub static EMOJI_RE: LazyLock<Regex<regex_automata::DenseDFA<Vec<u16>, u16>>> = LazyLock::new(|| {
     RegexBuilder::new()
         .minimize(true)
         .ignore_whitespace(true)

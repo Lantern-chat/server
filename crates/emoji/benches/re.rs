@@ -19,9 +19,9 @@ These 😍😱 include 📲 things 😃🥳🤡 like 🌂 choosing a smaller �
 Finally, 🅱️ DFA minimization is also 👨 provided, 🤔💭 but 🤪 can 🚡 increase ➕🔛 compilation times 🕐😆 dramatically. 🎭😱💢
 "#;
 
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
-pub static EMOJI_RE_REGEX: Lazy<regex::Regex> = Lazy::new(|| {
+pub static EMOJI_RE_REGEX: LazyLock<regex::Regex> = LazyLock::new(|| {
     regex::RegexBuilder::new(
         r"
     \p{RI} \p{RI}
