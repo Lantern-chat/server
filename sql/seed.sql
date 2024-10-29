@@ -166,6 +166,7 @@ CREATE TABLE lantern.config (
     reltime_rnd_factor  float4      NOT NULL DEFAULT 0.1, -- 10% random factor for relative time
     max_status_len      int2        NOT NULL DEFAULT 128,
     max_bio_len         int2        NOT NULL DEFAULT 1024,
+    presence_timeout    int8        NOT NULL DEFAULT (7 * MS_SECOND), -- 7 seconds
 
     -- Party settings
     party_name_len      int4range   NOT NULL DEFAULT int4range(3, 96),
@@ -202,9 +203,11 @@ CREATE TABLE lantern.config (
     -- Service settings
     hcaptcha_secret     char(42)    NOT NULL DEFAULT '0x0000000000000000000000000000000000000000',
     hcaptcha_sitekey    char(36)    NOT NULL DEFAULT '10000000-ffff-ffff-ffff-000000000001',
+
+    embed_worker_uris   text[]      NOT NULL DEFAULT ARRAY[], -- uris will be chosen at random for use
+
     b2_app              text, -- optional
     b2_key              text, -- optional
-    embed_worker_uris   text[], -- uris will be chosen at random for use
 
     CONSTRAINT config_pk PRIMARY KEY(config_id)
 );
