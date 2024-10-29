@@ -35,8 +35,9 @@ impl Authorization {
         matches!(self, Authorization::User { .. })
     }
 
-    pub const fn is_admin(&self) -> bool {
-        matches!(self, Authorization::User { flags, .. } if matches!(flags.elevation(), ElevationLevel::Staff | ElevationLevel::System))
+    #[inline(always)]
+    pub fn is_admin(&self) -> bool {
+        matches!(self, Authorization::User { flags, .. } if flags.elevation() >= ElevationLevel::Staff)
     }
 
     #[inline(always)]
