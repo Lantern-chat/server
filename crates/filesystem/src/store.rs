@@ -40,14 +40,12 @@ impl CipherOptions {
 
 use super::crypt::EncryptedFile;
 
-#[async_trait::async_trait]
 pub trait FileExt {
-    async fn set_len(&self, size: u64) -> Result<(), io::Error>;
+    fn set_len(&self, size: u64) -> impl std::future::Future<Output = Result<(), io::Error>> + Send;
 
-    async fn get_len(&self) -> Result<u64, io::Error>;
+    fn get_len(&self) -> impl std::future::Future<Output = Result<u64, io::Error>> + Send;
 }
 
-#[async_trait::async_trait]
 impl FileExt for TkFile {
     async fn set_len(&self, size: u64) -> Result<(), io::Error> {
         TkFile::set_len(self, size).await
@@ -60,7 +58,6 @@ impl FileExt for TkFile {
     }
 }
 
-#[async_trait::async_trait]
 impl<F: FileExt + Sync> FileExt for EncryptedFile<F> {
     async fn set_len(&self, size: u64) -> Result<(), io::Error> {
         self.get_ref().set_len(size).await

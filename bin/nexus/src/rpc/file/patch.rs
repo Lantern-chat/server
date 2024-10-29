@@ -164,6 +164,7 @@ pub async fn patch_file(
     if let Some(err) = res {
         // only rewind if there was anything written
         if bytes_written > 0 {
+            // NOTE: This is boxed to avoid bloating the future
             file.set_len(append_pos).boxed().await?;
         }
 
