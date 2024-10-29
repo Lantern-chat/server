@@ -1,4 +1,4 @@
-use std::{ops::RangeInclusive, time::Duration};
+use std::{borrow::Cow, ops::RangeInclusive, time::Duration};
 
 use sdk::models::{HCaptchaSiteKey, Timestamp};
 use smol_str::SmolStr;
@@ -50,6 +50,7 @@ pub struct SharedConfig {
     pub relative_time_random_factor: f32,
     pub max_status_length: usize,
     pub max_bio_length: usize,
+    pub presence_timeout: Duration,
 
     // Party settings
     pub party_name_length: RangeInclusive<usize>,
@@ -94,6 +95,19 @@ const _: () = {
 
 use postgres_range::{BoundType, Range as PgRange, RangeBound};
 
+#[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ConfigIdentifier {
+    /// Use the first config in the database
+    #[default]
+    First,
+
+    /// Use the config with the given name
+    ByName(Cow<'static, str>),
+
+    /// Use the config with the given UUID
+    ById(Uuid),
+}
+
 impl SharedConfig {
     pub async fn save(&self, obj: &db::Object) -> Result<Self, ConfigError> {
         #[inline]
@@ -112,6 +126,7 @@ impl SharedConfig {
         let fs_cache_interval = dur(self.fs_cache_interval);
         let fs_cache_max_age = dur(self.fs_cache_max_age);
         let session_duration = dur(self.session_duration);
+        let presence_timeout = dur(self.presence_timeout);
         let mfa_pending_time = dur(self.mfa_pending_time);
         let orphan_cleanup = dur(self.orphan_cleanup);
 
@@ -125,56 +140,81 @@ impl SharedConfig {
         let role_description_length = range(&self.role_description_length);
         let message_length = range(&self.message_length);
 
+        let minimum_age = self.minimum_age as i16;
+        let mfa_backup_count = self.mfa_backup_count as i16;
+        let max_status_len = self.max_status_length as i16;
+        let max_bio_len = self.max_bio_length as i16;
+        let max_active_rooms = self.max_active_rooms as i16;
+        let max_total_rooms = self.max_total_rooms as i16;
+        let max_newlines = self.max_newlines as i16;
+        let max_embeds = self.max_embeds as i16;
+        let regex_search_len = self.max_regex_search_len as i16;
+
+        let max_upload_size = self.max_upload_size as i64;
+        let max_upload_chunk = self.max_upload_chunk as i32;
+
+        let max_avatar_size = self.max_avatar_size as i32;
+        let max_banner_size = self.max_banner_size as i32;
+        let avatar_width = self.avatar_width as i32;
+        let banner_width = self.banner_width as i32;
+        let banner_height = self.banner_height as i32;
+        let max_avatar_pixels = self.max_avatar_pixels as i32;
+        let max_banner_pixels = self.max_banner_pixels as i32;
+
+        let hcaptcha_sitekey = self.hcaptcha_sitekey.as_str();
+
+        #[rustfmt::skip]
         let row = obj.query_one2(crate::sql! {
-            UPDATE Configs SET
-                Configs./ConfigName         = #{&self.config_name as Configs::ConfigName},
-                Configs./LastUpdated        = now(),
-                Configs./ServerName         = #{&self.server_name as Configs::ServerName},
-                Configs./CdnDomain          = #{&self.cdn_domain as Configs::CdnDomain},
-                Configs./StrictCdn          = #{&self.strict_cdn as Configs::StrictCdn},
-                Configs./BaseDomain         = #{&self.base_domain as Configs::BaseDomain},
-                Configs./SecureWeb          = #{&self.secure_web as Configs::SecureWeb},
-                Configs./CamoEnable         = #{&self.camo_enable as Configs::CamoEnable},
-                Configs./FsCacheInterval    = #{&fs_cache_interval as Configs::FsCacheInterval},
-                Configs./FsCacheMaxAge      = #{&fs_cache_max_age as Configs::FsCacheMaxAge},
-                Configs./SessionDuration    = #{&session_duration as Configs::SessionDuration},
-                Configs./MinimumAge         = ,
-                Configs./PasswordLength     = #{&password_length as Configs::PasswordLength},
-                Configs./UsernameLength     = #{&username_length as Configs::UsernameLength},
-                Configs./MfaBackupCount     = ,
-                Configs./MfaPendingTime     = #{&mfa_pending_time as Configs::MfaPendingTime},
-                Configs./ReltimeRndFactor   = #{&self.relative_time_random_factor as Configs::ReltimeRndFactor},
-                Configs./MaxStatusLen       = ,
-                Configs./MaxBioLen          = ,
-                Configs./PartyNameLen       = #{&party_name_length as Configs::PartyNameLen},
-                Configs./PartyDescLen       = #{&party_description_length as Configs::PartyDescLen},
-                Configs./RoomNameLen        = #{&room_name_length as Configs::RoomNameLen},
-                Configs./RoomTopicLen       = #{&room_topic_length as Configs::RoomTopicLen},
-                Configs./RoleNameLen        = #{&role_name_length as Configs::RoleNameLen},
-                Configs./RoleDescLen        = #{&role_description_length as Configs::RoleDescLen},
-                Configs./MaxActiveRooms     = ,
-                Configs./MaxTotalRooms      = ,
-                Configs./MaxNewlines        = ,
-                Configs./MessageLength      = #{&message_length as Configs::MessageLength},
-                Configs./MaxEmbeds          = ,
-                Configs./RegexSearchLen     = ,
-                Configs./MaxUploadSize      = ,
-                Configs./MaxUploadChunk     = ,
-                Configs./OrphanCleanup      = #{&orphan_cleanup as Configs::OrphanCleanup},
-                Configs./MaxAvatarSize      = ,
-                Configs./MaxBannerSize      = ,
-                Configs./AvatarWidth        = ,
-                Configs./BannerWidth        = ,
-                Configs./BannerHeight       = ,
-                Configs./MaxAvatarPixels    = ,
-                Configs./MaxBannerPixels    = ,
-                Configs./HcaptchaSecret     = ,
-                Configs./HcaptchaSitekey    = ,
-                Configs./B2App              = ,
-                Configs./B2Key              = ,
-                Configs./EmbedWorkerUris    =
-            WHERE Configs.ConfigId = #{&self.config_id as Configs::ConfigId}
-            RETURNING Configs.LastUpdated AS @LastUpdated
+            UPDATE Config SET
+                Config./ConfigName         = #{&self.config_name as Config::ConfigName},
+                Config./LastUpdated        = now(),
+                Config./ServerName         = #{&self.server_name as Config::ServerName},
+                Config./CdnDomain          = #{&self.cdn_domain as Config::CdnDomain},
+                Config./StrictCdn          = #{&self.strict_cdn as Config::StrictCdn},
+                Config./BaseDomain         = #{&self.base_domain as Config::BaseDomain},
+                Config./SecureWeb          = #{&self.secure_web as Config::SecureWeb},
+                Config./CamoEnable         = #{&self.camo_enable as Config::CamoEnable},
+                Config./FsCacheInterval    = #{&fs_cache_interval as Config::FsCacheInterval},
+                Config./FsCacheMaxAge      = #{&fs_cache_max_age as Config::FsCacheMaxAge},
+                Config./SessionDuration    = #{&session_duration as Config::SessionDuration},
+                Config./MinimumAge         = #{&minimum_age as Config::MinimumAge},
+                Config./PasswordLength     = #{&password_length as Config::PasswordLength},
+                Config./UsernameLength     = #{&username_length as Config::UsernameLength},
+                Config./MfaBackupCount     = #{&mfa_backup_count as Config::MfaBackupCount},
+                Config./MfaPendingTime     = #{&mfa_pending_time as Config::MfaPendingTime},
+                Config./ReltimeRndFactor   = #{&self.relative_time_random_factor as Config::ReltimeRndFactor},
+                Config./MaxStatusLen       = #{&max_status_len as Config::MaxStatusLen},
+                Config./MaxBioLen          = #{&max_bio_len as Config::MaxBioLen},
+                Config./PresenceTimeout    = #{&presence_timeout as Config::PresenceTimeout},
+                Config./PartyNameLen       = #{&party_name_length as Config::PartyNameLen},
+                Config./PartyDescLen       = #{&party_description_length as Config::PartyDescLen},
+                Config./RoomNameLen        = #{&room_name_length as Config::RoomNameLen},
+                Config./RoomTopicLen       = #{&room_topic_length as Config::RoomTopicLen},
+                Config./RoleNameLen        = #{&role_name_length as Config::RoleNameLen},
+                Config./RoleDescLen        = #{&role_description_length as Config::RoleDescLen},
+                Config./MaxActiveRooms     = #{&max_active_rooms as Config::MaxActiveRooms},
+                Config./MaxTotalRooms      = #{&max_total_rooms as Config::MaxTotalRooms},
+                Config./MaxNewlines        = #{&max_newlines as Config::MaxNewlines},
+                Config./MessageLength      = #{&message_length as Config::MessageLength},
+                Config./MaxEmbeds          = #{&max_embeds as Config::MaxEmbeds},
+                Config./RegexSearchLen     = #{&regex_search_len as Config::RegexSearchLen},
+                Config./MaxUploadSize      = #{&max_upload_size as Config::MaxUploadSize},
+                Config./MaxUploadChunk     = #{&max_upload_chunk as Config::MaxUploadChunk},
+                Config./OrphanCleanup      = #{&orphan_cleanup as Config::OrphanCleanup},
+                Config./MaxAvatarSize      = #{&max_avatar_size as Config::MaxAvatarSize},
+                Config./MaxBannerSize      = #{&max_banner_size as Config::MaxBannerSize},
+                Config./AvatarWidth        = #{&avatar_width as Config::AvatarWidth},
+                Config./BannerWidth        = #{&banner_width as Config::BannerWidth},
+                Config./BannerHeight       = #{&banner_height as Config::BannerHeight},
+                Config./MaxAvatarPixels    = #{&max_avatar_pixels as Config::MaxAvatarPixels},
+                Config./MaxBannerPixels    = #{&max_banner_pixels as Config::MaxBannerPixels},
+                Config./HcaptchaSecret     = #{&self.hcaptcha_secret as Config::HcaptchaSecret},
+                Config./HcaptchaSitekey    = #{&hcaptcha_sitekey as Config::HcaptchaSitekey},
+                Config./B2App              = NULLIF(#{&self.b2_app as Config::B2App}, ""),
+                Config./B2Key              = NULLIF(#{&self.b2_key as Config::B2Key}, ""),
+                Config./EmbedWorkerUris    = #{&self.embed_worker_uris as Config::EmbedWorkerUris}
+            WHERE Config.ConfigId = #{&self.config_id as Config::ConfigId}
+            RETURNING Config.LastUpdated AS @LastUpdated
         })
         .await?;
 
@@ -184,58 +224,67 @@ impl SharedConfig {
         Ok(config)
     }
 
-    pub async fn load(obj: &db::Object) -> Result<Self, ConfigError> {
+    pub async fn load(obj: &db::Object, by: ConfigIdentifier) -> Result<Self, ConfigError> {
         #[rustfmt::skip]
         let row = obj.query_one2(crate::sql! {
             SELECT
-                Configs.ConfigId            AS @_,
-                Configs.ConfigName          AS @_,
-                Configs.LastUpdated         AS @_,
-                Configs.ServerName          AS @_,
-                Configs.CdnDomain           AS @_,
-                Configs.StrictCdn           AS @_,
-                Configs.BaseDomain          AS @_,
-                Configs.SecureWeb           AS @_,
-                Configs.CamoEnable          AS @_,
-                Configs.FsCacheInterval     AS @_,
-                Configs.FsCacheMaxAge       AS @_,
-                Configs.SessionDuration     AS @_,
-                Configs.MinimumAge          AS @_,
-                Configs.PasswordLength      AS @_,
-                Configs.UsernameLength      AS @_,
-                Configs.MfaBackupCount      AS @_,
-                Configs.MfaPendingTime      AS @_,
-                Configs.ReltimeRndFactor    AS @_,
-                Configs.MaxStatusLen        AS @_,
-                Configs.MaxBioLen           AS @_,
-                Configs.PartyNameLen        AS @_,
-                Configs.PartyDescLen        AS @_,
-                Configs.RoomNameLen         AS @_,
-                Configs.RoomTopicLen        AS @_,
-                Configs.RoleNameLen         AS @_,
-                Configs.RoleDescLen         AS @_,
-                Configs.MaxActiveRooms      AS @_,
-                Configs.MaxTotalRooms       AS @_,
-                Configs.MaxNewlines         AS @_,
-                Configs.MessageLength       AS @_,
-                Configs.MaxEmbeds           AS @_,
-                Configs.RegexSearchLen      AS @_,
-                Configs.MaxUploadSize       AS @_,
-                Configs.MaxUploadChunk      AS @_,
-                Configs.OrphanCleanup       AS @_,
-                Configs.MaxAvatarSize       AS @_,
-                Configs.MaxBannerSize       AS @_,
-                Configs.AvatarWidth         AS @_,
-                Configs.BannerWidth         AS @_,
-                Configs.BannerHeight        AS @_,
-                Configs.MaxAvatarPixels     AS @_,
-                Configs.MaxBannerPixels     AS @_,
-                Configs.HcaptchaSecret      AS @_,
-                Configs.HcaptchaSitekey     AS @_,
-                Configs.B2App               AS @_,
-                Configs.B2Key               AS @_,
-                Configs.EmbedWorkerUris     AS @_
-            FROM Configs LIMIT 1
+                Config.ConfigId            AS @_,
+                Config.ConfigName          AS @_,
+                Config.LastUpdated         AS @_,
+                Config.ServerName          AS @_,
+                Config.CdnDomain           AS @_,
+                Config.StrictCdn           AS @_,
+                Config.BaseDomain          AS @_,
+                Config.SecureWeb           AS @_,
+                Config.CamoEnable          AS @_,
+                Config.FsCacheInterval     AS @_,
+                Config.FsCacheMaxAge       AS @_,
+                Config.SessionDuration     AS @_,
+                Config.MinimumAge          AS @_,
+                Config.PasswordLength      AS @_,
+                Config.UsernameLength      AS @_,
+                Config.MfaBackupCount      AS @_,
+                Config.MfaPendingTime      AS @_,
+                Config.ReltimeRndFactor    AS @_,
+                Config.MaxStatusLen        AS @_,
+                Config.MaxBioLen           AS @_,
+                Config.PresenceTimeout     AS @_,
+                Config.PartyNameLen        AS @_,
+                Config.PartyDescLen        AS @_,
+                Config.RoomNameLen         AS @_,
+                Config.RoomTopicLen        AS @_,
+                Config.RoleNameLen         AS @_,
+                Config.RoleDescLen         AS @_,
+                Config.MaxActiveRooms      AS @_,
+                Config.MaxTotalRooms       AS @_,
+                Config.MaxNewlines         AS @_,
+                Config.MessageLength       AS @_,
+                Config.MaxEmbeds           AS @_,
+                Config.RegexSearchLen      AS @_,
+                Config.MaxUploadSize       AS @_,
+                Config.MaxUploadChunk      AS @_,
+                Config.OrphanCleanup       AS @_,
+                Config.MaxAvatarSize       AS @_,
+                Config.MaxBannerSize       AS @_,
+                Config.AvatarWidth         AS @_,
+                Config.BannerWidth         AS @_,
+                Config.BannerHeight        AS @_,
+                Config.MaxAvatarPixels     AS @_,
+                Config.MaxBannerPixels     AS @_,
+                Config.HcaptchaSecret      AS @_,
+                Config.HcaptchaSitekey     AS @_,
+                Config.B2App               AS @_,
+                Config.B2Key               AS @_,
+                Config.EmbedWorkerUris     AS @_
+            FROM Config
+
+            match &by {
+                ConfigIdentifier::First => {},
+                ConfigIdentifier::ByName(name) => { WHERE Config.ConfigName = #{name as Config::ConfigName} },
+                ConfigIdentifier::ById(id) => { WHERE Config.ConfigId = #{id as Config::ConfigId} },
+            }
+
+            LIMIT 1
         }).await?;
 
         fn dur(ms: i64) -> Duration {
@@ -251,54 +300,55 @@ impl SharedConfig {
         }
 
         Ok(SharedConfig {
-            config_id: row.configs_config_id()?,
-            config_name: row.configs_config_name()?,
-            last_updated: row.configs_last_updated()?,
-            server_name: row.configs_server_name()?,
-            base_domain: row.configs_base_domain()?,
-            cdn_domain: row.configs_cdn_domain()?,
-            strict_cdn: row.configs_strict_cdn()?,
-            secure_web: row.configs_secure_web()?,
-            camo_enable: row.configs_camo_enable()?,
-            fs_cache_interval: dur(row.configs_fs_cache_interval()?),
-            fs_cache_max_age: dur(row.configs_fs_cache_max_age()?),
-            session_duration: dur(row.configs_session_duration()?),
-            minimum_age: row.configs_minimum_age::<i16>()? as u8,
-            password_length: range(row.configs_password_length()?),
-            username_length: range(row.configs_username_length()?),
-            mfa_backup_count: row.configs_mfa_backup_count::<i16>()? as u8,
-            mfa_pending_time: dur(row.configs_mfa_pending_time()?),
-            relative_time_random_factor: row.configs_reltime_rnd_factor()?,
-            max_status_length: row.configs_max_status_len::<i16>()? as usize,
-            max_bio_length: row.configs_max_bio_len::<i16>()? as usize,
-            party_name_length: range(row.configs_party_name_len()?),
-            party_description_length: range(row.configs_party_desc_len()?),
-            room_name_length: range(row.configs_room_name_len()?),
-            room_topic_length: range(row.configs_room_topic_len()?),
-            role_name_length: range(row.configs_role_name_len()?),
-            role_description_length: range(row.configs_role_desc_len()?),
-            max_active_rooms: row.configs_max_active_rooms::<i16>()? as u16,
-            max_total_rooms: row.configs_max_total_rooms::<i16>()? as u16,
-            max_newlines: row.configs_max_newlines::<i16>()? as u8,
-            message_length: range(row.configs_message_length()?),
-            max_embeds: row.configs_max_embeds::<i16>()? as u8,
-            max_regex_search_len: row.configs_regex_search_len::<i64>()? as usize,
-            max_upload_size: row.configs_max_upload_size::<i64>()? as u64,
-            max_upload_chunk: row.configs_max_upload_chunk::<i32>()? as u32,
-            orphan_cleanup: dur(row.configs_orphan_cleanup()?),
-            max_avatar_size: row.configs_max_avatar_size()?,
-            max_banner_size: row.configs_max_banner_size()?,
-            avatar_width: row.configs_avatar_width()?,
-            banner_width: row.configs_banner_width()?,
-            banner_height: row.configs_banner_height()?,
-            max_avatar_pixels: row.configs_max_avatar_pixels()?,
-            max_banner_pixels: row.configs_max_banner_pixels()?,
-            hcaptcha_secret: row.configs_hcaptcha_secret()?,
-            hcaptcha_sitekey: HCaptchaSiteKey::try_from(row.configs_hcaptcha_sitekey::<&str>()?)
+            config_id: row.config_config_id()?,
+            config_name: row.config_config_name()?,
+            last_updated: row.config_last_updated()?,
+            server_name: row.config_server_name()?,
+            base_domain: row.config_base_domain()?,
+            cdn_domain: row.config_cdn_domain()?,
+            strict_cdn: row.config_strict_cdn()?,
+            secure_web: row.config_secure_web()?,
+            camo_enable: row.config_camo_enable()?,
+            fs_cache_interval: dur(row.config_fs_cache_interval()?),
+            fs_cache_max_age: dur(row.config_fs_cache_max_age()?),
+            session_duration: dur(row.config_session_duration()?),
+            minimum_age: row.config_minimum_age::<i16>()? as u8,
+            password_length: range(row.config_password_length()?),
+            username_length: range(row.config_username_length()?),
+            mfa_backup_count: row.config_mfa_backup_count::<i16>()? as u8,
+            mfa_pending_time: dur(row.config_mfa_pending_time()?),
+            relative_time_random_factor: row.config_reltime_rnd_factor()?,
+            max_status_length: row.config_max_status_len::<i16>()? as usize,
+            max_bio_length: row.config_max_bio_len::<i16>()? as usize,
+            presence_timeout: dur(row.config_presence_timeout()?),
+            party_name_length: range(row.config_party_name_len()?),
+            party_description_length: range(row.config_party_desc_len()?),
+            room_name_length: range(row.config_room_name_len()?),
+            room_topic_length: range(row.config_room_topic_len()?),
+            role_name_length: range(row.config_role_name_len()?),
+            role_description_length: range(row.config_role_desc_len()?),
+            max_active_rooms: row.config_max_active_rooms::<i16>()? as u16,
+            max_total_rooms: row.config_max_total_rooms::<i16>()? as u16,
+            max_newlines: row.config_max_newlines::<i16>()? as u8,
+            message_length: range(row.config_message_length()?),
+            max_embeds: row.config_max_embeds::<i16>()? as u8,
+            max_regex_search_len: row.config_regex_search_len::<i64>()? as usize,
+            max_upload_size: row.config_max_upload_size::<i64>()? as u64,
+            max_upload_chunk: row.config_max_upload_chunk::<i32>()? as u32,
+            orphan_cleanup: dur(row.config_orphan_cleanup()?),
+            max_avatar_size: row.config_max_avatar_size()?,
+            max_banner_size: row.config_max_banner_size()?,
+            avatar_width: row.config_avatar_width()?,
+            banner_width: row.config_banner_width()?,
+            banner_height: row.config_banner_height()?,
+            max_avatar_pixels: row.config_max_avatar_pixels()?,
+            max_banner_pixels: row.config_max_banner_pixels()?,
+            hcaptcha_secret: row.config_hcaptcha_secret()?,
+            hcaptcha_sitekey: HCaptchaSiteKey::try_from(row.config_hcaptcha_sitekey::<&str>()?)
                 .ok_or(ConfigError::InvalidHCaptchaSiteKey)?,
-            b2_app: row.configs_b2_app()?,
-            b2_key: row.configs_b2_key()?,
-            embed_worker_uris: row.configs_embed_worker_uris()?,
+            b2_app: row.config_b2_app()?,
+            b2_key: row.config_b2_key()?,
+            embed_worker_uris: row.config_embed_worker_uris()?,
         })
     }
 }
