@@ -2,13 +2,13 @@
 name = "ffmpeg_processing"
 version = "0.1.0"
 edition = "2021"
-private = true
+publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 tokio = { version = "1", features = ["process"] }
-thiserror = "1"
+thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tracing = "0.1.37"
@@ -16,3 +16,4 @@ gcd = "2.3.0"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
+tracing-subscriber = "0.3.17"

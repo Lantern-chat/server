@@ -11,7 +11,7 @@ built.workspace = true
 [dependencies]
 bincode = "1"
 serde = { version = "1", features = ["derive"] }
-thiserror = "1"
+thiserror = "2"
 
 framed = { path = "../../crates/framed", features = ["encoding"] }
 image_processing = { optional = true, path = "../../crates/image_processing" }

@@ -13,7 +13,7 @@ serde.workspace = true
 rkyv = { workspace = true, features = ["smallvec-1"] }
 rkyv_rpc.workspace = true
 auth.workspace = true
-thiserror = "1"
+thiserror = "2"
 paste = "1"
 framed.workspace = true
 tokio = { workspace = true, features = ["macros", "fs"] }

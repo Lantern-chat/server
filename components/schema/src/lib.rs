@@ -27,7 +27,6 @@ pub use sf::{Snowflake, SnowflakeExt};
 
 pub mod asset;
 pub mod config;
-pub mod email;
 pub mod flags;
 pub mod names;
 pub mod roles;
