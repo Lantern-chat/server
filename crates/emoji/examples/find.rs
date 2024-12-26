@@ -18,11 +18,6 @@ fn main() {
     }
 
     println!("Total emojis: {}", emoji::iter().count());
-
-    println!(
-        "Memory usage: {} bytes",
-        EMOJI_RE.forward().memory_usage() + EMOJI_RE.reverse().memory_usage()
-    );
 }
 
 fn print_chars(c: std::str::Chars) {
