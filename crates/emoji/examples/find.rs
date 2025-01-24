@@ -1,5 +1,3 @@
-use emoji::EMOJI_RE;
-
 fn main() {
     if let Some(emoji) =
         emoji::find("\u{1F469}\u{1F3FC}\u{200D}\u{2764}\u{200D}\u{1F48B}\u{200D}\u{1F468}\u{1F3FB}")

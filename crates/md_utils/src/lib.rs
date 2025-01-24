@@ -4,9 +4,10 @@ use std::ops::{Range, RangeInclusive};
 use smallvec::SmallVec;
 
 pub mod regexes {
-    use regex_automata::{DenseDFA, Regex};
-
-    include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
+    // TODO: Replace with custom iterator?
+    regex_automata_macro::decl_regex_sparse! {
+        pub NEWLINES = r"(\r?\n){3,}"
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -317,10 +318,11 @@ pub fn trim_message(content: &str, limits: Option<TrimLimits>) -> Option<Cow<str
         let mut new_content = String::new();
         let mut idx = 0;
 
-        for (start, end) in regexes::NEWLINES.find_iter(trimmed_content.as_bytes()) {
-            new_content.push_str(&trimmed_content[idx..start]);
+        for m in regexes::NEWLINES.find_iter(trimmed_content.as_bytes()) {
+            let r = m.range();
+            new_content.push_str(&trimmed_content[idx..r.start]);
             new_content.push_str("\n\n");
-            idx = end;
+            idx = r.end;
         }
 
         if idx != 0 {
@@ -361,5 +363,10 @@ mod url_test {
 
             assert_eq!(VALID_URL.contains(&(c as u8)), valid_url(&c), "Invalid? {}", c as u8);
         }
+    }
+
+    #[test]
+    fn test_newlines_size() {
+        println!("{} + {}", regexes::NEWLINES.forward().memory_usage(), regexes::NEWLINES.reverse().memory_usage());
     }
 }

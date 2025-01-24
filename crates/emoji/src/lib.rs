@@ -23,8 +23,7 @@ use std::sync::LazyLock;
 
 /// NOTE: This will match `^[*#0-9]$` as well, so double-check results
 ///
-/// <https://www.unicode.org/reports/tr51/tr51-22.html#EBNF_and_Regex>
-// DEV NOTE: The validity of u16 here is subject to change as the number of emojis increases
+/// <https://www.unicode.org/reports/tr51/#EBNF_and_Regex>
 pub static EMOJI_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
     regex::Regex::new(
         r"(?ux)
